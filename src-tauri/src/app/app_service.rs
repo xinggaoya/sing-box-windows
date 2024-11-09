@@ -47,7 +47,24 @@ pub fn stop_kernel() {
         Ok(mut file) => {
             let mut buffer = String::new();
             match file.read_to_string(&mut buffer) {
-                Ok(_) => {}
+                Ok(_) => {
+                    let pid = buffer.trim().parse::<u32>().unwrap();
+                    // 杀死进程
+                    let result = std::process::Command::new("taskkill")
+                        .arg("/F")
+                        .arg("/PID")
+                        .arg(pid.to_string())
+                        .creation_flags(0x08000000)
+                        .output();
+                    match result {
+                        Ok(_) => {
+                            info!("进程已杀死")
+                        }
+                        Err(e) => {
+                            println!("Error killing process: {}", e);
+                        }
+                    }
+                }
                 Err(e) => {
                     println!("Error reading file: {}", e);
                 }
