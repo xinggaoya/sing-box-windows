@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
-use log::info;
+use log::{error, info};
 use zip::ZipArchive;
 use crate::entity::github_model;
 
@@ -109,7 +109,7 @@ pub async fn download_subscription(url: String) {
 
 // 下载内核
 #[tauri::command]
-pub async fn download_latest_kernel() {
+pub async fn download_latest_kernel() -> Result<(), String> {
     let url = "https://api.github.com/repos/SagerNet/sing-box/releases/latest";
     let dist_dir = "./sing-box";
     let client = reqwest::Client::new();
@@ -118,51 +118,40 @@ pub async fn download_latest_kernel() {
     let user_agent = reqwest::header::HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
     headers.insert(reqwest::header::USER_AGENT, user_agent);
 
-    let response = client.get(url).headers(headers).send().await;
+    let response = client.get(url).headers(headers).send().await.map_err(|e| format!("Error: {:?}", e.status()))?;
 
-    match response {
-        Ok(response) => {
-            let text = response.text().await.unwrap();
-            // json 转实体
-            let json = serde_json::from_str::<github_model::Release>(&text);
-            match json {
-                Ok(json) => {
-                    // 获取当前系统平台
-                    let platform = std::env::consts::OS;
-                    // 获取系统 比如amd64
-                    let mut arch = std::env::consts::ARCH;
-                    if arch == "x86_64" {
-                        arch = "amd64";
-                    }
+    let text = response.text().await.map_err(|e| format!("Failed to get response text: {}", e))?;
+    // json 转实体
+    let json: github_model::Release = serde_json::from_str(&text).map_err(|e| format!("Error parsing JSON: {}", e))?;
 
-                    let str = format!("{}-{}.zip", platform, arch);
-                    for asset in json.assets {
-                        if asset.name.contains(&str) {
-                            println!("Asset: {}", asset.name);
-                            // 下载文件
-                            let path = Path::new(dist_dir).join(&asset.name);
-                            download_file(asset.browser_download_url, path.to_str().unwrap())
-                                .await.expect("Failed to download file");
-                            // 解压文件
-                            unzip_file(&format!("./sing-box/{}", asset.name), "./sing-box").await;
-                        }
-                    }
-                }
-                Err(e) => {
-                    println!("Error: {}", e);
-                }
-            }
-        }
-        Err(e) => {
-            println!("Error: {:?}", e.status());
+    // 获取当前系统平台
+    let platform = std::env::consts::OS;
+    // 获取系统 比如amd64
+    let mut arch = std::env::consts::ARCH;
+    if arch == "x86_64" {
+        arch = "amd64";
+    }
+
+    let str = format!("{}-{}.zip", platform, arch);
+    for asset in json.assets {
+        if asset.name.contains(&str) {
+            info!("Asset: {}", asset.name);
+            // 下载文件
+            let path = Path::new(dist_dir).join(&asset.name);
+            download_file(asset.browser_download_url, path.to_str().unwrap())
+                .await.map_err(|e| format!("Failed to download file: {}", e))?;
+            // 解压文件
+            unzip_file(&format!("./sing-box/{}", asset.name), "./sing-box").await?;
         }
     }
+    Ok(())
 }
+
 
 // 根据url下载文件到指定位置
 async fn download_file(url: String, path: &str) -> Result<(), String> {
     let file_path = Path::new(path);
-    println!("Downloading file from {} to {}", url, file_path.to_str().unwrap());
+    info!("Downloading file from {} to {}", url, file_path.to_str().unwrap());
 
     let client = reqwest::Client::new();
     let response = client.get(&url).send().await;
@@ -173,71 +162,66 @@ async fn download_file(url: String, path: &str) -> Result<(), String> {
 
             match bytes {
                 Ok(bytes) => {
-                    // 仅创建文件夹
-                    let r = std::fs::create_dir_all(file_path.parent().unwrap());
-                    match r {
-                        Ok(_) => {
-                            println!("Create dir all successfully")
-                        }
-                        Err(e) => {
-                            println!("Error create dir all: {}", e)
-                        }
+                    if let Err(e) = std::fs::create_dir_all(file_path.parent().unwrap()) {
+                        error!("Error creating directory: {}", e);
+                        return Err("Failed to create directory".to_string());
                     }
-                    let r = std::fs::write(&file_path, bytes);
-                    match r {
-                        Ok(_) => {
-                            println!("File downloaded successfully");
-                            Ok(())
-                        }
-                        Err(e) => {
-                            println!("Error writing file: {}", e);
-                            Err("Failed to write file".to_string())
-                        }
+
+                    if let Err(e) = std::fs::write(&file_path, bytes) {
+                        error!("Error writing file: {}", e);
+                        return Err("Failed to write file".to_string());
                     }
+
+                    info!("File downloaded successfully");
+                    Ok(())
                 }
-                _ => {
+                Err(e) => {
+                    error!("Failed to download file: {}", e);
                     Err("Failed to download file".to_string())
                 }
             }
         }
-        _ => {
+        Err(e) => {
+            error!("Failed to download file: {}", e);
             Err("Failed to download file".to_string())
         }
     }
 }
-async fn unzip_file(path: &str, to: &str) {
-    println!("从 {} 解压文件到 {}", path, to);
+
+async fn unzip_file(path: &str, to: &str) -> Result<(), String> {
+    info!("从 {} 解压文件到 {}", path, to);
 
     // 打开ZIP文件
-    let file = File::open(path).expect("打开文件失败");
+    let file = File::open(path).map_err(|e| format!("打开文件失败: {}", e))?;
 
     // 创建ZipArchive对象
-    let mut archive = ZipArchive::new(file).expect("读取归档失败");
+    let mut archive = ZipArchive::new(file).map_err(|e| format!("读取归档失败: {}", e))?;
 
     // 遍历ZIP文件中的所有条目
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).expect("读取文件失败");
+        let mut file = archive.by_index(i).map_err(|e| format!("读取文件失败: {}", e))?;
 
         // 获取文件名并去除前导路径
-        let file_name = Path::new(file.name()).file_name().expect("获取文件名失败");
+        let file_name = Path::new(file.name()).file_name().ok_or("获取文件名失败")?;
         let outpath = Path::new(to).join(file_name.to_str().unwrap());
-        println!("正在解压文件: {}", outpath.display());
+        info!("正在解压文件: {}", outpath.display());
 
         // 如果是目录，则创建目录
         if file.is_dir() {
-            std::fs::create_dir_all(&outpath).expect("创建目录失败");
+            std::fs::create_dir_all(&outpath).map_err(|e| format!("创建目录失败: {}", e))?;
         } else {
             // 创建之间的文件夹
             if let Some(parent) = outpath.parent() {
-                std::fs::create_dir_all(parent).expect("创建目录失败");
+                std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
             }
-            let mut outfile = File::create(&outpath).expect("创建文件失败");
-            std::io::copy(&mut file, &mut outfile).expect("复制文件失败");
-            println!("已解压文件: {}", outpath.display());
+            let mut outfile = File::create(&outpath).map_err(|e| format!("创建文件失败: {}", e))?;
+            std::io::copy(&mut file, &mut outfile).map_err(|e| format!("复制文件失败: {}", e))?;
+            info!("已解压文件: {}", outpath.display());
         }
     }
 
     // 删除zip
-    std::fs::remove_file(path).expect("删除文件失败");
-    info!("解压完成")
+    std::fs::remove_file(path).map_err(|e| format!("删除文件失败: {}", e))?;
+    info!("解压完成");
+    Ok(())
 }
