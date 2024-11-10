@@ -1,6 +1,6 @@
 <template>
   <div class="home-main">
-    <n-card>
+    <div>
       <n-flex justify="space-between">
         <n-space>
           <n-button type="primary" @click="downloadTheKernel">
@@ -12,6 +12,9 @@
           </n-button>
         </n-space>
         <n-space>
+          <router-link to="/about" class="text-decoration-none">
+            代理
+          </router-link>
           <n-button type="success" @click="runKernel">
             启 动
           </n-button>
@@ -20,10 +23,56 @@
           </n-button>
         </n-space>
       </n-flex>
-    </n-card>
-    <n-card v-if="showUI" style="margin-top: 7px">
+    </div>
+    <n-flex justify="space-between">
+      <n-card
+        style="margin-top: 7px;width: 160px"
+        content-style="padding: 7px"
+      >
+        <div id="kernel-log">
+          上传
+        </div>
+        <div id="subscription-log">
+          {{ traffic.up }} kb/s
+        </div>
+      </n-card>
+      <n-card
+        style="margin-top: 7px;width: 160px"
+        content-style="padding: 7px"
+      >
+        <div id="kernel-log">
+          下载
+        </div>
+        <div id="subscription-log">
+          {{ traffic.down }} kb/s
+        </div>
+      </n-card>
+      <n-card
+        style="margin-top: 7px;width: 160px"
+        content-style="padding: 7px"
+      >
+        <div id="kernel-log">
+          使用内存
+        </div>
+        <div id="subscription-log">
+          {{ (memory.inuse / 1024 / 1024).toFixed(2) }} MB
+        </div>
+      </n-card>
+      <n-card
+        style="margin-top: 7px;width: 160px"
+        content-style="padding: 7px"
+      >
+        <div id="kernel-log">
+          使用流量
+        </div>
+        <div id="subscription-log">
+          {{ useTotalTraffic.toFixed(2) }} MB
+        </div>
+      </n-card>
+    </n-flex>
+    <n-card v-if="showUI" style="margin-top: 7px" content-style="padding: 10px">
       <div>
-        <iframe src="http://127.0.0.1:9090" width="100%" height="440px"></iframe>
+        <iframe src="http://127.0.0.1:9090" width="100%" height="400px"></iframe>
       </div>
     </n-card>
   </div>
@@ -32,14 +81,37 @@
 import { invoke } from '@tauri-apps/api/core'
 import { useMessage } from 'naive-ui'
 import { onMounted, ref } from 'vue'
+import { createWebSocket } from '@/utils'
 
 const message = useMessage()
 const url = ref('')
 const showUI = ref(false)
+const useTotalTraffic = ref(0)
+const traffic = ref({
+  up: 0,
+  down: 0
+})
+const memory = ref({
+  inuse: 0,
+  oslimit: 0
+})
 
 onMounted(() => {
   showUI.value = localStorage.getItem('showUI') === 'true'
+  initWS()
 })
+
+const initWS = async () => {
+  // 流量
+  createWebSocket(`ws://127.0.0.1:9090/traffic?token=`, (data) => {
+    traffic.value = data
+    // 转int
+    useTotalTraffic.value += Number(((data.up + data.down) / 1024 / 1024))
+  })
+  createWebSocket(`ws://127.0.0.1:9090/memory?token=`, (data) => {
+    memory.value = data
+  })
+}
 
 const downloadTheKernel = async () => {
   const loading = message.loading('下载内核中')
