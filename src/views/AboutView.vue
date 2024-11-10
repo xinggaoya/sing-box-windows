@@ -21,17 +21,13 @@
 <script lang="ts" setup>
 import { onMounted, ref } from 'vue'
 
-const list = ref([])
+const list = ref<any>([])
 
 onMounted(() => {
   init()
 })
 
 const init = () => {
-  // createWebSocket(`ws://127.0.0.1:9090/connections?token=`, (data) => {
-  //   console.log(data)
-  // })
-
   fetch('http://127.0.0.1:9090/proxies', {
     headers: {
       'Content-Type': 'application/json'
