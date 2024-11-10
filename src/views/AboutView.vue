@@ -1,6 +1,6 @@
 <template>
   <div class="about">
-    <h1>This is an about page</h1>
+    <iframe src="http://127.0.0.1:9090"></iframe>
   </div>
 </template>
 
