@@ -1,2 +1,2 @@
-pub mod github_model;
 pub mod config_model;
+pub mod github_model;

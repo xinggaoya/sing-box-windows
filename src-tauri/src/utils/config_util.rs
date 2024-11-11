@@ -21,7 +21,10 @@ impl ConfigUtil {
     }
 
     /// 获取指定属性并映射到实体
-    pub fn get_property_as_entity<T: for<'de> Deserialize<'de>>(&self, target_keys: &[&str]) -> Result<T> {
+    pub fn get_property_as_entity<T: for<'de> Deserialize<'de>>(
+        &self,
+        target_keys: &[&str],
+    ) -> Result<T> {
         let mut current_value = &self.json;
 
         for key in target_keys {

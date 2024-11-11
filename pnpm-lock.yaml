@@ -11,6 +11,9 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.0.3
         version: 2.0.3
+      '@tauri-apps/plugin-autostart':
+        specifier: ~2
+        version: 2.0.0
       '@vicons/ionicons5':
         specifier: ^0.12.0
         version: 0.12.0
@@ -720,6 +723,9 @@ packages:
     resolution: {integrity: sha512-Hl9eFXz+O366+6su9PfaSzu2EJdFe1p8K8ghkWmi40dz8VmSE7vsMTaOStD0I71ckSOkh2ICDX7FQTBgjlpjWw==}
     engines: {node: '>= 10'}
     hasBin: true
+
+  '@tauri-apps/plugin-autostart@2.0.0':
+    resolution: {integrity: sha512-NEwOQWVasZ8RczXkMLNJokRDujneuMH/UFA5t84DLkbNZUmiD3G7HZWhgSd1YQ0BFU9h9w+h2B/py3y6bzWg4Q==}
 
   '@tsconfig/node20@20.1.4':
     resolution: {integrity: sha512-sqgsT69YFeLWf5NtJ4Xq/xAF8p4ZQHlmGW74Nu2tD4+g5fAsposc4ZfaaPixVu4y01BEiDCWLRDCvDM5JOsRxg==}
@@ -2648,6 +2654,10 @@ snapshots:
       '@tauri-apps/cli-win32-arm64-msvc': 2.0.4
       '@tauri-apps/cli-win32-ia32-msvc': 2.0.4
       '@tauri-apps/cli-win32-x64-msvc': 2.0.4
+
+  '@tauri-apps/plugin-autostart@2.0.0':
+    dependencies:
+      '@tauri-apps/api': 2.0.3
 
   '@tsconfig/node20@20.1.4': {}
 

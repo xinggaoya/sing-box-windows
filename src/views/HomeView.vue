@@ -80,7 +80,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { useMessage } from 'naive-ui'
 import { onMounted, ref } from 'vue'
 import { createWebSocket } from '@/utils'
-import { useAppStore } from '@/stores/counter'
+import { useAppStore } from '@/stores/AppStore'
 
 const message = useMessage()
 const appState = useAppStore()

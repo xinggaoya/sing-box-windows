@@ -4,8 +4,9 @@ import { defineStore } from 'pinia'
 export const useAppStore = defineStore('counter', () => {
 
   const mode = ref('')
+  const autoStart = ref(false)
 
-  return { mode }
+  return { mode, autoStart }
 }, {
   persist: true
 })

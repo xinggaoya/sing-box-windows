@@ -1,11 +1,11 @@
+use crate::entity::{config_model, github_model};
+use crate::utils::config_util::ConfigUtil;
+use crate::utils::file_util::{download_file, unzip_file};
+use log::{error, info};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
-use log::{error, info};
-use crate::entity::{config_model, github_model};
-use crate::utils::config_util::ConfigUtil;
-use crate::utils::file_util::{download_file, unzip_file};
 
 // 运行内核
 #[tauri::command]
@@ -24,14 +24,12 @@ pub fn start_kernel() {
     let pid_file = "./sing-box/pid.txt";
     let file = File::create(pid_file);
     match file {
-        Ok(mut file) => {
-            match file.write_all(pid.to_string().as_bytes()) {
-                Ok(_) => {}
-                Err(e) => {
-                    println!("Error writing to file: {}", e);
-                }
+        Ok(mut file) => match file.write_all(pid.to_string().as_bytes()) {
+            Ok(_) => {}
+            Err(e) => {
+                println!("Error writing to file: {}", e);
             }
-        }
+        },
         Err(e) => {
             println!("Error creating file: {}", e);
         }
@@ -120,11 +118,20 @@ pub async fn download_latest_kernel() -> Result<(), String> {
     let user_agent = reqwest::header::HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
     headers.insert(reqwest::header::USER_AGENT, user_agent);
 
-    let response = client.get(url).headers(headers).send().await.map_err(|e| format!("Error: {:?}", e.status()))?;
+    let response = client
+        .get(url)
+        .headers(headers)
+        .send()
+        .await
+        .map_err(|e| format!("Error: {:?}", e.status()))?;
 
-    let text = response.text().await.map_err(|e| format!("Failed to get response text: {}", e))?;
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to get response text: {}", e))?;
     // json 转实体
-    let json: github_model::Release = serde_json::from_str(&text).map_err(|e| format!("Error parsing JSON: {}", e))?;
+    let json: github_model::Release =
+        serde_json::from_str(&text).map_err(|e| format!("Error parsing JSON: {}", e))?;
 
     // 获取当前系统平台
     let platform = std::env::consts::OS;
@@ -141,7 +148,8 @@ pub async fn download_latest_kernel() -> Result<(), String> {
             // 下载文件
             let path = Path::new(dist_dir).join(&asset.name);
             download_file(asset.browser_download_url, path.to_str().unwrap())
-                .await.map_err(|e| format!("Failed to download file: {}", e))?;
+                .await
+                .map_err(|e| format!("Failed to download file: {}", e))?;
             // 解压文件
             unzip_file(&format!("./sing-box/{}", asset.name), "./sing-box").await?;
         }
@@ -185,29 +193,31 @@ pub fn set_tun_proxy() {
     match json_util {
         Ok(mut json_util) => {
             let target_keys = vec!["inbounds"]; // 修改为你的属性路径
-            let new_structs = vec![config_model::Inbound {
-                r#type: "mixed".to_string(),
-                tag: "mixed-in".to_string(),
-                listen: Some("0.0.0.0".to_string()),
-                listen_port: Some(2080),
-                inet4_address: None,
-                auto_route: None,
-                strict_route: None,
-                stack: None,
-                sniff: None,
-                set_system_proxy: None,
-            }, config_model::Inbound {
-                r#type: "tun".to_string(),
-                tag: "tun-in".to_string(),
-                listen: None,
-                listen_port: None,
-                inet4_address: Some("172.19.0.1/30".to_string()),
-                auto_route: Some(true),
-                strict_route: Some(true),
-                stack: Some("mixed".to_string()),
-                sniff: Some(true),
-                set_system_proxy: None,
-            }
+            let new_structs = vec![
+                config_model::Inbound {
+                    r#type: "mixed".to_string(),
+                    tag: "mixed-in".to_string(),
+                    listen: Some("0.0.0.0".to_string()),
+                    listen_port: Some(2080),
+                    inet4_address: None,
+                    auto_route: None,
+                    strict_route: None,
+                    stack: None,
+                    sniff: None,
+                    set_system_proxy: None,
+                },
+                config_model::Inbound {
+                    r#type: "tun".to_string(),
+                    tag: "tun-in".to_string(),
+                    listen: None,
+                    listen_port: None,
+                    inet4_address: Some("172.19.0.1/30".to_string()),
+                    auto_route: Some(true),
+                    strict_route: Some(true),
+                    stack: Some("mixed".to_string()),
+                    sniff: Some(true),
+                    set_system_proxy: None,
+                },
             ];
 
             json_util.modify_property(&target_keys, serde_json::to_value(new_structs).unwrap());

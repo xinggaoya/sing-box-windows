@@ -1,11 +1,15 @@
+use log::{error, info};
 use std::fs::File;
 use std::path::Path;
-use log::{error, info};
 use zip::ZipArchive;
 // 根据url下载文件到指定位置
 pub async fn download_file(url: String, path: &str) -> Result<(), String> {
     let file_path = Path::new(path);
-    info!("Downloading file from {} to {}", url, file_path.to_str().unwrap());
+    info!(
+        "Downloading file from {} to {}",
+        url,
+        file_path.to_str().unwrap()
+    );
 
     let client = reqwest::Client::new();
     let response = client.get(&url).send().await;
@@ -42,7 +46,6 @@ pub async fn download_file(url: String, path: &str) -> Result<(), String> {
     }
 }
 
-
 pub async fn unzip_file(path: &str, to: &str) -> Result<(), String> {
     info!("从 {} 解压文件到 {}", path, to);
 
@@ -54,7 +57,9 @@ pub async fn unzip_file(path: &str, to: &str) -> Result<(), String> {
 
     // 遍历ZIP文件中的所有条目
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| format!("读取文件失败: {}", e))?;
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| format!("读取文件失败: {}", e))?;
 
         // 获取文件名并去除前导路径
         let file_name = Path::new(file.name()).file_name().ok_or("获取文件名失败")?;
