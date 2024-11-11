@@ -31,7 +31,7 @@ const downloadTheKernel = async () => {
 }
 
 const onAutoStartChange = async (value: boolean) => {
-  if (await isEnabled()) {
+  if (!value) {
     await disable()
     message.success('已关闭开机自启')
   } else {
