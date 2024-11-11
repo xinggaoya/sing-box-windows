@@ -15,6 +15,8 @@ const appWindow = Window.getCurrent()
 
 onBeforeMount(() => {
   initTray()
+  // 禁止浏览器右键菜单
+  document.oncontextmenu = () => false
 })
 // 停止前
 onUnmounted(() => {
