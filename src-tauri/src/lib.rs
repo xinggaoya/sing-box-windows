@@ -2,6 +2,7 @@ use crate::app::app_service::{download_latest_kernel, start_kernel, download_sub
 
 mod app;
 mod entity;
+mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
