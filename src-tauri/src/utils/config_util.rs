@@ -41,14 +41,17 @@ impl ConfigUtil {
         let mut current_value = &mut self.json;
 
         for (i, key) in target_keys.iter().enumerate() {
-            if let Some(val) = current_value.get_mut(*key) {
-                if i == target_keys.len() - 1 {
-                    // 最后一个键，直接修改
+            if i == target_keys.len() - 1 {
+                // 最后一个键，直接修改
+                if let Some(val) = current_value.get_mut(key) {
                     *val = new_value.clone();
-                } else {
-                    // 递归进入子对象
-                    current_value = val;
                 }
+                return;
+            }
+
+            // 递归进入子对象
+            if let Some(val) = current_value.get_mut(key) {
+                current_value = val;
             } else {
                 // 如果当前键不存在，返回
                 return;
