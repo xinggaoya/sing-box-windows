@@ -1,20 +1,16 @@
 <template>
-  <div class="home-main">
-    <div>
+  <n-flex vertical class="home-main">
+    <n-card content-style="padding: 10px">
       <n-flex justify="space-between">
+        <n-radio-group v-model:value="appState.mode" @update-value="onModeChange">
+          <n-radio-button label="1" value="system">
+            系统代理
+          </n-radio-button>
+          <n-radio-button label="2" value="tun">
+            TUN
+          </n-radio-button>
+        </n-radio-group>
         <n-space>
-          <n-button type="primary" @click="downloadTheKernel">
-            下载内核
-          </n-button>
-          <n-input v-model:value="url" placeholder="请输入订阅链接" />
-          <n-button type="primary" @click="downloadSubscription">
-            下载订阅
-          </n-button>
-        </n-space>
-        <n-space>
-          <router-link to="/about" class="text-decoration-none">
-            代理
-          </router-link>
           <n-button type="success" @click="runKernel">
             启 动
           </n-button>
@@ -23,10 +19,11 @@
           </n-button>
         </n-space>
       </n-flex>
-    </div>
+    </n-card>
     <n-flex justify="space-between">
       <n-card
-        style="margin-top: 7px;width: 160px"
+        class="home-card-item"
+        hoverable
         content-style="padding: 7px"
       >
         <div id="kernel-log">
@@ -37,8 +34,9 @@
         </div>
       </n-card>
       <n-card
-        style="margin-top: 7px;width: 160px"
         content-style="padding: 7px"
+        hoverable
+        class="home-card-item"
       >
         <div id="kernel-log">
           下载
@@ -48,8 +46,9 @@
         </div>
       </n-card>
       <n-card
-        style="margin-top: 7px;width: 160px"
         content-style="padding: 7px"
+        hoverable
+        class="home-card-item"
       >
         <div id="kernel-log">
           使用内存
@@ -59,8 +58,9 @@
         </div>
       </n-card>
       <n-card
-        style="margin-top: 7px;width: 160px"
         content-style="padding: 7px"
+        hoverable
+        class="home-card-item"
       >
         <div id="kernel-log">
           使用流量
@@ -70,22 +70,20 @@
         </div>
       </n-card>
     </n-flex>
-    <n-card v-if="showUI" style="margin-top: 7px" content-style="padding: 10px">
-      <div>
-        <iframe src="http://127.0.0.1:9090" width="100%" height="400px"></iframe>
-      </div>
+    <n-card content-style="padding: 10px" style="height: calc(100vh - 220px)">
+      123
     </n-card>
-  </div>
+  </n-flex>
 </template>
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { useMessage } from 'naive-ui'
 import { onMounted, ref } from 'vue'
 import { createWebSocket } from '@/utils'
+import { useAppStore } from '@/stores/counter'
 
 const message = useMessage()
-const url = ref('')
-const showUI = ref(false)
+const appState = useAppStore()
 const useTotalTraffic = ref(0)
 const traffic = ref({
   up: 0,
@@ -97,7 +95,6 @@ const memory = ref({
 })
 
 onMounted(() => {
-  showUI.value = localStorage.getItem('showUI') === 'true'
   initWS()
 })
 
@@ -113,19 +110,6 @@ const initWS = async () => {
   })
 }
 
-const downloadTheKernel = async () => {
-  const loading = message.loading('下载内核中')
-  const res = await invoke('download_latest_kernel')
-  loading.destroy()
-  message.success('下载完成')
-}
-
-const downloadSubscription = async () => {
-  const loading = message.loading('下载订阅中')
-  const res = await invoke('download_subscription', { url: url.value })
-  loading.destroy()
-  message.success('下载完成')
-}
 
 // 执行内核
 const runKernel = async () => {
@@ -133,8 +117,6 @@ const runKernel = async () => {
   const res = await invoke('start_kernel')
   loading.destroy()
   message.success('启动成功')
-  showUI.value = true
-  localStorage.setItem('showUI', 'true')
 }
 
 const stopKernel = async () => {
@@ -142,13 +124,20 @@ const stopKernel = async () => {
   const res = await invoke('stop_kernel')
   loading.destroy()
   message.success('停止成功')
-  showUI.value = false
-  localStorage.setItem('showUI', 'false')
+}
+
+const onModeChange = async (value: string) => {
+  if (value === 'system') {
+    await invoke('set_system_proxy')
+  } else {
+    await invoke('set_tun_proxy')
+  }
 }
 </script>
 
 <style scoped>
-.home-main {
-  margin: 10px;
+
+.home-card-item {
+  width: 130px;
 }
 </style>
