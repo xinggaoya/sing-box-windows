@@ -24,6 +24,7 @@ log = "0.4"
 tauri = { version = "2.0.6", features = ["tray-icon", "unstable"] }
 tauri-plugin-log = "2.0.0-rc"
 reqwest = "0.12.9"
+winreg = "0.10.1"
 
 zip = { version = "0.5.13" }
 

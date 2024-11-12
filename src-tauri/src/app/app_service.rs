@@ -1,3 +1,4 @@
+use std::error::Error;
 use crate::entity::{config_model, github_model};
 use crate::utils::config_util::ConfigUtil;
 use crate::utils::file_util::{download_file, unzip_file};
@@ -6,6 +7,8 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
+use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
+use winreg::RegKey;
 
 // 运行内核
 #[tauri::command]
@@ -57,7 +60,8 @@ pub fn stop_kernel() {
                         .output();
                     match result {
                         Ok(_) => {
-                            info!("进程已杀死")
+                            info!("进程已杀死");
+                            disable_proxy().unwrap()
                         }
                         Err(e) => {
                             println!("Error killing process: {}", e);
@@ -227,4 +231,21 @@ pub fn set_tun_proxy() {
             error!("修改配置文件失败: {}", e)
         }
     }
+}
+
+fn disable_proxy() -> Result<(), Box<dyn Error>> {
+    // 打开注册表键
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let internet_settings = hkcu.open_subkey_with_flags(
+        "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+        KEY_SET_VALUE,
+    )?;
+
+    // 关闭代理
+    internet_settings.set_value("ProxyEnable", &0u32)?;
+
+    // 清空代理服务器地址
+    internet_settings.set_value("ProxyServer", &"")?;
+
+    Ok(())
 }
