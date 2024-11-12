@@ -152,6 +152,7 @@ const initWS = async () => {
 const runKernel = async () => {
   const loading = message.loading('正在启动')
   const res = await invoke('start_kernel')
+  await initWS()
   loading.destroy()
   message.success('启动成功')
 }
