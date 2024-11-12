@@ -1,5 +1,5 @@
 [package]
-name = "app"
+name = "sing-box-windows"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
@@ -21,7 +21,7 @@ tauri-build = { version = "2.0.1", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.0.6", features = ["tray-icon"] }
+tauri = { version = "2.0.6", features = ["tray-icon", "unstable"] }
 tauri-plugin-log = "2.0.0-rc"
 reqwest = "0.12.9"
 
@@ -29,3 +29,4 @@ zip = { version = "0.5.13" }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
+tauri-plugin-window-state = "2"

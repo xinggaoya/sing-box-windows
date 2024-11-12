@@ -30,7 +30,7 @@
           上传
         </div>
         <div id="subscription-log">
-          {{ traffic.up }} kb/s
+          {{ trafficStr.up }}
         </div>
       </n-card>
       <n-card
@@ -42,7 +42,7 @@
           下载
         </div>
         <div id="subscription-log">
-          {{ traffic.down }} kb/s
+          {{ trafficStr.down }}
         </div>
       </n-card>
       <n-card
@@ -54,7 +54,7 @@
           使用内存
         </div>
         <div id="subscription-log">
-          {{ (memory.inuse / 1024 / 1024).toFixed(2) }} MB
+          {{ memory.inuse }}
         </div>
       </n-card>
       <n-card
@@ -66,32 +66,66 @@
           使用流量
         </div>
         <div id="subscription-log">
-          {{ useTotalTraffic.toFixed(2) }} MB
+          {{ useTotalTraffic }}
         </div>
       </n-card>
     </n-flex>
-    <n-card content-style="padding: 10px" style="height: calc(100vh - 220px)">
-      123
+    <n-card content-style="padding: 5px" style="height: calc(100vh - 220px)">
+      <Echarts :download-speed="traffic.up" :upload-speed="traffic.down" />
     </n-card>
   </n-flex>
 </template>
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { useMessage } from 'naive-ui'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { createWebSocket } from '@/utils'
 import { useAppStore } from '@/stores/AppStore'
+import Echarts from '@/components/layout/Echarts.vue'
 
 const message = useMessage()
 const appState = useAppStore()
-const useTotalTraffic = ref(0)
+const useTotalTraffic = computed(() => {
+  // 根据大小显示kb mb gb
+  return formatBandwidth(appState.usedData)
+})
 const traffic = ref({
   up: 0,
   down: 0
 })
+const trafficStr = computed(() => {
+  // 根据大小显示kb mb gb
+  const up = formatBandwidth(traffic.value.up)
+  const down = formatBandwidth(traffic.value.down)
+  return {
+    up,
+    down
+  }
+})
+
+function formatBandwidth(kbps: number) {
+  kbps = kbps / 1024
+  // 计算 MB/s 和 GB/s
+  const mbps = kbps / 1024 // 将 KB/s 转为 MB/s
+  const gbps = mbps / 1024 // 将 MB/s 转为 GB/s
+
+  // 选择最佳单位
+  let formattedBandwidth
+  if (gbps >= 1) {
+    formattedBandwidth = `${gbps.toFixed(2)} GB`
+  } else if (mbps >= 1) {
+    formattedBandwidth = `${mbps.toFixed(2)} MB`
+  } else {
+    formattedBandwidth = `${kbps.toFixed(2)} KB`
+  }
+
+  // 格式化输出，保持小数点后两位
+  return formattedBandwidth
+}
+
 const memory = ref({
-  inuse: 0,
-  oslimit: 0
+  inuse: '',
+  oslimit: ''
 })
 
 onMounted(() => {
@@ -103,10 +137,13 @@ const initWS = async () => {
   createWebSocket(`ws://127.0.0.1:9090/traffic?token=`, (data) => {
     traffic.value = data
     // 转int
-    useTotalTraffic.value += Number(((data.up + data.down) / 1024 / 1024))
+    appState.usedData += Number(data.up + data.down)
   })
   createWebSocket(`ws://127.0.0.1:9090/memory?token=`, (data) => {
-    memory.value = data
+    memory.value = {
+      inuse: formatBandwidth(data.inuse),
+      oslimit: formatBandwidth(data.oslimit)
+    }
   })
 }
 

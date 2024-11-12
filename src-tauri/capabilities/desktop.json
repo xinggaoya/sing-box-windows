@@ -6,6 +6,8 @@
     "linux"
   ],
   "permissions": [
-    "autostart:default"
+    "autostart:default",
+    "window-state:default",
+    "window-state:default"
   ]
 }
