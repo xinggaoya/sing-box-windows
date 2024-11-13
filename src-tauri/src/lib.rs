@@ -1,4 +1,4 @@
-use tauri::{Manager, Window};
+use tauri::{Manager};
 use crate::app::app_service::{
     download_latest_kernel, download_subscription, start_kernel, stop_kernel,
 };
