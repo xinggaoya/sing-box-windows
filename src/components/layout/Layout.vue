@@ -7,23 +7,27 @@ import MainLayout from '@/components/layout/main/MainLayout.vue'
 import { TrayIcon } from '@tauri-apps/api/tray'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
-import { onBeforeMount, onUnmounted } from 'vue'
+import { onBeforeMount } from 'vue'
 import { Window } from '@tauri-apps/api/window'
+import { useAppStore } from '@/stores/AppStore'
+import { invoke } from '@tauri-apps/api/core'
+import { useInfoStore } from '@/stores/infoStore'
 
-let tray: any = null
 const appWindow = Window.getCurrent()
+const appStore = useAppStore()
+const infoStore = useInfoStore()
 
-onBeforeMount(() => {
+onBeforeMount(async () => {
   initTray()
   // 如果dev
   if (!import.meta.env.DEV) {
     document.oncontextmenu = () => false
   }
+  if (appStore.autoStartKernel && !infoStore.isRunning) {
+    await invoke('start_kernel')
+  }
 })
-// 停止前
-onUnmounted(() => {
-  tray.destroy()
-})
+
 const initTray = async () => {
   const menu = await Menu.new({
     items: [
@@ -52,7 +56,7 @@ const initTray = async () => {
   }
 
   //@ts-ignore
-  tray = await TrayIcon.new(options)
+  await TrayIcon.new(options)
 }
 
 </script>

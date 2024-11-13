@@ -1,14 +1,15 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-export const useAppStore = defineStore('counter', () => {
+export const useAppStore = defineStore('app', () => {
 
   const mode = ref('')
   // 使用流量
   const usedData = ref(0)
   const autoStart = ref(false)
+  const autoStartKernel = ref(false)
 
-  return { mode, autoStart, usedData }
+  return { mode, autoStart, usedData, autoStartKernel }
 }, {
   persist: true
 })

@@ -1,5 +1,5 @@
 <template>
-  <n-card style="height: 100%" content-style="height: 100%;padding: 10px">
+  <n-card title="应用设置" style="height: 100%" content-style="height: 100%;">
     <n-scrollbar>
       <n-form label-placement="left">
         <n-form-item label="内核设置">
@@ -10,6 +10,9 @@
         <n-form-item label="开机自启">
           <n-switch v-model:value="appStore.autoStart" @update-value="onAutoStartChange" />
         </n-form-item>
+        <n-form-item label="自动启动内核">
+          <n-switch v-model:value="appStore.autoStartKernel" />
+        </n-form-item>
       </n-form>
     </n-scrollbar>
   </n-card>
@@ -18,7 +21,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { useMessage } from 'naive-ui'
 import { useAppStore } from '@/stores/AppStore'
-import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
+import { enable, disable } from '@tauri-apps/plugin-autostart'
 
 const message = useMessage()
 const appStore = useAppStore()

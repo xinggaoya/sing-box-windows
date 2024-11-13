@@ -2,7 +2,7 @@
   <n-card style="height: 100%" content-style="height: 100%;padding: 10px">
     <n-scrollbar>
       <n-flex vertical>
-        <div v-for="(log,index) in logs" :key="index">
+        <div v-for="(log,index) in infoStore.logs" :key="index">
           <n-tag :type="log.type"> {{ log.type }}</n-tag>
           {{ log.payload }}
         </div>
@@ -11,20 +11,9 @@
   </n-card>
 </template>
 <script setup lang="ts">
-import { createWebSocket } from '@/utils'
-import { onMounted, ref } from 'vue'
+import { useInfoStore } from '@/stores/infoStore'
 
-const logs = ref<any>([])
-
-onMounted(() => {
-  getLogs()
-})
-
-const getLogs = async () => {
-  createWebSocket(`ws://127.0.0.1:9090/logs?token=`, (data) => {
-    logs.value.push(data)
-  })
-}
+const infoStore = useInfoStore()
 </script>
 
 <style scoped>
