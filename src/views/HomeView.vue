@@ -11,7 +11,7 @@
           </n-radio-button>
         </n-radio-group>
         <n-space>
-          <n-button type="success" @click="runKernel">
+          <n-button type="success" :disabled="infoStore.isRunning" @click="runKernel">
             <template #icon>
               <n-icon>
                 <AirplaneOutline />
@@ -19,7 +19,7 @@
             </template>
             启 动
           </n-button>
-          <n-button type="error" @click="stopKernel">
+          <n-button type="error" :disabled="!infoStore.isRunning" @click="stopKernel">
             <template #icon>
               <n-icon>
                 <StopCircle />
