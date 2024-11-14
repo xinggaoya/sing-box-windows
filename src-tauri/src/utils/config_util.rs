@@ -8,6 +8,7 @@ pub struct ConfigUtil {
     file_path: String,
 }
 
+#[allow(dead_code)]
 impl ConfigUtil {
     /// 创建新的 JsonUtil 实例，读取指定文件的 JSON 数据
     pub fn new(file_path: &str) -> Result<Self> {
