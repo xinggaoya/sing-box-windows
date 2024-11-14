@@ -24,6 +24,8 @@ onBeforeMount(async () => {
     document.oncontextmenu = () => false
   }
   if (appStore.autoStartKernel && !infoStore.isRunning) {
+    await invoke('set_system_proxy')
+    appStore.mode = 'system'
     await invoke('start_kernel')
   }
 })
@@ -34,11 +36,12 @@ const initTray = async () => {
       {
         id: 'quit',
         text: '退出',
-        action: () => {
-          appWindow.close()
-        }
-      }
-    ]
+        action: async () => {
+          await invoke('stop_kernel')
+          await appWindow.close()
+        },
+      },
+    ],
   })
 
   const options = {
@@ -52,15 +55,12 @@ const initTray = async () => {
       }
     },
     menu,
-    menuOnLeftClick: false
+    menuOnLeftClick: false,
   }
 
   //@ts-ignore
   await TrayIcon.new(options)
 }
-
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>
