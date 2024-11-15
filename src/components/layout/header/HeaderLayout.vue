@@ -32,28 +32,28 @@ async function handelFullScreen() {
         <n-text class="header-text" strong>Sing-Box-Windows</n-text>
       </n-flex>
       <n-flex>
-<!--        <n-button @click="handleDark" strong secondary circle type="default">-->
-<!--          <template #icon>-->
-<!--            <n-icon>-->
-<!--              <BulbOutline />-->
-<!--            </n-icon>-->
-<!--          </template>-->
-<!--        </n-button>-->
-        <n-button @click="handelFullScreen" strong secondary circle type="default" class="pc-but">
+        <!--        <n-button @click="handleDark" strong secondary circle type="default">-->
+        <!--          <template #icon>-->
+        <!--            <n-icon>-->
+        <!--              <BulbOutline />-->
+        <!--            </n-icon>-->
+        <!--          </template>-->
+        <!--        </n-button>-->
+        <n-button @click="handelFullScreen" strong secondary circle type="default">
           <template #icon>
             <n-icon>
               <Code />
             </n-icon>
           </template>
         </n-button>
-        <n-button @click="handelHideWindow" strong secondary circle type="default" class="pc-but">
+        <n-button @click="handelHideWindow" strong secondary circle type="default">
           <template #icon>
             <n-icon>
               <ChevronDown />
             </n-icon>
           </template>
         </n-button>
-        <n-button @click="handelCloseWindow" strong secondary circle type="default" class="pc-but">
+        <n-button @click="handelCloseWindow" strong secondary circle type="default">
           <template #icon>
             <n-icon>
               <CloseCircleOutline />
@@ -70,11 +70,5 @@ async function handelFullScreen() {
   font-weight: bold;
   line-height: 32px;
   font-size: 20px;
-}
-
-@media screen and (max-width: 768px) {
-  .pc-but {
-    display: none;
-  }
 }
 </style>
