@@ -4,7 +4,7 @@
 sing-box-windows 项目是一个基于 [Tauri 2.0](https://tauri.app/) 和 [Vue](https://vuejs.org/) 的跨平台桌面应用程序，用于管理 [sing-box](https://github.com/SagerNet/sing-box)。仅用于个人测试、学习使用。
 
 ## 预览
-<img src="./example/img.png" alt="sing-box-windows 预览" width="800">
+<img src="./public/image.png" alt="sing-box-windows 预览" width="800">
 
 ## 开始使用
 
