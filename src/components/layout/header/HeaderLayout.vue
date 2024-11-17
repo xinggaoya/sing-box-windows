@@ -5,9 +5,7 @@ import { Window } from '@tauri-apps/api/window'
 
 const appWindow = Window.getCurrent()
 
-function handleDark() {
-
-}
+function handleDark() {}
 
 async function handelCloseWindow() {
   await appWindow.hide()
@@ -24,8 +22,6 @@ async function handelFullScreen() {
     await appWindow.setFullscreen(true)
   }
 }
-
-
 </script>
 
 <template>
@@ -36,71 +32,43 @@ async function handelFullScreen() {
         <n-text class="header-text" strong>Sing-Box-Windows</n-text>
       </n-flex>
       <n-flex>
-
-        <n-tooltip placement="bottom" trigger="hover">
-          <template #trigger>
-            <n-button @click="handleDark" strong secondary circle type="default">
-              <template #icon>
-                <n-icon>
-                  <BulbOutline />
-                </n-icon>
-              </template>
-            </n-button>
+        <!--        <n-button @click="handleDark" strong secondary circle type="default">-->
+        <!--          <template #icon>-->
+        <!--            <n-icon>-->
+        <!--              <BulbOutline />-->
+        <!--            </n-icon>-->
+        <!--          </template>-->
+        <!--        </n-button>-->
+        <n-button @click="handelFullScreen" strong secondary circle type="default">
+          <template #icon>
+            <n-icon>
+              <Code />
+            </n-icon>
           </template>
-          <span>调整主题</span>
-        </n-tooltip>
-        <n-tooltip placement="bottom" trigger="hover">
-          <template #trigger>
-            <n-button @click="handelFullScreen" strong secondary circle type="default" class="pc-but">
-              <template #icon>
-                <n-icon>
-                  <Code />
-                </n-icon>
-              </template>
-            </n-button>
+        </n-button>
+        <n-button @click="handelHideWindow" strong secondary circle type="default">
+          <template #icon>
+            <n-icon>
+              <ChevronDown />
+            </n-icon>
           </template>
-          <span>全屏</span>
-        </n-tooltip>
-        <n-tooltip placement="bottom" trigger="hover">
-          <template #trigger>
-            <n-button @click="handelHideWindow" strong secondary circle type="default" class="pc-but">
-              <template #icon>
-                <n-icon>
-                  <ChevronDown />
-                </n-icon>
-              </template>
-            </n-button>
+        </n-button>
+        <n-button @click="handelCloseWindow" strong secondary circle type="default">
+          <template #icon>
+            <n-icon>
+              <CloseCircleOutline />
+            </n-icon>
           </template>
-          <span>最小化</span>
-        </n-tooltip>
-        <n-tooltip placement="bottom" trigger="hover">
-          <template #trigger>
-            <n-button @click="handelCloseWindow" strong secondary circle type="default" class="pc-but">
-              <template #icon>
-                <n-icon>
-                  <CloseCircleOutline />
-                </n-icon>
-              </template>
-            </n-button>
-          </template>
-          <span>关闭窗口</span>
-        </n-tooltip>
+        </n-button>
       </n-flex>
     </n-space>
   </n-card>
 </template>
 
 <style scoped>
-
 .header-text {
   font-weight: bold;
   line-height: 32px;
   font-size: 20px;
-}
-
-@media screen and (max-width: 768px) {
-  .pc-but {
-    display: none;
-  }
 }
 </style>
