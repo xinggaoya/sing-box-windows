@@ -7,7 +7,7 @@ import MainLayout from '@/components/layout/main/MainLayout.vue'
 import { TrayIcon } from '@tauri-apps/api/tray'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
-import { onBeforeMount } from 'vue'
+import { onMounted } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
 import { invoke } from '@tauri-apps/api/core'
@@ -17,7 +17,7 @@ const appWindow = Window.getCurrent()
 const appStore = useAppStore()
 const infoStore = useInfoStore()
 
-onBeforeMount(async () => {
+onMounted(async () => {
   initTray()
   // 如果dev
   if (!import.meta.env.DEV) {
