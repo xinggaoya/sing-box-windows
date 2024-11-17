@@ -10,23 +10,27 @@ use std::path::Path;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
 use winreg::RegKey;
 use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
+use crate::utils::app_util::get_work_dir;
 
 // 运行内核
 #[tauri::command]
 pub fn start_kernel() {
+    let word_dir = get_work_dir();
     // 命令执行 不堵塞
-    let child = std::process::Command::new("./sing-box/sing-box")
+    let kernel_path = Path::new(&word_dir).join("sing-box/sing-box");
+    let kernel_word_dir = Path::new(&word_dir).join("sing-box");
+    let child = std::process::Command::new(kernel_path.to_str().unwrap())
         .arg("run")
         .arg("-D")
-        .arg("./sing-box")
+        .arg(kernel_word_dir.to_str().unwrap())
         .creation_flags(0x08000000)
         .spawn()
         .expect("Failed to start child process");
 
     // 记录pid到文件
     let pid = child.id();
-    let pid_file = "./sing-box/pid.txt";
-    let file = File::create(pid_file);
+    let pid_path = Path::new(&word_dir).join("sing-box/pid.txt");
+    let file = File::create(pid_path.to_str().unwrap());
     match file {
         Ok(mut file) => match file.write_all(pid.to_string().as_bytes()) {
             Ok(_) => {}
@@ -49,7 +53,8 @@ pub fn stop_kernel() {
 }
 
 fn stop_kernel_impl() -> Result<(), Box<dyn Error>> {
-    let pid_file = "./sing-box/pid.txt";
+    let word_dir = get_work_dir();
+    let pid_file = Path::new(&word_dir).join("sing-box/pid.txt");
     let mut file = File::open(pid_file)?;
 
     let mut buffer = String::new();
@@ -96,11 +101,14 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     let response = client.get(url).headers(headers).send().await?;
     let text = response.text().await?;
 
-    let path = Path::new("./sing-box/config.json");
-    let mut file = File::create(path)?;
+    let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/config.json");
+    let mut file = File::create(path.to_str().unwrap())?;
     file.write_all(text.as_bytes())?;
 
-    let mut json_util = ConfigUtil::new("./sing-box/config.json")?;
+    let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/config.json");
+    let mut json_util = ConfigUtil::new(path.to_str().unwrap())?;
     let target_keys = vec!["experimental"];
     let config = Config {
         clash_api: ClashApiConfig {
@@ -126,11 +134,14 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
 #[tauri::command]
 pub async fn download_latest_kernel() -> Result<(), String> {
     let url = "https://api.github.com/repos/SagerNet/sing-box/releases/latest";
-    let dist_dir = "./sing-box";
+    let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/");
     let client = reqwest::Client::new();
     // 设置请求头
     let mut headers = reqwest::header::HeaderMap::new();
-    let user_agent = reqwest::header::HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
+    let user_agent = reqwest::header::HeaderValue
+    ::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\
+     (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
     headers.insert(reqwest::header::USER_AGENT, user_agent);
 
     let response = client
@@ -161,7 +172,7 @@ pub async fn download_latest_kernel() -> Result<(), String> {
         if asset.name.contains(&str) {
             info!("Asset: {}", asset.name);
             // 下载文件
-            let path = Path::new(dist_dir).join(&asset.name);
+            let path = Path::new(&path.to_str().unwrap()).join(&asset.name);
             download_file(asset.browser_download_url, path.to_str().unwrap())
                 .await
                 .map_err(|e| format!("Failed to download file: {}", e))?;
@@ -175,7 +186,9 @@ pub async fn download_latest_kernel() -> Result<(), String> {
 // 修改代理模式为系统代理
 #[tauri::command]
 pub fn set_system_proxy() {
-    let json_util = ConfigUtil::new("./sing-box/config.json");
+    let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/config.json");
+    let json_util = ConfigUtil::new(path.to_str().unwrap());
 
     match json_util {
         Ok(mut json_util) => {
@@ -210,7 +223,9 @@ pub fn set_tun_proxy() {
 }
 
 fn set_tun_proxy_impl() -> Result<(), Box<dyn Error>> {
-    let mut json_util = ConfigUtil::new("./sing-box/config.json")?;
+     let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/config.json");
+    let mut json_util = ConfigUtil::new(path.to_str().unwrap())?;
 
     let target_keys = vec!["inbounds"]; // 修改为你的属性路径
     let new_structs = vec![
