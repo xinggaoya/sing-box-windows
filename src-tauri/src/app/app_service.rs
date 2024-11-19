@@ -63,7 +63,7 @@ fn stop_kernel_impl() -> Result<(), Box<dyn Error>> {
     let pid: u32 = buffer.trim().parse()?;
     kill_process(pid)?;
 
-    info!("进程已杀死");
+    info!("进程已杀死,进程id: {}", pid);
     disable_proxy()?;
     Ok(())
 }
@@ -177,7 +177,12 @@ pub async fn download_latest_kernel() -> Result<(), String> {
                 .await
                 .map_err(|e| format!("Failed to download file: {}", e))?;
             // 解压文件
-            unzip_file(&format!("./sing-box/{}", asset.name), "./sing-box").await?;
+            let word_dir = get_work_dir();
+            let out_path = Path::new(&word_dir).join("sing-box");
+            let to_path = out_path.join(asset.name);
+            unzip_file(&to_path.to_str().unwrap(), out_path.to_str().unwrap()).await?;
+
+            info!("内核已下载,路径: {}", path.to_str().unwrap())
         }
     }
     Ok(())
@@ -223,7 +228,7 @@ pub fn set_tun_proxy() {
 }
 
 fn set_tun_proxy_impl() -> Result<(), Box<dyn Error>> {
-     let work_dir = get_work_dir();
+    let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/config.json");
     let mut json_util = ConfigUtil::new(path.to_str().unwrap())?;
 

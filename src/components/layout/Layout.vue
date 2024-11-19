@@ -23,10 +23,10 @@ onMounted(async () => {
   if (!import.meta.env.DEV) {
     document.oncontextmenu = () => false
   }
-  if (appStore.autoStartKernel && !infoStore.isRunning) {
+  if (appStore.autoStartKernel && !appStore.isRunning) {
     await invoke('set_system_proxy')
     appStore.mode = 'system'
-    await invoke('start_kernel')
+    await infoStore.startKernel()
   }
 })
 
@@ -49,7 +49,6 @@ const initTray = async () => {
     action: (event: any) => {
       switch (event.type) {
         case 'Click':
-          console.log('click')
           appWindow.show()
           break
       }

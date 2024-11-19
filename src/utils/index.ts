@@ -7,10 +7,6 @@ export const createWebSocket = (url: string, onMessage: (data: any) => void, onC
     ws.onerror = function() {
       console.log('ws连接发生错误')
       onClose?.()
-      // 一秒后重新连接
-      setTimeout(() => {
-        createWebSocket(url, onMessage)
-      }, 1000)
     }
     //连接成功建立的回调方法
     ws.onopen = function() {
@@ -25,10 +21,6 @@ export const createWebSocket = (url: string, onMessage: (data: any) => void, onC
     ws.onclose = function() {
       console.log('ws连接关闭')
       onClose?.()
-      // 一秒后重新连接
-      setTimeout(() => {
-        createWebSocket(url, onMessage)
-      }, 1000)
     }
   }
 }

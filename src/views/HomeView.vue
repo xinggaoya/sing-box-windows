@@ -11,7 +11,7 @@
           </n-radio-button>
         </n-radio-group>
         <n-space>
-          <n-button type="success" :disabled="infoStore.isRunning" @click="runKernel">
+          <n-button type="success" :disabled="appState.isRunning" @click="runKernel">
             <template #icon>
               <n-icon>
                 <AirplaneOutline />
@@ -19,7 +19,7 @@
             </template>
             启动
           </n-button>
-          <n-button type="error" :disabled="!infoStore.isRunning" @click="stopKernel">
+          <n-button type="error" :disabled="!appState.isRunning" @click="stopKernel">
             <template #icon>
               <n-icon>
                 <StopCircle />
@@ -121,16 +121,16 @@ const trafficStr = computed(() => {
 // 执行内核
 const runKernel = async () => {
   const loading = message.loading('正在启动')
-  const res = await invoke('start_kernel')
+  const res = await infoStore.startKernel()
   loading.destroy()
   message.success('启动成功')
 }
 
 const stopKernel = async () => {
   const loading = message.loading('正在停止')
-  const res = await invoke('stop_kernel')
+  const res = await infoStore.stopKernel()
   loading.destroy()
-  infoStore.isRunning = false
+  appState.isRunning = false
   message.success('停止成功')
 }
 
