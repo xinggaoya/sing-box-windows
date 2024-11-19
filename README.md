@@ -6,7 +6,13 @@ sing-box-windows 项目是一个基于 [Tauri 2.0](https://tauri.app/) 和 [Vue]
 ## 预览
 <img src="./public/image.png" alt="sing-box-windows 预览" width="800">
 
-## 开始使用
+## 快速使用
+1. 设置-下载内核
+2. 代理-下载订阅
+3. 概况-选中系统代理-启动
+
+###### `tun 模式需要管理员运行程序`
+## 编译使用
 
 ### 准备工作
 在开始之前，请确保满足以下要求：
