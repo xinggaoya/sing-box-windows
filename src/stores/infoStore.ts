@@ -94,7 +94,7 @@ export const useInfoStore = defineStore('info', () => {
 
   // 获取最新版本
   const getLatestVersion = async () => {
-    const res = await fetch('https://api.github.com/repos/MetaCubeX/metacubexd/releases/latest')
+    const res = await fetch('https://api.github.com/repos/SagerNet/sing-box/releases/latest')
     const json = await res.json()
     newVersion.value = json.tag_name
   }

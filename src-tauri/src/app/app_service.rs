@@ -173,7 +173,9 @@ pub async fn download_latest_kernel() -> Result<(), String> {
             info!("Asset: {}", asset.name);
             // 下载文件
             let path = Path::new(&path.to_str().unwrap()).join(&asset.name);
-            download_file(asset.browser_download_url, path.to_str().unwrap())
+            // 加速下载
+            let speed_url = format!("https://ghp.ci/{}", asset.browser_download_url);
+            download_file(speed_url, path.to_str().unwrap())
                 .await
                 .map_err(|e| format!("Failed to download file: {}", e))?;
             // 解压文件

@@ -8,7 +8,7 @@
       <div>
         <n-form label-placement="left">
           <n-form-item label="内核设置">
-            <n-button type="primary" @click="downloadTheKernel"> 下载内核</n-button>
+            <n-button type="primary" @click="downloadTheKernel" :loading>下载内核</n-button>
           </n-form-item>
           <n-form-item label="开机自启">
             <n-switch v-model:value="appStore.autoStart" @update-value="onAutoStartChange" />
@@ -23,6 +23,7 @@
 </template>
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useAppStore } from '@/stores/AppStore'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
@@ -31,11 +32,12 @@ import { useInfoStore } from '@/stores/infoStore'
 const message = useMessage()
 const appStore = useAppStore()
 const infoStore = useInfoStore()
+const loading = ref(false)
 
 const downloadTheKernel = async () => {
-  const loading = message.loading('下载内核中')
+  loading.value = true
   const res = await invoke('download_latest_kernel')
-  loading.destroy()
+  loading.value = false
   message.success('下载完成')
 }
 
