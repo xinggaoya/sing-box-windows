@@ -37,7 +37,7 @@ const initTray = async () => {
         id: 'quit',
         text: '退出',
         action: async () => {
-          await invoke('stop_kernel')
+          await infoStore.stopKernel()
           await appWindow.close()
         },
       },
