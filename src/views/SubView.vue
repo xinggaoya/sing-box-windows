@@ -1,19 +1,28 @@
 <template>
-  <n-card title="订阅列表" content-style="padding: 10px">
-    <n-space>
-      <n-card :title="item.name" v-for="(item, index) in subStore.list" :key="index">
-        <n-ellipsis>{{ item.url }}</n-ellipsis>
-        <div>
-          <n-button type="primary" @click="downloadSubscription(url)">下载</n-button>
-          <n-button type="error" @click="deleteSubscription(index)">删除</n-button>
-        </div>
-      </n-card>
-    </n-space>
-    <n-space vertical>
-      <n-input type="text" v-model:value="name" placeholder="请输入订阅名称" />
-      <n-input type="textarea" v-model:value="url" placeholder="请输入订阅链接" />
-      <n-button type="primary" @click="addSubscription" :loading>添加订阅</n-button>
-    </n-space>
+  <n-card content-style="padding: 10px">
+    <n-flex vertical>
+      <n-space>
+        <n-card v-for="(item, index) in subStore.list" :key="index" content-style="padding: 10px;width: 200px;">
+          <div>
+            <n-text>{{ item.name }}</n-text>
+          </div>
+          <div>
+            <n-ellipsis>{{ item.url }}</n-ellipsis>
+          </div>
+          <n-space size="small">
+            <n-button size="small" type="primary" @click="downloadSubscription(item.url)" :loading>下载</n-button>
+            <n-button size="small" type="error" @click="deleteSubscription(index)">删除</n-button>
+          </n-space>
+        </n-card>
+      </n-space>
+      <n-space vertical>
+        <n-input type="text" v-model:value="name" placeholder="请输入订阅名称" />
+        <n-input type="textarea" v-model:value="url" placeholder="请输入订阅链接" />
+        <n-flex justify="end">
+          <n-button type="primary" @click="addSubscription">添加订阅</n-button>
+        </n-flex>
+      </n-space>
+    </n-flex>
   </n-card>
 </template>
 <script setup lang="ts">

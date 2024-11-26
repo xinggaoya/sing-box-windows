@@ -19,13 +19,20 @@ pub fn start_kernel() {
     // 命令执行 不堵塞
     let kernel_path = Path::new(&word_dir).join("sing-box/sing-box");
     let kernel_word_dir = Path::new(&word_dir).join("sing-box");
-    let child = std::process::Command::new(kernel_path.to_str().unwrap())
+    let res = std::process::Command::new(kernel_path.to_str().unwrap())
         .arg("run")
         .arg("-D")
         .arg(kernel_word_dir.to_str().unwrap())
         .creation_flags(0x08000000)
-        .spawn()
-        .expect("Failed to start child process");
+        .spawn();
+
+    let child = match res {
+        Ok(child) => child,
+        Err(e) => {
+            error!("Error starting kernel: {}", e);
+            return;
+        }
+    };
 
     // 记录pid到文件
     let pid = child.id();
@@ -106,8 +113,6 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     let mut file = File::create(path.to_str().unwrap())?;
     file.write_all(text.as_bytes())?;
 
-    let work_dir = get_work_dir();
-    let path = Path::new(&work_dir).join("sing-box/config.json");
     let mut json_util = ConfigUtil::new(path.to_str().unwrap())?;
     let target_keys = vec!["experimental"];
     let config = Config {

@@ -12,7 +12,16 @@ pub struct ConfigUtil {
 impl ConfigUtil {
     /// 创建新的 JsonUtil 实例，读取指定文件的 JSON 数据
     pub fn new(file_path: &str) -> Result<Self> {
-        let data = fs::read_to_string(file_path).unwrap();
+        let res = fs::read_to_string(file_path);
+        let data = match res {
+            Ok(data) => data,
+            Err(err) => {
+                return Err(serde_json::Error::custom(format!(
+                    "Error reading file: {}",
+                    err
+                )));
+            }
+        };
         let json = serde_json::from_str(&data)?;
 
         Ok(ConfigUtil {
