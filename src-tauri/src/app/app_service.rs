@@ -114,7 +114,7 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
         clash_api: ClashApiConfig {
             external_controller: "127.0.0.1:9090".to_string(),
             external_ui: "metacubexd".to_string(),
-            external_ui_download_url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip".to_string(),
+            external_ui_download_url: "".to_string(),
             external_ui_download_detour: "手动切换".to_string(),
             default_mode: "rule".to_string(),
         },
