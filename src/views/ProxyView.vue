@@ -66,6 +66,7 @@ const init = () => {
     .then((res) => res.json())
     .then((res) => {
       const data = res.proxies
+      const info: any = []
       // 循环对象
       Object.keys(data).forEach((key) => {
         const item = data[key]
@@ -82,9 +83,10 @@ const init = () => {
               delay: '0ms',
             })
           })
-          list.value.push(data)
+          info.push(data)
         }
       })
+      list.value = info
     })
 }
 
@@ -124,7 +126,7 @@ const changeProxy = (type: string, name: string, index: number) => {
     }
     if (res.status === 204) {
       message.success('切换成功')
-      list.value[index].now = name
+      init()
       return
     }
   })
