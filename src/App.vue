@@ -1,5 +1,11 @@
 <template>
-  <router-view />
+  <n-config-provider>
+    <n-dialog-provider>
+      <n-message-provider>
+        <router-view />
+      </n-message-provider>
+    </n-dialog-provider>
+  </n-config-provider>
 </template>
 
 <script setup lang="ts">
@@ -11,6 +17,7 @@ import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
 import { invoke } from '@tauri-apps/api/core'
 import { useInfoStore } from '@/stores/infoStore'
+import { NConfigProvider, NDialogProvider, NMessageProvider } from 'naive-ui'
 
 const appWindow = Window.getCurrent()
 const appStore = useAppStore()

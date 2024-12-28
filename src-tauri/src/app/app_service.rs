@@ -13,6 +13,39 @@ use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
 use crate::utils::app_util::get_work_dir;
 use serde_json::json;
 
+// 以管理员权限重启
+#[tauri::command]
+pub fn restart_as_admin() -> Result<(), String> {
+    let current_exe = std::env::current_exe().map_err(|e| format!("获取当前程序路径失败: {}", e))?;
+    
+    let result = std::process::Command::new("powershell")
+        .arg("Start-Process")
+        .arg(current_exe.to_str().unwrap())
+        .arg("-Verb")
+        .arg("RunAs")
+        .creation_flags(0x08000000)
+        .spawn();
+
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("重启失败: {}", e))
+    }
+}
+
+// 检查是否有管理员权限
+#[tauri::command]
+pub fn check_admin() -> bool {
+    let result = std::process::Command::new("net")
+        .arg("session")
+        .creation_flags(0x08000000)
+        .output();
+
+    match result {
+        Ok(output) => output.status.success(),
+        Err(_) => false
+    }
+}
+
 // 运行内核
 #[tauri::command]
 pub fn start_kernel() -> Result<(), String> {
@@ -85,7 +118,7 @@ fn stop_kernel_impl() -> Result<(), Box<dyn Error>> {
     let pid: u32 = match buffer.trim().parse() {
         Ok(pid) => pid,
         Err(e) => {
-            info!("PID格式无效: {}, 内核可能已经停止", e);
+            info!("PID���式无效: {}, 内核可能已经停止", e);
             disable_proxy()?;
             return Ok(());
         }

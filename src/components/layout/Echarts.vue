@@ -12,6 +12,7 @@ import {
   GridComponent,
   ToolboxComponent,
   DataZoomComponent,
+  LegendComponent,
 } from 'echarts/components'
 import VChart, { THEME_KEY } from 'vue-echarts'
 import { ref, provide, watch, defineProps, onMounted } from 'vue'
@@ -28,6 +29,7 @@ use([
   GridComponent,
   ToolboxComponent,
   DataZoomComponent,
+  LegendComponent,
 ])
 
 provide(THEME_KEY, 'light')

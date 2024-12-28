@@ -1,6 +1,5 @@
 <template>
   <n-space vertical>
-    <TunModeSwitch />
     <n-card>
       <n-space align="center">
         <n-h3 style="margin: 0">代理设置</n-h3>

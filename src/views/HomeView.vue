@@ -141,8 +141,10 @@ import {
 import { useAppStore } from '@/stores/AppStore'
 import Echarts from '@/components/layout/Echarts.vue'
 import { useInfoStore } from '@/stores/infoStore'
+import { useDialog } from 'naive-ui'
 
 const message = useMessage()
+const dialog = useDialog()
 const appState = useAppStore()
 const infoStore = useInfoStore()
 const isStarting = ref(false)
@@ -225,6 +227,29 @@ const onModeChange = async (value: string) => {
       await invoke('set_system_proxy')
       message.success('已切换到系统代理模式')
     } else {
+      // TUN模式需要管理员权限
+      const isAdmin = await invoke('check_admin')
+      if (!isAdmin) {
+        dialog.warning({
+          title: '需要管理员权限',
+          content: 'TUN模式需要管理员权限才能运行，是否以管理员身份重启程序？',
+          positiveText: '重启',
+          negativeText: '取消',
+          onPositiveClick: async () => {
+            try {
+              await invoke('restart_as_admin')
+              const appWindow = Window.getCurrent()
+              await appWindow.close()
+            } catch (error) {
+              message.error(error as string)
+            }
+          },
+          onNegativeClick: () => {
+            appState.mode = 'system'
+          }
+        })
+        return
+      }
       await invoke('set_tun_proxy')
       message.success('已切换到TUN模式')
     }
