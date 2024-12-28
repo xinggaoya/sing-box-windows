@@ -57,15 +57,46 @@ pub fn stop_kernel() -> Result<(), String> {
 fn stop_kernel_impl() -> Result<(), Box<dyn Error>> {
     let word_dir = get_work_dir();
     let pid_file = Path::new(&word_dir).join("sing-box/pid.txt");
-    let mut file = File::open(pid_file)?;
+    
+    // 如果pid文件不存在，说明进程已经不在运行，直接返回成功
+    if !pid_file.exists() {
+        info!("PID文件不存在，内核可能已经停止");
+        disable_proxy()?;
+        return Ok(());
+    }
+
+    // 尝试读取pid文件
+    let mut file = match File::open(&pid_file) {
+        Ok(file) => file,
+        Err(e) => {
+            info!("无法打开PID文件: {}, 内核可能已经停止", e);
+            disable_proxy()?;
+            return Ok(());
+        }
+    };
 
     let mut buffer = String::new();
-    file.read_to_string(&mut buffer)?;
+    if let Err(e) = file.read_to_string(&mut buffer) {
+        info!("无法读取PID文件内容: {}, 内核可能已经停止", e);
+        disable_proxy()?;
+        return Ok(());
+    }
 
-    let pid: u32 = buffer.trim().parse()?;
-    kill_process(pid)?;
+    let pid: u32 = match buffer.trim().parse() {
+        Ok(pid) => pid,
+        Err(e) => {
+            info!("PID格式无效: {}, 内核可能已经停止", e);
+            disable_proxy()?;
+            return Ok(());
+        }
+    };
 
-    info!("进程已杀死,进程id: {}", pid);
+    // 尝试结束进程
+    if let Err(e) = kill_process(pid) {
+        info!("结束进程失败: {}, 内核可能已经停止", e);
+    }
+
+    info!("进程已停止,进程id: {}", pid);
     disable_proxy()?;
     Ok(())
 }
@@ -78,8 +109,15 @@ fn kill_process(pid: u32) -> Result<(), Box<dyn Error>> {
         .creation_flags(0x08000000)
         .output()?;
 
+    // 如果进程不存在，taskkill 会返回错误，但这种情况我们也认为是成功的
     if !result.status.success() {
-        return Err(format!("Error killing process: {:?}", result.stderr).into());
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        // 如果错误信息表明进程不存在，我们认为这是成功的情况
+        if stderr.contains("进程未运行") || stderr.contains("not found") || stderr.contains("不存在") {
+            info!("进程 {} 已经不存在", pid);
+            return Ok(());
+        }
+        return Err(format!("Error killing process: {}", stderr).into());
     }
     Ok(())
 }

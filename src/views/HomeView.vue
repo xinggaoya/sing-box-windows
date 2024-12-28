@@ -147,74 +147,28 @@ const appState = useAppStore()
 const infoStore = useInfoStore()
 const isStarting = ref(false)
 const isStopping = ref(false)
-let monitorTimer: number | null = null
 const isWindowVisible = ref(true)
-
-// 开始监控
-const startMonitoring = () => {
-  if (monitorTimer || !isWindowVisible.value) return
-  
-  // 立即执行一次
-  updateMetrics()
-  
-  // 每秒更新一次
-  monitorTimer = window.setInterval(() => {
-    updateMetrics()
-  }, 1000)
-}
-
-// 停止监控
-const stopMonitoring = () => {
-  if (monitorTimer) {
-    clearInterval(monitorTimer)
-    monitorTimer = null
-  }
-}
-
-// 更新指标数据
-const updateMetrics = async () => {
-  if (!isWindowVisible.value) return
-  
-  try {
-    const [memory, traffic] = await Promise.all([
-      invoke('get_memory_usage'),
-      invoke('get_traffic_data')
-    ])
-    infoStore.updateMemory(memory as any)
-    infoStore.updateTraffic(traffic as any)
-  } catch (error) {
-    console.error('Failed to update metrics:', error)
-  }
-}
 
 // 监听窗口事件
 const setupWindowListeners = () => {
   // 监听最小化事件
   mitt.on('window-minimize', () => {
     isWindowVisible.value = false
-    stopMonitoring()
   })
 
   // 监听关闭/隐藏事件
   mitt.on('window-hide', () => {
     isWindowVisible.value = false
-    stopMonitoring()
   })
 
   // 监听窗口显示事件
   mitt.on('window-show', () => {
     isWindowVisible.value = true
-    if (appState.isRunning) {
-      startMonitoring()
-    }
   })
 
   // 监听窗口恢复事件
   mitt.on('window-restore', () => {
     isWindowVisible.value = true
-    if (appState.isRunning) {
-      startMonitoring()
-    }
   })
 }
 
@@ -225,7 +179,6 @@ onMounted(() => {
 
 // 组件卸载时清理
 onUnmounted(() => {
-  stopMonitoring()
   // 移除所有事件监听
   mitt.off('window-minimize')
   mitt.off('window-hide')
@@ -245,17 +198,9 @@ const trafficStr = computed(() => ({
 const runKernel = async () => {
   try {
     isStarting.value = true
-    await invoke('start_kernel')
-    appState.isRunning = true
-    // 重置流量统计
-    infoStore.resetTraffic()
+    await infoStore.startKernel()
     message.success('内核已启动')
-    // 只在窗口可见时启动监控
-    if (isWindowVisible.value) {
-      startMonitoring()
-    }
   } catch (error) {
-    appState.isRunning = false
     message.error(error as string)
   } finally {
     isStarting.value = false
@@ -265,11 +210,8 @@ const runKernel = async () => {
 const stopKernel = async () => {
   try {
     isStopping.value = true
-    await invoke('stop_kernel')
-    appState.isRunning = false
+    await infoStore.stopKernel()
     message.success('内核已停止')
-    stopMonitoring()
-    // 停止时保留流量统计，不重置
   } catch (error) {
     message.error(error as string)
   } finally {

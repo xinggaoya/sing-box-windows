@@ -259,7 +259,7 @@ const deleteSubscription = (index: number) => {
 const downloadSubscription = async (url: string, index: number) => {
   subStore.list[index].isLoading = true
   try {
-    await invoke('update_subscription', { url })
+    await invoke('download_subscription', { url })
     subStore.list[index].lastUpdate = Date.now()
     message.success('更新成功')
   } catch (error) {
