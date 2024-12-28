@@ -49,9 +49,7 @@ declare module 'vue' {
     NText: typeof import('naive-ui')['NText']
     NTimeline: typeof import('naive-ui')['NTimeline']
     NTimelineItem: typeof import('naive-ui')['NTimelineItem']
-    NTooltip: typeof import('naive-ui')['NTooltip']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    TunModeSwitch: typeof import('./src/components/TunModeSwitch.vue')['default']
   }
 }

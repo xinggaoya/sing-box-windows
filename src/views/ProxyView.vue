@@ -91,7 +91,6 @@ import {
   SwapHorizontalOutline,
   SpeedometerOutline
 } from '@vicons/ionicons5'
-import TunModeSwitch from '../components/TunModeSwitch.vue'
 
 interface ProxyItem {
   name: string
