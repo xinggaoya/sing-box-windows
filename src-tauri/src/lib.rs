@@ -1,6 +1,10 @@
-use tauri::{Manager};
-use crate::app::app_service::{download_latest_kernel, download_subscription, start_kernel, stop_kernel};
-use crate::app::app_service::{set_system_proxy, set_tun_proxy};
+use crate::app::app_service::{
+    download_latest_kernel, download_subscription, start_kernel, stop_kernel,
+};
+use crate::app::app_service::{
+    get_memory_usage, get_traffic_data, set_system_proxy, set_tun_proxy,
+};
+use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
 
 mod app;
@@ -39,7 +43,9 @@ pub fn run() {
             download_subscription,
             stop_kernel,
             set_system_proxy,
-            set_tun_proxy
+            set_tun_proxy,
+            get_memory_usage,
+            get_traffic_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

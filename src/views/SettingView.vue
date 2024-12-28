@@ -1,55 +1,167 @@
 <template>
-  <n-card title="应用设置" style="height: 100%" content-style="height: 100%;">
-    <n-scrollbar>
-      <n-flex>
-        <n-text> 内核版本：{{ infoStore.version.version}}</n-text>
-        <n-text> 最新版本：{{ infoStore.newVersion}}</n-text>
-      </n-flex>
-      <div>
-        <n-form label-placement="left">
-          <n-form-item label="内核设置">
-            <n-button type="primary" @click="downloadTheKernel" :loading>下载内核</n-button>
-          </n-form-item>
-          <n-form-item label="开机自启">
-            <n-switch v-model:value="appStore.autoStart" @update-value="onAutoStartChange" />
-          </n-form-item>
-          <n-form-item label="自动启动内核">
-            <n-switch v-model:value="appStore.autoStartKernel" />
-          </n-form-item>
-        </n-form>
-      </div>
-    </n-scrollbar>
-  </n-card>
+  <n-space vertical>
+    <n-card>
+      <template #header>
+        <n-space align="center">
+          <n-h3 style="margin: 0">内核管理</n-h3>
+          <n-tag type="info" round>v{{ infoStore.version.version }}</n-tag>
+          <n-tag v-if="hasNewVersion" type="warning" round>
+            新版本可用: v{{ infoStore.newVersion }}
+          </n-tag>
+        </n-space>
+      </template>
+      <n-space vertical>
+        <n-alert
+          v-if="hasNewVersion"
+          type="warning"
+          title="发现新版本"
+        >
+          有新版本的内核可供下载，建议更新以获得更好的体验。
+        </n-alert>
+        <n-space align="center">
+          <n-button
+            type="primary"
+            @click="downloadTheKernel"
+            :loading="loading"
+          >
+            <template #icon>
+              <n-icon>
+                <download-outline />
+              </n-icon>
+            </template>
+            {{ hasNewVersion ? '下载新版本' : '重新下载当前版本' }}
+          </n-button>
+          <n-text depth="3" style="font-size: 14px">
+            当前版本：{{ infoStore.version.version }}
+            <n-text v-if="hasNewVersion" type="warning">
+              (可更新到 {{ infoStore.newVersion }})
+            </n-text>
+          </n-text>
+        </n-space>
+      </n-space>
+    </n-card>
+
+    <n-card>
+      <template #header>
+        <n-h3 style="margin: 0">启动设置</n-h3>
+      </template>
+      <n-form
+        label-placement="left"
+        :model="appStore"
+        label-width="120"
+        :style="{
+          maxWidth: '640px'
+        }"
+      >
+        <n-form-item label="开机自启">
+          <n-space align="center">
+            <n-switch
+              v-model:value="appStore.autoStart"
+              @update-value="onAutoStartChange"
+            >
+              <template #checked>
+                开启
+              </template>
+              <template #unchecked>
+                关闭
+              </template>
+            </n-switch>
+            <n-text depth="3">
+              {{ appStore.autoStart ? '应用将在系统启动时自动运行' : '应用需要手动启动' }}
+            </n-text>
+          </n-space>
+        </n-form-item>
+
+        <n-form-item label="自动启动内核">
+          <n-space align="center">
+            <n-switch v-model:value="appStore.autoStartKernel">
+              <template #checked>
+                开启
+              </template>
+              <template #unchecked>
+                关闭
+              </template>
+            </n-switch>
+            <n-text depth="3">
+              {{ appStore.autoStartKernel ? '应用启动时将自动启动内核' : '需要手动启动内核' }}
+            </n-text>
+          </n-space>
+        </n-form-item>
+      </n-form>
+    </n-card>
+
+    <n-card>
+      <template #header>
+        <n-h3 style="margin: 0">关于</n-h3>
+      </template>
+      <n-descriptions bordered>
+        <n-descriptions-item label="应用版本">
+          1.0.0
+        </n-descriptions-item>
+        <n-descriptions-item label="内核版本">
+          {{ infoStore.version.version }}
+        </n-descriptions-item>
+        <n-descriptions-item label="系统">
+          Windows
+        </n-descriptions-item>
+        <n-descriptions-item label="开源协议">
+          MIT License
+        </n-descriptions-item>
+      </n-descriptions>
+    </n-card>
+  </n-space>
 </template>
+
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useAppStore } from '@/stores/AppStore'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
 import { useInfoStore } from '@/stores/infoStore'
+import { DownloadOutline } from '@vicons/ionicons5'
 
 const message = useMessage()
 const appStore = useAppStore()
 const infoStore = useInfoStore()
 const loading = ref(false)
 
+const hasNewVersion = computed(() => {
+  if (!infoStore.newVersion || !infoStore.version.version) return false
+  return infoStore.newVersion !== infoStore.version.version
+})
+
 const downloadTheKernel = async () => {
-  loading.value = true
-  const res = await invoke('download_latest_kernel')
-  loading.value = false
-  message.success('下载完成')
+  try {
+    loading.value = true
+    await invoke('download_latest_kernel')
+    message.success(hasNewVersion.value ? '新版本下载完成' : '内核重新下载完成')
+  } catch (error) {
+    message.error(error as string)
+  } finally {
+    loading.value = false
+  }
 }
 
 const onAutoStartChange = async (value: boolean) => {
-  if (!value) {
-    await disable()
-    message.success('已关闭开机自启')
-  } else {
-    await enable()
-    message.success('已开启开机自启')
+  try {
+    if (!value) {
+      await disable()
+      message.success('已关闭开机自启')
+    } else {
+      await enable()
+      message.success('已开启开机自启')
+    }
+  } catch (error) {
+    message.error('设置失败')
+    // 回滚状态
+    appStore.autoStart = !value
   }
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.n-card {
+  margin-bottom: 16px;
+}
+</style>

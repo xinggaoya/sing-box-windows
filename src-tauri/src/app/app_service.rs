@@ -11,14 +11,15 @@ use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
 use winreg::RegKey;
 use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
 use crate::utils::app_util::get_work_dir;
+use serde_json::json;
 
 // 运行内核
 #[tauri::command]
-pub fn start_kernel() {
+pub fn start_kernel() -> Result<(), String> {
     let word_dir = get_work_dir();
-    // 命令执行 不堵塞
     let kernel_path = Path::new(&word_dir).join("sing-box/sing-box");
     let kernel_word_dir = Path::new(&word_dir).join("sing-box");
+    
     let res = std::process::Command::new(kernel_path.to_str().unwrap())
         .arg("run")
         .arg("-D")
@@ -30,7 +31,7 @@ pub fn start_kernel() {
         Ok(child) => child,
         Err(e) => {
             error!("Error starting kernel: {}", e);
-            return;
+            return Err(format!("启动内核失败: {}", e));
         }
     };
 
@@ -40,23 +41,17 @@ pub fn start_kernel() {
     let file = File::create(pid_path.to_str().unwrap());
     match file {
         Ok(mut file) => match file.write_all(pid.to_string().as_bytes()) {
-            Ok(_) => {}
-            Err(e) => {
-                println!("Error writing to file: {}", e);
-            }
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("写入PID文件失败: {}", e))
         },
-        Err(e) => {
-            println!("Error creating file: {}", e);
-        }
+        Err(e) => Err(format!("创建PID文件失败: {}", e))
     }
 }
 
 // 停止
 #[tauri::command]
-pub fn stop_kernel() {
-    if let Err(e) = stop_kernel_impl() {
-        println!("Error: {}", e);
-    }
+pub fn stop_kernel() -> Result<(), String> {
+    stop_kernel_impl().map_err(|e| format!("停止内核失败: {}", e))
 }
 
 fn stop_kernel_impl() -> Result<(), Box<dyn Error>> {
@@ -92,11 +87,11 @@ fn kill_process(pid: u32) -> Result<(), Box<dyn Error>> {
 
 // 下载订阅
 #[tauri::command]
-pub async fn download_subscription(url: String) {
-    if let Err(e) = download_and_process_subscription(url).await {
-        println!("Error: {:?}", e);
-    }
-    set_system_proxy()
+pub async fn download_subscription(url: String) -> Result<(), String> {
+    download_and_process_subscription(url).await
+        .map_err(|e| format!("下载订阅失败: {}", e))?;
+    set_system_proxy();
+    Ok(())
 }
 
 async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Error>> {
@@ -179,7 +174,7 @@ pub async fn download_latest_kernel() -> Result<(), String> {
             // 下载文件
             let path = Path::new(&path.to_str().unwrap()).join(&asset.name);
             // 加速下载
-            let speed_url = format!("https://ghp.ci/{}", asset.browser_download_url);
+            let speed_url = format!("https://ghgo.xyz/{}", asset.browser_download_url);
             download_file(speed_url, path.to_str().unwrap())
                 .await
                 .map_err(|e| format!("Failed to download file: {}", e))?;
@@ -197,41 +192,39 @@ pub async fn download_latest_kernel() -> Result<(), String> {
 
 // 修改代理模式为系统代理
 #[tauri::command]
-pub fn set_system_proxy() {
+pub fn set_system_proxy() -> Result<(), String> {
     let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/config.json");
-    let json_util = ConfigUtil::new(path.to_str().unwrap());
+    let json_util = ConfigUtil::new(path.to_str().unwrap())
+        .map_err(|e| format!("读取配置文件失败: {}", e))?;
 
-    match json_util {
-        Ok(mut json_util) => {
-            let target_keys = vec!["inbounds"];
-            let new_structs = vec![config_model::Inbound {
-                r#type: "mixed".to_string(),
-                tag: "mixed-in".to_string(),
-                listen: Some("0.0.0.0".to_string()),
-                listen_port: Some(2080),
-                inet4_address: None,
-                auto_route: None,
-                strict_route: None,
-                stack: None,
-                sniff: None,
-                set_system_proxy: Some(true),
-            }];
-            json_util.modify_property(&target_keys, serde_json::to_value(new_structs).unwrap());
-            json_util.save().unwrap()
-        }
-        Err(e) => {
-            error!("修改配置文件失败: {}", e)
-        }
-    }
-    info!("代理模式已修改")
+    let mut json_util = json_util;
+    let target_keys = vec!["inbounds"];
+    let new_structs = vec![config_model::Inbound {
+        r#type: "mixed".to_string(),
+        tag: "mixed-in".to_string(),
+        listen: Some("0.0.0.0".to_string()),
+        listen_port: Some(2080),
+        inet4_address: None,
+        auto_route: None,
+        strict_route: None,
+        stack: None,
+        sniff: None,
+        set_system_proxy: Some(true),
+    }];
+    
+    json_util.modify_property(&target_keys, serde_json::to_value(new_structs)
+        .map_err(|e| format!("序列化配置失败: {}", e))?);
+    json_util.save()
+        .map_err(|e| format!("保存配置文件失败: {}", e))?;
+    
+    info!("代理模式已修改");
+    Ok(())
 }
 // 修改TUN 模式为代理模式
 #[tauri::command]
-pub fn set_tun_proxy() {
-    if let Err(e) = set_tun_proxy_impl() {
-        error!("设置TUN代理失败: {}", e);
-    }
+pub fn set_tun_proxy() -> Result<(), String> {
+    set_tun_proxy_impl().map_err(|e| format!("设置TUN代理失败: {}", e))
 }
 
 fn set_tun_proxy_impl() -> Result<(), Box<dyn Error>> {
@@ -288,4 +281,55 @@ fn disable_proxy() -> Result<(), Box<dyn Error>> {
     internet_settings.set_value("ProxyServer", &"")?;
 
     Ok(())
+}
+
+// 获取内存使用情况
+#[tauri::command]
+pub async fn get_memory_usage() -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = "http://127.0.0.1:9090/memory";
+    
+    let response = client.get(url)
+        .send()
+        .await
+        .map_err(|e| format!("请求内存数据失败: {}", e))?;
+        
+    let data = response.json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("解析内存数据失败: {}", e))?;
+        
+    Ok(data)
+}
+
+// 获取流量数据
+#[tauri::command]
+pub async fn get_traffic_data() -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = "http://127.0.0.1:9090/traffic";
+    
+    let response = client.get(url)
+        .send()
+        .await
+        .map_err(|e| format!("请求流量数据失败: {}", e))?;
+        
+    let mut data = response.json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("解析流量数据失败: {}", e))?;
+        
+    // 确保数据中包含总流量
+    if let Some(obj) = data.as_object_mut() {
+        // 如果没有总流量字段，添加它们
+        if !obj.contains_key("upTotal") {
+            if let Some(up) = obj.get("up").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()) {
+                obj.insert("upTotal".to_string(), json!(up));
+            }
+        }
+        if !obj.contains_key("downTotal") {
+            if let Some(down) = obj.get("down").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()) {
+                obj.insert("downTotal".to_string(), json!(down));
+            }
+        }
+    }
+        
+    Ok(data)
 }

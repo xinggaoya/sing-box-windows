@@ -10,6 +10,7 @@ export const useInfoStore = defineStore('info', () => {
   const traffic = ref({
     up: 0,
     down: 0,
+    total: 0
   })
 
   const memory = ref({
@@ -36,12 +37,10 @@ export const useInfoStore = defineStore('info', () => {
   const initWS = async () => {
     // 流量
     createWebSocket(`ws://127.0.0.1:9090/traffic?token=`, (data) => {
-      traffic.value = data
-      // 转int
-      appState.usedData += Number(data.up + data.down)
+      updateTraffic(data)
     })
     createWebSocket(`ws://127.0.0.1:9090/memory?token=`, (data) => {
-      memory.value = data
+      updateMemory(data)
     })
     createWebSocket(`ws://127.0.0.1:9090/logs?token=`, (data) => {
       logs.value.push(data)
@@ -84,7 +83,11 @@ export const useInfoStore = defineStore('info', () => {
           appState.isRunning = false
           memory.value = { inuse: 0, oslimit: 0 }
           logs.value = []
-          traffic.value = { up: 0, down: 0 }
+          traffic.value = {
+            up: 0,
+            down: 0,
+            total: 0
+          }
         })
         .catch(() => {
           reject()
@@ -99,5 +102,28 @@ export const useInfoStore = defineStore('info', () => {
     newVersion.value = json.tag_name
   }
 
-  return { traffic, memory, logs, version, newVersion, startKernel, stopKernel }
+  const updateMemory = (data: any) => {
+    memory.value = data
+  }
+
+  const updateTraffic = (data: any) => {
+    const currentUp = Number(data.up) || 0
+    const currentDown = Number(data.down) || 0
+    
+    traffic.value = {
+      up: currentUp,
+      down: currentDown,
+      total: traffic.value.total + currentUp + currentDown
+    }
+  }
+
+  const resetTraffic = () => {
+    traffic.value = {
+      up: 0,
+      down: 0,
+      total: 0
+    }
+  }
+
+  return { traffic, memory, logs, version, newVersion, startKernel, stopKernel, updateMemory, updateTraffic, resetTraffic }
 })
