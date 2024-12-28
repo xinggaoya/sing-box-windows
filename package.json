@@ -15,7 +15,6 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.3",
     "@tauri-apps/plugin-autostart": "~2",
     "@tauri-apps/plugin-window-state": "~2.0.0",
     "@vicons/ionicons5": "^0.12.0",

@@ -179,6 +179,13 @@ import {
 } from '@vicons/ionicons5'
 import type { FormInst, FormRules } from 'naive-ui'
 
+interface Subscription {
+  name: string
+  url: string
+  isLoading?: boolean
+  lastUpdate?: number
+}
+
 const message = useMessage()
 const subStore = useSubStore()
 const showAddModal = ref(false)
@@ -186,7 +193,7 @@ const editIndex = ref<number | null>(null)
 const formRef = ref<FormInst | null>(null)
 const isLoading = ref(false)
 
-const formValue = ref({
+const formValue = ref<Subscription>({
   name: '',
   url: ''
 })
@@ -209,7 +216,7 @@ const resetForm = () => {
   editIndex.value = null
 }
 
-const handleEdit = (index: number, item: any) => {
+const handleEdit = (index: number, item: Subscription) => {
   editIndex.value = index
   formValue.value = {
     name: item.name,
@@ -250,19 +257,15 @@ const deleteSubscription = (index: number) => {
 }
 
 const downloadSubscription = async (url: string, index: number) => {
-  if (!subStore.list[index]) return
   subStore.list[index].isLoading = true
-  
   try {
-    await invoke('download_subscription', { url })
+    await invoke('update_subscription', { url })
     subStore.list[index].lastUpdate = Date.now()
     message.success('更新成功')
   } catch (error) {
-    message.error(error as string)
+    message.error('更新失败：' + error)
   } finally {
-    if (subStore.list[index]) {
-      subStore.list[index].isLoading = false
-    }
+    subStore.list[index].isLoading = false
   }
 }
 

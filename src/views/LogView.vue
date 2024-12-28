@@ -127,7 +127,7 @@ onMounted(() => {
 })
 
 const loadInitialLogs = () => {
-  const initialLogs = infoStore.logs.slice(0, 20).map(log => ({
+  const initialLogs = infoStore.logs.slice(0, 20).map((log: any) => ({
     ...log,
     timestamp: Date.now()
   }))
@@ -137,7 +137,7 @@ const loadInitialLogs = () => {
 const handleLoad = () => {
   const newLogs = infoStore.logs
     .slice(logs.value.length, logs.value.length + 20)
-    .map(log => ({
+    .map((log: any) => ({
       ...log,
       timestamp: Date.now()
     }))
