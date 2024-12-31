@@ -118,7 +118,7 @@ fn stop_kernel_impl() -> Result<(), Box<dyn Error>> {
     let pid: u32 = match buffer.trim().parse() {
         Ok(pid) => pid,
         Err(e) => {
-            info!("PID���式无效: {}, 内核可能已经停止", e);
+            info!("PID格式无效: {}, 内核可能已经停止", e);
             disable_proxy()?;
             return Ok(());
         }
@@ -207,57 +207,127 @@ pub async fn download_latest_kernel() -> Result<(), String> {
     let url = "https://api.github.com/repos/SagerNet/sing-box/releases/latest";
     let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/");
-    let client = reqwest::Client::new();
+    
+    // 确保目录存在
+    if let Err(e) = std::fs::create_dir_all(&path) {
+        error!("创建目录失败: {}", e);
+        return Err(format!("创建目录失败: {}", e));
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
+
     // 设置请求头
     let mut headers = reqwest::header::HeaderMap::new();
-    let user_agent = reqwest::header::HeaderValue
-    ::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\
-     (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
+    let user_agent = reqwest::header::HeaderValue::from_static(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+    );
     headers.insert(reqwest::header::USER_AGENT, user_agent);
 
+    info!("正在获取最新版本信息...");
     let response = client
         .get(url)
-        .headers(headers)
+        .headers(headers.clone())
         .send()
         .await
-        .map_err(|e| format!("Error: {:?}", e.status()))?;
+        .map_err(|e| format!("请求GitHub API失败: {}", e))?;
+
+    if !response.status().is_success() {
+        error!("GitHub API请求失败: {}", response.status());
+        return Err(format!("GitHub API请求失败: {}", response.status()));
+    }
 
     let text = response
         .text()
         .await
-        .map_err(|e| format!("Failed to get response text: {}", e))?;
-    // json 转实体
-    let json: github_model::Release =
-        serde_json::from_str(&text).map_err(|e| format!("Error parsing JSON: {}", e))?;
+        .map_err(|e| format!("读取响应内容失败: {}", e))?;
+
+    info!("正在解析版本信息...");
+    let json: github_model::Release = serde_json::from_str(&text)
+        .map_err(|e| format!("解析JSON失败: {}", e))?;
+
+    info!("最新版本: {}", json.tag_name);
 
     // 获取当前系统平台
     let platform = std::env::consts::OS;
-    // 获取系统 比如amd64
+    // 获取系统架构
     let mut arch = std::env::consts::ARCH;
     if arch == "x86_64" {
         arch = "amd64";
     }
 
-    let str = format!("{}-{}.zip", platform, arch);
-    for asset in json.assets {
-        if asset.name.contains(&str) {
-            info!("Asset: {}", asset.name);
-            // 下载文件
-            let path = Path::new(&path.to_str().unwrap()).join(&asset.name);
-            // 加速下载
-            let speed_url = format!("https://ghgo.xyz/{}", asset.browser_download_url);
-            download_file(speed_url, path.to_str().unwrap())
-                .await
-                .map_err(|e| format!("Failed to download file: {}", e))?;
-            // 解压文件
-            let word_dir = get_work_dir();
-            let out_path = Path::new(&word_dir).join("sing-box");
-            let to_path = out_path.join(asset.name);
-            unzip_file(&to_path.to_str().unwrap(), out_path.to_str().unwrap()).await?;
+    let target_file = format!("{}-{}.zip", platform, arch);
+    info!("目标文件名: {}", target_file);
+    
+    let mut found = false;
+    let mut download_attempted = false;
 
-            info!("内核已下载,路径: {}", path.to_str().unwrap())
+    for asset in json.assets {
+        if asset.name.contains(&target_file) {
+            info!("找到匹配的文件: {}", asset.name);
+            found = true;
+            download_attempted = true;
+            
+            let download_path = Path::new(&path).join(&asset.name);
+            
+            // 尝试多个下载源
+            let download_urls = vec![
+                format!("https://ghgo.xyz/{}", asset.browser_download_url),
+                format!("https://gh.api.99988866.xyz/{}", asset.browser_download_url),
+                asset.browser_download_url.clone()
+            ];
+
+            let mut success = false;
+            let mut last_error = String::new();
+
+            for url in &download_urls {
+                info!("尝试从 {} 下载", url);
+                match download_file(url.clone(), download_path.to_str().unwrap()).await {
+                    Ok(_) => {
+                        success = true;
+                        info!("下载成功");
+                        break;
+                    }
+                    Err(e) => {
+                        error!("从 {} 下载失败: {}", url, e);
+                        last_error = e;
+                        continue;
+                    }
+                }
+            }
+
+            if !success {
+                return Err(format!("所有下载源均失败，最后一次错误: {}", last_error));
+            }
+
+            // 解压文件
+            info!("开始解压文件...");
+            let out_path = Path::new(&work_dir).join("sing-box");
+            match unzip_file(download_path.to_str().unwrap(), out_path.to_str().unwrap()).await {
+                Ok(_) => {
+                    info!("内核已下载并解压到: {}", out_path.display());
+                    break;
+                }
+                Err(e) => {
+                    error!("解压文件失败: {}", e);
+                    return Err(format!("解压文件失败: {}", e));
+                }
+            }
         }
     }
+
+    if !found {
+        error!("未找到适配当前系统的版本: {}-{}", platform, arch);
+        return Err(format!("未找到适配当前系统的版本: {}-{}", platform, arch));
+    }
+
+    if !download_attempted {
+        error!("未尝试下载任何文件");
+        return Err("未尝试下载任何文件".to_string());
+    }
+
     Ok(())
 }
 

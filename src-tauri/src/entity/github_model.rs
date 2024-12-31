@@ -1,110 +1,37 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct User {
-    login: String,
-    id: u64,
-    node_id: String,
-    avatar_url: String,
-    gravatar_id: String,
-    url: String,
-    html_url: String,
-    followers_url: String,
-    following_url: String,
-    gists_url: String,
-    starred_url: String,
-    subscriptions_url: String,
-    organizations_url: String,
-    repos_url: String,
-    events_url: String,
-    received_events_url: String,
-    #[serde(rename = "type")]
-    user_type: String,
-    user_view_type: String,
-    site_admin: bool,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Release {
+    pub url: String,
+    pub assets_url: String,
+    pub upload_url: String,
+    pub html_url: String,
+    pub id: i64,
+    pub tag_name: String,
+    pub target_commitish: String,
+    pub name: Option<String>,
+    pub draft: bool,
+    pub prerelease: bool,
+    pub created_at: String,
+    pub published_at: Option<String>,
+    pub assets: Vec<Asset>,
+    pub tarball_url: Option<String>,
+    pub zipball_url: Option<String>,
+    pub body: Option<String>,
 }
 
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct AssetUploader {
-    login: String,
-    id: u64,
-    node_id: String,
-    avatar_url: String,
-    gravatar_id: String,
-    url: String,
-    html_url: String,
-    followers_url: String,
-    following_url: String,
-    gists_url: String,
-    starred_url: String,
-    subscriptions_url: String,
-    organizations_url: String,
-    repos_url: String,
-    events_url: String,
-    received_events_url: String,
-    #[serde(rename = "type")]
-    user_type: String,
-    user_view_type: String,
-    site_admin: bool,
-}
-
-#[derive(Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Asset {
     pub url: String,
-    id: u64,
-    node_id: String,
+    pub id: i64,
+    pub node_id: String,
     pub name: String,
-    pub label: String,
-    uploader: AssetUploader,
-    content_type: String,
-    state: String,
-    size: u64,
-    download_count: u64,
-    created_at: String,
-    updated_at: String,
+    pub label: Option<String>,
+    pub content_type: String,
+    pub state: String,
+    pub size: i64,
+    pub download_count: i64,
+    pub created_at: String,
+    pub updated_at: String,
     pub browser_download_url: String,
-}
-
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct Reactions {
-    url: String,
-    total_count: i32,
-    #[serde(rename = "+1")]
-    plus_one: i32,
-    #[serde(rename = "-1")]
-    minus_one: i32,
-    laugh: i32,
-    hooray: i32,
-    confused: i32,
-    heart: i32,
-    rocket: i32,
-    eyes: i32,
-}
-
-#[derive(Deserialize)]
-#[allow(dead_code)]
-pub struct Release {
-    url: String,
-    assets_url: String,
-    upload_url: String,
-    html_url: String,
-    id: u64,
-    author: User,
-    node_id: String,
-    tag_name: String,
-    target_commitish: String,
-    name: String,
-    draft: bool,
-    prerelease: bool,
-    created_at: String,
-    published_at: String,
-    pub assets: Vec<Asset>,
-    tarball_url: String,
-    zipball_url: String,
-    body: String,
-    reactions: Reactions,
 }
