@@ -12,25 +12,22 @@
 import { TrayIcon } from '@tauri-apps/api/tray'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
-import { onMounted, ref } from 'vue'
+import { onMounted } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
 import { useInfoStore } from '@/stores/infoStore'
 import { invoke } from '@tauri-apps/api/core'
-import { darkTheme, useMessage, type MessageApi } from 'naive-ui'
+import { darkTheme } from 'naive-ui'
 
 const appWindow = Window.getCurrent()
 const appStore = useAppStore()
 const infoStore = useInfoStore()
 const theme = darkTheme
-const message = ref<MessageApi>()
 
 onMounted(async () => {
-  message.value = useMessage()
-
   // 初始化托盘图标
   await initTray()
-  
+
   // 如果不是开发环境，禁用右键菜单
   if (!import.meta.env.DEV) {
     document.oncontextmenu = () => false
@@ -41,21 +38,19 @@ onMounted(async () => {
     try {
       // 检查是否有管理员权限
       const isAdmin = await invoke('check_admin')
-      
+
       if (isAdmin) {
         // 如果是管理员权限，尝试启动内核
         await invoke('start_kernel')
-        message.value?.success('内核已自动启动')
       } else {
         // 如果不是管理员权限，切换到系统代理模式并启动
         await invoke('set_system_proxy')
         appStore.mode = 'system'
         await invoke('start_kernel')
-        message.value?.success('内核已以系统代理模式自动启动')
       }
       appStore.isRunning = true
     } catch (error) {
-      message.value?.error('自动启动内核失败: ' + (error as string))
+      console.error('自动启动内核失败: ' + (error as string))
     }
   }
 })
