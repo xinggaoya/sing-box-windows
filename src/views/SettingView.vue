@@ -18,11 +18,23 @@
         >
           有新版本的内核可供下载，建议更新以获得更好的体验。
         </n-alert>
+        
+        <n-progress
+          v-if="downloading"
+          type="line"
+          :percentage="downloadProgress"
+          :processing="downloadProgress < 100"
+          :indicator-placement="'inside'"
+        >
+          {{ downloadMessage }}
+        </n-progress>
+
         <n-space align="center">
           <n-button
             type="primary"
             @click="downloadTheKernel"
             :loading="loading"
+            :disabled="downloading"
           >
             <template #icon>
               <n-icon>
@@ -34,7 +46,7 @@
           <n-text depth="3" style="font-size: 14px">
             当前版本：{{ infoStore.version.version }}
             <n-text v-if="hasNewVersion" type="warning">
-              (可更新到 {{ infoStore.newVersion }})
+              新版本可用: v{{ infoStore.newVersion }}
             </n-text>
           </n-text>
         </n-space>
@@ -113,18 +125,34 @@
 </template>
 
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
 import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
-import { useAppStore } from '@/stores/AppStore'
+import { invoke } from '@tauri-apps/api/core'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
 import { useInfoStore } from '@/stores/infoStore'
+import { useAppStore } from '@/stores/AppStore'
 import { DownloadOutline } from '@vicons/ionicons5'
+import { listen } from '@tauri-apps/api/event'
 
 const message = useMessage()
 const appStore = useAppStore()
 const infoStore = useInfoStore()
 const loading = ref(false)
+const downloading = ref(false)
+const downloadProgress = ref(0)
+const downloadMessage = ref('')
+
+// 监听下载进度事件
+listen('download-progress', (event: any) => {
+  const { status, progress, message: msg } = event.payload
+  downloadProgress.value = progress
+  downloadMessage.value = msg
+  
+  if (status === 'completed') {
+    downloading.value = false
+    message.success('内核下载完成！')
+  }
+})
 
 const hasNewVersion = computed(() => {
   if (!infoStore.newVersion || !infoStore.version.version) return false
@@ -134,10 +162,14 @@ const hasNewVersion = computed(() => {
 const downloadTheKernel = async () => {
   try {
     loading.value = true
+    downloading.value = true
+    downloadProgress.value = 0
+    downloadMessage.value = '准备下载...'
+    
     await invoke('download_latest_kernel')
-    message.success(hasNewVersion.value ? '新版本下载完成' : '内核重新下载完成')
   } catch (error) {
     message.error(error as string)
+    downloading.value = false
   } finally {
     loading.value = false
   }

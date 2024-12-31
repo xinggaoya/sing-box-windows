@@ -6,7 +6,10 @@ use futures_util::StreamExt;
 use std::io::Write;
 
 // 根据url下载文件到指定位置
-pub async fn download_file(url: String, path: &str) -> Result<(), String> {
+pub async fn download_file<F>(url: String, path: &str, progress_callback: F) -> Result<(), String>
+where
+    F: Fn(u32) + Send + 'static,
+{
     let file_path = Path::new(path);
     info!(
         "开始下载文件: {} -> {}",
@@ -48,7 +51,7 @@ pub async fn download_file(url: String, path: &str) -> Result<(), String> {
 
     let mut downloaded = 0u64;
     let mut stream = response.bytes_stream();
-    let mut last_percent = 0u64;
+    let mut last_percent = 0u32;
 
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("下载过程中出错: {}", e))?;
@@ -56,11 +59,11 @@ pub async fn download_file(url: String, path: &str) -> Result<(), String> {
             .map_err(|e| format!("写入文件失败: {}", e))?;
         
         downloaded += chunk.len() as u64;
-        let percent = downloaded * 100 / total_size;
+        let percent = (downloaded as f64 / total_size as f64 * 100.0) as u32;
         
-        // 每增加5%显示一次进度
-        if percent > last_percent && percent % 5 == 0 {
-            info!("下载进度: {}%", percent);
+        // 每当进度变化时通知回调
+        if percent != last_percent {
+            progress_callback(percent);
             last_percent = percent;
         }
     }

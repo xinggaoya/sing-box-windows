@@ -12,6 +12,7 @@ use winreg::RegKey;
 use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
 use crate::utils::app_util::get_work_dir;
 use serde_json::json;
+use tauri::Emitter;
 
 // 以管理员权限重启
 #[tauri::command]
@@ -203,7 +204,7 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
 
 // 下载内核
 #[tauri::command]
-pub async fn download_latest_kernel() -> Result<(), String> {
+pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String> {
     let url = "https://api.github.com/repos/SagerNet/sing-box/releases/latest";
     let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/");
@@ -227,6 +228,13 @@ pub async fn download_latest_kernel() -> Result<(), String> {
     headers.insert(reqwest::header::USER_AGENT, user_agent);
 
     info!("正在获取最新版本信息...");
+    // 发送进度事件
+    let _ = window.emit("download-progress", json!({
+        "status": "checking",
+        "progress": 0,
+        "message": "正在获取最新版本信息..."
+    }));
+
     let response = client
         .get(url)
         .headers(headers.clone())
@@ -249,6 +257,12 @@ pub async fn download_latest_kernel() -> Result<(), String> {
         .map_err(|e| format!("解析JSON失败: {}", e))?;
 
     info!("最新版本: {}", json.tag_name);
+    // 发送进度事件
+    let _ = window.emit("download-progress", json!({
+        "status": "found",
+        "progress": 10,
+        "message": format!("找到最新版本: {}", json.tag_name)
+    }));
 
     // 获取当前系统平台
     let platform = std::env::consts::OS;
@@ -272,6 +286,13 @@ pub async fn download_latest_kernel() -> Result<(), String> {
             
             let download_path = Path::new(&path).join(&asset.name);
             
+            // 发送进度事件
+            let _ = window.emit("download-progress", json!({
+                "status": "downloading",
+                "progress": 20,
+                "message": format!("开始下载文件: {}", asset.name)
+            }));
+            
             // 尝试多个下载源
             let download_urls = vec![
                 format!("https://ghgo.xyz/{}", asset.browser_download_url),
@@ -284,7 +305,15 @@ pub async fn download_latest_kernel() -> Result<(), String> {
 
             for url in &download_urls {
                 info!("尝试从 {} 下载", url);
-                match download_file(url.clone(), download_path.to_str().unwrap()).await {
+                let window_clone = window.clone();
+                match download_file(url.clone(), download_path.to_str().unwrap(), move |progress| {
+                    let real_progress = 20 + (progress as f64 * 0.6) as u32; // 20-80%的进度用于下载
+                    let _ = window_clone.emit("download-progress", json!({
+                        "status": "downloading",
+                        "progress": real_progress,
+                        "message": format!("正在下载: {}%", progress)
+                    }));
+                }).await {
                     Ok(_) => {
                         success = true;
                         info!("下载成功");
@@ -304,10 +333,23 @@ pub async fn download_latest_kernel() -> Result<(), String> {
 
             // 解压文件
             info!("开始解压文件...");
+            // 发送进度事件
+            let _ = window.emit("download-progress", json!({
+                "status": "extracting",
+                "progress": 80,
+                "message": "正在解压文件..."
+            }));
+
             let out_path = Path::new(&work_dir).join("sing-box");
             match unzip_file(download_path.to_str().unwrap(), out_path.to_str().unwrap()).await {
                 Ok(_) => {
                     info!("内核已下载并解压到: {}", out_path.display());
+                    // 发送完成事件
+                    let _ = window.emit("download-progress", json!({
+                        "status": "completed",
+                        "progress": 100,
+                        "message": "下载完成！"
+                    }));
                     break;
                 }
                 Err(e) => {
