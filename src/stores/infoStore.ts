@@ -26,6 +26,7 @@ export const useInfoStore = defineStore('info', () => {
 
   const newVersion = ref('')
 
+  const MAX_LOGS = 1000; // 最大日志条数
   const logs = ref<any>([])
 
   onMounted(() => {
@@ -33,6 +34,15 @@ export const useInfoStore = defineStore('info', () => {
       initWS()
     }
   })
+
+  // 添加日志
+  const addLog = (data: any) => {
+    logs.value.push(data);
+    // 如果超过最大日志数，删除最早的日志
+    if (logs.value.length > MAX_LOGS) {
+      logs.value = logs.value.slice(-MAX_LOGS);
+    }
+  }
 
   const initWS = async () => {
     // 流量
@@ -43,30 +53,48 @@ export const useInfoStore = defineStore('info', () => {
       updateMemory(data)
     })
     createWebSocket(`ws://127.0.0.1:9090/logs?token=`, (data) => {
-      logs.value.push(data)
+      addLog(data)
     })
   }
 
   // 检查是否成功
   const startKernel = async () => {
     return new Promise((resolve, reject) => {
+      let retryCount = 0;
+      const maxRetries = 3;
+      
       const retryFetch = async () => {
         try {
+          // 启动内核
           await invoke('start_kernel')
+          
+          // 等待内核启动并检查状态
           const res = await fetch('http://127.0.0.1:9090/version')
           if (!res.ok) {
             throw new Error(`HTTP error! status: ${res.status}`)
           }
+          
           const json = await res.json()
-          resolve(json)
           version.value = json
           appState.isRunning = true
-          getLatestVersion()
-          initWS()
+          
+          // 获取最新版本信息
+          await getLatestVersion()
+          
+          // 初始化WebSocket连接
+          await initWS()
+          
+          resolve(json)
         } catch (error) {
-          console.error('请求失败:', error)
-          console.log('将在1秒后重试...')
-          setTimeout(retryFetch, 1000) // 等待1秒后重试
+          console.error('启动失败:', error)
+          
+          if (retryCount < maxRetries) {
+            retryCount++
+            console.log(`重试第 ${retryCount} 次，共 ${maxRetries} 次`)
+            setTimeout(retryFetch, 1000) // 等待1秒后重试
+          } else {
+            reject(new Error(`启动失败，已重试 ${maxRetries} 次: ${error}`))
+          }
         }
       }
 

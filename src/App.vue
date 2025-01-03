@@ -36,24 +36,35 @@ onMounted(async () => {
   // 如果开启了自动启动内核
   if (appStore.autoStartKernel && !appStore.isRunning) {
     try {
-      // 检查是否有管理员权限
-      const isAdmin = await invoke('check_admin')
-
-      if (isAdmin) {
-        // 如果是管理员权限，尝试启动内核
-        await invoke('start_kernel')
-      } else {
-        // 如果不是管理员权限，切换到系统代理模式并启动
-        await invoke('set_system_proxy')
-        appStore.mode = 'system'
-        await invoke('start_kernel')
-      }
-      appStore.isRunning = true
+      await startKernel()
     } catch (error) {
-      console.error('自动启动内核失败: ' + (error as string))
+      console.error('自动启动内核失败:', error)
     }
   }
 })
+
+// 启动内核的统一处理函数
+const startKernel = async () => {
+  try {
+    // 检查是否有管理员权限
+    const isAdmin = await invoke('check_admin')
+    
+    if (!isAdmin) {
+      // 如果不是管理员权限，切换到系统代理模式
+      appStore.mode = 'system'
+    }
+    
+    // 启动内核
+    await infoStore.startKernel()
+    
+    // 更新状态
+    appStore.isRunning = true
+    
+  } catch (error) {
+    console.error('启动内核失败:', error)
+    throw error
+  }
+}
 
 const initTray = async () => {
   const menu = await Menu.new({

@@ -4,7 +4,7 @@
       <n-space align="center" justify="space-between">
         <n-space align="center">
           <n-h3 style="margin: 0">运行日志</n-h3>
-          <n-text depth="3">{{ logs.length }} 条记录</n-text>
+          <n-text depth="3">{{ displayedLogs.length }}/{{ totalLogs }} 条记录</n-text>
         </n-space>
         <n-space>
           <n-select
@@ -18,7 +18,7 @@
             circle
             type="primary"
             @click="clearLogs"
-            :disabled="!logs.length"
+            :disabled="!displayedLogs.length"
           >
             <template #icon>
               <n-icon><TrashOutline /></n-icon>
@@ -29,7 +29,7 @@
             circle
             type="primary"
             @click="copyLogs"
-            :disabled="!logs.length"
+            :disabled="!displayedLogs.length"
           >
             <template #icon>
               <n-icon><CopyOutline /></n-icon>
@@ -40,31 +40,34 @@
     </n-card>
 
     <n-card>
-      <n-scrollbar style="max-height: calc(100vh - 180px)" trigger="none">
-        <n-infinite-scroll @load="handleLoad">
-          <n-space vertical>
-            <n-timeline>
-              <n-timeline-item
-                v-for="(log, index) in filteredLogs"
-                :key="index"
-                :type="getLogType(log.type)"
-                :title="formatTime(log.timestamp)"
-                :content="log.payload"
-                :time="formatTime(log.timestamp, true)"
-              >
-                <template #icon>
-                  <n-icon>
-                    <component :is="getLogIcon(log.type)" />
-                  </n-icon>
-                </template>
-              </n-timeline-item>
-            </n-timeline>
-            <n-empty
-              v-if="!filteredLogs.length"
-              description="暂无日志记录"
-            />
-          </n-space>
-        </n-infinite-scroll>
+      <n-scrollbar 
+        ref="scrollbarRef"
+        style="max-height: calc(100vh - 180px)" 
+        trigger="none"
+        @scroll="handleScroll"
+      >
+        <div class="log-container">
+          <n-timeline>
+            <n-timeline-item
+              v-for="(log, index) in displayedLogs"
+              :key="log.timestamp + index"
+              :type="getLogType(log.type)"
+              :title="formatTime(log.timestamp)"
+              :content="log.payload"
+              :time="formatTime(log.timestamp, true)"
+            >
+              <template #icon>
+                <n-icon>
+                  <component :is="getLogIcon(log.type)" />
+                </n-icon>
+              </template>
+            </n-timeline-item>
+          </n-timeline>
+          <n-empty
+            v-if="!displayedLogs.length"
+            description="暂无日志记录"
+          />
+        </div>
       </n-scrollbar>
     </n-card>
   </n-space>
@@ -72,7 +75,7 @@
 
 <script setup lang="ts">
 import { useInfoStore } from '@/stores/infoStore'
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   TrashOutline,
@@ -89,72 +92,81 @@ interface Log {
   timestamp: number
 }
 
+const PAGE_SIZE = 50; // 每页显示的日志数量
 const message = useMessage()
 const infoStore = useInfoStore()
-const logs = ref<Log[]>([])
+const scrollbarRef = ref(null)
+const currentPage = ref(1)
 const filterType = ref<string | null>(null)
+const displayedLogs = ref<Log[]>([])
+
+const totalLogs = computed(() => {
+  return filterType.value
+    ? infoStore.logs.filter((log: Log) => log.type === filterType.value).length
+    : infoStore.logs.length
+})
 
 const logTypeOptions = [
-  {
-    label: '全部',
-    value: null
-  },
-  {
-    label: '信息',
-    value: 'info'
-  },
-  {
-    label: '警告',
-    value: 'warning'
-  },
-  {
-    label: '错误',
-    value: 'error'
-  },
-  {
-    label: '成功',
-    value: 'success'
-  }
+  { label: '全部', value: null },
+  { label: '信息', value: 'info' },
+  { label: '警告', value: 'warning' },
+  { label: '错误', value: 'error' },
+  { label: '成功', value: 'success' }
 ]
 
-const filteredLogs = computed(() => {
-  if (!filterType.value) return logs.value
-  return logs.value.filter(log => log.type === filterType.value)
+// 监听筛选条件变化
+watch(filterType, () => {
+  currentPage.value = 1;
+  loadLogs();
 })
+
+// 加载日志
+const loadLogs = () => {
+  const start = (currentPage.value - 1) * PAGE_SIZE;
+  const filteredLogs = filterType.value
+    ? infoStore.logs.filter((log: Log) => log.type === filterType.value)
+    : infoStore.logs;
+  
+  displayedLogs.value = filteredLogs
+    .slice(start, start + PAGE_SIZE)
+    .map((log: Log) => ({
+      ...log,
+      timestamp: log.timestamp || Date.now()
+    }));
+}
+
+// 处理滚动
+const handleScroll = (e: any) => {
+  const { scrollTop, scrollHeight, clientHeight } = e.target;
+  if (scrollHeight - scrollTop - clientHeight < 50 && 
+      currentPage.value * PAGE_SIZE < totalLogs.value) {
+    currentPage.value++;
+    loadLogs();
+  }
+}
 
 onMounted(() => {
-  loadInitialLogs()
+  loadLogs();
 })
 
-const loadInitialLogs = () => {
-  const initialLogs = infoStore.logs.slice(0, 20).map((log: any) => ({
-    ...log,
-    timestamp: Date.now()
-  }))
-  logs.value = initialLogs
-}
-
-const handleLoad = () => {
-  const newLogs = infoStore.logs
-    .slice(logs.value.length, logs.value.length + 20)
-    .map((log: any) => ({
-      ...log,
-      timestamp: Date.now()
-    }))
-  logs.value.push(...newLogs)
-}
+// 清理函数
+onUnmounted(() => {
+  displayedLogs.value = [];
+})
 
 const clearLogs = () => {
-  logs.value = []
-  message.success('日志已清空')
+  infoStore.logs = [];
+  displayedLogs.value = [];
+  currentPage.value = 1;
+  message.success('日志已清空');
 }
 
 const copyLogs = () => {
-  const logText = logs.value
+  const logText = displayedLogs.value
     .map(log => `[${formatTime(log.timestamp)}] [${log.type}] ${log.payload}`)
-    .join('\n')
-  navigator.clipboard.writeText(logText)
-  message.success('日志已复制到剪贴板')
+    .join('\n');
+  navigator.clipboard.writeText(logText);
+  message.success('日志已复制到剪贴板');
 }
 
 const formatTime = (timestamp: number, showSeconds = false) => {
@@ -189,6 +201,9 @@ const getLogIcon = (type: string) => {
 </script>
 
 <style scoped>
+.log-container {
+  padding: 8px;
+}
 .n-timeline-item {
   margin-bottom: 12px;
 }
