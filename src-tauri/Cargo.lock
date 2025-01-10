@@ -3590,6 +3590,7 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "futures-util",
+ "lazy_static",
  "log",
  "reqwest",
  "serde",

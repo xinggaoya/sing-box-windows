@@ -29,9 +29,6 @@ importers:
       echarts:
         specifier: ^5.5.1
         version: 5.5.1
-      mitt:
-        specifier: ^3.0.1
-        version: 3.0.1
       pinia:
         specifier: ^2.2.6
         version: 2.2.6(typescript@5.6.3)(vue@3.5.12(typescript@5.6.3))
@@ -78,6 +75,9 @@ importers:
       eslint-plugin-vue:
         specifier: ^9.30.0
         version: 9.30.0(eslint@9.14.0(jiti@2.4.0))
+      mitt:
+        specifier: ^3.0.1
+        version: 3.0.1
       naive-ui:
         specifier: ^2.40.1
         version: 2.40.1(vue@3.5.12(typescript@5.6.3))

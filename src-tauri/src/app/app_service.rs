@@ -1,24 +1,32 @@
-use std::error::Error;
+use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
 use crate::entity::{config_model, github_model};
+use crate::process::manager::ProcessManager;
+use crate::utils::app_util::get_work_dir;
 use crate::utils::config_util::ConfigUtil;
 use crate::utils::file_util::{download_file, unzip_file};
 use log::{error, info};
+use serde_json::json;
+use std::error::Error;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::os::windows::process::CommandExt;
 use std::path::Path;
+use std::sync::Arc;
+use tauri::Emitter;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
 use winreg::RegKey;
-use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
-use crate::utils::app_util::get_work_dir;
-use serde_json::json;
-use tauri::Emitter;
+
+// 全局进程管理器
+lazy_static::lazy_static! {
+    pub(crate) static ref PROCESS_MANAGER: Arc<ProcessManager> = Arc::new(ProcessManager::new());
+}
 
 // 以管理员权限重启
 #[tauri::command]
 pub fn restart_as_admin() -> Result<(), String> {
-    let current_exe = std::env::current_exe().map_err(|e| format!("获取当前程序路径失败: {}", e))?;
-    
+    let current_exe =
+        std::env::current_exe().map_err(|e| format!("获取当前程序路径失败: {}", e))?;
+
     let result = std::process::Command::new("powershell")
         .arg("Start-Process")
         .arg(current_exe.to_str().unwrap())
@@ -29,7 +37,7 @@ pub fn restart_as_admin() -> Result<(), String> {
 
     match result {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("重启失败: {}", e))
+        Err(e) => Err(format!("重启失败: {}", e)),
     }
 }
 
@@ -43,124 +51,34 @@ pub fn check_admin() -> bool {
 
     match result {
         Ok(output) => output.status.success(),
-        Err(_) => false
+        Err(_) => false,
     }
 }
 
 // 运行内核
 #[tauri::command]
-pub fn start_kernel() -> Result<(), String> {
-    let word_dir = get_work_dir();
-    let kernel_path = Path::new(&word_dir).join("sing-box/sing-box");
-    let kernel_word_dir = Path::new(&word_dir).join("sing-box");
-    
-    let res = std::process::Command::new(kernel_path.to_str().unwrap())
-        .arg("run")
-        .arg("-D")
-        .arg(kernel_word_dir.to_str().unwrap())
-        .creation_flags(0x08000000)
-        .spawn();
-
-    let child = match res {
-        Ok(child) => child,
-        Err(e) => {
-            error!("Error starting kernel: {}", e);
-            return Err(format!("启动内核失败: {}", e));
-        }
-    };
-
-    // 记录pid到文件
-    let pid = child.id();
-    let pid_path = Path::new(&word_dir).join("sing-box/pid.txt");
-    let file = File::create(pid_path.to_str().unwrap());
-    match file {
-        Ok(mut file) => match file.write_all(pid.to_string().as_bytes()) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(format!("写入PID文件失败: {}", e))
-        },
-        Err(e) => Err(format!("创建PID文件失败: {}", e))
-    }
+pub async fn start_kernel() -> Result<(), String> {
+    PROCESS_MANAGER.start().await.map_err(|e| e.to_string())
 }
 
-// 停止
+// 停止内核
 #[tauri::command]
-pub fn stop_kernel() -> Result<(), String> {
-    stop_kernel_impl().map_err(|e| format!("停止内核失败: {}", e))
+pub async fn stop_kernel() -> Result<(), String> {
+    PROCESS_MANAGER.stop().await.map_err(|e| e.to_string())
 }
 
-fn stop_kernel_impl() -> Result<(), Box<dyn Error>> {
-    let word_dir = get_work_dir();
-    let pid_file = Path::new(&word_dir).join("sing-box/pid.txt");
-    
-    // 如果pid文件不存在，说明进程已经不在运行，直接返回成功
-    if !pid_file.exists() {
-        info!("PID文件不存在，内核可能已经停止");
-        disable_proxy()?;
-        return Ok(());
-    }
-
-    // 尝试读取pid文件
-    let mut file = match File::open(&pid_file) {
-        Ok(file) => file,
-        Err(e) => {
-            info!("无法打开PID文件: {}, 内核可能已经停止", e);
-            disable_proxy()?;
-            return Ok(());
-        }
-    };
-
-    let mut buffer = String::new();
-    if let Err(e) = file.read_to_string(&mut buffer) {
-        info!("无法读取PID文件内容: {}, 内核可能已经停止", e);
-        disable_proxy()?;
-        return Ok(());
-    }
-
-    let pid: u32 = match buffer.trim().parse() {
-        Ok(pid) => pid,
-        Err(e) => {
-            info!("PID格式无效: {}, 内核可能已经停止", e);
-            disable_proxy()?;
-            return Ok(());
-        }
-    };
-
-    // 尝试结束进程
-    if let Err(e) = kill_process(pid) {
-        info!("结束进程失败: {}, 内核可能已经停止", e);
-    }
-
-    info!("进程已停止,进程id: {}", pid);
-    disable_proxy()?;
-    Ok(())
+// 获取进程状态
+#[tauri::command]
+pub async fn get_process_status() -> Result<String, String> {
+    let status = PROCESS_MANAGER.get_status().await;
+    serde_json::to_string(&status).map_err(|e| e.to_string())
 }
-
-fn kill_process(pid: u32) -> Result<(), Box<dyn Error>> {
-    let result = std::process::Command::new("taskkill")
-        .arg("/F")
-        .arg("/PID")
-        .arg(pid.to_string())
-        .creation_flags(0x08000000)
-        .output()?;
-
-    // 如果进程不存在，taskkill 会返回错误，但这种情况我们也认为是成功的
-    if !result.status.success() {
-        let stderr = String::from_utf8_lossy(&result.stderr);
-        // 如果错误信息表明进程不存在，我们认为这是成功的情况
-        if stderr.contains("进程未运行") || stderr.contains("not found") || stderr.contains("不存在") {
-            info!("进程 {} 已经不存在", pid);
-            return Ok(());
-        }
-        return Err(format!("Error killing process: {}", stderr).into());
-    }
-    Ok(())
-}
-
 
 // 下载订阅
 #[tauri::command]
 pub async fn download_subscription(url: String) -> Result<(), String> {
-    download_and_process_subscription(url).await
+    download_and_process_subscription(url)
+        .await
         .map_err(|e| format!("下载订阅失败: {}", e))?;
     set_system_proxy();
     Ok(())
@@ -190,9 +108,7 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
             external_ui_download_detour: "手动切换".to_string(),
             default_mode: "rule".to_string(),
         },
-        cache_file: CacheFileConfig {
-            enabled: true,
-        },
+        cache_file: CacheFileConfig { enabled: true },
     };
     json_util.modify_property(&target_keys, serde_json::to_value(config)?);
     json_util.save()?;
@@ -201,19 +117,30 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     Ok(())
 }
 
-
 // 下载内核
 #[tauri::command]
 pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String> {
     let url = "https://api.github.com/repos/SagerNet/sing-box/releases/latest";
     let work_dir = get_work_dir();
+    info!("当前工作目录: {}", work_dir);
+
     let path = Path::new(&work_dir).join("sing-box/");
-    
+    info!("目标下载目录: {}", path.display());
+
+    // 如果目录已存在，先检查是否为有效目录
+    if path.exists() {
+        if !path.is_dir() {
+            error!("sing-box 路径存在但不是目录");
+            return Err("sing-box 路径存在但不是目录".to_string());
+        }
+    }
+
     // 确保目录存在
     if let Err(e) = std::fs::create_dir_all(&path) {
         error!("创建目录失败: {}", e);
         return Err(format!("创建目录失败: {}", e));
     }
+    info!("已确保下载目录存在");
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
@@ -229,11 +156,14 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
 
     info!("正在获取最新版本信息...");
     // 发送进度事件
-    let _ = window.emit("download-progress", json!({
-        "status": "checking",
-        "progress": 0,
-        "message": "正在获取最新版本信息..."
-    }));
+    let _ = window.emit(
+        "download-progress",
+        json!({
+            "status": "checking",
+            "progress": 0,
+            "message": "正在获取最新版本信息..."
+        }),
+    );
 
     let response = client
         .get(url)
@@ -253,16 +183,19 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
         .map_err(|e| format!("读取响应内容失败: {}", e))?;
 
     info!("正在解析版本信息...");
-    let json: github_model::Release = serde_json::from_str(&text)
-        .map_err(|e| format!("解析JSON失败: {}", e))?;
+    let json: github_model::Release =
+        serde_json::from_str(&text).map_err(|e| format!("解析JSON失败: {}", e))?;
 
     info!("最新版本: {}", json.tag_name);
     // 发送进度事件
-    let _ = window.emit("download-progress", json!({
-        "status": "found",
-        "progress": 10,
-        "message": format!("找到最新版本: {}", json.tag_name)
-    }));
+    let _ = window.emit(
+        "download-progress",
+        json!({
+            "status": "found",
+            "progress": 10,
+            "message": format!("找到最新版本: {}", json.tag_name)
+        }),
+    );
 
     // 获取当前系统平台
     let platform = std::env::consts::OS;
@@ -274,7 +207,7 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
 
     let target_file = format!("{}-{}.zip", platform, arch);
     info!("目标文件名: {}", target_file);
-    
+
     let mut found = false;
     let mut download_attempted = false;
 
@@ -283,21 +216,24 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
             info!("找到匹配的文件: {}", asset.name);
             found = true;
             download_attempted = true;
-            
+
             let download_path = Path::new(&path).join(&asset.name);
-            
+
             // 发送进度事件
-            let _ = window.emit("download-progress", json!({
-                "status": "downloading",
-                "progress": 20,
-                "message": format!("开始下载文件: {}", asset.name)
-            }));
-            
+            let _ = window.emit(
+                "download-progress",
+                json!({
+                    "status": "downloading",
+                    "progress": 20,
+                    "message": format!("开始下载文件: {}", asset.name)
+                }),
+            );
+
             // 尝试多个下载源
             let download_urls = vec![
                 format!("https://ghgo.xyz/{}", asset.browser_download_url),
                 format!("https://gh.api.99988866.xyz/{}", asset.browser_download_url),
-                asset.browser_download_url.clone()
+                asset.browser_download_url.clone(),
             ];
 
             let mut success = false;
@@ -306,14 +242,23 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
             for url in &download_urls {
                 info!("尝试从 {} 下载", url);
                 let window_clone = window.clone();
-                match download_file(url.clone(), download_path.to_str().unwrap(), move |progress| {
-                    let real_progress = 20 + (progress as f64 * 0.6) as u32; // 20-80%的进度用于下载
-                    let _ = window_clone.emit("download-progress", json!({
-                        "status": "downloading",
-                        "progress": real_progress,
-                        "message": format!("正在下载: {}%", progress)
-                    }));
-                }).await {
+                match download_file(
+                    url.clone(),
+                    download_path.to_str().unwrap(),
+                    move |progress| {
+                        let real_progress = 20 + (progress as f64 * 0.6) as u32; // 20-80%的进度用于下载
+                        let _ = window_clone.emit(
+                            "download-progress",
+                            json!({
+                                "status": "downloading",
+                                "progress": real_progress,
+                                "message": format!("正在下载: {}%", progress)
+                            }),
+                        );
+                    },
+                )
+                .await
+                {
                     Ok(_) => {
                         success = true;
                         info!("下载成功");
@@ -334,22 +279,28 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
             // 解压文件
             info!("开始解压文件...");
             // 发送进度事件
-            let _ = window.emit("download-progress", json!({
-                "status": "extracting",
-                "progress": 80,
-                "message": "正在解压文件..."
-            }));
+            let _ = window.emit(
+                "download-progress",
+                json!({
+                    "status": "extracting",
+                    "progress": 80,
+                    "message": "正在解压文件..."
+                }),
+            );
 
             let out_path = Path::new(&work_dir).join("sing-box");
             match unzip_file(download_path.to_str().unwrap(), out_path.to_str().unwrap()).await {
                 Ok(_) => {
                     info!("内核已下载并解压到: {}", out_path.display());
                     // 发送完成事件
-                    let _ = window.emit("download-progress", json!({
-                        "status": "completed",
-                        "progress": 100,
-                        "message": "下载完成！"
-                    }));
+                    let _ = window.emit(
+                        "download-progress",
+                        json!({
+                            "status": "completed",
+                            "progress": 100,
+                            "message": "下载完成！"
+                        }),
+                    );
                     break;
                 }
                 Err(e) => {
@@ -378,8 +329,8 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
 pub fn set_system_proxy() -> Result<(), String> {
     let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/config.json");
-    let json_util = ConfigUtil::new(path.to_str().unwrap())
-        .map_err(|e| format!("读取配置文件失败: {}", e))?;
+    let json_util =
+        ConfigUtil::new(path.to_str().unwrap()).map_err(|e| format!("读取配置文件失败: {}", e))?;
 
     let mut json_util = json_util;
     let target_keys = vec!["inbounds"];
@@ -395,12 +346,15 @@ pub fn set_system_proxy() -> Result<(), String> {
         sniff: None,
         set_system_proxy: Some(true),
     }];
-    
-    json_util.modify_property(&target_keys, serde_json::to_value(new_structs)
-        .map_err(|e| format!("序列化配置失败: {}", e))?);
-    json_util.save()
+
+    json_util.modify_property(
+        &target_keys,
+        serde_json::to_value(new_structs).map_err(|e| format!("序列化配置失败: {}", e))?,
+    );
+    json_util
+        .save()
         .map_err(|e| format!("保存配置文件失败: {}", e))?;
-    
+
     info!("代理模式已修改");
     Ok(())
 }
@@ -448,7 +402,14 @@ fn set_tun_proxy_impl() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+pub fn set_proxy_mode(mode: String) -> Result<(), String> {
+    if let Err(e) = set_system_proxy() {
+        return Err(format!("设置系统代理失败: {}", e));
+    }
+    Ok(())
+}
 
+#[allow(dead_code)]
 fn disable_proxy() -> Result<(), Box<dyn Error>> {
     // 打开注册表键
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -471,16 +432,18 @@ fn disable_proxy() -> Result<(), Box<dyn Error>> {
 pub async fn get_memory_usage() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let url = "http://127.0.0.1:9090/memory";
-    
-    let response = client.get(url)
+
+    let response = client
+        .get(url)
         .send()
         .await
         .map_err(|e| format!("请求内存数据失败: {}", e))?;
-        
-    let data = response.json::<serde_json::Value>()
+
+    let data = response
+        .json::<serde_json::Value>()
         .await
         .map_err(|e| format!("解析内存数据失败: {}", e))?;
-        
+
     Ok(data)
 }
 
@@ -489,30 +452,40 @@ pub async fn get_memory_usage() -> Result<serde_json::Value, String> {
 pub async fn get_traffic_data() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let url = "http://127.0.0.1:9090/traffic";
-    
-    let response = client.get(url)
+
+    let response = client
+        .get(url)
         .send()
         .await
         .map_err(|e| format!("请求流量数据失败: {}", e))?;
-        
-    let mut data = response.json::<serde_json::Value>()
+
+    let mut data = response
+        .json::<serde_json::Value>()
         .await
         .map_err(|e| format!("解析流量数据失败: {}", e))?;
-        
+
     // 确保数据中包含总流量
     if let Some(obj) = data.as_object_mut() {
         // 如果没有总流量字段，添加它们
         if !obj.contains_key("upTotal") {
-            if let Some(up) = obj.get("up").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()) {
+            if let Some(up) = obj
+                .get("up")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<u64>().ok())
+            {
                 obj.insert("upTotal".to_string(), json!(up));
             }
         }
         if !obj.contains_key("downTotal") {
-            if let Some(down) = obj.get("down").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()) {
+            if let Some(down) = obj
+                .get("down")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<u64>().ok())
+            {
                 obj.insert("downTotal".to_string(), json!(down));
             }
         }
     }
-        
+
     Ok(data)
 }
