@@ -25,34 +25,34 @@
 
       <n-grid :x-gap="12" :y-gap="12" :cols="3">
         <n-grid-item v-for="(item, index) in subStore.list" :key="index">
-          <n-card :class="{ 'sub-card': true, 'sub-card-loading': item.isLoading }" hoverable>
+          <n-card
+            :class="{
+              'sub-card': true,
+              'sub-card-loading': item.isLoading,
+              'sub-card-active': subStore.activeIndex === index,
+            }"
+            hoverable
+          >
             <n-space vertical :size="12">
               <n-flex justify="space-between" align="center">
                 <n-space align="center">
-                  <n-icon size="18" color="#2080f0">
+                  <n-icon size="18" :color="subStore.activeIndex === index ? '#18a058' : '#2080f0'">
                     <link-outline />
                   </n-icon>
                   <n-text strong>{{ item.name }}</n-text>
+                  <n-tag v-if="subStore.activeIndex === index" type="success" size="small"
+                    >使用中</n-tag
+                  >
                 </n-space>
                 <n-space>
-                  <n-button
-                    quaternary
-                    circle
-                    size="small"
-                    @click="copyUrl(item.url)"
-                  >
+                  <n-button quaternary circle size="small" @click="copyUrl(item.url)">
                     <template #icon>
                       <n-icon>
                         <copy-outline />
                       </n-icon>
                     </template>
                   </n-button>
-                  <n-button
-                    quaternary
-                    circle
-                    size="small"
-                    @click="handleEdit(index, item)"
-                  >
+                  <n-button quaternary circle size="small" @click="handleEdit(index, item)">
                     <template #icon>
                       <n-icon>
                         <create-outline />
@@ -70,6 +70,7 @@
                         circle
                         size="small"
                         type="error"
+                        :disabled="subStore.activeIndex === index"
                       >
                         <template #icon>
                           <n-icon>
@@ -89,20 +90,23 @@
 
               <n-flex justify="space-between" align="center">
                 <n-text depth="3" style="font-size: 12px">
-                  {{ item.lastUpdate ? formatTime(item.lastUpdate) : '从未更新' }}
+                  {{ item.lastUpdate ? formatTime(item.lastUpdate) : '从未使用' }}
                 </n-text>
                 <n-button
                   secondary
                   size="small"
                   :loading="item.isLoading"
-                  @click="downloadSubscription(item.url, index)"
+                  :disabled="subStore.activeIndex === index"
+                  @click="useSubscription(item.url, index)"
+                  :type="subStore.activeIndex === index ? 'success' : 'primary'"
                 >
                   <template #icon>
                     <n-icon>
-                      <refresh-outline />
+                      <checkmark-circle-outline v-if="subStore.activeIndex === index" />
+                      <play-circle-outline v-else />
                     </n-icon>
                   </template>
-                  更新
+                  {{ subStore.activeIndex === index ? '使用中' : '使用' }}
                 </n-button>
               </n-flex>
             </n-space>
@@ -110,17 +114,9 @@
         </n-grid-item>
       </n-grid>
 
-      <n-empty
-        v-if="!subStore.list.length"
-        description="暂无订阅"
-      >
+      <n-empty v-if="!subStore.list.length" description="暂无订阅">
         <template #extra>
-          <n-button
-            type="primary"
-            @click="showAddModal = true"
-          >
-            添加订阅
-          </n-button>
+          <n-button type="primary" @click="showAddModal = true"> 添加订阅 </n-button>
         </template>
       </n-empty>
     </n-card>
@@ -175,7 +171,8 @@ import {
   CopyOutline,
   CreateOutline,
   TrashOutline,
-  RefreshOutline
+  CheckmarkCircleOutline,
+  PlayCircleOutline,
 } from '@vicons/ionicons5'
 import type { FormInst, FormRules } from 'naive-ui'
 
@@ -195,23 +192,21 @@ const isLoading = ref(false)
 
 const formValue = ref<Subscription>({
   name: '',
-  url: ''
+  url: '',
 })
 
 const rules: FormRules = {
-  name: [
-    { required: true, message: '请输入订阅名称', trigger: 'blur' }
-  ],
+  name: [{ required: true, message: '请输入订阅名称', trigger: 'blur' }],
   url: [
     { required: true, message: '请输入订阅链接', trigger: 'blur' },
-    { type: 'url', message: '请输入有效的URL', trigger: 'blur' }
-  ]
+    { type: 'url', message: '请输入有效的URL', trigger: 'blur' },
+  ],
 }
 
 const resetForm = () => {
   formValue.value = {
     name: '',
-    url: ''
+    url: '',
   }
   editIndex.value = null
 }
@@ -220,7 +215,7 @@ const handleEdit = (index: number, item: Subscription) => {
   editIndex.value = index
   formValue.value = {
     name: item.name,
-    url: item.url
+    url: item.url,
   }
   showAddModal.value = true
 }
@@ -237,7 +232,7 @@ const handleConfirm = () => {
         subStore.list[editIndex.value] = {
           ...subStore.list[editIndex.value],
           name: formValue.value.name,
-          url: formValue.value.url
+          url: formValue.value.url,
         }
         message.success('修改成功')
       }
@@ -256,14 +251,19 @@ const deleteSubscription = (index: number) => {
   message.success('删除成功')
 }
 
-const downloadSubscription = async (url: string, index: number) => {
+const useSubscription = async (url: string, index: number) => {
+  if (subStore.activeIndex === index) {
+    return
+  }
+
   subStore.list[index].isLoading = true
   try {
     await invoke('download_subscription', { url })
     subStore.list[index].lastUpdate = Date.now()
-    message.success('更新成功')
+    subStore.activeIndex = index
+    message.success('订阅已启用')
   } catch (error) {
-    message.error('更新失败：' + error)
+    message.error('启用失败：' + error)
   } finally {
     subStore.list[index].isLoading = false
   }
@@ -287,6 +287,7 @@ const formatTime = (timestamp: number) => {
 <style scoped>
 .sub-card {
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .sub-card:hover {
@@ -295,5 +296,9 @@ const formatTime = (timestamp: number) => {
 
 .sub-card-loading {
   opacity: 0.7;
+}
+
+.sub-card-active {
+  border: 2px solid #18a058;
 }
 </style>

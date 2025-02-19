@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-interface Subscription {
+export interface Subscription {
   name: string
   url: string
   isLoading?: boolean
@@ -11,18 +11,23 @@ interface Subscription {
 export const useSubStore = defineStore(
   'sub',
   () => {
-    const list = ref<Array<Subscription>>([])
+    const list = ref<Subscription[]>([])
+    const activeIndex = ref<number | null>(null)
 
     const add = (name: string, url: string) => {
-      list.value.push({ 
-        name, 
+      list.value.push({
+        name,
         url,
         isLoading: false,
-        lastUpdate: undefined
+        lastUpdate: undefined,
       })
     }
 
-    return { list, add }
+    return {
+      list,
+      activeIndex,
+      add,
+    }
   },
   {
     persist: true,

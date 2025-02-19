@@ -116,14 +116,17 @@
     </n-grid>
 
     <n-card title="实时流量监控" size="small" style="height: calc(100vh - 420px)">
-      <Echarts :download-speed="infoStore.traffic.up" :upload-speed="infoStore.traffic.down" :is-visible="isWindowVisible" />
+      <Echarts
+        :download-speed="infoStore.traffic.up"
+        :upload-speed="infoStore.traffic.down"
+        :is-visible="isWindowVisible"
+      />
     </n-card>
   </n-space>
 </template>
 
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
-import { useMessage } from 'naive-ui'
+import { useMessage, useDialog } from 'naive-ui'
 import { computed, ref, onUnmounted, onMounted } from 'vue'
 import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
@@ -141,12 +144,13 @@ import {
 import { useAppStore } from '@/stores/AppStore'
 import Echarts from '@/components/layout/Echarts.vue'
 import { useInfoStore } from '@/stores/infoStore'
-import { useDialog } from 'naive-ui'
+import { ProxyService } from '@/services/proxy-service'
 
 const message = useMessage()
 const dialog = useDialog()
 const appState = useAppStore()
 const infoStore = useInfoStore()
+const proxyService = ProxyService.getInstance()
 const isStarting = ref(false)
 const isStopping = ref(false)
 const isWindowVisible = ref(true)
@@ -191,7 +195,9 @@ onUnmounted(() => {
 const useTotalTraffic = computed(() => {
   return formatBandwidth(infoStore.traffic.total)
 })
+
 const memoryStr = computed(() => formatBandwidth(infoStore.memory.inuse))
+
 const trafficStr = computed(() => ({
   up: formatBandwidth(Number(infoStore.traffic.up) || 0),
   down: formatBandwidth(Number(infoStore.traffic.down) || 0),
@@ -201,6 +207,7 @@ const runKernel = async () => {
   try {
     isStarting.value = true
     await infoStore.startKernel()
+    appState.isRunning = true
     message.success('内核已启动')
   } catch (error) {
     message.error(error as string)
@@ -213,6 +220,7 @@ const stopKernel = async () => {
   try {
     isStopping.value = true
     await infoStore.stopKernel()
+    appState.isRunning = false
     message.success('内核已停止')
   } catch (error) {
     message.error(error as string)
@@ -222,39 +230,24 @@ const stopKernel = async () => {
 }
 
 const onModeChange = async (value: string) => {
-  try {
-    if (value === 'system') {
-      await invoke('set_system_proxy')
-      message.success('已切换到系统代理模式')
-    } else {
-      // TUN模式需要管理员权限
-      const isAdmin = await invoke('check_admin')
-      if (!isAdmin) {
-        dialog.warning({
-          title: '需要管理员权限',
-          content: 'TUN模式需要管理员权限才能运行，是否以管理员身份重启程序？',
-          positiveText: '重启',
-          negativeText: '取消',
-          onPositiveClick: async () => {
-            try {
-              await invoke('restart_as_admin')
-              const appWindow = Window.getCurrent()
-              await appWindow.close()
-            } catch (error) {
-              message.error(error as string)
-            }
-          },
-          onNegativeClick: () => {
-            appState.mode = 'system'
-          },
-        })
-        return
-      }
-      await invoke('set_tun_proxy')
-      message.success('已切换到TUN模式')
+  const showMessage = (type: 'success' | 'info' | 'error', content: string) => {
+    switch (type) {
+      case 'success':
+        message.success(content)
+        break
+      case 'info':
+        message.info(content)
+        break
+      case 'error':
+        message.error(content)
+        break
     }
-  } catch (error) {
-    message.error(error as string)
+  }
+
+  const needClose = await proxyService.switchMode(value as 'system' | 'tun', showMessage)
+  if (needClose) {
+    const appWindow = Window.getCurrent()
+    await appWindow.close()
   }
 }
 </script>

@@ -1,26 +1,86 @@
-export const createWebSocket = (url: string, onMessage: (data: any) => void, onClose?: () => void) => {
-  if (typeof (WebSocket) === 'undefined') {
+// 定义 WebSocket 消息类型
+interface WSTrafficData {
+  up: number
+  down: number
+}
+
+interface WSMemoryData {
+  inuse: number
+  oslimit: number
+}
+
+interface WSLogData {
+  time: string
+  level: string
+  message: string
+}
+
+type WSData = WSTrafficData | WSMemoryData | WSLogData
+
+export const createWebSocket = (
+  url: string,
+  onMessage: (data: WSData) => void,
+  onClose?: () => void,
+) => {
+  if (typeof WebSocket === 'undefined') {
     alert('您的浏览器不支持socket')
-  } else {
-    const ws = new WebSocket(url)
-    //  //连接发生错误的回调方法
-    ws.onerror = function() {
+    return
+  }
+
+  let ws: WebSocket | null = null
+  let reconnectTimer: number | null = null
+
+  const connect = () => {
+    ws = new WebSocket(url)
+
+    ws.onerror = () => {
       console.log('ws连接发生错误')
       onClose?.()
+      scheduleReconnect()
     }
-    //连接成功建立的回调方法
-    ws.onopen = function() {
+
+    ws.onopen = () => {
       console.log('ws连接成功')
+      if (reconnectTimer) {
+        window.clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
     }
-    //接收到消息的回调方法
-    ws.onmessage = function(event) {
-      const data = JSON.parse(event.data)
-      onMessage(data)
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as WSData
+        onMessage(data)
+      } catch (error) {
+        console.error('解析消息失败:', error)
+      }
     }
-    //连接关闭的回调方法
-    ws.onclose = function() {
+
+    ws.onclose = () => {
       console.log('ws连接关闭')
       onClose?.()
+      scheduleReconnect()
+    }
+  }
+
+  const scheduleReconnect = () => {
+    if (!reconnectTimer) {
+      reconnectTimer = window.setTimeout(() => {
+        console.log('尝试重新连接...')
+        connect()
+      }, 3000) // 3秒后重连
+    }
+  }
+
+  connect()
+
+  // 返回清理函数
+  return () => {
+    if (ws) {
+      ws.close()
+    }
+    if (reconnectTimer) {
+      window.clearTimeout(reconnectTimer)
     }
   }
 }

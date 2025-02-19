@@ -30,7 +30,8 @@ futures = "0.3"
 futures-util = "0.3"
 zip = { version = "0.5.13" }
 lazy_static = "1.4.0"
-winreg = "0.50"
+winreg = "0.52.0"
+winapi = { version = "0.3", features = ["wininet"] }
 is_elevated = "0.1.2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

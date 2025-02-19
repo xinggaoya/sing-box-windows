@@ -16,12 +16,14 @@ import { onMounted } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
 import { useInfoStore } from '@/stores/infoStore'
-import { invoke } from '@tauri-apps/api/core'
+import { tauriApi } from '@/services/tauri-api'
 import { darkTheme } from 'naive-ui'
+import { ProxyService } from '@/services/proxy-service'
 
 const appWindow = Window.getCurrent()
 const appStore = useAppStore()
 const infoStore = useInfoStore()
+const proxyService = ProxyService.getInstance()
 const theme = darkTheme
 
 onMounted(async () => {
@@ -47,18 +49,15 @@ onMounted(async () => {
 const startKernel = async () => {
   try {
     // 检查是否有管理员权限
-    const isAdmin = await invoke('check_admin')
+    const isAdmin = await tauriApi.proxy.checkAdmin()
 
     if (!isAdmin) {
       // 如果不是管理员权限，切换到系统代理模式
-      await invoke('set_system_proxy')
-      appStore.mode = 'system'
+      await appStore.switchProxyMode('system')
     }
 
     // 启动内核
     await infoStore.startKernel()
-
-    // 更新状态
     appStore.isRunning = true
   } catch (error) {
     console.error('启动内核失败:', error)
@@ -73,45 +72,37 @@ const initTray = async () => {
         id: 'start',
         text: '启动内核',
         action: async () => {
-          await infoStore.startKernel()
+          await startKernel()
         },
       },
       {
         id: 'stop',
         text: '停止内核',
         action: async () => {
-          infoStore.stopKernel()
+          await infoStore.stopKernel()
+          appStore.isRunning = false
         },
       },
       {
         id: 'system_proxy',
         text: '系统代理模式',
         action: async () => {
-          try {
-            await invoke('set_system_proxy')
-            appStore.mode = 'system'
-            infoStore.restartKernel()
-          } catch (error) {
-            console.error('切换到系统代理模式失败:', error)
+          const showMessage = (type: 'success' | 'info' | 'error', content: string) => {
+            console.log(`${type}: ${content}`)
           }
+          await proxyService.switchMode('system', showMessage)
         },
       },
       {
         id: 'tun_mode',
         text: 'TUN 模式',
         action: async () => {
-          try {
-            const isAdmin = await invoke('check_admin')
-            if (!isAdmin) {
-              await invoke('restart_as_admin')
-              await appWindow.close()
-              return
-            }
-            await invoke('set_tun_proxy')
-            appStore.mode = 'tun'
-            infoStore.restartKernel()
-          } catch (error) {
-            console.error('切换到 TUN 模式失败:', error)
+          const showMessage = (type: 'success' | 'info' | 'error', content: string) => {
+            console.log(`${type}: ${content}`)
+          }
+          const needClose = await proxyService.switchMode('tun', showMessage)
+          if (needClose) {
+            await appWindow.close()
           }
         },
       },

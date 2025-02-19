@@ -9,7 +9,12 @@ use tauri_plugin_autostart::MacosLauncher;
 pub mod app;
 pub mod entity;
 pub mod process;
-pub mod utils;
+pub mod utils {
+    pub mod app_util;
+    pub mod config_util;
+    pub mod file_util;
+    pub mod proxy_util;
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

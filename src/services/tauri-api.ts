@@ -1,0 +1,53 @@
+import { invoke } from '@tauri-apps/api/core'
+
+// 内核管理相关接口
+export const kernelApi = {
+  // 获取内存使用情况
+  getMemoryUsage: () => invoke<string>('get_memory_usage'),
+
+  // 获取流量数据
+  getTrafficData: () => invoke<string>('get_traffic_data'),
+
+  // 启动内核
+  startKernel: () => invoke<void>('start_kernel'),
+
+  // 停止内核
+  stopKernel: () => invoke<void>('stop_kernel'),
+
+  // 重启内核
+  restartKernel: () => invoke<void>('restart_kernel'),
+
+  // 获取进程状态
+  getProcessStatus: () => invoke<string>('get_process_status'),
+}
+
+// 代理模式相关接口
+export const proxyApi = {
+  // 设置系统代理模式
+  setSystemProxy: () => invoke<void>('set_system_proxy'),
+
+  // 设置 TUN 代理模式
+  setTunProxy: () => invoke<void>('set_tun_proxy'),
+
+  // 检查管理员权限
+  checkAdmin: () => invoke<boolean>('check_admin'),
+
+  // 以管理员权限重启
+  restartAsAdmin: () => invoke<void>('restart_as_admin'),
+}
+
+// 订阅相关接口
+export const subscriptionApi = {
+  // 下载订阅
+  downloadSubscription: (url: string) => invoke<void>('download_subscription', { url }),
+
+  // 下载最新内核
+  downloadLatestKernel: () => invoke<void>('download_latest_kernel'),
+}
+
+// 统一导出所有 API
+export const tauriApi = {
+  kernel: kernelApi,
+  proxy: proxyApi,
+  subscription: subscriptionApi,
+}

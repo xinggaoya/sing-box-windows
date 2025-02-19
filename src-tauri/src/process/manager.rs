@@ -1,5 +1,6 @@
 use super::{ProcessError, ProcessInfo, ProcessStatus, Result};
 use crate::utils::app_util::get_work_dir;
+use crate::utils::proxy_util::disable_system_proxy;
 use log::{error, info, warn};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
@@ -197,55 +198,19 @@ impl ProcessManager {
             }
         }
 
-        // 等待进程退出
-        let timeout = Duration::from_secs(5);
-        let start_time = std::time::Instant::now();
-
-        'wait_loop: while start_time.elapsed() < timeout {
-            // 检查进程是否还存在
-            if !self.check_process_exists(Some(pid)).await {
-                break 'wait_loop;
-            }
-
-            let mut process_guard = self.child_process.write().await;
-            if let Some(child) = process_guard.as_mut() {
-                match child.try_wait() {
-                    Ok(Some(_)) => {
-                        // 进程已退出
-                        *process_guard = None;
-                        break 'wait_loop;
-                    }
-                    Ok(None) => {
-                        // 进程仍在运行，释放锁并等待
-                        drop(process_guard);
-                        sleep(Duration::from_millis(100)).await;
-                        continue;
-                    }
-                    Err(e) => {
-                        // 如果出错，检查进程是否真的还在运行
-                        if !self.check_process_exists(Some(pid)).await {
-                            break 'wait_loop;
-                        }
-                        return Err(ProcessError::StopFailed(e.to_string()));
-                    }
-                }
-            } else {
-                // 如果child_process为None，但进程仍在运行，尝试强制终止
-                if self.check_process_exists(Some(pid)).await {
-                    if let Err(e) = self.kill_process(pid) {
-                        return Err(ProcessError::StopFailed(format!("强制停止失败: {}", e)));
-                    }
-                }
-                break 'wait_loop;
-            }
-        }
-
         // 如果超时后进程仍然存在，强制终止
         if self.check_process_exists(Some(pid)).await {
             warn!("进程停止超时，尝试强制终止");
             if let Err(e) = self.kill_process(pid) {
                 return Err(ProcessError::StopFailed(format!("强制停止失败: {}", e)));
             }
+        }
+
+        // 关闭系统代理
+        if let Err(e) = disable_system_proxy() {
+            warn!("关闭系统代理失败: {}", e);
+        } else {
+            info!("系统代理已关闭");
         }
 
         // 重置进程状态
@@ -279,6 +244,8 @@ impl ProcessManager {
     // 重启进程 强制停止
     pub async fn restart(&self) -> Result<()> {
         self.stop().await?;
+        // 休眠1s
+        sleep(Duration::from_secs(1)).await;
         self.start().await?;
         Ok(())
     }

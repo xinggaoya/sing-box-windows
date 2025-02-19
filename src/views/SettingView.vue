@@ -106,12 +106,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
-import { invoke } from '@tauri-apps/api/core'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
 import { useInfoStore } from '@/stores/infoStore'
 import { useAppStore } from '@/stores/AppStore'
 import { DownloadOutline } from '@vicons/ionicons5'
 import { listen } from '@tauri-apps/api/event'
+import { tauriApi } from '@/services/tauri-api'
 
 const message = useMessage()
 const appStore = useAppStore()
@@ -135,7 +135,6 @@ listen('download-progress', (event: any) => {
 
 const hasNewVersion = computed(() => {
   if (!infoStore.newVersion || !infoStore.version.version) return false
-  // 包含即使最新
   return infoStore.newVersion.includes(infoStore.version.version)
 })
 
@@ -146,7 +145,7 @@ const downloadTheKernel = async () => {
     downloadProgress.value = 0
     downloadMessage.value = '准备下载...'
 
-    await invoke('download_latest_kernel')
+    await tauriApi.subscription.downloadLatestKernel()
   } catch (error) {
     message.error(error as string)
     downloading.value = false
