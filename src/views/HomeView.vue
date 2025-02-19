@@ -116,7 +116,7 @@
     </n-grid>
 
     <n-card title="实时流量监控" size="small" style="height: calc(100vh - 420px)">
-      <Echarts :download-speed="infoStore.traffic.up" :upload-speed="infoStore.traffic.down" />
+      <Echarts :download-speed="infoStore.traffic.up" :upload-speed="infoStore.traffic.down" :is-visible="isWindowVisible" />
     </n-card>
   </n-space>
 </template>

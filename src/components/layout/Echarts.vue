@@ -15,7 +15,7 @@ import {
   LegendComponent,
 } from 'echarts/components'
 import VChart, { THEME_KEY } from 'vue-echarts'
-import { ref, provide, watch, defineProps, onMounted } from 'vue'
+import { ref, provide, watch, defineProps, onMounted, onUnmounted } from 'vue'
 
 defineOptions({
   name: 'SpeedChart',
@@ -46,6 +46,10 @@ const props = defineProps({
   downloadSpeed: {
     type: Number,
     default: 0,
+  },
+  isVisible: {
+    type: Boolean,
+    default: true,
   },
 })
 
@@ -99,9 +103,18 @@ const option = ref<any>({
   ],
 })
 
+let updateTimer: NodeJS.Timeout | null = null
+
 // 安装定时器
 const startTheTask = () => {
-  setInterval(() => {
+  // 清除可能存在的旧定时器
+  if (updateTimer !== null) {
+    clearInterval(updateTimer)
+  }
+
+  updateTimer = setInterval(() => {
+    if (!props.isVisible) return // 如果不可见，跳过更新
+
     // 将传入的毫秒值转换为 MB/s
     const mbUploadSpeed = props.uploadSpeed / 1024 / 1024
     const mbDownloadSpeed = props.downloadSpeed / 1024 / 1024
@@ -122,6 +135,24 @@ const startTheTask = () => {
     option.value.xAxis.data.push(date.getMinutes() + ':' + date.getSeconds())
   }, 1000)
 }
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  if (updateTimer !== null) {
+    clearInterval(updateTimer)
+    updateTimer = null
+  }
+})
+
+// 监听可见性变化
+watch(() => props.isVisible, (newValue) => {
+  if (newValue) {
+    startTheTask() // 重新启动定时器
+  } else if (updateTimer !== null) {
+    clearInterval(updateTimer) // 清除定时器
+    updateTimer = null
+  }
+})
 </script>
 
 <style scoped>

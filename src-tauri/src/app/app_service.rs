@@ -99,6 +99,12 @@ pub async fn stop_kernel() -> Result<(), String> {
     PROCESS_MANAGER.stop().await.map_err(|e| e.to_string())
 }
 
+// 重启内核
+#[tauri::command]
+pub async fn restart_kernel() -> Result<(), String> {
+    PROCESS_MANAGER.restart().await.map_err(|e| e.to_string())
+}
+
 // 获取进程状态
 #[tauri::command]
 pub async fn get_process_status() -> Result<String, String> {

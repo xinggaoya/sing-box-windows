@@ -84,13 +84,42 @@ const initTray = async () => {
         },
       },
       {
+        id: 'system_proxy',
+        text: '系统代理模式',
+        action: async () => {
+          try {
+            await invoke('set_system_proxy')
+            appStore.mode = 'system'
+            infoStore.restartKernel()
+          } catch (error) {
+            console.error('切换到系统代理模式失败:', error)
+          }
+        },
+      },
+      {
+        id: 'tun_mode',
+        text: 'TUN 模式',
+        action: async () => {
+          try {
+            const isAdmin = await invoke('check_admin')
+            if (!isAdmin) {
+              await invoke('restart_as_admin')
+              await appWindow.close()
+              return
+            }
+            await invoke('set_tun_proxy')
+            appStore.mode = 'tun'
+            infoStore.restartKernel()
+          } catch (error) {
+            console.error('切换到 TUN 模式失败:', error)
+          }
+        },
+      },
+      {
         id: 'quit',
         text: '退出',
         action: async () => {
-          if (appStore.isRunning) {
-            await invoke('stop_kernel')
-            appStore.isRunning = false
-          }
+          await infoStore.stopKernel()
           await appWindow.close()
         },
       },

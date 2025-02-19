@@ -6,8 +6,6 @@ use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
-use std::process::Stdio;
-use tokio::io::AsyncBufReadExt;
 use tokio::process::Command;
 
 pub struct ProcessManager {
@@ -104,7 +102,7 @@ impl ProcessManager {
 
         let sing_box_dir = Path::new(&work_dir).join("sing-box");
         let kernel_path = sing_box_dir.join("sing-box.exe");
-        let config_path = sing_box_dir.join("config.json");
+        let _config_path = sing_box_dir.join("config.json");
 
         // 检查 sing-box 目录是否存在
         if !sing_box_dir.exists() {
@@ -140,7 +138,7 @@ impl ProcessManager {
         let kernel_path = kernel_work_dir.join("sing-box.exe");
 
         // 启动进程
-        let mut child = match Command::new(kernel_path.to_str().unwrap())
+        let child = match Command::new(kernel_path.to_str().unwrap())
             .arg("run")
             .arg("-D")
             .arg(kernel_work_dir.to_str().unwrap())
@@ -275,6 +273,13 @@ impl ProcessManager {
             .arg(pid.to_string())
             .creation_flags(0x08000000)
             .output()?;
+        Ok(())
+    }
+
+    // 重启进程 强制停止
+    pub async fn restart(&self) -> Result<()> {
+        self.stop().await?;
+        self.start().await?;
         Ok(())
     }
 

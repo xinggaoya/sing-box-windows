@@ -101,6 +101,20 @@ export const useInfoStore = defineStore('info', () => {
     })
   }
 
+  // 重启内核
+  const restartKernel = () => {
+    return new Promise((resolve, reject) => {
+      invoke('restart_kernel')
+        .then(() => {
+          resolve(true)
+          initWS()
+        })
+        .catch(() => {
+          reject()
+        })
+    })
+  }
+
   // 停止内核
   const stopKernel = () => {
     return new Promise((resolve, reject) => {
@@ -163,5 +177,6 @@ export const useInfoStore = defineStore('info', () => {
     updateMemory,
     updateTraffic,
     resetTraffic,
+    restartKernel,
   }
 })

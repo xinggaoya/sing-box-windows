@@ -1,6 +1,6 @@
 use crate::app::app_service::{
     check_admin, download_latest_kernel, download_subscription, get_memory_usage, get_traffic_data,
-    restart_as_admin, set_system_proxy, set_tun_proxy, start_kernel, stop_kernel,
+    restart_as_admin, set_system_proxy, set_tun_proxy, start_kernel, stop_kernel,restart_kernel,
 };
 // use lazy_static::lazy_static;
 use tauri::Manager;
@@ -48,6 +48,7 @@ pub fn run() {
             get_traffic_data,
             check_admin,
             restart_as_admin,
+            restart_kernel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
