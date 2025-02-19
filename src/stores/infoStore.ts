@@ -10,7 +10,7 @@ export const useInfoStore = defineStore('info', () => {
   const traffic = ref({
     up: 0,
     down: 0,
-    total: 0
+    total: 0,
   })
 
   const memory = ref({
@@ -26,7 +26,7 @@ export const useInfoStore = defineStore('info', () => {
 
   const newVersion = ref('')
 
-  const MAX_LOGS = 1000; // 最大日志条数
+  const MAX_LOGS = 300 // 最大日志条数
   const logs = ref<any>([])
 
   onMounted(() => {
@@ -37,10 +37,10 @@ export const useInfoStore = defineStore('info', () => {
 
   // 添加日志
   const addLog = (data: any) => {
-    logs.value.push(data);
+    logs.value.push(data)
     // 如果超过最大日志数，删除最早的日志
     if (logs.value.length > MAX_LOGS) {
-      logs.value = logs.value.slice(-MAX_LOGS);
+      logs.value = logs.value.slice(-MAX_LOGS)
     }
   }
 
@@ -59,35 +59,34 @@ export const useInfoStore = defineStore('info', () => {
 
   // 检查是否成功
   const startKernel = async () => {
+    // 启动内核
+    await invoke('start_kernel')
     return new Promise((resolve, reject) => {
-      let retryCount = 0;
-      const maxRetries = 3;
-      
+      let retryCount = 0
+      const maxRetries = 5
+
       const retryFetch = async () => {
         try {
-          // 启动内核
-          await invoke('start_kernel')
-          
           // 等待内核启动并检查状态
           const res = await fetch('http://127.0.0.1:9090/version')
           if (!res.ok) {
             throw new Error(`HTTP error! status: ${res.status}`)
           }
-          
+
           const json = await res.json()
           version.value = json
           appState.isRunning = true
-          
+
           // 获取最新版本信息
           await getLatestVersion()
-          
+
           // 初始化WebSocket连接
           await initWS()
-          
+
           resolve(json)
         } catch (error) {
           console.error('启动失败:', error)
-          
+
           if (retryCount < maxRetries) {
             retryCount++
             console.log(`重试第 ${retryCount} 次，共 ${maxRetries} 次`)
@@ -114,7 +113,7 @@ export const useInfoStore = defineStore('info', () => {
           traffic.value = {
             up: 0,
             down: 0,
-            total: 0
+            total: 0,
           }
         })
         .catch(() => {
@@ -137,11 +136,11 @@ export const useInfoStore = defineStore('info', () => {
   const updateTraffic = (data: any) => {
     const currentUp = Number(data.up) || 0
     const currentDown = Number(data.down) || 0
-    
+
     traffic.value = {
       up: currentUp,
       down: currentDown,
-      total: traffic.value.total + currentUp + currentDown
+      total: traffic.value.total + currentUp + currentDown,
     }
   }
 
@@ -149,9 +148,20 @@ export const useInfoStore = defineStore('info', () => {
     traffic.value = {
       up: 0,
       down: 0,
-      total: 0
+      total: 0,
     }
   }
 
-  return { traffic, memory, logs, version, newVersion, startKernel, stopKernel, updateMemory, updateTraffic, resetTraffic }
+  return {
+    traffic,
+    memory,
+    logs,
+    version,
+    newVersion,
+    startKernel,
+    stopKernel,
+    updateMemory,
+    updateTraffic,
+    resetTraffic,
+  }
 })

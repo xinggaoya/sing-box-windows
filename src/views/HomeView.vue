@@ -136,7 +136,7 @@ import {
   ArrowUpOutline,
   ArrowDownOutline,
   HardwareChipOutline,
-  AnalyticsOutline
+  AnalyticsOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/AppStore'
 import Echarts from '@/components/layout/Echarts.vue'
@@ -194,7 +194,7 @@ const useTotalTraffic = computed(() => {
 const memoryStr = computed(() => formatBandwidth(infoStore.memory.inuse))
 const trafficStr = computed(() => ({
   up: formatBandwidth(Number(infoStore.traffic.up) || 0),
-  down: formatBandwidth(Number(infoStore.traffic.down) || 0)
+  down: formatBandwidth(Number(infoStore.traffic.down) || 0),
 }))
 
 const runKernel = async () => {
@@ -246,7 +246,7 @@ const onModeChange = async (value: string) => {
           },
           onNegativeClick: () => {
             appState.mode = 'system'
-          }
+          },
         })
         return
       }

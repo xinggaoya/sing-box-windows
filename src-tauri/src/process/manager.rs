@@ -3,14 +3,16 @@ use crate::utils::app_util::get_work_dir;
 use log::{error, info, warn};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
-use std::process::Child;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
+use std::process::Stdio;
+use tokio::io::AsyncBufReadExt;
+use tokio::process::Command;
 
 pub struct ProcessManager {
     process_info: Arc<RwLock<ProcessInfo>>,
-    child_process: Arc<RwLock<Option<Child>>>,
+    child_process: Arc<RwLock<Option<tokio::process::Child>>>,
 }
 
 impl ProcessManager {
@@ -101,7 +103,7 @@ impl ProcessManager {
         info!("当前工作目录: {}", work_dir);
 
         let sing_box_dir = Path::new(&work_dir).join("sing-box");
-        let kernel_path = sing_box_dir.join("sing-box");
+        let kernel_path = sing_box_dir.join("sing-box.exe");
         let config_path = sing_box_dir.join("config.json");
 
         // 检查 sing-box 目录是否存在
@@ -112,11 +114,6 @@ impl ProcessManager {
         // 检查内核文件是否存在
         if !kernel_path.exists() {
             return Err(ProcessError::StartFailed("内核文件不存在".to_string()));
-        }
-
-        // 检查配置文件是否存在
-        if !config_path.exists() {
-            return Err(ProcessError::StartFailed("配置文件不存在".to_string()));
         }
 
         Ok(())
@@ -139,11 +136,11 @@ impl ProcessManager {
 
         // 获取工作目录
         let work_dir = get_work_dir();
-        let kernel_path = Path::new(&work_dir).join("sing-box/sing-box");
         let kernel_work_dir = Path::new(&work_dir).join("sing-box");
+        let kernel_path = kernel_work_dir.join("sing-box.exe");
 
         // 启动进程
-        let child = match std::process::Command::new(kernel_path.to_str().unwrap())
+        let mut child = match Command::new(kernel_path.to_str().unwrap())
             .arg("run")
             .arg("-D")
             .arg(kernel_work_dir.to_str().unwrap())
@@ -161,8 +158,8 @@ impl ProcessManager {
         // 更新进程信息
         {
             let mut info = self.process_info.write().await;
-            info.pid = Some(child.id());
-            info.status = ProcessStatus::Running;
+            info.pid = Some(child.id().unwrap_or(0));
+            info.status = ProcessStatus::Starting;
         }
 
         // 保存子进程
@@ -286,7 +283,26 @@ impl ProcessManager {
         let mut info = self.process_info.write().await;
         info.status = ProcessStatus::Failed(error.to_string());
         info.last_error = Some(error.to_string());
-        error!("进程错误: {}", error);
+        
+        // 根据错误类型记录不同级别的日志
+        match &error {
+            ProcessError::AlreadyRunning => warn!("进程已在运行中: {}", error),
+            ProcessError::NotRunning => warn!("进程未运行: {}", error),
+            ProcessError::StartFailed(msg) => error!("启动失败: {}", msg),
+            ProcessError::StopFailed(msg) => error!("停止失败: {}", msg),
+            ProcessError::StatusCheckFailed(msg) => error!("状态检查失败: {}", msg),
+            ProcessError::ConfigError(msg) => error!("配置错误: {}", msg),
+            ProcessError::SystemError(msg) => error!("系统错误: {}", msg),
+            ProcessError::PermissionError(msg) => error!("权限错误: {}", msg),
+            ProcessError::NetworkError(msg) => error!("网络错误: {}", msg),
+            ProcessError::Unknown(msg) => error!("未知错误: {}", msg),
+        }
+
+        // 记录额外的系统信息
+        if let Some(pid) = info.pid {
+            info!("相关进程PID: {}", pid);
+        }
+
         Ok(())
     }
 }

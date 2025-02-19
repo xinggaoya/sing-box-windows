@@ -79,7 +79,7 @@
 
 <script setup lang="ts">
 import { darkTheme, useOsTheme, NIcon } from 'naive-ui'
-import { h, ref, onMounted } from 'vue'
+import { h, ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import mitt from '@/utils/mitt'
 import {
@@ -93,13 +93,15 @@ import {
   ExpandOutline,
   ContractOutline,
   RemoveOutline,
-  CloseOutline
+  CloseOutline,
 } from '@vicons/ionicons5'
 import { Window } from '@tauri-apps/api/window'
+import { useAppStore } from '@/stores/AppStore'
 import logo from '@/assets/icon.png'
 
 const router = useRouter()
 const appWindow = Window.getCurrent()
+const appState = useAppStore()
 const osThemeRef = useOsTheme()
 const isDark = ref(osThemeRef.value === 'dark')
 const theme = ref(isDark.value ? darkTheme : null)
@@ -132,33 +134,34 @@ function renderIcon(icon: any) {
   return () => h(NIcon, { size: 22 }, { default: () => h(icon) })
 }
 
-const menuOptions = [
+const menuOptions = computed(() => [
   {
     label: () => h('span', { style: 'font-size: 16px' }, '主页'),
     key: 0,
-    icon: renderIcon(HomeOutline)
+    icon: renderIcon(HomeOutline),
   },
   {
     label: () => h('span', { style: 'font-size: 16px' }, '代理'),
     key: 1,
-    icon: renderIcon(SwapHorizontalOutline)
+    disabled: !appState.isRunning,
+    icon: renderIcon(SwapHorizontalOutline),
   },
   {
     label: () => h('span', { style: 'font-size: 16px' }, '订阅'),
     key: 2,
-    icon: renderIcon(AtCircleOutline)
+    icon: renderIcon(AtCircleOutline),
   },
   {
     label: () => h('span', { style: 'font-size: 16px' }, '日志'),
     key: 3,
-    icon: renderIcon(DocumentTextOutline)
+    icon: renderIcon(DocumentTextOutline),
   },
   {
     label: () => h('span', { style: 'font-size: 16px' }, '设置'),
     key: 4,
-    icon: renderIcon(SettingsOutline)
-  }
-]
+    icon: renderIcon(SettingsOutline),
+  },
+])
 
 function onSelect(key: number) {
   switch (key) {
@@ -200,7 +203,13 @@ onMounted(async () => {
 <style>
 body {
   margin: 0;
-  font-family: v-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    v-sans,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
 }
 
 a {

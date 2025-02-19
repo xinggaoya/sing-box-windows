@@ -4,21 +4,17 @@
       <template #header>
         <n-space align="center">
           <n-h3 style="margin: 0">内核管理</n-h3>
-          <n-tag type="info" round>v{{ infoStore.version.version }}</n-tag>
+          <n-tag type="info" round>{{ infoStore.version.version }}</n-tag>
           <n-tag v-if="hasNewVersion" type="warning" round>
-            新版本可用: v{{ infoStore.newVersion }}
+            新版本可用: {{ infoStore.newVersion }}
           </n-tag>
         </n-space>
       </template>
       <n-space vertical>
-        <n-alert
-          v-if="hasNewVersion"
-          type="warning"
-          title="发现新版本"
-        >
+        <n-alert v-if="hasNewVersion" type="warning" title="发现新版本">
           有新版本的内核可供下载，建议更新以获得更好的体验。
         </n-alert>
-        
+
         <n-progress
           v-if="downloading"
           type="line"
@@ -46,7 +42,7 @@
           <n-text depth="3" style="font-size: 14px">
             当前版本：{{ infoStore.version.version }}
             <n-text v-if="hasNewVersion" type="warning">
-              新版本可用: v{{ infoStore.newVersion }}
+              新版本可用: {{ infoStore.newVersion }}
             </n-text>
           </n-text>
         </n-space>
@@ -62,21 +58,14 @@
         :model="appStore"
         label-width="120"
         :style="{
-          maxWidth: '640px'
+          maxWidth: '640px',
         }"
       >
         <n-form-item label="开机自启">
           <n-space align="center">
-            <n-switch
-              v-model:value="appStore.autoStart"
-              @update-value="onAutoStartChange"
-            >
-              <template #checked>
-                开启
-              </template>
-              <template #unchecked>
-                关闭
-              </template>
+            <n-switch v-model:value="appStore.autoStart" @update-value="onAutoStartChange">
+              <template #checked> 开启 </template>
+              <template #unchecked> 关闭 </template>
             </n-switch>
             <n-text depth="3">
               {{ appStore.autoStart ? '应用将在系统启动时自动运行' : '应用需要手动启动' }}
@@ -87,12 +76,8 @@
         <n-form-item label="自动启动内核">
           <n-space align="center">
             <n-switch v-model:value="appStore.autoStartKernel">
-              <template #checked>
-                开启
-              </template>
-              <template #unchecked>
-                关闭
-              </template>
+              <template #checked> 开启 </template>
+              <template #unchecked> 关闭 </template>
             </n-switch>
             <n-text depth="3">
               {{ appStore.autoStartKernel ? '应用启动时将自动启动内核' : '需要手动启动内核' }}
@@ -107,18 +92,12 @@
         <n-h3 style="margin: 0">关于</n-h3>
       </template>
       <n-descriptions bordered>
-        <n-descriptions-item label="应用版本">
-          1.0.0
-        </n-descriptions-item>
+        <n-descriptions-item label="应用版本"> 1.0.0 </n-descriptions-item>
         <n-descriptions-item label="内核版本">
           {{ infoStore.version.version }}
         </n-descriptions-item>
-        <n-descriptions-item label="系统">
-          Windows
-        </n-descriptions-item>
-        <n-descriptions-item label="开源协议">
-          MIT License
-        </n-descriptions-item>
+        <n-descriptions-item label="系统"> Windows </n-descriptions-item>
+        <n-descriptions-item label="开源协议"> MIT License </n-descriptions-item>
       </n-descriptions>
     </n-card>
   </n-space>
@@ -147,7 +126,7 @@ listen('download-progress', (event: any) => {
   const { status, progress, message: msg } = event.payload
   downloadProgress.value = progress
   downloadMessage.value = msg
-  
+
   if (status === 'completed') {
     downloading.value = false
     message.success('内核下载完成！')
@@ -156,7 +135,8 @@ listen('download-progress', (event: any) => {
 
 const hasNewVersion = computed(() => {
   if (!infoStore.newVersion || !infoStore.version.version) return false
-  return infoStore.newVersion !== infoStore.version.version
+  // 包含即使最新
+  return infoStore.newVersion.includes(infoStore.version.version)
 })
 
 const downloadTheKernel = async () => {
@@ -165,7 +145,7 @@ const downloadTheKernel = async () => {
     downloading.value = true
     downloadProgress.value = 0
     downloadMessage.value = '准备下载...'
-    
+
     await invoke('download_latest_kernel')
   } catch (error) {
     message.error(error as string)

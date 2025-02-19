@@ -2,7 +2,7 @@ use crate::app::app_service::{
     check_admin, download_latest_kernel, download_subscription, get_memory_usage, get_traffic_data,
     restart_as_admin, set_system_proxy, set_tun_proxy, start_kernel, stop_kernel,
 };
-use lazy_static::lazy_static;
+// use lazy_static::lazy_static;
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
 

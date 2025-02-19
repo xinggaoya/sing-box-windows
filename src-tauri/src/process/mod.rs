@@ -20,13 +20,17 @@ pub enum ProcessError {
     NotRunning,
     StartFailed(String),
     StopFailed(String),
+    StatusCheckFailed(String),
     ConfigError(String),
-    IoError(String),
+    SystemError(String),
+    PermissionError(String),
+    NetworkError(String),
+    Unknown(String),
 }
 
 impl From<std::io::Error> for ProcessError {
     fn from(err: std::io::Error) -> Self {
-        ProcessError::IoError(err.to_string())
+        ProcessError::SystemError(err.to_string())
     }
 }
 
@@ -37,8 +41,12 @@ impl fmt::Display for ProcessError {
             ProcessError::NotRunning => write!(f, "进程未运行"),
             ProcessError::StartFailed(msg) => write!(f, "启动失败: {}", msg),
             ProcessError::StopFailed(msg) => write!(f, "停止失败: {}", msg),
+            ProcessError::StatusCheckFailed(msg) => write!(f, "进程状态检查失败: {}", msg),
             ProcessError::ConfigError(msg) => write!(f, "配置错误: {}", msg),
-            ProcessError::IoError(e) => write!(f, "IO错误: {}", e),
+            ProcessError::SystemError(msg) => write!(f, "系统错误: {}", msg),
+            ProcessError::PermissionError(msg) => write!(f, "权限错误: {}", msg),
+            ProcessError::NetworkError(msg) => write!(f, "网络错误: {}", msg),
+            ProcessError::Unknown(msg) => write!(f, "未知错误: {}", msg),
         }
     }
 }

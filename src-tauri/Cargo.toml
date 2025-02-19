@@ -24,12 +24,14 @@ log = "0.4"
 tauri = { version = "2.0.6", features = ["tray-icon", "unstable"] }
 tauri-plugin-log = "2.0.0-rc"
 reqwest = { version = "0.12.9", features = ["json", "stream", "rustls-tls"] }
-winreg = "0.10.1"
+dirs = "5.0.1"
 tokio = { version = "1.0", features = ["full"] }
 futures = "0.3"
 futures-util = "0.3"
 zip = { version = "0.5.13" }
 lazy_static = "1.4.0"
+winreg = "0.50"
+is_elevated = "0.1.2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
