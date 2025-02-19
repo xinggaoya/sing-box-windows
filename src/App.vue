@@ -69,6 +69,13 @@ const initTray = async () => {
   const menu = await Menu.new({
     items: [
       {
+        id: 'show',
+        text: '显示界面',
+        action: async () => {
+          appWindow.show()
+        },
+      },
+      {
         id: 'start',
         text: '启动内核',
         action: async () => {
@@ -121,13 +128,13 @@ const initTray = async () => {
     icon: await defaultWindowIcon(),
     action: (event: any) => {
       switch (event.type) {
-        case 'Click':
+        case 'DoubleClick':
           appWindow.show()
           break
       }
     },
     menu,
-    menuOnLeftClick: false,
+    menuOnLeftClick: true,
   }
 
   //@ts-ignore
