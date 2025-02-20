@@ -221,7 +221,6 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
     ];
 
     let mut success = false;
-    let mut last_error = String::new();
 
     for url in &download_urls {
         info!("尝试从 {} 下载", url);
@@ -250,7 +249,6 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
             }
             Err(e) => {
                 error!("从 {} 下载失败: {}", url, e);
-                last_error = e;
                 continue;
             }
         }
@@ -384,5 +382,37 @@ fn set_tun_proxy_impl() -> Result<(), Box<dyn Error>> {
         .map_err(|e| format!("保存配置文件失败: {}", e))?;
 
     info!("TUN代理模式已设置");
+    Ok(())
+}
+
+// 切换 IPV6版本模式
+#[tauri::command]
+pub fn toggle_ip_version(preferIpv6: bool) -> Result<(), String> {
+    info!("开始切换IP版本模式: {}", if preferIpv6 { "IPv6优先" } else { "仅IPv4" });
+    
+    let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/config.json");
+    info!("配置文件路径: {}", path.display());
+
+    // 读取文件内容
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| format!("读取配置文件失败: {}", e))?;
+
+    // 直接替换字符串
+    let modified_content = if preferIpv6 {
+        content.replace("\"ipv4_only\"", "\"prefer_ipv6\"")
+    } else {
+        content.replace("\"prefer_ipv6\"", "\"ipv4_only\"")
+    };
+
+    // 验证修改后的内容是否是有效的 JSON
+    serde_json::from_str::<serde_json::Value>(&modified_content)
+        .map_err(|e| format!("修改后的配置不是有效的 JSON: {}", e))?;
+
+    // 保存修改后的内容
+    std::fs::write(&path, modified_content)
+        .map_err(|e| format!("保存配置文件失败: {}", e))?;
+
+    info!("IP版本模式已成功切换为: {}", if preferIpv6 { "IPv6优先" } else { "仅IPv4" });
     Ok(())
 }

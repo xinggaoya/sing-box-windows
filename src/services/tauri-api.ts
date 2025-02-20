@@ -34,6 +34,9 @@ export const proxyApi = {
 
   // 以管理员权限重启
   restartAsAdmin: () => invoke<void>('restart_as_admin'),
+
+  // 切换 IP 版本
+  toggleIpVersion: (preferIpv6: boolean) => invoke<void>('toggle_ip_version', { preferIpv6 }),
 }
 
 // 订阅相关接口

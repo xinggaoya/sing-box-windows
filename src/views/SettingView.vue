@@ -84,6 +84,18 @@
             </n-text>
           </n-space>
         </n-form-item>
+
+        <n-form-item label="IPv6优先">
+          <n-space align="center">
+            <n-switch v-model:value="appStore.preferIpv6" @update-value="onIpVersionChange">
+              <template #checked> 开启 </template>
+              <template #unchecked> 关闭 </template>
+            </n-switch>
+            <n-text depth="3">
+              {{ appStore.preferIpv6 ? '优先使用IPv6连接' : '仅使用IPv4连接' }}
+            </n-text>
+          </n-space>
+        </n-form-item>
       </n-form>
     </n-card>
 
@@ -122,16 +134,19 @@ const downloadProgress = ref(0)
 const downloadMessage = ref('')
 
 // 监听下载进度事件
-listen('download-progress', (event: any) => {
-  const { status, progress, message: msg } = event.payload
-  downloadProgress.value = progress
-  downloadMessage.value = msg
+listen(
+  'download-progress',
+  (event: { payload: { status: string; progress: number; message: string } }) => {
+    const { status, progress, message: msg } = event.payload
+    downloadProgress.value = progress
+    downloadMessage.value = msg
 
-  if (status === 'completed') {
-    downloading.value = false
-    message.success('内核下载完成！')
-  }
-})
+    if (status === 'completed') {
+      downloading.value = false
+      message.success('内核下载完成！')
+    }
+  },
+)
 
 const hasNewVersion = computed(() => {
   if (!infoStore.newVersion || !infoStore.version.version) return false
@@ -167,6 +182,20 @@ const onAutoStartChange = async (value: boolean) => {
     message.error('设置失败')
     // 回滚状态
     appStore.autoStart = !value
+  }
+}
+
+const onIpVersionChange = async (value: boolean) => {
+  try {
+    await tauriApi.proxy.toggleIpVersion(value)
+    // 切换后重启内核
+    if (appStore.isRunning) {
+      await tauriApi.kernel.restartKernel()
+    }
+  } catch (error: unknown) {
+    message.error(`设置失败: ${error instanceof Error ? error.message : String(error)}`)
+    // 回滚状态
+    appStore.preferIpv6 = !value
   }
 }
 </script>

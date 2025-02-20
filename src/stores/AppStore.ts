@@ -15,6 +15,9 @@ export const useAppStore = defineStore(
     const autoStart = ref(false)
     const autoStartKernel = ref(false)
 
+    // IP版本设置
+    const preferIpv6 = ref(false)
+
     // 切换代理模式
     const switchProxyMode = async (targetMode: 'system' | 'tun') => {
       try {
@@ -42,6 +45,7 @@ export const useAppStore = defineStore(
       mode,
       autoStart,
       autoStartKernel,
+      preferIpv6,
       switchProxyMode,
     }
   },
