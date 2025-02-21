@@ -23,7 +23,12 @@ export const useInfoStore = defineStore('info', () => {
 
   // 日志信息
   const MAX_LOGS = 300
-  const logs = ref<any[]>([])
+  interface LogEntry {
+    type: string
+    payload: string
+    timestamp: number
+  }
+  const logs = ref<LogEntry[]>([])
 
   // 存储 WebSocket 清理函数
   let cleanupFunctions: Array<() => void> = []
@@ -55,10 +60,19 @@ export const useInfoStore = defineStore('info', () => {
 
     // 日志监控
     const cleanupLogs = createWebSocket('ws://127.0.0.1:9090/logs?token=', (data) => {
-      if ('time' in data && 'message' in data) {
-        logs.value.push(data)
+      if (
+        'type' in data &&
+        'payload' in data &&
+        typeof data.type === 'string' &&
+        typeof data.payload === 'string'
+      ) {
+        logs.value.unshift({
+          type: data.type,
+          payload: data.payload,
+          timestamp: Date.now(),
+        })
         if (logs.value.length > MAX_LOGS) {
-          logs.value = logs.value.slice(-MAX_LOGS)
+          logs.value = logs.value.slice(0, MAX_LOGS)
         }
       }
     })
@@ -158,5 +172,6 @@ export const useInfoStore = defineStore('info', () => {
     startKernel,
     stopKernel,
     restartKernel,
+    initWebSocket,
   }
 })

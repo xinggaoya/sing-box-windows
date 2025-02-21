@@ -1,28 +1,50 @@
 {
-  "common": {
-    "primaryColor": "#1677ff",
-    "primaryColorHover": "#4A90E2",
-    "primaryColorPressed": "#1161AE",
-    "primaryColorSuppl": "#1677ff",
-    "infoColor": "#7B7B7B",
-    "infoColorHover": "#A8A8A8",
-    "infoColorPressed": "#5C5C5C",
-    "infoColorSuppl": "#7B7B7B",
-    "successColor": "#67C23A",
-    "successColorHover": "#9FCF5B",
-    "successColorPressed": "#4B9B2F",
-    "warningColor": "#FFA726",
-    "warningColorHover": "#FFB74D",
-    "warningColorPressed": "#F57C00",
-    "warningColorSuppl": "#FF9800",
-    "errorColor": "#DC3545",
-    "errorColorHover": "#E57373",
-    "errorColorPressed": "#C62828",
-    "errorColorSuppl": "#F44336",
-    "borderRadius": "4px",
-    "borderRadiusSmall": "3px"
-  },
-  "Tag": {
-    "borderRadius": "5px"
-  }
+    "common": {
+        "primaryColor": "#3366FF",
+        "primaryColorHover": "#5A7EFF",
+        "primaryColorPressed": "#1A4BFF",
+        "primaryColorSuppl": "#1A4BFF",
+        "infoColor": "#909399",
+        "infoColorHover": "#A6A9AD",
+        "infoColorPressed": "#7B7E83",
+        "infoColorSuppl": "#7B7E83",
+        "successColor": "#00B42A",
+        "successColorHover": "#20C040",
+        "successColorPressed": "#009A1A",
+        "successColorSuppl": "#009A1A",
+        "warningColor": "#FF7D00",
+        "warningColorHover": "#FF952B",
+        "warningColorPressed": "#D66600",
+        "warningColorSuppl": "#D66600",
+        "errorColor": "#F53F3F",
+        "errorColorHover": "#F76560",
+        "errorColorPressed": "#CB2A2A",
+        "errorColorSuppl": "#CB2A2A"
+    },
+    "Button": {
+        "borderRadiusMedium": "8px",
+        "borderPressed": "1px solid #1A4BFF",
+        "colorPrimary": "#3366FF",
+        "fontWeightText": "600"
+    },
+    "Input": {
+        "borderFocus": "1px solid #3366FF",
+        "boxShadowFocus": "0 0 0 2px rgba(51, 102, 255, 0.2)",
+        "caretColor": "#3366FF"
+    },
+    "Card": {
+        "borderRadius": "12px",
+        "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.08)"
+    },
+    "Tag": {
+        "borderRadius": "4px",
+        "heightMedium": "28px"
+    },
+    "Alert": {
+        "padding": "12px 16px",
+        "borderRadius": "8px"
+    },
+    "InternalSelection": {
+        "boxShadowActive": "0 4px 8px rgba(51, 102, 255, 0.15)"
+    }
 }

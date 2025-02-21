@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 export interface Subscription {
   name: string
   url: string
-  isLoading?: boolean
+  isLoading: boolean
   lastUpdate?: number
 }
 

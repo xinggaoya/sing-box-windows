@@ -1,128 +1,92 @@
 <template>
-  <n-space vertical size="small">
-    <n-card size="small">
-      <n-tabs type="segment" animated v-model:value="appState.mode" @update:value="onModeChange">
-        <n-tab-pane name="system">
-          <template #tab>
-            <n-space align="center" size="small" inline>
-              <n-icon><DesktopOutline /></n-icon>
-              系统代理
-            </n-space>
-          </template>
-          <n-space vertical size="small">
-            <n-alert v-if="appState.isRunning" type="success">
-              系统代理模式运行中，所有应用程序都将通过代理访问网络
-            </n-alert>
-            <n-alert v-else type="info">
-              选择此模式将自动配置系统代理，所有应用程序都将通过代理访问网络
-            </n-alert>
+  <div class="home-container">
+    <!-- 状态控制卡片 -->
+    <n-card class="control-card" :bordered="false">
+      <n-space vertical :size="24">
+        <!-- 状态指示器和控制按钮 -->
+        <n-space justify="space-between" align="center">
+          <n-space align="center" :size="16">
+            <div class="status-indicator">
+              <div class="status-dot" :class="{ active: appState.isRunning }" />
+              <span class="status-text">{{ appState.isRunning ? '运行中' : '已停止' }}</span>
+            </div>
+            <n-tag :bordered="false" type="info" size="small">
+              {{ appState.mode === 'system' ? '系统代理' : 'TUN 模式' }}
+            </n-tag>
           </n-space>
-        </n-tab-pane>
-        <n-tab-pane name="tun">
-          <template #tab>
-            <n-space align="center" size="small" inline>
-              <n-icon><GitNetworkOutline /></n-icon>
-              TUN 模式
-            </n-space>
-          </template>
-          <n-space vertical size="small">
-            <n-alert v-if="appState.isRunning" type="success">
-              TUN 模式运行中，流量将通过虚拟网卡进行路由
-            </n-alert>
-            <n-alert v-else type="info">
-              选择此模式将创建虚拟网卡，所有流量将通过 TUN 接口进行路由
-            </n-alert>
+          <n-space :size="12">
+            <n-button
+              secondary
+              type="info"
+              size="small"
+              :disabled="!appState.isRunning"
+              @click="onModeChange(appState.mode === 'system' ? 'tun' : 'system')"
+            >
+              <template #icon>
+                <n-icon><repeat-outline /></n-icon>
+              </template>
+              切换模式
+            </n-button>
+            <n-button
+              secondary
+              :type="appState.isRunning ? 'error' : 'primary'"
+              size="small"
+              :loading="isStarting || isStopping"
+              @click="appState.isRunning ? stopKernel() : runKernel()"
+            >
+              <template #icon>
+                <n-icon>
+                  <power-outline />
+                </n-icon>
+              </template>
+              {{ appState.isRunning ? '停止' : '启动' }}
+            </n-button>
           </n-space>
-        </n-tab-pane>
-      </n-tabs>
-
-      <n-divider />
-
-      <n-flex justify="center" align="center">
-        <n-space>
-          <n-button
-            strong
-            secondary
-            size="large"
-            type="primary"
-            :disabled="appState.isRunning"
-            @click="runKernel"
-            :loading="isStarting"
-          >
-            <template #icon>
-              <n-icon><PlayCircleOutline /></n-icon>
-            </template>
-            启动
-          </n-button>
-          <n-button
-            strong
-            secondary
-            size="large"
-            type="error"
-            :disabled="!appState.isRunning"
-            @click="stopKernel"
-            :loading="isStopping"
-          >
-            <template #icon>
-              <n-icon><StopCircleOutline /></n-icon>
-            </template>
-            停止
-          </n-button>
         </n-space>
-      </n-flex>
-    </n-card>
 
-    <n-grid :x-gap="8" :y-gap="8" :cols="4">
-      <n-grid-item>
-        <n-card size="small" hoverable>
-          <n-statistic label="上传速度">
-            <template #prefix>
-              <n-icon color="#18a058"><ArrowUpOutline /></n-icon>
-            </template>
-            {{ trafficStr.up }}
-          </n-statistic>
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card size="small" hoverable>
-          <n-statistic label="下载速度">
-            <template #prefix>
-              <n-icon color="#2080f0"><ArrowDownOutline /></n-icon>
-            </template>
-            {{ trafficStr.down }}
-          </n-statistic>
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card size="small" hoverable>
-          <n-statistic label="内存占用">
-            <template #prefix>
-              <n-icon color="#d03050"><HardwareChipOutline /></n-icon>
-            </template>
-            {{ memoryStr }}
-          </n-statistic>
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card size="small" hoverable>
-          <n-statistic label="总流量">
-            <template #prefix>
-              <n-icon color="#f0a020"><AnalyticsOutline /></n-icon>
-            </template>
-            {{ useTotalTraffic }}
-          </n-statistic>
-        </n-card>
-      </n-grid-item>
-    </n-grid>
+        <!-- 实时流量监控 -->
+        <div class="traffic-monitor">
+          <div class="traffic-card upload">
+            <n-icon size="22" color="#18a058"><arrow-up-outline /></n-icon>
+            <div class="traffic-info">
+              <span class="traffic-label">上传</span>
+              <span class="traffic-value">{{ trafficStr.up }}</span>
+            </div>
+          </div>
+          <div class="traffic-card download">
+            <n-icon size="22" color="#2080f0"><arrow-down-outline /></n-icon>
+            <div class="traffic-info">
+              <span class="traffic-label">下载</span>
+              <span class="traffic-value">{{ trafficStr.down }}</span>
+            </div>
+          </div>
+          <div class="traffic-card memory">
+            <n-icon size="22" color="#d03050"><hardware-chip-outline /></n-icon>
+            <div class="traffic-info">
+              <span class="traffic-label">内存</span>
+              <span class="traffic-value">{{ memoryStr }}</span>
+            </div>
+          </div>
+          <div class="traffic-card total">
+            <n-icon size="22" color="#f0a020"><analytics-outline /></n-icon>
+            <div class="traffic-info">
+              <span class="traffic-label">总流量</span>
+              <span class="traffic-value">{{ useTotalTraffic }}</span>
+            </div>
+          </div>
+        </div>
 
-    <n-card title="实时流量监控" size="small" style="height: calc(100vh - 420px)">
-      <Echarts
-        :download-speed="infoStore.traffic.up"
-        :upload-speed="infoStore.traffic.down"
-        :is-visible="isWindowVisible"
-      />
+        <!-- 流量图表 -->
+        <div class="chart-wrapper">
+          <Echarts
+            :download-speed="infoStore.traffic.up"
+            :upload-speed="infoStore.traffic.down"
+            :is-visible="isWindowVisible"
+          />
+        </div>
+      </n-space>
     </n-card>
-  </n-space>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -132,10 +96,8 @@ import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
 import {
-  PlayCircleOutline,
-  StopCircleOutline,
-  DesktopOutline,
-  GitNetworkOutline,
+  PowerOutline,
+  RepeatOutline,
   ArrowUpOutline,
   ArrowDownOutline,
   HardwareChipOutline,
@@ -157,35 +119,28 @@ const isWindowVisible = ref(true)
 
 // 监听窗口事件
 const setupWindowListeners = () => {
-  // 监听最小化事件
   mitt.on('window-minimize', () => {
     isWindowVisible.value = false
   })
 
-  // 监听关闭/隐藏事件
   mitt.on('window-hide', () => {
     isWindowVisible.value = false
   })
 
-  // 监听窗口显示事件
   mitt.on('window-show', () => {
     isWindowVisible.value = true
   })
 
-  // 监听窗口恢复事件
   mitt.on('window-restore', () => {
     isWindowVisible.value = true
   })
 }
 
-// 组件挂载时设置监听器
 onMounted(() => {
   setupWindowListeners()
 })
 
-// 组件卸载时清理
 onUnmounted(() => {
-  // 移除所有事件监听
   mitt.off('window-minimize')
   mitt.off('window-hide')
   mitt.off('window-show')
@@ -251,3 +206,110 @@ const onModeChange = async (value: string) => {
   }
 }
 </script>
+
+<style scoped>
+.home-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.control-card {
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.control-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--n-text-color-disabled);
+  transition: all 0.3s ease;
+}
+
+.status-dot.active {
+  background-color: var(--success-color);
+  box-shadow: 0 0 8px var(--success-color);
+}
+
+.status-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color-1);
+}
+
+.traffic-monitor {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 0 -8px;
+}
+
+.traffic-card {
+  background-color: var(--card-color);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.traffic-card:hover {
+  transform: translateY(-2px);
+  background-color: var(--card-color-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.traffic-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.traffic-label {
+  font-size: 13px;
+  color: var(--text-color-2);
+}
+
+.traffic-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-color-1);
+}
+
+.chart-wrapper {
+  margin-top: 8px;
+  height: calc(100vh - 380px);
+  min-height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: var(--card-color);
+  transition: all 0.3s ease;
+}
+
+.chart-wrapper:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.n-button) {
+  font-weight: 500;
+}
+
+:deep(.n-tag) {
+  font-weight: 500;
+}
+</style>

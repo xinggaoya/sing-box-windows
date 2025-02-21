@@ -1,12 +1,20 @@
 <template>
-  <n-space vertical size="large">
-    <n-card>
+  <div class="sub-container">
+    <!-- 订阅管理卡片 -->
+    <n-card class="sub-card" :bordered="false">
       <template #header>
-        <n-space align="center" justify="space-between">
-          <n-space align="center">
-            <n-h3 style="margin: 0">订阅管理</n-h3>
-            <n-tag :bordered="false" type="info">{{ subStore.list.length }} 个订阅</n-tag>
-          </n-space>
+        <div class="card-header">
+          <div class="header-left">
+            <n-h3 class="card-title">
+              <n-icon size="20" class="card-icon">
+                <link-outline />
+              </n-icon>
+              订阅管理
+            </n-h3>
+            <n-tag :bordered="false" type="info" size="small"
+              >{{ subStore.list.length }} 个订阅</n-tag
+            >
+          </div>
           <n-button
             quaternary
             circle
@@ -20,17 +28,17 @@
               </n-icon>
             </template>
           </n-button>
-        </n-space>
+        </div>
       </template>
 
       <n-grid :x-gap="12" :y-gap="12" :cols="3">
         <n-grid-item v-for="(item, index) in subStore.list" :key="index">
           <n-card
             :class="{
-              'sub-card': true,
-              'sub-card-loading': item.isLoading,
-              'sub-card-active': subStore.activeIndex === index,
+              'sub-node-card': true,
+              'sub-node-card-active': subStore.activeIndex === index,
             }"
+            :bordered="false"
             hoverable
           >
             <n-space vertical :size="12">
@@ -40,7 +48,11 @@
                     <link-outline />
                   </n-icon>
                   <n-text strong>{{ item.name }}</n-text>
-                  <n-tag v-if="subStore.activeIndex === index" type="success" size="small"
+                  <n-tag
+                    v-if="subStore.activeIndex === index"
+                    type="success"
+                    size="small"
+                    :bordered="false"
                     >使用中</n-tag
                   >
                 </n-space>
@@ -96,9 +108,9 @@
                   secondary
                   size="small"
                   :loading="item.isLoading"
-                  :disabled="subStore.activeIndex === index"
                   @click="useSubscription(item.url, index)"
                   :type="subStore.activeIndex === index ? 'success' : 'primary'"
+                  :ghost="subStore.activeIndex !== index"
                 >
                   <template #icon>
                     <n-icon>
@@ -106,7 +118,7 @@
                       <play-circle-outline v-else />
                     </n-icon>
                   </template>
-                  {{ subStore.activeIndex === index ? '使用中' : '使用' }}
+                  {{ subStore.activeIndex === index ? '重新使用' : '使用' }}
                 </n-button>
               </n-flex>
             </n-space>
@@ -116,11 +128,16 @@
 
       <n-empty v-if="!subStore.list.length" description="暂无订阅">
         <template #extra>
-          <n-button type="primary" @click="showAddModal = true"> 添加订阅 </n-button>
+          <n-button type="primary" @click="showAddModal = true" ghost>
+            <template #icon>
+              <n-icon><add-outline /></n-icon>
+            </template>
+            添加订阅
+          </n-button>
         </template>
       </n-empty>
     </n-card>
-  </n-space>
+  </div>
 
   <!-- 添加/编辑订阅对话框 -->
   <n-modal
@@ -128,10 +145,8 @@
     :mask-closable="false"
     preset="dialog"
     :title="editIndex === null ? '添加订阅' : '编辑订阅'"
-    positive-text="确认"
-    negative-text="取消"
-    @positive-click="handleConfirm"
-    @negative-click="handleCancel"
+    :bordered="false"
+    style="width: 500px"
   >
     <n-form
       ref="formRef"
@@ -157,6 +172,12 @@
         />
       </n-form-item>
     </n-form>
+    <template #action>
+      <n-space justify="end">
+        <n-button @click="handleCancel" ghost>取消</n-button>
+        <n-button type="primary" @click="handleConfirm" :loading="isLoading"> 确认 </n-button>
+      </n-space>
+    </template>
   </n-modal>
 </template>
 
@@ -179,8 +200,8 @@ import type { FormInst, FormRules } from 'naive-ui'
 interface Subscription {
   name: string
   url: string
-  isLoading?: boolean
   lastUpdate?: number
+  isLoading: boolean
 }
 
 const message = useMessage()
@@ -193,6 +214,7 @@ const isLoading = ref(false)
 const formValue = ref<Subscription>({
   name: '',
   url: '',
+  isLoading: false,
 })
 
 const rules: FormRules = {
@@ -207,6 +229,7 @@ const resetForm = () => {
   formValue.value = {
     name: '',
     url: '',
+    isLoading: false,
   }
   editIndex.value = null
 }
@@ -216,6 +239,7 @@ const handleEdit = (index: number, item: Subscription) => {
   formValue.value = {
     name: item.name,
     url: item.url,
+    isLoading: item.isLoading,
   }
   showAddModal.value = true
 }
@@ -252,20 +276,18 @@ const deleteSubscription = (index: number) => {
 }
 
 const useSubscription = async (url: string, index: number) => {
-  if (subStore.activeIndex === index) {
-    return
-  }
-
-  subStore.list[index].isLoading = true
+  // 设置加载状态
+  const currentItem = subStore.list[index]
+  currentItem.isLoading = true
   try {
     await invoke('download_subscription', { url })
-    subStore.list[index].lastUpdate = Date.now()
+    currentItem.lastUpdate = Date.now()
     subStore.activeIndex = index
     message.success('订阅已启用')
   } catch (error) {
     message.error('启用失败：' + error)
   } finally {
-    subStore.list[index].isLoading = false
+    currentItem.isLoading = false
   }
 }
 
@@ -285,20 +307,105 @@ const formatTime = (timestamp: number) => {
 </script>
 
 <style scoped>
+.sub-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
 .sub-card {
+  border-radius: 8px;
   transition: all 0.3s ease;
-  position: relative;
 }
 
 .sub-card:hover {
   transform: translateY(-2px);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
-.sub-card-loading {
-  opacity: 0.7;
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.sub-card-active {
-  border: 2px solid #18a058;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.card-icon {
+  margin-right: 8px;
+  color: var(--primary-color);
+}
+
+.sub-node-card {
+  transition: all 0.3s ease;
+  border-radius: 8px;
+  background-color: var(--card-color);
+}
+
+.sub-node-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.sub-node-card-active {
+  background-color: rgba(var(--primary-color-rgb), 0.1);
+  border: 1px solid var(--primary-color);
+}
+
+:deep(.n-button.n-button--ghost) {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+:deep(.n-button.n-button--ghost:hover) {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+:deep(.n-button.n-button--ghost.n-button--error) {
+  border-color: var(--error-color);
+  color: var(--error-color);
+}
+
+:deep(.n-button.n-button--ghost.n-button--error:hover) {
+  background-color: var(--error-color);
+  color: white;
+}
+
+:deep(.n-modal) {
+  --n-title-font-size: 16px;
+  --n-padding: 20px;
+}
+
+:deep(.n-form) {
+  margin-top: 8px;
+}
+
+:deep(.n-form-item-label) {
+  font-weight: 500;
+}
+
+:deep(.n-input) {
+  --n-border-radius: 4px;
+}
+
+:deep(.n-tag) {
+  --n-border-radius: 4px;
+}
+
+:deep(.n-empty) {
+  padding: 32px 0;
 }
 </style>

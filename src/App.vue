@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme="theme">
+  <n-config-provider :theme="theme" :theme-overrides="themeOverrides">
     <n-dialog-provider>
       <n-message-provider>
         <router-view />
@@ -12,6 +12,7 @@
 import { TrayIcon } from '@tauri-apps/api/tray'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
+import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 import { onMounted } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
@@ -42,6 +43,10 @@ onMounted(async () => {
     } catch (error) {
       console.error('自动启动内核失败:', error)
     }
+  }
+  // 如果内核正在运行，初始化 WebSocket 连接
+  if (appStore.isRunning) {
+    infoStore.initWebSocket()
   }
 })
 
@@ -88,6 +93,13 @@ const initTray = async () => {
         action: async () => {
           await infoStore.stopKernel()
           appStore.isRunning = false
+        },
+      },
+      {
+        id: 'restart',
+        text: '重启内核',
+        action: async () => {
+          await infoStore.restartKernel()
         },
       },
       {
