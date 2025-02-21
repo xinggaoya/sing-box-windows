@@ -42,14 +42,19 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # 先生成 lockfile
+      # 安装依赖
       - name: Install dependencies
         run: |
           pnpm install --no-frozen-lockfile
           pnpm store prune
 
+      # 安装 Tauri CLI
+      - name: Install Tauri CLI
+        run: pnpm add -D @tauri-apps/cli
+
+      # 构建应用
       - name: Build the app
-        run: pnpm run tauri build
+        run: pnpm run build && pnpm exec tauri build
 
       - name: Create Release
         uses: softprops/action-gh-release@v1

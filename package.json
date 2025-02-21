@@ -12,7 +12,10 @@
     "lint:oxlint": "oxlint . --fix -D correctness",
     "lint:eslint": "eslint . --fix",
     "lint": "run-s lint:*",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "tauri": "tauri",
+    "tauri dev": "tauri dev",
+    "tauri build": "tauri build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.1",
