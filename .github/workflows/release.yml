@@ -42,8 +42,11 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
+      # 先生成 lockfile
+      - name: Install dependencies
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm store prune
 
       - name: Build the app
         run: pnpm run tauri build
