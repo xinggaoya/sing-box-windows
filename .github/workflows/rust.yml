@@ -1,0 +1,82 @@
+name: Rust Tauri Build and Release
+
+on:
+  push:
+    branches: 
+      - "master"
+  pull_request:
+    branches: 
+      - "master"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-release:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # 安装 Tauri CLI
+    - name: Install Tauri CLI
+      run: cargo install create-tauri-app --locked
+
+    # 缓存依赖项（可选但推荐）
+    - name: Cache cargo dependencies
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/bin
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    # 构建项目
+    - name: Build with Tauri
+      run: cargo tauri build --verbose
+
+    # 检查是否有未提交的更改
+    - name: Check for uncommitted changes
+      run: git diff-index --quiet HEAD || (echo "There are uncommitted changes. Aborting release." && exit 1)
+
+    # 确定下一个版本号
+    - name: Determine next version
+      id: version
+      run: echo "::set-output name=version::$(git describe --tags --abbrev=0 | awk -F. '{print $1"."$2+1".0"}')"
+
+    # 创建新标签并推送
+    - name: Create and push tag
+      run: |
+        git config user.name "${{ github.actor }}"
+        git config user.email "${{ github.actor }}@users.noreply.github.com"
+        git tag ${{ steps.version.outputs.version }}
+        git push origin ${{ steps.version.outputs.version }}
+
+    # 发布到 GitHub Releases
+    - name: Upload to GitHub Releases
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        body: |
+          ## Changelog
+          - New features and fixes in this release
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # 可选：上传构建产物到 GitHub Releases
+    - name: Upload binaries
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./path/to/binary
+        asset_name: myapp-v${{ steps.version.outputs.version }}-linux-x64
+        asset_content_type: application/octet-stream
