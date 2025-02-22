@@ -1,98 +1,95 @@
 <template>
-  <n-config-provider :theme="theme">
-    <n-message-provider>
-      <n-layout position="absolute">
-        <n-layout-header bordered style="height: 56px; padding: 8px 16px">
-          <n-flex justify="space-between" align="center" data-tauri-drag-region>
-            <n-space align="center">
-              <n-image :src="logo" width="32" height="32" />
-              <n-h2 style="margin: 0">
-                Sing-Box
-                <n-text depth="3" style="font-size: 12px">Windows</n-text>
-              </n-h2>
-            </n-space>
-            <n-space :size="12">
-              <n-button quaternary circle size="small" @click="toggleTheme">
-                <template #icon>
-                  <n-icon>
-                    <moon-outline v-if="isDark" />
-                    <sunny-outline v-else />
-                  </n-icon>
-                </template>
-              </n-button>
-              <n-button quaternary circle size="small" @click="handleFullScreen">
-                <template #icon>
-                  <n-icon>
-                    <expand-outline v-if="!isFullscreen" />
-                    <contract-outline v-else />
-                  </n-icon>
-                </template>
-              </n-button>
-              <n-button quaternary circle size="small" @click="handleMinimize">
-                <template #icon>
-                  <n-icon>
-                    <remove-outline />
-                  </n-icon>
-                </template>
-              </n-button>
-              <n-button quaternary circle size="small" @click="handleClose">
-                <template #icon>
-                  <n-icon>
-                    <close-outline />
-                  </n-icon>
-                </template>
-              </n-button>
-            </n-space>
-          </n-flex>
-        </n-layout-header>
-        <n-layout has-sider position="absolute" style="top: 56px">
-          <n-layout-sider
-            bordered
-            collapse-mode="width"
-            :collapsed-width="64"
-            :width="200"
-            show-trigger
-            @collapse="collapsed = true"
-            @expand="collapsed = false"
+  <n-layout position="absolute">
+    <n-layout-header bordered style="height: 56px; padding: 8px 16px">
+      <n-flex justify="space-between" align="center" data-tauri-drag-region>
+        <n-space align="center">
+          <n-image :src="logo" width="32" height="32" />
+          <n-h2 style="margin: 0">
+            Sing-Box
+            <n-text depth="3" style="font-size: 12px">Windows</n-text>
+          </n-h2>
+        </n-space>
+        <n-space :size="12">
+          <n-button quaternary circle size="small" @click="appStore.toggleTheme">
+            <template #icon>
+              <n-icon>
+                <moon-outline v-if="appStore.isDark" />
+                <sunny-outline v-else />
+              </n-icon>
+            </template>
+          </n-button>
+          <n-button quaternary circle size="small" @click="handleFullScreen">
+            <template #icon>
+              <n-icon>
+                <expand-outline v-if="!isFullscreen" />
+                <contract-outline v-else />
+              </n-icon>
+            </template>
+          </n-button>
+          <n-button quaternary circle size="small" @click="handleMinimize">
+            <template #icon>
+              <n-icon>
+                <remove-outline />
+              </n-icon>
+            </template>
+          </n-button>
+          <n-button quaternary circle size="small" @click="handleClose">
+            <template #icon>
+              <n-icon>
+                <close-outline />
+              </n-icon>
+            </template>
+          </n-button>
+        </n-space>
+      </n-flex>
+    </n-layout-header>
+    <n-layout has-sider position="absolute" style="top: 56px">
+      <n-layout-sider
+        bordered
+        collapse-mode="width"
+        :collapsed-width="64"
+        :width="200"
+        show-trigger
+        @collapse="collapsed = true"
+        @expand="collapsed = false"
+      >
+        <div class="custom-menu" :class="{ 'menu-collapsed': collapsed }">
+          <div
+            v-for="(item, index) in menuOptions"
+            :key="index"
+            class="menu-item"
+            :class="{
+              'menu-item-active': currentMenu === item.key,
+              'menu-item-disabled': item.disabled,
+            }"
+            @click="!item.disabled && onSelect(item.key)"
           >
-            <div class="custom-menu" :class="{ 'menu-collapsed': collapsed }">
-              <div
-                v-for="(item, index) in menuOptions"
-                :key="index"
-                class="menu-item"
-                :class="{
-                  'menu-item-active': currentMenu === item.key,
-                  'menu-item-disabled': item.disabled,
-                }"
-                @click="!item.disabled && onSelect(item.key)"
-              >
-                <div class="menu-item-content">
-                  <n-icon :size="22" class="menu-icon">
-                    <component :is="item.icon" />
-                  </n-icon>
-                  <span v-show="!collapsed" class="menu-label">{{ item.label }}</span>
-                </div>
-                <div
-                  v-show="!collapsed"
-                  class="menu-indicator"
-                  :class="{ active: currentMenu === item.key }"
-                />
-              </div>
+            <div class="menu-item-content">
+              <n-icon :size="22" class="menu-icon">
+                <component :is="item.icon" />
+              </n-icon>
+              <span v-show="!collapsed" class="menu-label">{{ item.label }}</span>
             </div>
-          </n-layout-sider>
-          <n-layout-content content-style="padding: 8px;">
-            <n-scrollbar style="max-height: calc(100vh - 56px)">
-              <router-view />
-            </n-scrollbar>
-          </n-layout-content>
-        </n-layout>
-      </n-layout>
-    </n-message-provider>
-  </n-config-provider>
+            <div
+              v-show="!collapsed"
+              class="menu-indicator"
+              :class="{ active: currentMenu === item.key }"
+            />
+          </div>
+        </div>
+      </n-layout-sider>
+      <n-layout-content content-style="padding: 8px;">
+        <n-scrollbar style="max-height: calc(100vh - 56px)">
+          <router-view />
+        </n-scrollbar>
+      </n-layout-content>
+    </n-layout>
+  </n-layout>
 </template>
 
 <script setup lang="ts">
-import { darkTheme, useOsTheme, NIcon } from 'naive-ui'
+import { darkTheme, useOsTheme, NIcon, useNotification, NButton, NProgress } from 'naive-ui'
+import type { NotificationReactive } from 'naive-ui'
 import { h, ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import mitt from '@/utils/mitt'
@@ -111,17 +108,120 @@ import {
 } from '@vicons/ionicons5'
 import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
+import { listen } from '@tauri-apps/api/event'
 import logo from '@/assets/icon.png'
 
 const router = useRouter()
 const appWindow = Window.getCurrent()
-const appState = useAppStore()
+const appStore = useAppStore()
+const notification = useNotification()
 const osThemeRef = useOsTheme()
 const isDark = ref(osThemeRef.value === 'dark')
 const theme = ref(isDark.value ? darkTheme : null)
 const collapsed = ref(false)
 const currentMenu = ref(0)
 const isFullscreen = ref(false)
+
+// 检查更新并显示通知
+const checkUpdateWithNotification = async () => {
+  try {
+    const result = await appStore.checkUpdate()
+    if (result?.has_update) {
+      const notificationReactive = ref<NotificationReactive | null>(null)
+      const updateProgress = ref(0)
+      const isUpdating = ref(false)
+
+      // 监听更新进度
+      const unlistenProgress = await listen(
+        'update-progress',
+        (event: { payload: { status: string; progress: number; message: string } }) => {
+          const { status, progress } = event.payload
+          if (status === 'downloading') {
+            updateProgress.value = progress
+          } else if (status === 'completed') {
+            notification.success({
+              title: '更新下载完成',
+              content: '即将安装更新...',
+              duration: 3000,
+            })
+            unlistenProgress()
+          }
+        },
+      )
+
+      notificationReactive.value = notification.create({
+        title: '发现新版本',
+        content: () =>
+          h('div', [
+            h('p', `新版本 ${result.latest_version} 已发布，是否立即更新？`),
+            h(
+              'p',
+              { style: 'margin: 4px 0; color: var(--n-text-color-3);' },
+              `当前版本：${appStore.appVersion}`,
+            ),
+            isUpdating.value
+              ? h(NProgress, {
+                  type: 'line',
+                  percentage: updateProgress.value,
+                  indicatorPlacement: 'inside',
+                  processing: updateProgress.value < 100,
+                  style: 'margin-top: 8px',
+                })
+              : null,
+            h(
+              'div',
+              {
+                style: 'margin-top: 8px; display: flex; gap: 12px;',
+              },
+              [
+                h(
+                  NButton,
+                  {
+                    type: 'primary',
+                    size: 'small',
+                    loading: isUpdating.value,
+                    disabled: isUpdating.value,
+                    onClick: async () => {
+                      try {
+                        isUpdating.value = true
+                        await appStore.downloadAndInstallUpdate()
+                      } catch (error) {
+                        notification.error({
+                          title: '更新失败',
+                          content: String(error),
+                          duration: 5000,
+                        })
+                        unlistenProgress()
+                      }
+                    },
+                  },
+                  {
+                    default: () =>
+                      isUpdating.value ? `正在更新 ${updateProgress.value}%` : '立即更新',
+                  },
+                ),
+                h(
+                  NButton,
+                  {
+                    size: 'small',
+                    disabled: isUpdating.value,
+                    onClick: () => {
+                      unlistenProgress()
+                      notification.destroyAll()
+                    },
+                  },
+                  { default: () => '下次再说' },
+                ),
+              ],
+            ),
+          ]),
+        duration: 0,
+      })
+    }
+  } catch (error) {
+    console.error('检查更新失败:', error)
+  }
+}
 
 const toggleTheme = () => {
   isDark.value = !isDark.value
@@ -153,7 +253,7 @@ const menuOptions = computed(() => [
   {
     label: '代理',
     key: 1,
-    disabled: !appState.isRunning,
+    disabled: !appStore.isRunning,
     icon: SwapHorizontalOutline,
   },
   {
@@ -198,6 +298,10 @@ function onSelect(key: number) {
 
 // 监听窗口事件
 onMounted(async () => {
+  // 获取当前版本号并检查更新
+  await appStore.fetchAppVersion()
+  await checkUpdateWithNotification()
+
   // 监听窗口显示
   await appWindow.listen('tauri://show', () => {
     mitt.emit('window-show')

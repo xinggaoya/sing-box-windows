@@ -1,9 +1,11 @@
 <template>
-  <n-config-provider :theme="theme" :theme-overrides="themeOverrides">
+  <n-config-provider :theme="appStore.theme" :theme-overrides="themeOverrides">
     <n-dialog-provider>
-      <n-message-provider>
-        <router-view />
-      </n-message-provider>
+      <n-notification-provider>
+        <n-message-provider>
+          <router-view />
+        </n-message-provider>
+      </n-notification-provider>
     </n-dialog-provider>
   </n-config-provider>
 </template>
@@ -18,14 +20,12 @@ import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
 import { useInfoStore } from '@/stores/infoStore'
 import { tauriApi } from '@/services/tauri-api'
-import { darkTheme } from 'naive-ui'
 import { ProxyService } from '@/services/proxy-service'
 
 const appWindow = Window.getCurrent()
 const appStore = useAppStore()
 const infoStore = useInfoStore()
 const proxyService = ProxyService.getInstance()
-const theme = darkTheme
 
 onMounted(async () => {
   // 初始化托盘图标

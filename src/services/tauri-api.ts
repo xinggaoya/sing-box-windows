@@ -53,4 +53,21 @@ export const tauriApi = {
   kernel: kernelApi,
   proxy: proxyApi,
   subscription: subscriptionApi,
+
+  // 更新相关 API
+  update: {
+    // 检查更新
+    checkUpdate: async (currentVersion: string) => {
+      return await invoke<{
+        latest_version: string
+        download_url: string
+        has_update: boolean
+      }>('check_update', { currentVersion })
+    },
+
+    // 下载并安装更新
+    downloadAndInstallUpdate: async (downloadUrl: string) => {
+      return await invoke<void>('download_and_install_update', { downloadUrl })
+    },
+  },
 }

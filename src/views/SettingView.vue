@@ -1,5 +1,22 @@
 <template>
   <div class="setting-container">
+    <!-- 更新提示卡片 -->
+    <n-card v-if="hasUpdate" class="setting-card" :bordered="false">
+      <n-alert type="info" :show-icon="true">
+        <template #header> 发现新版本 {{ latestVersion }} </template>
+        <template #icon>
+          <n-icon><download-outline /></n-icon>
+        </template>
+        有新版本可用，是否立即更新？
+        <div class="update-actions" style="margin-top: 12px">
+          <n-button type="primary" size="small" :loading="updating" @click="handleUpdate">
+            {{ updating ? `正在更新 ${updateProgress}%` : '立即更新' }}
+          </n-button>
+          <n-button text size="small" @click="skipUpdate"> 暂不更新 </n-button>
+        </div>
+      </n-alert>
+    </n-card>
+
     <!-- 内核管理卡片 -->
     <n-card class="setting-card" :bordered="false">
       <template #header-extra>
@@ -142,7 +159,15 @@
         <n-gi>
           <div class="about-item">
             <span class="about-label">应用版本</span>
-            <span class="about-value">1.0.0</span>
+            <n-space align="center">
+              <span class="about-value">{{ appStore.appVersion }}</span>
+              <n-button text size="tiny" @click="handleCheckUpdate" :loading="checkingUpdate">
+                <template #icon>
+                  <n-icon><refresh-outline /></n-icon>
+                </template>
+                检查更新
+              </n-button>
+            </n-space>
           </div>
         </n-gi>
         <n-gi>
@@ -197,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
 import { useInfoStore } from '@/stores/infoStore'
@@ -209,6 +234,7 @@ import {
   InformationCircleOutline,
   LogoGithub,
   GlobeOutline,
+  RefreshOutline,
 } from '@vicons/ionicons5'
 import { listen } from '@tauri-apps/api/event'
 import { tauriApi } from '@/services/tauri-api'
@@ -220,6 +246,17 @@ const loading = ref(false)
 const downloading = ref(false)
 const downloadProgress = ref(0)
 const downloadMessage = ref('')
+
+// 更新相关状态
+const hasUpdate = ref(false)
+const latestVersion = ref('')
+const downloadUrl = ref('')
+const updating = ref(false)
+const updateProgress = ref(0)
+const skipUpdateFlag = ref(false)
+
+// 检查更新状态
+const checkingUpdate = ref(false)
 
 // 监听下载进度事件
 listen(
@@ -286,6 +323,78 @@ const onIpVersionChange = async (value: boolean) => {
     appStore.preferIpv6 = !value
   }
 }
+
+// 检查更新
+const checkUpdate = async () => {
+  try {
+    if (skipUpdateFlag.value) return
+
+    const result = await tauriApi.update.checkUpdate(appStore.appVersion)
+    if (result.has_update) {
+      hasUpdate.value = true
+      latestVersion.value = result.latest_version
+      downloadUrl.value = result.download_url
+    }
+  } catch (error) {
+    console.error('检查更新失败:', error)
+  }
+}
+
+// 处理更新
+const handleUpdate = async () => {
+  try {
+    updating.value = true
+    await tauriApi.update.downloadAndInstallUpdate(downloadUrl.value)
+  } catch (error) {
+    message.error('更新失败: ' + error)
+  } finally {
+    updating.value = false
+  }
+}
+
+// 跳过更新
+const skipUpdate = () => {
+  hasUpdate.value = false
+  skipUpdateFlag.value = true
+}
+
+// 监听更新进度
+listen(
+  'update-progress',
+  (event: { payload: { status: string; progress: number; message: string } }) => {
+    const { status, progress } = event.payload
+    updateProgress.value = progress
+
+    if (status === 'completed') {
+      updating.value = false
+      message.success('更新下载完成，即将安装...')
+    }
+  },
+)
+
+// 手动检查更新
+const handleCheckUpdate = async () => {
+  try {
+    checkingUpdate.value = true
+    const result = await appStore.checkUpdate(false)
+    if (result?.has_update) {
+      message.success(`发现新版本：${result.latest_version}`)
+    } else {
+      message.info('当前已是最新版本')
+    }
+  } catch (error) {
+    message.error(`检查更新失败: ${error}`)
+  } finally {
+    checkingUpdate.value = false
+  }
+}
+
+onMounted(async () => {
+  // 获取当前版本号
+  await appStore.fetchAppVersion()
+  // 检查更新
+  await checkUpdate()
+})
 </script>
 
 <style scoped>
@@ -364,5 +473,11 @@ const onIpVersionChange = async (value: boolean) => {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--divider-color);
+}
+
+.update-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
 }
 </style>
