@@ -1,10 +1,10 @@
 use crate::app::app_service::{
-    check_admin, download_latest_kernel, download_subscription, get_memory_usage, get_traffic_data,
-    restart_as_admin, set_system_proxy, set_tun_proxy, start_kernel, stop_kernel,restart_kernel,
-    toggle_ip_version,check_update,download_and_install_update
+    check_admin, check_update, download_and_install_update, download_latest_kernel,
+    download_subscription, get_memory_usage, get_traffic_data, restart_as_admin, restart_kernel,
+    set_system_proxy, set_tun_proxy, start_kernel, stop_kernel, toggle_ip_version,
 };
 // use lazy_static::lazy_static;
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 
 pub mod app;
@@ -20,6 +20,10 @@ pub mod utils {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = show_window(app);
+        }))
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -57,8 +61,19 @@ pub fn run() {
             restart_kernel,
             toggle_ip_version,
             check_update,
-            download_and_install_update ,
+            download_and_install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn show_window(app: &AppHandle) {
+    let windows = app.webview_windows();
+
+    windows
+        .values()
+        .next()
+        .expect("Sorry, no window found")
+        .set_focus()
+        .expect("Can't Bring Window to Focus");
 }

@@ -14,6 +14,9 @@ importers:
       '@tauri-apps/plugin-autostart':
         specifier: ~2
         version: 2.0.0
+      '@tauri-apps/plugin-positioner':
+        specifier: ~2.0.1
+        version: 2.0.1
       '@tauri-apps/plugin-updater':
         specifier: ^2.3.0
         version: 2.3.0
@@ -744,6 +747,9 @@ packages:
 
   '@tauri-apps/plugin-autostart@2.0.0':
     resolution: {integrity: sha512-NEwOQWVasZ8RczXkMLNJokRDujneuMH/UFA5t84DLkbNZUmiD3G7HZWhgSd1YQ0BFU9h9w+h2B/py3y6bzWg4Q==}
+
+  '@tauri-apps/plugin-positioner@2.0.1':
+    resolution: {integrity: sha512-qZY3qiFnt4XU7pYiew17pso9Wg+lgfr6UBva4uvAuWaeW+6KaZCrGJKyr6GLHDar/Lc5KQV392jKMswfrwOplw==}
 
   '@tauri-apps/plugin-updater@2.3.0':
     resolution: {integrity: sha512-qdzyZEUN69FZQ/nRx51fBub10tT6wffJl3DLVo9q922Gvw8Wk++rZhoD9eethPlZYbog/7RGgT8JkrfLh5BKAg==}
@@ -2713,6 +2719,10 @@ snapshots:
       '@tauri-apps/cli-win32-x64-msvc': 2.0.0-rc.18
 
   '@tauri-apps/plugin-autostart@2.0.0':
+    dependencies:
+      '@tauri-apps/api': 2.0.1
+
+  '@tauri-apps/plugin-positioner@2.0.1':
     dependencies:
       '@tauri-apps/api': 2.0.1
 

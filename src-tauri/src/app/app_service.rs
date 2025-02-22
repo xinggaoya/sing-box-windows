@@ -1,5 +1,5 @@
-use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
 use crate::entity::config_model;
+use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
 use crate::process::manager::ProcessManager;
 use crate::utils::app_util::get_work_dir;
 use crate::utils::config_util::ConfigUtil;
@@ -23,7 +23,13 @@ lazy_static::lazy_static! {
 #[tauri::command]
 pub async fn get_memory_usage() -> Result<String, String> {
     let output = std::process::Command::new("wmic")
-        .args(["process", "where", "name='sing-box.exe'", "get", "WorkingSetSize"])
+        .args([
+            "process",
+            "where",
+            "name='sing-box.exe'",
+            "get",
+            "WorkingSetSize",
+        ])
         .creation_flags(0x08000000)
         .output()
         .map_err(|e| e.to_string())?;
@@ -50,7 +56,8 @@ pub async fn get_traffic_data() -> Result<String, String> {
     Ok(json!({
         "upload": 0,
         "download": 0
-    }).to_string())
+    })
+    .to_string())
 }
 
 // 以管理员权限重启
@@ -118,7 +125,7 @@ pub async fn download_subscription(url: String) -> Result<(), String> {
     download_and_process_subscription(url)
         .await
         .map_err(|e| format!("下载订阅失败: {}", e))?;
-        let _ = set_system_proxy();
+    let _ = set_system_proxy();
     Ok(())
 }
 
@@ -216,9 +223,7 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
     );
 
     // 尝试多个下载源
-    let download_urls = vec![
-        format!("{}/sing-box-{}.zip", url, target_file),
-    ];
+    let download_urls = vec![format!("{}/sing-box-{}.zip", url, target_file)];
 
     let mut success = false;
 
@@ -337,7 +342,6 @@ pub fn set_tun_proxy() -> Result<(), String> {
 }
 
 fn set_tun_proxy_impl() -> Result<(), Box<dyn Error>> {
-
     let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/config.json");
     let mut json_util = ConfigUtil::new(path.to_str().unwrap())?;
@@ -363,14 +367,14 @@ fn set_tun_proxy_impl() -> Result<(), Box<dyn Error>> {
             listen_port: None,
             address: Some(vec![
                 "172.18.0.1/30".to_string(),
-               "fdfe:dcba:9876::1/126".to_string()
-           ]),
+                "fdfe:dcba:9876::1/126".to_string(),
+            ]),
             auto_route: Some(true),
             strict_route: Some(true),
             stack: Some("mixed".to_string()),
             sniff: None,
             set_system_proxy: None,
-        }
+        },
     ];
 
     json_util.modify_property(
@@ -387,19 +391,21 @@ fn set_tun_proxy_impl() -> Result<(), Box<dyn Error>> {
 
 // 切换 IPV6版本模式
 #[tauri::command]
-pub fn toggle_ip_version(preferIpv6: bool) -> Result<(), String> {
-    info!("开始切换IP版本模式: {}", if preferIpv6 { "IPv6优先" } else { "仅IPv4" });
-    
+pub fn toggle_ip_version(prefer_ipv6: bool) -> Result<(), String> {
+    info!(
+        "开始切换IP版本模式: {}",
+        if prefer_ipv6 { "IPv6优先" } else { "仅IPv4" }
+    );
+
     let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/config.json");
     info!("配置文件路径: {}", path.display());
 
     // 读取文件内容
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("读取配置文件失败: {}", e))?;
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("读取配置文件失败: {}", e))?;
 
     // 直接替换字符串
-    let modified_content = if preferIpv6 {
+    let modified_content = if prefer_ipv6 {
         content.replace("\"ipv4_only\"", "\"prefer_ipv6\"")
     } else {
         content.replace("\"prefer_ipv6\"", "\"ipv4_only\"")
@@ -410,10 +416,12 @@ pub fn toggle_ip_version(preferIpv6: bool) -> Result<(), String> {
         .map_err(|e| format!("修改后的配置不是有效的 JSON: {}", e))?;
 
     // 保存修改后的内容
-    std::fs::write(&path, modified_content)
-        .map_err(|e| format!("保存配置文件失败: {}", e))?;
+    std::fs::write(&path, modified_content).map_err(|e| format!("保存配置文件失败: {}", e))?;
 
-    info!("IP版本模式已成功切换为: {}", if preferIpv6 { "IPv6优先" } else { "仅IPv4" });
+    info!(
+        "IP版本模式已成功切换为: {}",
+        if prefer_ipv6 { "IPv6优先" } else { "仅IPv4" }
+    );
     Ok(())
 }
 
@@ -429,7 +437,7 @@ pub struct UpdateInfo {
 #[tauri::command]
 pub async fn check_update(current_version: String) -> Result<UpdateInfo, String> {
     let client = reqwest::Client::new();
-    
+
     // 获取最新版本信息
     let releases_url = "https://api.github.com/repos/xinggaoya/sing-box-windows/releases/latest";
     let response = client
@@ -438,23 +446,21 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
         .send()
         .await
         .map_err(|e| format!("获取版本信息失败: {}", e))?;
-    
+
     let release: serde_json::Value = response
         .json()
         .await
         .map_err(|e| format!("解析版本信息失败: {}", e))?;
-    
+
     let latest_version = release["tag_name"]
         .as_str()
         .ok_or("无法获取最新版本号")?
         .trim_start_matches('v')
         .to_string();
-    
+
     // 查找 .exe 资源
-    let assets = release["assets"]
-        .as_array()
-        .ok_or("无法获取发布资源")?;
-    
+    let assets = release["assets"].as_array().ok_or("无法获取发布资源")?;
+
     let exe_asset = assets
         .iter()
         .find(|asset| {
@@ -464,15 +470,15 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
                 .unwrap_or(false)
         })
         .ok_or("未找到可执行文件")?;
-    
+
     let download_url = exe_asset["browser_download_url"]
         .as_str()
         .ok_or("无法获取下载链接")?
         .to_string();
-    
+
     // 比较版本号
     let has_update = latest_version != current_version;
-    
+
     Ok(UpdateInfo {
         latest_version,
         download_url,
@@ -482,10 +488,13 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
 
 // 下载并安装更新
 #[tauri::command]
-pub async fn download_and_install_update(window: tauri::Window, download_url: String) -> Result<(), String> {
+pub async fn download_and_install_update(
+    window: tauri::Window,
+    download_url: String,
+) -> Result<(), String> {
     let work_dir = get_work_dir();
     let download_path = Path::new(&work_dir).join("update.exe");
-    
+
     // 发送开始下载事件
     let _ = window.emit(
         "update-progress",
@@ -495,7 +504,7 @@ pub async fn download_and_install_update(window: tauri::Window, download_url: St
             "message": "开始下载更新..."
         }),
     );
-    
+
     // 下载更新文件
     let window_clone = window.clone();
     download_file(
@@ -514,7 +523,7 @@ pub async fn download_and_install_update(window: tauri::Window, download_url: St
     )
     .await
     .map_err(|e| format!("下载更新失败: {}", e))?;
-    
+
     // 发送下载完成事件
     let _ = window.emit(
         "update-progress",
@@ -524,12 +533,12 @@ pub async fn download_and_install_update(window: tauri::Window, download_url: St
             "message": "下载完成，准备安装..."
         }),
     );
-    
+
     // 启动安装程序
     std::process::Command::new(download_path)
         .creation_flags(0x08000000)
         .spawn()
         .map_err(|e| format!("启动安装程序失败: {}", e))?;
-    
+
     Ok(())
 }

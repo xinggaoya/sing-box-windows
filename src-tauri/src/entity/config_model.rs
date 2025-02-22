@@ -23,7 +23,6 @@ pub struct Inbound {
     pub set_system_proxy: Option<bool>,
 }
 
-
 #[derive(Debug, serde::Deserialize, Serialize)]
 #[allow(dead_code)]
 pub struct ClashApiConfig {

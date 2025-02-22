@@ -5,9 +5,9 @@ use log::{error, info, warn};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::sync::Arc;
+use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
-use tokio::process::Command;
 
 pub struct ProcessManager {
     process_info: Arc<RwLock<ProcessInfo>>,
@@ -255,7 +255,7 @@ impl ProcessManager {
         let mut info = self.process_info.write().await;
         info.status = ProcessStatus::Failed(error.to_string());
         info.last_error = Some(error.to_string());
-        
+
         // 根据错误类型记录不同级别的日志
         match &error {
             ProcessError::AlreadyRunning => warn!("进程已在运行中: {}", error),

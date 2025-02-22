@@ -1,9 +1,9 @@
+use futures_util::StreamExt;
 use log::{error, info};
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 use zip::ZipArchive;
-use futures_util::StreamExt;
-use std::io::Write;
 
 // 根据url下载文件到指定位置
 pub async fn download_file<F>(url: String, path: &str, progress_callback: F) -> Result<(), String>
@@ -11,11 +11,7 @@ where
     F: Fn(u32) + Send + 'static,
 {
     let file_path = Path::new(path);
-    info!(
-        "开始下载文件: {} -> {}",
-        url,
-        file_path.to_str().unwrap()
-    );
+    info!("开始下载文件: {} -> {}", url, file_path.to_str().unwrap());
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
@@ -46,8 +42,7 @@ where
 
     // 创建临时文件
     let temp_path = file_path.with_extension("tmp");
-    let mut file = File::create(&temp_path)
-        .map_err(|e| format!("创建临时文件失败: {}", e))?;
+    let mut file = File::create(&temp_path).map_err(|e| format!("创建临时文件失败: {}", e))?;
 
     let mut downloaded = 0u64;
     let mut stream = response.bytes_stream();
@@ -57,10 +52,10 @@ where
         let chunk = chunk.map_err(|e| format!("下载过程中出错: {}", e))?;
         file.write_all(&chunk)
             .map_err(|e| format!("写入文件失败: {}", e))?;
-        
+
         downloaded += chunk.len() as u64;
         let percent = (downloaded as f64 / total_size as f64 * 100.0) as u32;
-        
+
         // 每当进度变化时通知回调
         if percent != last_percent {
             progress_callback(percent);
@@ -126,8 +121,7 @@ pub async fn unzip_file(path: &str, to: &str) -> Result<(), String> {
         info!("正在解压: {}", outpath.display());
 
         if file.is_dir() {
-            std::fs::create_dir_all(&outpath)
-                .map_err(|e| format!("创建目录失败: {}", e))?;
+            std::fs::create_dir_all(&outpath).map_err(|e| format!("创建目录失败: {}", e))?;
         } else {
             if let Some(parent) = outpath.parent() {
                 if !parent.exists() {
@@ -136,11 +130,9 @@ pub async fn unzip_file(path: &str, to: &str) -> Result<(), String> {
                 }
             }
 
-            let mut outfile = File::create(&outpath)
-                .map_err(|e| format!("创建文件失败: {}", e))?;
+            let mut outfile = File::create(&outpath).map_err(|e| format!("创建文件失败: {}", e))?;
 
-            std::io::copy(&mut file, &mut outfile)
-                .map_err(|e| format!("复制文件失败: {}", e))?;
+            std::io::copy(&mut file, &mut outfile).map_err(|e| format!("复制文件失败: {}", e))?;
 
             // 设置可执行权限（仅在类Unix系统上）
             #[cfg(unix)]
