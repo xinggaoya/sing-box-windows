@@ -240,8 +240,6 @@ export const useInfoStore = defineStore(
     }
   },
   {
-    persist: {
-      paths: ['version'], // 持久化版本信息
-    },
+    persist: true,
   },
 )
