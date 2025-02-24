@@ -51,6 +51,35 @@ impl ProcessManager {
         }
     }
 
+    // 检查是否存在其他 sing-box 进程
+    async fn check_other_sing_box_process(&self) -> Option<u32> {
+        match std::process::Command::new("tasklist")
+            .arg("/FI")
+            .arg("IMAGENAME eq sing-box.exe")
+            .arg("/FO")
+            .arg("CSV")
+            .arg("/NH")
+            .creation_flags(0x08000000)
+            .output()
+        {
+            Ok(output) => {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                // CSV 格式: "sing-box.exe","1234",...
+                if let Some(line) = output_str.lines().next() {
+                    let parts: Vec<&str> = line.split(',').collect();
+                    if parts.len() >= 2 {
+                        // 提取 PID
+                        if let Some(pid_str) = parts[1].trim_matches('"').parse::<u32>().ok() {
+                            return Some(pid_str);
+                        }
+                    }
+                }
+                None
+            }
+            Err(_) => None,
+        }
+    }
+
     // 重置进程状态
     async fn reset_process_state(&self) {
         let mut info = self.process_info.write().await;
@@ -62,7 +91,7 @@ impl ProcessManager {
         *process = None;
     }
 
-    // 检查进程是否在运行（修改后的版本）
+    // 检查进程是否在运行
     pub async fn is_running(&self) -> bool {
         let info = self.process_info.read().await;
         let status_running = matches!(
@@ -80,22 +109,27 @@ impl ProcessManager {
         status_running
     }
 
-    // 启动前检查（修改后的版本）
+    // 启动前检查
     async fn pre_start_check(&self) -> Result<()> {
-        let info = self.process_info.read().await;
-
-        // 检查状态和实际进程
-        if matches!(
-            info.status,
-            ProcessStatus::Running | ProcessStatus::Starting
-        ) {
-            // 如果状态是运行中但进程不存在，重置状态
-            if !self.check_process_exists(info.pid).await {
-                drop(info); // 释放读锁
-                self.reset_process_state().await;
-            } else {
-                return Err(ProcessError::AlreadyRunning);
+        // 检查是否有其他 sing-box 进程在运行
+        if let Some(pid) = self.check_other_sing_box_process().await {
+            // 尝试停止其他进程
+            info!("检测到其他 sing-box 进程 (PID: {}), 尝试停止", pid);
+            if let Err(e) = self.send_signal(pid) {
+                warn!("停止其他进程失败: {}, 尝试强制停止", e);
+                if let Err(e) = self.kill_process(pid) {
+                    error!("强制停止其他进程失败: {}", e);
+                }
             }
+                    // 如果超时后进程仍然存在，强制终止
+        if self.check_process_exists(Some(pid)).await {
+            warn!("进程停止超时，尝试强制终止");
+            if let Err(e) = self.kill_process(pid) {
+                return Err(ProcessError::StopFailed(format!("强制停止失败: {}", e)));
+            }
+        }
+            // 等待进程完全停止
+            sleep(Duration::from_secs(1)).await;
         }
 
         let work_dir = get_work_dir();
