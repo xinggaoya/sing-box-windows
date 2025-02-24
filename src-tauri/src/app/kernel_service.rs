@@ -13,6 +13,31 @@ lazy_static::lazy_static! {
     pub(crate) static ref PROCESS_MANAGER: Arc<ProcessManager> = Arc::new(ProcessManager::new());
 }
 
+// 检查内核版本
+#[tauri::command]
+pub async fn check_kernel_version() -> Result<String, String> {
+    let work_dir = get_work_dir();
+    let kernel_path = Path::new(&work_dir).join("sing-box").join("sing-box.exe");
+
+    if !kernel_path.exists() {
+        return Err("内核文件不存在".to_string());
+    }
+
+    let output = std::process::Command::new(kernel_path)
+        .arg("version")
+        .creation_flags(0x08000000)
+        .output()
+        .map_err(|e| format!("执行版本检查失败: {}", e))?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("获取版本信息失败: {}", error));
+    }
+
+    let version_info = String::from_utf8_lossy(&output.stdout);
+    Ok(version_info.to_string())
+}
+
 // 运行内核
 #[tauri::command]
 pub async fn start_kernel() -> Result<(), String> {

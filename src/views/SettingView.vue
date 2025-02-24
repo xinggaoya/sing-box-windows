@@ -95,9 +95,14 @@
             }}
           </n-button>
 
-          <n-button text size="small" @click="showManualDownloadModal" :disabled="downloading">
-            手动下载
-          </n-button>
+          <n-space>
+            <n-button text size="small" @click="showManualDownloadModal" :disabled="downloading">
+              手动下载
+            </n-button>
+            <n-button text size="small" @click="checkManualInstall" :disabled="downloading">
+              检查安装
+            </n-button>
+          </n-space>
         </n-space>
 
         <n-alert v-if="downloadError" type="error" :show-icon="true" style="margin-top: 16px">
@@ -249,7 +254,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useMessage } from 'naive-ui'
+import { useMessage, useDialog } from 'naive-ui'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
 import { useInfoStore } from '@/stores/infoStore'
 import { useAppStore } from '@/stores/AppStore'
@@ -267,6 +272,7 @@ import { tauriApi } from '@/services/tauri-api'
 import { appDataDir } from '@tauri-apps/api/path'
 
 const message = useMessage()
+const dialog = useDialog()
 const appStore = useAppStore()
 const infoStore = useInfoStore()
 const loading = ref(false)
@@ -430,9 +436,34 @@ const handleCheckUpdate = async () => {
 
 // 显示手动下载指引
 const showManualDownloadModal = () => {
-  const downloadUrl = 'https://github.com/SagerNet/sing-box/releases'
-  window.open(downloadUrl, '_blank')
-  message.info('请下载对应系统版本的 sing-box，并将 sing-box.exe 放置在指定目录')
+  dialog.info({
+    title: '手动下载说明',
+    content: `请按照以下步骤操作：
+1. 访问 https://github.com/SagerNet/sing-box/releases/latest
+2. 下载对应系统版本的 sing-box
+3. 将解压后的 sing-box.exe 放置在以下目录：
+${appDataPath.value}sing-box/
+
+完成后点击"检查安装"按钮验证安装是否成功。`,
+    positiveText: '我知道了',
+  })
+}
+
+// 检查手动安装
+const checkManualInstall = async () => {
+  try {
+    loading.value = true
+    const success = await infoStore.checkKernelVersion()
+    if (success) {
+      message.success('内核安装验证成功！')
+    } else {
+      message.error('未检测到有效的内核文件')
+    }
+  } catch (error) {
+    message.error(`检查失败: ${error}`)
+  } finally {
+    loading.value = false
+  }
 }
 
 // 获取应用数据目录

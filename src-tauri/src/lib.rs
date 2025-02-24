@@ -1,6 +1,6 @@
 use crate::app::kernel_service::{
     download_latest_kernel, get_memory_usage, restart_kernel, start_kernel,
-    stop_kernel,
+    stop_kernel, get_process_status, check_kernel_version,
 };
 use crate::app::proxy_service::{set_system_proxy, set_tun_proxy, toggle_ip_version};
 use crate::app::subscription_service::download_subscription;
@@ -60,6 +60,8 @@ pub fn run() {
             toggle_ip_version,
             check_update,
             download_and_install_update,
+            get_process_status,
+            check_kernel_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

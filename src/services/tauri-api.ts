@@ -19,6 +19,9 @@ export const kernelApi = {
 
   // 获取进程状态
   getProcessStatus: () => invoke<string>('get_process_status'),
+
+  // 检查内核版本
+  checkKernelVersion: () => invoke<string>('check_kernel_version'),
 }
 
 // 代理模式相关接口
