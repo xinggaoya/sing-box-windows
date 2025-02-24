@@ -33,7 +33,7 @@
     "vue-router": "^4.4.5"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "2.0.0-rc.18",
+    "@tauri-apps/cli": "2.2.7",
     "@tsconfig/node20": "^20.1.4",
     "@types/node": "^20.17.6",
     "@vitejs/plugin-vue": "^5.1.4",

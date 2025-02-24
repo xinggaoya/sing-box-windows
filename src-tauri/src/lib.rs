@@ -1,21 +1,19 @@
-use crate::app::app_service::{
-    check_admin, check_update, download_and_install_update, download_latest_kernel,
-    download_subscription, get_memory_usage, get_traffic_data, restart_as_admin, restart_kernel,
-    set_system_proxy, set_tun_proxy, start_kernel, stop_kernel, toggle_ip_version,
+use crate::app::kernel_service::{
+    download_latest_kernel, get_memory_usage, restart_kernel, start_kernel,
+    stop_kernel,
 };
-// use lazy_static::lazy_static;
+use crate::app::proxy_service::{set_system_proxy, set_tun_proxy, toggle_ip_version};
+use crate::app::subscription_service::download_subscription;
+use crate::app::system_service::{check_admin, get_traffic_data, restart_as_admin};
+use crate::app::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 
 pub mod app;
 pub mod entity;
 pub mod process;
-pub mod utils {
-    pub mod app_util;
-    pub mod config_util;
-    pub mod file_util;
-    pub mod proxy_util;
-}
+pub mod utils;
+pub mod config;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,13 +28,13 @@ pub fn run() {
             Some(vec!["--hide"]),
         ))
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            // if cfg!(debug_assertions) {
+            //     app.handle().plugin(
+            //         tauri_plugin_log::Builder::default()
+            //             .level("info")
+            //             .build(),
+            //     )?;
+            // }
             // 判断参数
             let args: Vec<String> = std::env::args().collect();
             if args.len() > 1 {

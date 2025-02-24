@@ -23,11 +23,13 @@ export const useInfoStore = defineStore('info', () => {
 
   // 日志信息
   const MAX_LOGS = 300
+
   interface LogEntry {
     type: string
     payload: string
     timestamp: number
   }
+
   const logs = ref<LogEntry[]>([])
 
   // 存储 WebSocket 清理函数
@@ -158,6 +160,18 @@ export const useInfoStore = defineStore('info', () => {
     await startKernel()
   }
 
+  // 更新版本信息
+  const updateVersion = async () => {
+    try {
+      const status = await tauriApi.kernel.getProcessStatus()
+      const data = JSON.parse(status)
+      version.value = data
+    } catch (error) {
+      console.error('获取版本信息失败:', error)
+      version.value = { version: '', meta: false, premium: false }
+    }
+  }
+
   // 组件卸载时清理
   onUnmounted(() => {
     cleanupWebSockets()
@@ -173,5 +187,6 @@ export const useInfoStore = defineStore('info', () => {
     stopKernel,
     restartKernel,
     initWebSocket,
+    updateVersion,
   }
 })

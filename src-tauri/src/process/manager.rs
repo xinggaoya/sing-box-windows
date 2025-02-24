@@ -1,13 +1,13 @@
 use super::{ProcessError, ProcessInfo, ProcessStatus, Result};
 use crate::utils::app_util::get_work_dir;
-use crate::utils::proxy_util::disable_system_proxy;
-use log::{error, info, warn};
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
+use tracing::{error, info, warn};
+use crate::utils::proxy_util::disable_system_proxy;
 
 pub struct ProcessManager {
     process_info: Arc<RwLock<ProcessInfo>>,

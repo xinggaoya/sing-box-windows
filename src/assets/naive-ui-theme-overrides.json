@@ -19,7 +19,8 @@
         "errorColor": "#F53F3F",
         "errorColorHover": "#F76560",
         "errorColorPressed": "#CB2A2A",
-        "errorColorSuppl": "#CB2A2A"
+        "errorColorSuppl": "#CB2A2A",
+        "borderRadius": "7px"
     },
     "Button": {
         "borderRadiusMedium": "8px",

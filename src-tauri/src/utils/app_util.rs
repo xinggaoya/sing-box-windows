@@ -1,5 +1,5 @@
-use log::error;
 use std::path::PathBuf;
+use tracing::error;
 
 // 获取工作目录
 pub fn get_work_dir() -> String {

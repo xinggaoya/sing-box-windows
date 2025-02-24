@@ -19,8 +19,11 @@ tauri-build = { version = "2.0.1", features = [] }
 
 [dependencies]
 serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-log = "0.4"
+# 日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "local-time"] }
+tracing-appender = "0.2"
+
 tauri = { version = "2.0.6", features = ["tray-icon", "unstable"] }
 tauri-plugin-log = "2.0.0-rc"
 reqwest = { version = "0.12.9", features = ["json", "stream", "rustls-tls"] }
@@ -33,6 +36,7 @@ lazy_static = "1.4.0"
 winreg = "0.52.0"
 winapi = { version = "0.3", features = ["wininet"] }
 is_elevated = "0.1.2"
+serde = { version = "1.0.214", features = ["derive"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"

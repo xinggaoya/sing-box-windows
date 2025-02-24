@@ -1,8 +1,8 @@
 use futures_util::StreamExt;
-use log::{error, info};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use tracing::{error, info};
 use zip::ZipArchive;
 
 // 根据url下载文件到指定位置

@@ -21,9 +21,10 @@
     <n-card class="setting-card" :bordered="false">
       <template #header-extra>
         <n-space align="center">
-          <n-tag :bordered="false" type="default" size="small">
+          <n-tag v-if="infoStore.version.version" :bordered="false" type="default" size="small">
             当前版本：{{ infoStore.version.version }}
           </n-tag>
+          <n-tag v-else :bordered="false" type="error" size="small"> 未安装内核 </n-tag>
           <n-tag v-if="hasNewVersion" :bordered="false" type="warning" size="small">
             新版本：{{ infoStore.newVersion }}
           </n-tag>
@@ -51,6 +52,16 @@
           有新版本的内核可供下载，建议更新以获得更好的体验。
         </n-alert>
 
+        <n-alert
+          v-if="!infoStore.version.version"
+          type="error"
+          :show-icon="true"
+          title="未安装内核"
+          style="margin-bottom: 16px"
+        >
+          请下载并安装内核后使用。
+        </n-alert>
+
         <n-progress
           v-if="downloading"
           type="line"
@@ -75,9 +86,24 @@
                 <download-outline />
               </n-icon>
             </template>
-            {{ hasNewVersion ? '下载新版本' : '重新下载当前版本' }}
+            {{
+              hasNewVersion
+                ? '下载新版本'
+                : infoStore.version.version
+                  ? '重新下载当前版本'
+                  : '下载内核'
+            }}
+          </n-button>
+
+          <n-button text size="small" @click="showManualDownloadModal" :disabled="downloading">
+            手动下载
           </n-button>
         </n-space>
+
+        <n-alert v-if="downloadError" type="error" :show-icon="true" style="margin-top: 16px">
+          <template #header> 下载失败 </template>
+          <div style="white-space: pre-line">{{ downloadError }}</div>
+        </n-alert>
       </n-space>
     </n-card>
 
@@ -238,6 +264,7 @@ import {
 } from '@vicons/ionicons5'
 import { listen } from '@tauri-apps/api/event'
 import { tauriApi } from '@/services/tauri-api'
+import { appDataDir } from '@tauri-apps/api/path'
 
 const message = useMessage()
 const appStore = useAppStore()
@@ -258,6 +285,10 @@ const skipUpdateFlag = ref(false)
 // 检查更新状态
 const checkingUpdate = ref(false)
 
+// 新增状态
+const downloadError = ref<string | null>(null)
+const appDataPath = ref('')
+
 // 监听下载进度事件
 listen(
   'download-progress',
@@ -268,7 +299,10 @@ listen(
 
     if (status === 'completed') {
       downloading.value = false
+      downloadError.value = null
       message.success('内核下载完成！')
+      // 更新版本信息
+      infoStore.updateVersion()
     }
   },
 )
@@ -284,12 +318,17 @@ const downloadTheKernel = async () => {
     downloading.value = true
     downloadProgress.value = 0
     downloadMessage.value = '准备下载...'
+    downloadError.value = null
 
     await tauriApi.subscription.downloadLatestKernel()
+
+    // 下载成功后更新版本信息
+    await infoStore.updateVersion()
   } catch (error) {
+    downloadError.value = error as string
     message.error(error as string)
-    downloading.value = false
   } finally {
+    downloading.value = false
     loading.value = false
   }
 }
@@ -389,11 +428,31 @@ const handleCheckUpdate = async () => {
   }
 }
 
+// 显示手动下载指引
+const showManualDownloadModal = () => {
+  const downloadUrl = 'https://github.com/SagerNet/sing-box/releases'
+  window.open(downloadUrl, '_blank')
+  message.info('请下载对应系统版本的 sing-box，并将 sing-box.exe 放置在指定目录')
+}
+
+// 获取应用数据目录
+const getAppDataPath = async () => {
+  try {
+    appDataPath.value = await appDataDir()
+  } catch (error) {
+    console.error('获取应用数据目录失败:', error)
+  }
+}
+
 onMounted(async () => {
   // 获取当前版本号
   await appStore.fetchAppVersion()
   // 检查更新
   await checkUpdate()
+  // 获取应用数据目录
+  await getAppDataPath()
+  // 获取内核版本信息
+  await infoStore.updateVersion()
 })
 </script>
 
@@ -479,5 +538,14 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+}
+
+.manual-path {
+  font-family: monospace;
+  background-color: var(--n-color-modal);
+  padding: 8px;
+  margin-top: 4px;
+  border-radius: 4px;
+  word-break: break-all;
 }
 </style>

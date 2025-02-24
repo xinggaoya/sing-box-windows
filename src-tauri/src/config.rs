@@ -1,4 +1,3 @@
-use config::{Config as ConfigLoader, ConfigError, Environment, File};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -53,24 +52,10 @@ pub struct RateLimitConfig {
     pub max_requests: u64,
 }
 
-impl Config {
-    pub fn load() -> Result<Self, ConfigError> {
-        let env = std::env::var("RUN_ENV").unwrap_or_else(|_| "development".to_string());
-
-        let config = ConfigLoader::builder()
-            .add_source(File::with_name("config/default"))
-            .add_source(File::with_name(&format!("config/{}", env)).required(false))
-            .add_source(Environment::with_prefix("APP"))
-            .build()?;
-
-        config.try_deserialize()
-    }
-}
-
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            level: "debug".to_string(),
+            level: "info".to_string(),
             dir: "logs".to_string(),
             file_name_prefix: "app".to_string(),
             rotation: "daily".to_string(),
