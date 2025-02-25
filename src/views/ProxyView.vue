@@ -4,38 +4,52 @@
     <n-card class="proxy-card" :bordered="false">
       <template #header>
         <div class="card-header">
-          <n-h3 class="card-title">
-            <n-icon size="20" class="card-icon">
-              <swap-horizontal-outline />
-            </n-icon>
-            代理设置
-          </n-h3>
-          <n-button quaternary circle type="primary" @click="init" :loading="isLoading">
-            <template #icon>
-              <n-icon><refresh-outline /></n-icon>
+          <div class="header-left">
+            <n-h3 class="card-title">
+              <n-icon size="24" class="card-icon">
+                <swap-horizontal-outline />
+              </n-icon>
+              代理设置
+            </n-h3>
+          </div>
+          <n-tooltip trigger="hover" placement="top">
+            <template #trigger>
+              <n-button
+                quaternary
+                circle
+                size="medium"
+                @click="init"
+                :loading="isLoading"
+                class="refresh-button"
+              >
+                <template #icon>
+                  <n-icon><refresh-outline /></n-icon>
+                </template>
+              </n-button>
             </template>
-          </n-button>
+            刷新代理列表
+          </n-tooltip>
         </div>
       </template>
     </n-card>
 
     <!-- 代理列表卡片 -->
     <n-spin :show="isLoading">
-      <n-card class="proxy-card" :bordered="false">
-        <n-tabs type="segment" animated>
+      <n-card class="proxy-list-card" :bordered="false">
+        <n-tabs type="segment" animated class="proxy-tabs">
           <n-tab-pane v-for="(item, index) in list" :key="index" :name="index" :tab="item.name">
             <div class="proxy-group-info">
-              <n-space align="center">
-                <n-tag :bordered="false" type="success" size="small"
-                  >当前节点：{{ item.now }}</n-tag
-                >
-                <n-tag :bordered="false" type="info" size="small"
-                  >{{ item.all.length }} 个节点</n-tag
-                >
+              <n-space align="center" :size="12">
+                <n-tag :bordered="false" type="success" size="medium" class="proxy-tag">
+                  当前节点：{{ item.now }}
+                </n-tag>
+                <n-tag :bordered="false" type="info" size="medium" class="proxy-tag">
+                  {{ item.all.length }} 个节点
+                </n-tag>
               </n-space>
             </div>
 
-            <n-grid :x-gap="12" :y-gap="12" :cols="4">
+            <n-grid :x-gap="16" :y-gap="16" :cols="gridCols" responsive="screen">
               <n-grid-item v-for="(proxy, i) in item.all" :key="i">
                 <n-card
                   :class="{
@@ -45,12 +59,20 @@
                   :bordered="false"
                   hoverable
                 >
-                  <n-space vertical :size="12">
+                  <n-space vertical :size="14">
                     <n-flex justify="space-between" align="center">
-                      <n-ellipsis style="max-width: 150px" :tooltip="{ width: 'trigger' }">
-                        {{ proxy.name }}
-                      </n-ellipsis>
-                      <n-tag :type="getDelayType(proxy.delay)" size="small" :bordered="false" round>
+                      <div class="proxy-name-container">
+                        <n-ellipsis style="max-width: 100%" :tooltip="{ width: 'trigger' }">
+                          {{ proxy.name }}
+                        </n-ellipsis>
+                      </div>
+                      <n-tag
+                        :type="getDelayType(proxy.delay)"
+                        size="small"
+                        :bordered="false"
+                        round
+                        class="delay-tag"
+                      >
                         {{ proxy.delay === '0ms' ? '未测速' : proxy.delay }}
                       </n-tag>
                     </n-flex>
@@ -62,6 +84,7 @@
                         size="small"
                         :disabled="item.now === proxy.name"
                         :ghost="item.now !== proxy.name"
+                        class="proxy-button"
                       >
                         <template #icon>
                           <n-icon>
@@ -78,6 +101,7 @@
                         size="small"
                         type="info"
                         ghost
+                        class="proxy-button"
                       >
                         <template #icon>
                           <n-icon><speedometer-outline /></n-icon>
@@ -90,7 +114,7 @@
               </n-grid-item>
             </n-grid>
 
-            <n-empty v-if="!item.all.length" description="暂无代理节点" />
+            <n-empty v-if="!item.all.length" description="暂无代理节点" class="empty-container" />
           </n-tab-pane>
         </n-tabs>
       </n-card>
@@ -99,7 +123,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   RefreshOutline,
@@ -107,6 +131,7 @@ import {
   SwapHorizontalOutline,
   SpeedometerOutline,
 } from '@vicons/ionicons5'
+import { useWindowSize } from '@vueuse/core'
 
 interface ProxyItem {
   name: string
@@ -134,6 +159,15 @@ interface Proxies {
 const list = ref<ProxyGroup[]>([])
 const message = useMessage()
 const isLoading = ref(false)
+const { width } = useWindowSize()
+
+// 根据窗口宽度调整网格列数
+const gridCols = computed(() => {
+  if (width.value < 640) return 1
+  if (width.value < 960) return 2
+  if (width.value < 1280) return 3
+  return 4
+})
 
 onMounted(() => {
   init()
@@ -167,6 +201,9 @@ const init = async () => {
     })
 
     list.value = info
+    if (info.length > 0) {
+      message.success('代理列表加载成功')
+    }
   } catch (error) {
     message.error('获取代理列表失败')
   } finally {
@@ -242,18 +279,27 @@ const changeProxy = async (type: string, name: string, index: number) => {
 .proxy-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 16px 8px;
+  animation: slide-up 0.4s ease;
 }
 
 .proxy-card {
   margin-bottom: 16px;
-  border-radius: 8px;
+  border-radius: 16px;
   transition: all 0.3s ease;
+  box-shadow: var(--shadow-light);
 }
 
-.proxy-card:hover {
+.proxy-card:hover,
+.proxy-list-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-medium);
+}
+
+.proxy-list-card {
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-light);
 }
 
 .card-header {
@@ -262,39 +308,108 @@ const changeProxy = async (type: string, name: string, index: number) => {
   justify-content: space-between;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .card-title {
   display: flex;
   align-items: center;
+  gap: 8px;
   margin: 0;
-  font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .card-icon {
-  margin-right: 8px;
   color: var(--primary-color);
 }
 
+.refresh-button {
+  transition: all 0.3s ease;
+}
+
+.refresh-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  color: var(--primary-color);
+  background-color: rgba(64, 128, 255, 0.1);
+}
+
 .proxy-group-info {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding: 0 4px;
+}
+
+.proxy-tag {
+  font-weight: 500;
+  padding: 0 12px;
+  height: 28px;
 }
 
 .proxy-node-card {
   transition: all 0.3s ease;
-  border-radius: 8px;
+  border-radius: 12px;
+  border-left: 3px solid transparent;
 }
 
 .proxy-node-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-medium);
 }
 
 .proxy-node-card-active {
-  background-color: rgba(var(--primary-color-rgb), 0.1);
-  border: 1px solid var(--primary-color);
+  border-left: 3px solid var(--success-color);
+}
+
+.proxy-name-container {
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  color: var(--n-text-color-1);
+}
+
+.delay-tag {
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.proxy-button {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.25s ease;
+}
+
+.proxy-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.dark) .proxy-button:hover:not(:disabled) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.empty-container {
+  margin: 60px 0;
+  opacity: 0.8;
+}
+
+:deep(.proxy-tabs .n-tabs-tab) {
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+:deep(.proxy-tabs .n-tabs-tab.n-tabs-tab--active) {
+  font-weight: 600;
+}
+
+:deep(.proxy-tabs .n-tabs-tab-wrapper) {
+  padding: 4px;
 }
 
 :deep(.n-tabs .n-tab-pane) {
-  padding: 12px 0;
+  padding: 16px 0;
 }
 
 :deep(.n-card.proxy-node-card) {
@@ -303,15 +418,5 @@ const changeProxy = async (type: string, name: string, index: number) => {
 
 :deep(.n-card.proxy-node-card:hover) {
   background-color: var(--card-color-hover);
-}
-
-:deep(.n-button.n-button--ghost) {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-:deep(.n-button.n-button--ghost:hover) {
-  background-color: var(--primary-color);
-  color: white;
 }
 </style>

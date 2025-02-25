@@ -1,16 +1,28 @@
 <template>
   <n-layout position="absolute">
-    <n-layout-header bordered style="height: 56px; padding: 8px 16px">
+    <n-layout-header bordered style="height: 64px; padding: 12px 24px">
       <n-flex justify="space-between" align="center" data-tauri-drag-region>
-        <n-space align="center">
-          <n-image :src="logo" width="32" height="32" />
-          <n-h2 style="margin: 0">
+        <n-space align="center" :size="16">
+          <n-image
+            :src="logo"
+            width="36"
+            height="36"
+            preview-disabled
+            style="transition: all 0.3s ease"
+          />
+          <n-h2 style="margin: 0; font-weight: 600">
             Sing-Box
-            <n-text depth="3" style="font-size: 12px">Windows</n-text>
+            <n-text depth="3" style="font-size: 14px; margin-left: 4px">Windows</n-text>
           </n-h2>
         </n-space>
-        <n-space :size="12">
-          <n-button quaternary circle size="small" @click="appStore.toggleTheme">
+        <n-space :size="16">
+          <n-button
+            quaternary
+            circle
+            size="medium"
+            @click="appStore.toggleTheme"
+            class="header-button"
+          >
             <template #icon>
               <n-icon>
                 <moon-outline v-if="appStore.isDark" />
@@ -18,7 +30,7 @@
               </n-icon>
             </template>
           </n-button>
-          <n-button quaternary circle size="small" @click="handleFullScreen">
+          <n-button quaternary circle size="medium" @click="handleFullScreen" class="header-button">
             <template #icon>
               <n-icon>
                 <expand-outline v-if="!isFullscreen" />
@@ -26,14 +38,14 @@
               </n-icon>
             </template>
           </n-button>
-          <n-button quaternary circle size="small" @click="handleMinimize">
+          <n-button quaternary circle size="medium" @click="handleMinimize" class="header-button">
             <template #icon>
               <n-icon>
                 <remove-outline />
               </n-icon>
             </template>
           </n-button>
-          <n-button quaternary circle size="small" @click="handleClose">
+          <n-button quaternary circle size="medium" @click="handleClose" class="header-button">
             <template #icon>
               <n-icon>
                 <close-outline />
@@ -43,15 +55,17 @@
         </n-space>
       </n-flex>
     </n-layout-header>
-    <n-layout has-sider position="absolute" style="top: 56px">
+    <n-layout has-sider position="absolute" style="top: 64px">
       <n-layout-sider
         bordered
         collapse-mode="width"
-        :collapsed-width="64"
-        :width="200"
+        :collapsed-width="70"
+        :width="220"
         show-trigger
+        style="background-color: var(--n-color-base)"
         @collapse="collapsed = true"
         @expand="collapsed = false"
+        class="custom-sider"
       >
         <div class="custom-menu" :class="{ 'menu-collapsed': collapsed }">
           <div
@@ -65,7 +79,7 @@
             @click="!item.disabled && onSelect(item.key)"
           >
             <div class="menu-item-content">
-              <n-icon :size="22" class="menu-icon">
+              <n-icon :size="24" class="menu-icon">
                 <component :is="item.icon" />
               </n-icon>
               <span v-show="!collapsed" class="menu-label">{{ item.label }}</span>
@@ -78,13 +92,23 @@
           </div>
         </div>
       </n-layout-sider>
-      <n-layout-content content-style="padding: 8px;">
-        <n-scrollbar style="max-height: calc(100vh - 56px)">
+      <n-layout-content content-style="padding: 0;">
+        <n-scrollbar style="max-height: calc(100vh - 64px)" class="main-scrollbar">
           <router-view />
         </n-scrollbar>
       </n-layout-content>
     </n-layout>
   </n-layout>
+
+  <!-- 更新对话框 -->
+  <update-modal
+    v-model:show="showUpdateModal"
+    :latest-version="updateInfo.latest_version"
+    :current-version="appStore.appVersion"
+    :download-url="updateInfo.download_url"
+    @update="handleUpdate"
+    @cancel="handleCancelUpdate"
+  />
 </template>
 
 <script setup lang="ts">
@@ -110,6 +134,7 @@ import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
 import { listen } from '@tauri-apps/api/event'
 import logo from '@/assets/icon.png'
+import UpdateModal from '@/components/UpdateModal.vue'
 
 const router = useRouter()
 const appWindow = Window.getCurrent()
@@ -122,105 +147,43 @@ const collapsed = ref(false)
 const currentMenu = ref(0)
 const isFullscreen = ref(false)
 
-// 检查更新并显示通知
+// 更新对话框相关状态
+const showUpdateModal = ref(false)
+const updateInfo = ref({
+  latest_version: '',
+  download_url: '',
+  has_update: false,
+})
+
+// 检查更新
 const checkUpdateWithNotification = async () => {
   try {
     const result = await appStore.checkUpdate()
     if (result?.has_update) {
-      const notificationReactive = ref<NotificationReactive | null>(null)
-      const updateProgress = ref(0)
-      const isUpdating = ref(false)
-
-      // 监听更新进度
-      const unlistenProgress = await listen(
-        'update-progress',
-        (event: { payload: { status: string; progress: number; message: string } }) => {
-          const { status, progress } = event.payload
-          if (status === 'downloading') {
-            updateProgress.value = progress
-          } else if (status === 'completed') {
-            notification.success({
-              title: '更新下载完成',
-              content: '即将安装更新...',
-              duration: 3000,
-            })
-            unlistenProgress()
-          }
-        },
-      )
-
-      notificationReactive.value = notification.create({
-        title: '发现新版本',
-        content: () =>
-          h('div', [
-            h('p', `新版本 ${result.latest_version} 已发布，是否立即更新？`),
-            h(
-              'p',
-              { style: 'margin: 4px 0; color: var(--n-text-color-3);' },
-              `当前版本：${appStore.appVersion}`,
-            ),
-            isUpdating.value
-              ? h(NProgress, {
-                  type: 'line',
-                  percentage: updateProgress.value,
-                  indicatorPlacement: 'inside',
-                  processing: updateProgress.value < 100,
-                  style: 'margin-top: 8px',
-                })
-              : null,
-            h(
-              'div',
-              {
-                style: 'margin-top: 8px; display: flex; gap: 12px;',
-              },
-              [
-                h(
-                  NButton,
-                  {
-                    type: 'primary',
-                    size: 'small',
-                    loading: isUpdating.value,
-                    disabled: isUpdating.value,
-                    onClick: async () => {
-                      try {
-                        isUpdating.value = true
-                        await appStore.downloadAndInstallUpdate()
-                      } catch (error) {
-                        notification.error({
-                          title: '更新失败',
-                          content: String(error),
-                          duration: 5000,
-                        })
-                        unlistenProgress()
-                      }
-                    },
-                  },
-                  {
-                    default: () =>
-                      isUpdating.value ? `正在更新 ${updateProgress.value}%` : '立即更新',
-                  },
-                ),
-                h(
-                  NButton,
-                  {
-                    size: 'small',
-                    disabled: isUpdating.value,
-                    onClick: () => {
-                      unlistenProgress()
-                      notification.destroyAll()
-                    },
-                  },
-                  { default: () => '下次再说' },
-                ),
-              ],
-            ),
-          ]),
-        duration: 0,
-      })
+      updateInfo.value = result
+      showUpdateModal.value = true
     }
   } catch (error) {
     console.error('检查更新失败:', error)
   }
+}
+
+// 处理更新
+const handleUpdate = async (downloadUrl: string) => {
+  try {
+    await appStore.downloadAndInstallUpdate()
+  } catch (error) {
+    notification.error({
+      title: '更新失败',
+      content: String(error),
+      duration: 5000,
+    })
+  }
+}
+
+// 取消更新
+const handleCancelUpdate = () => {
+  showUpdateModal.value = false
 }
 
 const toggleTheme = () => {
@@ -314,129 +277,123 @@ onMounted(async () => {
 })
 </script>
 
-<style>
-body {
-  margin: 0;
-  font-family:
-    v-sans,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-a {
-  text-decoration: none;
-  color: inherit;
-}
-
-[data-tauri-drag-region] {
-  cursor: move;
+<style scoped>
+.custom-sider {
+  transition: all 0.3s ease;
+  border-right: 1px solid var(--n-border-color);
 }
 
 .custom-menu {
   padding: 12px;
-  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .menu-collapsed {
-  padding: 12px 4px;
+  padding: 12px 8px;
+  align-items: center;
 }
 
 .menu-item {
   position: relative;
-  margin-bottom: 8px;
-  padding: 12px;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
+  transition: all 0.3s ease;
   user-select: none;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.menu-item:hover:not(.menu-item-disabled) {
-  background-color: rgba(51, 102, 255, 0.1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(51, 102, 255, 0.15);
-}
-
-.menu-item-active {
-  background-color: #3366ff;
-  color: white;
-  box-shadow: 0 4px 12px rgba(51, 102, 255, 0.25);
-}
-
-.menu-item-active:hover {
-  background-color: #5a7eff !important;
-  box-shadow: 0 4px 12px rgba(51, 102, 255, 0.3);
-}
-
-.menu-item-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background-color: rgba(0, 0, 0, 0.02);
 }
 
 .menu-item-content {
   display: flex;
   align-items: center;
   gap: 12px;
-  z-index: 1;
-  position: relative;
-}
-
-.menu-icon {
-  flex-shrink: 0;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.menu-item:hover:not(.menu-item-disabled) .menu-icon {
-  transform: scale(1.1);
 }
 
 .menu-label {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  opacity: 1;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  color: var(--n-text-color-1);
+}
+
+.menu-icon {
+  transition: all 0.25s ease;
+  color: var(--n-text-color-2);
+}
+
+.menu-item:hover {
+  color: var(--primary-color);
+}
+
+.menu-item-active {
+  color: var(--primary-color);
+}
+
+.menu-item-active .menu-icon,
+.menu-item-active .menu-label {
+  color: var(--primary-color);
 }
 
 .menu-indicator {
   position: absolute;
   right: 0;
   top: 50%;
-  transform: translateY(-50%);
+  height: 60%;
   width: 3px;
-  height: 0;
-  background-color: #3366ff;
-  border-radius: 1.5px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0;
+  border-radius: 4px;
+  transform: translateY(-50%);
+  background-color: transparent;
+  transition: all 0.3s ease;
 }
 
 .menu-indicator.active {
-  height: 24px;
-  opacity: 1;
+  background-color: var(--primary-color);
 }
 
-.menu-item-active .menu-indicator {
-  background-color: white;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+.menu-item-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-:root {
-  --primary-color: #3366ff;
-  --primary-color-hover: #5a7eff;
-  --primary-color-pressed: #1a4bff;
-  --primary-color-rgb: 51, 102, 255;
-  --card-color: var(--n-color);
-  --card-color-hover: var(--n-color-hover);
-  --text-color-1: var(--n-text-color-base);
-  --text-color-2: var(--n-text-color-2);
-  --text-color-3: var(--n-text-color-3);
-  --divider-color: var(--n-divider-color);
+.header-button {
+  transition: all 0.3s ease;
+}
+
+.header-button:hover {
+  transform: translateY(-1px);
+}
+
+:deep(.dark) .custom-sider {
+  background-color: rgba(34, 34, 38, 0.95);
+}
+
+:deep(.dark) .menu-item:hover {
+  background-color: rgba(64, 128, 255, 0.1);
+}
+
+:deep(.dark) .menu-item-active {
+  background-color: rgba(64, 128, 255, 0.15);
+}
+
+:deep(.dark) .header-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.dark) .menu-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+:deep(.dark) .menu-icon {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.main-scrollbar {
+  border-radius: 0;
+  padding-right: 8px;
+}
+
+:deep(.n-scrollbar-rail) {
+  right: 0 !important;
 }
 </style>

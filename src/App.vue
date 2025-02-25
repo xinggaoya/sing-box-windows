@@ -1,11 +1,13 @@
 <template>
   <n-config-provider :theme="appStore.theme" :theme-overrides="themeOverrides">
     <n-dialog-provider>
-      <n-notification-provider>
-        <n-message-provider>
-          <router-view />
-        </n-message-provider>
-      </n-notification-provider>
+      <n-modal-provider>
+        <n-notification-provider>
+          <n-message-provider>
+            <router-view />
+          </n-message-provider>
+        </n-notification-provider>
+      </n-modal-provider>
     </n-dialog-provider>
   </n-config-provider>
 </template>

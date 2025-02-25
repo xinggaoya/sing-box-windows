@@ -1,31 +1,28 @@
 <template>
   <div class="setting-container">
-    <!-- 更新提示卡片 -->
-    <n-card v-if="hasUpdate" class="setting-card" :bordered="false">
-      <n-alert type="info" :show-icon="true">
-        <template #header> 发现新版本 {{ latestVersion }} </template>
-        <template #icon>
-          <n-icon><download-outline /></n-icon>
-        </template>
-        有新版本可用，是否立即更新？
-        <div class="update-actions" style="margin-top: 12px">
-          <n-button type="primary" size="small" :loading="updating" @click="handleUpdate">
-            {{ updating ? `正在更新 ${updateProgress}%` : '立即更新' }}
-          </n-button>
-          <n-button text size="small" @click="skipUpdate"> 暂不更新 </n-button>
-        </div>
-      </n-alert>
-    </n-card>
-
     <!-- 内核管理卡片 -->
     <n-card class="setting-card" :bordered="false">
       <template #header-extra>
-        <n-space align="center">
-          <n-tag v-if="infoStore.version.version" :bordered="false" type="default" size="small">
+        <n-space align="center" :size="12">
+          <n-tag
+            v-if="infoStore.version.version"
+            :bordered="false"
+            type="default"
+            size="medium"
+            class="version-tag"
+          >
             当前版本：{{ infoStore.version.version }}
           </n-tag>
-          <n-tag v-else :bordered="false" type="error" size="small"> 未安装内核 </n-tag>
-          <n-tag v-if="hasNewVersion" :bordered="false" type="warning" size="small">
+          <n-tag v-else :bordered="false" type="error" size="medium" class="version-tag">
+            未安装内核
+          </n-tag>
+          <n-tag
+            v-if="hasNewVersion"
+            :bordered="false"
+            type="warning"
+            size="medium"
+            class="version-tag"
+          >
             新版本：{{ infoStore.newVersion }}
           </n-tag>
         </n-space>
@@ -33,7 +30,7 @@
       <template #header>
         <div class="card-header">
           <n-h3 class="card-title">
-            <n-icon size="20" class="card-icon">
+            <n-icon size="24" class="card-icon">
               <settings-outline />
             </n-icon>
             内核管理
@@ -41,13 +38,13 @@
         </div>
       </template>
 
-      <n-space vertical>
+      <n-space vertical :size="20">
         <n-alert
           v-if="hasNewVersion"
           type="warning"
           :show-icon="true"
           title="发现新版本"
-          style="margin-bottom: 16px"
+          class="version-alert"
         >
           有新版本的内核可供下载，建议更新以获得更好的体验。
         </n-alert>
@@ -57,7 +54,7 @@
           type="error"
           :show-icon="true"
           title="未安装内核"
-          style="margin-bottom: 16px"
+          class="version-alert"
         >
           请下载并安装内核后使用。
         </n-alert>
@@ -69,6 +66,7 @@
           :processing="downloadProgress < 100"
           :indicator-placement="'inside'"
           :rail-style="{ background: 'var(--n-color-disabled)' }"
+          class="download-progress"
         >
           {{ downloadMessage }}
         </n-progress>
@@ -79,7 +77,8 @@
             @click="downloadTheKernel"
             :loading="loading"
             :disabled="downloading"
-            size="small"
+            size="medium"
+            class="download-button"
           >
             <template #icon>
               <n-icon>
@@ -95,11 +94,17 @@
             }}
           </n-button>
 
-          <n-space>
-            <n-button text size="small" @click="showManualDownloadModal" :disabled="downloading">
+          <n-space :size="16">
+            <n-button
+              text
+              size="medium"
+              @click="showManualDownloadModal"
+              :disabled="downloading"
+              class="action-button"
+            >
               手动下载
             </n-button>
-            <n-button text size="small" @click="checkManualInstall" :disabled="downloading">
+            <n-button text size="medium" @click="checkManualInstall" :disabled="downloading">
               检查安装
             </n-button>
           </n-space>
@@ -250,6 +255,16 @@
       </div>
     </n-card>
   </div>
+
+  <!-- 应用更新对话框 -->
+  <update-modal
+    v-model:show="showUpdateModal"
+    :latest-version="latestVersion"
+    :current-version="appStore.appVersion"
+    :download-url="downloadUrl"
+    @update="handleUpdate"
+    @cancel="skipUpdate"
+  />
 </template>
 
 <script setup lang="ts">
@@ -270,6 +285,7 @@ import {
 import { listen } from '@tauri-apps/api/event'
 import { tauriApi } from '@/services/tauri-api'
 import { appDataDir } from '@tauri-apps/api/path'
+import UpdateModal from '@/components/UpdateModal.vue'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -281,11 +297,9 @@ const downloadProgress = ref(0)
 const downloadMessage = ref('')
 
 // 更新相关状态
-const hasUpdate = ref(false)
+const showUpdateModal = ref(false)
 const latestVersion = ref('')
 const downloadUrl = ref('')
-const updating = ref(false)
-const updateProgress = ref(0)
 const skipUpdateFlag = ref(false)
 
 // 检查更新状态
@@ -295,23 +309,56 @@ const checkingUpdate = ref(false)
 const downloadError = ref<string | null>(null)
 const appDataPath = ref('')
 
-// 监听下载进度事件
-listen(
-  'download-progress',
-  (event: { payload: { status: string; progress: number; message: string } }) => {
-    const { status, progress, message: msg } = event.payload
-    downloadProgress.value = progress
-    downloadMessage.value = msg
+// 检查更新
+const checkUpdate = async () => {
+  try {
+    if (skipUpdateFlag.value) return
 
-    if (status === 'completed') {
-      downloading.value = false
-      downloadError.value = null
-      message.success('内核下载完成！')
-      // 更新版本信息
-      infoStore.updateVersion()
+    const result = await tauriApi.update.checkUpdate(appStore.appVersion)
+    if (result.has_update) {
+      showUpdateModal.value = true
+      latestVersion.value = result.latest_version
+      downloadUrl.value = result.download_url
     }
-  },
-)
+  } catch (error) {
+    console.error('检查更新失败:', error)
+  }
+}
+
+// 处理更新
+const handleUpdate = async () => {
+  try {
+    await tauriApi.update.downloadAndInstallUpdate(downloadUrl.value)
+  } catch (error) {
+    message.error('更新失败: ' + error)
+  }
+}
+
+// 跳过更新
+const skipUpdate = () => {
+  showUpdateModal.value = false
+  skipUpdateFlag.value = true
+}
+
+// 手动检查更新
+const handleCheckUpdate = async () => {
+  try {
+    checkingUpdate.value = true
+    const result = await appStore.checkUpdate(false)
+    if (result?.has_update) {
+      showUpdateModal.value = true
+      latestVersion.value = result.latest_version
+      downloadUrl.value = result.download_url
+      message.success(`发现新版本：${result.latest_version}`)
+    } else {
+      message.info('当前已是最新版本')
+    }
+  } catch (error) {
+    message.error(`检查更新失败: ${error}`)
+  } finally {
+    checkingUpdate.value = false
+  }
+}
 
 const hasNewVersion = computed(() => {
   if (!infoStore.newVersion || !infoStore.version.version) return false
@@ -369,71 +416,6 @@ const onIpVersionChange = async (value: boolean) => {
   }
 }
 
-// 检查更新
-const checkUpdate = async () => {
-  try {
-    if (skipUpdateFlag.value) return
-
-    const result = await tauriApi.update.checkUpdate(appStore.appVersion)
-    if (result.has_update) {
-      hasUpdate.value = true
-      latestVersion.value = result.latest_version
-      downloadUrl.value = result.download_url
-    }
-  } catch (error) {
-    console.error('检查更新失败:', error)
-  }
-}
-
-// 处理更新
-const handleUpdate = async () => {
-  try {
-    updating.value = true
-    await tauriApi.update.downloadAndInstallUpdate(downloadUrl.value)
-  } catch (error) {
-    message.error('更新失败: ' + error)
-  } finally {
-    updating.value = false
-  }
-}
-
-// 跳过更新
-const skipUpdate = () => {
-  hasUpdate.value = false
-  skipUpdateFlag.value = true
-}
-
-// 监听更新进度
-listen(
-  'update-progress',
-  (event: { payload: { status: string; progress: number; message: string } }) => {
-    const { status, progress } = event.payload
-    updateProgress.value = progress
-
-    if (status === 'completed') {
-      updating.value = false
-      message.success('更新下载完成，即将安装...')
-    }
-  },
-)
-
-// 手动检查更新
-const handleCheckUpdate = async () => {
-  try {
-    checkingUpdate.value = true
-    const result = await appStore.checkUpdate(false)
-    if (result?.has_update) {
-      message.success(`发现新版本：${result.latest_version}`)
-    } else {
-      message.info('当前已是最新版本')
-    }
-  } catch (error) {
-    message.error(`检查更新失败: ${error}`)
-  } finally {
-    checkingUpdate.value = false
-  }
-}
-
 // 显示手动下载指引
 const showManualDownloadModal = () => {
   dialog.info({
@@ -475,6 +457,24 @@ const getAppDataPath = async () => {
   }
 }
 
+// 监听下载进度事件
+listen(
+  'download-progress',
+  (event: { payload: { status: string; progress: number; message: string } }) => {
+    const { status, progress, message: msg } = event.payload
+    downloadProgress.value = progress
+    downloadMessage.value = msg
+
+    if (status === 'completed') {
+      downloading.value = false
+      downloadError.value = null
+      message.success('内核下载完成！')
+      // 更新版本信息
+      infoStore.updateVersion()
+    }
+  },
+)
+
 onMounted(async () => {
   // 获取当前版本号
   await appStore.fetchAppVersion()
@@ -489,37 +489,107 @@ onMounted(async () => {
 
 <style scoped>
 .setting-container {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: slide-up 0.4s ease;
 }
 
 .setting-card {
-  margin-bottom: 16px;
-  border-radius: 8px;
+  border-radius: 16px;
   transition: all 0.3s ease;
+  box-shadow: var(--shadow-light);
 }
 
 .setting-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-medium);
 }
 
 .card-header {
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 .card-title {
   display: flex;
   align-items: center;
+  gap: 8px;
   margin: 0;
-  font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--n-text-color);
 }
 
 .card-icon {
-  margin-right: 8px;
+  color: var(--primary-color);
+}
+
+.version-tag {
+  font-weight: 500;
+  padding: 0 12px;
+  height: 28px;
+}
+
+.version-alert {
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.download-progress {
+  margin: 10px 0;
+  height: 36px;
+  font-weight: 500;
+}
+
+.download-button {
+  font-weight: 500;
+  min-width: 140px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.download-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 128, 255, 0.25);
+}
+
+.action-button {
+  font-weight: 500;
+  color: var(--n-text-color);
+  transition: all 0.25s ease;
+}
+
+.action-button:hover:not(:disabled) {
+  color: var(--primary-color);
+  transform: translateY(-1px);
+}
+
+:deep(.n-switch) {
+  --n-rail-color-active: var(--primary-color);
+}
+
+:deep(.n-radio-button) {
+  border-radius: 8px;
+}
+
+:deep(.n-form-item-feedback) {
+  font-size: 13px;
+}
+
+:deep(.n-tabs-nav) {
+  background-color: transparent;
+}
+
+:deep(.n-tabs-tab) {
+  font-weight: 500;
+}
+
+:deep(.n-tabs-tab.n-tabs-tab--active) {
+  font-weight: 600;
   color: var(--primary-color);
 }
 
@@ -563,12 +633,6 @@ onMounted(async () => {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--divider-color);
-}
-
-.update-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
 }
 
 .manual-path {

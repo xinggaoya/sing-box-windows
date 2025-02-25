@@ -7,20 +7,32 @@
         <n-space justify="space-between" align="center">
           <n-space align="center" :size="16">
             <div class="status-indicator">
-              <div class="status-dot" :class="{ active: appState.isRunning }" />
+              <div class="status-dot" :class="{ active: appState.isRunning }"></div>
               <span class="status-text">{{ appState.isRunning ? '运行中' : '已停止' }}</span>
             </div>
-            <n-tag :bordered="false" type="info" size="small">
+            <n-tag
+              :bordered="false"
+              :type="appState.mode === 'system' ? 'info' : 'warning'"
+              size="medium"
+              class="mode-tag"
+            >
+              <template #icon>
+                <n-icon size="16">
+                  <globe-outline v-if="appState.mode === 'system'" />
+                  <flash-outline v-else />
+                </n-icon>
+              </template>
               {{ appState.mode === 'system' ? '系统代理' : 'TUN 模式' }}
             </n-tag>
           </n-space>
-          <n-space :size="12">
+          <n-space :size="16">
             <n-button
               secondary
               type="info"
-              size="small"
+              size="medium"
               :disabled="!appState.isRunning"
               @click="onModeChange(appState.mode === 'system' ? 'tun' : 'system')"
+              class="control-button"
             >
               <template #icon>
                 <n-icon><repeat-outline /></n-icon>
@@ -30,9 +42,10 @@
             <n-button
               secondary
               :type="appState.isRunning ? 'error' : 'primary'"
-              size="small"
+              size="medium"
               :loading="isStarting || isStopping"
               @click="appState.isRunning ? stopKernel() : runKernel()"
+              class="control-button"
             >
               <template #icon>
                 <n-icon>
@@ -47,28 +60,36 @@
         <!-- 实时流量监控 -->
         <div class="traffic-monitor">
           <div class="traffic-card upload">
-            <n-icon size="22" color="#18a058"><arrow-up-outline /></n-icon>
+            <div class="traffic-icon-container">
+              <n-icon size="24"><arrow-up-outline /></n-icon>
+            </div>
             <div class="traffic-info">
-              <span class="traffic-label">上传</span>
+              <span class="traffic-label">上传速度</span>
               <span class="traffic-value">{{ trafficStr.up }}</span>
             </div>
           </div>
           <div class="traffic-card download">
-            <n-icon size="22" color="#2080f0"><arrow-down-outline /></n-icon>
+            <div class="traffic-icon-container">
+              <n-icon size="24"><arrow-down-outline /></n-icon>
+            </div>
             <div class="traffic-info">
-              <span class="traffic-label">下载</span>
+              <span class="traffic-label">下载速度</span>
               <span class="traffic-value">{{ trafficStr.down }}</span>
             </div>
           </div>
           <div class="traffic-card memory">
-            <n-icon size="22" color="#d03050"><hardware-chip-outline /></n-icon>
+            <div class="traffic-icon-container">
+              <n-icon size="24"><hardware-chip-outline /></n-icon>
+            </div>
             <div class="traffic-info">
-              <span class="traffic-label">内存</span>
+              <span class="traffic-label">内存占用</span>
               <span class="traffic-value">{{ memoryStr }}</span>
             </div>
           </div>
           <div class="traffic-card total">
-            <n-icon size="22" color="#f0a020"><analytics-outline /></n-icon>
+            <div class="traffic-icon-container">
+              <n-icon size="24"><analytics-outline /></n-icon>
+            </div>
             <div class="traffic-info">
               <span class="traffic-label">总流量</span>
               <span class="traffic-value">{{ useTotalTraffic }}</span>
@@ -102,6 +123,8 @@ import {
   ArrowDownOutline,
   HardwareChipOutline,
   AnalyticsOutline,
+  GlobeOutline,
+  FlashOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/AppStore'
 import Echarts from '@/components/layout/Echarts.vue'
@@ -211,17 +234,18 @@ const onModeChange = async (value: string) => {
 .home-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 16px 8px;
 }
 
 .control-card {
   border-radius: 16px;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .control-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .status-indicator {
@@ -231,11 +255,12 @@ const onModeChange = async (value: string) => {
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background-color: var(--n-text-color-disabled);
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .status-dot.active {
@@ -243,34 +268,120 @@ const onModeChange = async (value: string) => {
   box-shadow: 0 0 8px var(--success-color);
 }
 
+.status-dot.active::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  border: 1px solid var(--success-color);
+  opacity: 0.4;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.6;
+  }
+  70% {
+    transform: scale(1.1);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.6;
+  }
+}
+
 .status-text {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
-  color: var(--text-color-1);
+  color: var(--n-text-color-1);
+}
+
+.mode-tag {
+  padding: 0 12px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  font-weight: 500;
 }
 
 .traffic-monitor {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin: 0 -8px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 0;
 }
 
 .traffic-card {
-  background-color: var(--card-color);
-  border-radius: 12px;
-  padding: 16px;
+  padding: 20px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   transition: all 0.3s ease;
-  cursor: default;
+  border: 1px solid var(--n-border-color);
 }
 
 .traffic-card:hover {
   transform: translateY(-2px);
-  background-color: var(--card-color-hover);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.dark) .traffic-card:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.traffic-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.upload .traffic-icon-container {
+  background-color: rgba(24, 160, 88, 0.08);
+  color: var(--success-color);
+}
+
+.download .traffic-icon-container {
+  background-color: rgba(32, 128, 240, 0.08);
+  color: var(--primary-color);
+}
+
+.memory .traffic-icon-container {
+  background-color: rgba(208, 48, 80, 0.08);
+  color: var(--error-color);
+}
+
+.total .traffic-icon-container {
+  background-color: rgba(240, 160, 32, 0.08);
+  color: var(--warning-color);
+}
+
+:deep(.dark) .upload .traffic-icon-container {
+  background-color: rgba(24, 160, 88, 0.15);
+}
+
+:deep(.dark) .download .traffic-icon-container {
+  background-color: rgba(32, 128, 240, 0.15);
+}
+
+:deep(.dark) .memory .traffic-icon-container {
+  background-color: rgba(208, 48, 80, 0.15);
+}
+
+:deep(.dark) .total .traffic-icon-container {
+  background-color: rgba(240, 160, 32, 0.15);
 }
 
 .traffic-info {
@@ -280,36 +391,32 @@ const onModeChange = async (value: string) => {
 }
 
 .traffic-label {
-  font-size: 13px;
-  color: var(--text-color-2);
+  font-size: 14px;
+  color: var(--n-text-color-2);
 }
 
 .traffic-value {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
-  color: var(--text-color-1);
+  color: var(--n-text-color-1);
 }
 
 .chart-wrapper {
   margin-top: 8px;
-  height: calc(100vh - 380px);
-  min-height: 300px;
-  border-radius: 12px;
+  height: 300px;
+  border-radius: 14px;
   overflow: hidden;
-  background-color: var(--card-color);
-  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.chart-wrapper:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-:deep(.n-button) {
+.control-button {
+  border-radius: 10px;
   font-weight: 500;
+  transition: all 0.25s ease;
 }
 
-:deep(.n-tag) {
-  font-weight: 500;
+.control-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 </style>
