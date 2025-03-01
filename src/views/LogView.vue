@@ -90,18 +90,33 @@
 
     <!-- 日志内容卡片 -->
     <n-card class="log-content-card" :bordered="false">
-      <n-scrollbar ref="scrollbarRef" class="log-scrollbar" trigger="none" @scroll="handleScroll">
-        <div class="log-content">
-          <div v-for="(log, index) in displayedLogs" :key="log.timestamp + index" class="log-item">
-            <n-tag :type="getLogTagType(log.type)" size="small" round class="log-tag">
-              {{ log.type }}
-            </n-tag>
-            <span class="log-time">{{ formatTime(log.timestamp, true) }}</span>
-            <span class="log-message" :class="getLogClass(log.type)">{{ log.payload }}</span>
-          </div>
-          <n-empty v-if="!displayedLogs.length" description="暂无日志记录" class="log-empty" />
+      <div class="log-content-wrapper">
+        <div v-if="displayedLogs.length">
+          <!-- 使用 Naive UI 的虚拟列表组件 -->
+          <n-virtual-list
+            ref="virtualListRef"
+            class="log-virtual-list"
+            :items="formattedLogs"
+            :item-size="60"
+            :show-scrollbar="true"
+            container-style="max-height: calc(100vh - 200px); overflow: auto;"
+            @scroll="handleVirtualScroll"
+          >
+            <template #default="{ item }">
+              <div class="log-item" :key="item.key">
+                <n-tag :type="getLogTagType(item.type)" size="small" round class="log-tag">
+                  {{ item.type }}
+                </n-tag>
+                <span class="log-time">{{ formatTime(item.timestamp, true) }}</span>
+                <span class="log-message" :class="getLogClass(item.type)">
+                  {{ item.payload }}
+                </span>
+              </div>
+            </template>
+          </n-virtual-list>
         </div>
-      </n-scrollbar>
+        <n-empty v-else description="暂无日志记录" class="log-empty" />
+      </div>
     </n-card>
   </div>
 </template>
@@ -111,6 +126,7 @@ import { useInfoStore } from '@/stores/infoStore'
 import { onMounted, ref, computed, onUnmounted, watch, nextTick } from 'vue'
 import { useMessage } from 'naive-ui'
 import { TrashOutline, CopyOutline, DownloadOutline, DocumentTextOutline } from '@vicons/ionicons5'
+import type { VirtualListInst } from 'naive-ui'
 
 interface Log {
   type: string
@@ -118,25 +134,37 @@ interface Log {
   timestamp: number
 }
 
-interface ScrollbarInstance {
-  scrollTo: (options: ScrollToOptions) => void
-  containerRef: { scrollHeight: number }
-}
-
-interface ScrollEvent {
-  target: {
-    scrollTop: number
-    scrollHeight: number
-    clientHeight: number
-  }
+interface FormattedLog extends Log {
+  key: string
 }
 
 const message = useMessage()
 const infoStore = useInfoStore()
-const scrollbarRef = ref(null)
+const virtualListRef = ref<VirtualListInst | null>(null)
 const autoScroll = ref(true)
 const filterType = ref<string | null>(null)
 const displayedLogs = ref<Log[]>([])
+
+// 格式化日志数据，添加key属性以适配虚拟列表
+const formattedLogs = computed<FormattedLog[]>(() => {
+  return displayedLogs.value.map((log, index) => ({
+    ...log,
+    key: `${log.timestamp}-${index}`,
+  }))
+})
+
+// 处理虚拟列表的滚动事件
+const handleVirtualScroll = (e: Event) => {
+  const target = e.target as HTMLElement
+  if (!target) return
+
+  const { scrollTop, scrollHeight, clientHeight } = target
+
+  // 如果用户向上滚动超过一定距离，关闭自动滚动
+  if (scrollHeight - scrollTop - clientHeight > 100) {
+    autoScroll.value = false
+  }
+}
 
 // 监听日志变化
 watch(
@@ -154,8 +182,30 @@ watch(
 // 监听筛选条件变化
 watch(filterType, () => {
   updateDisplayedLogs()
+  nextTick(() => {
+    if (autoScroll.value) {
+      scrollToBottom()
+    }
+  })
 })
 
+// 监听自动滚动状态变化
+watch(autoScroll, (newValue) => {
+  if (newValue) {
+    scrollToBottom()
+  }
+})
+
+onMounted(() => {
+  updateDisplayedLogs()
+  nextTick(() => {
+    if (autoScroll.value) {
+      scrollToBottom()
+    }
+  })
+})
+
+// 计算总日志数
 const totalLogs = computed(() => {
   return filterType.value
     ? infoStore.logs.filter((log: Log) => log.type === filterType.value).length
@@ -179,40 +229,17 @@ const updateDisplayedLogs = () => {
 
 // 滚动到底部
 const scrollToBottom = () => {
-  const scrollbarElement = scrollbarRef.value
-  if (!scrollbarElement) return
-
-  // 使用 nextTick 确保 DOM 已更新
   nextTick(() => {
-    // 使用类型断言确保类型安全
-    const scrollbar = scrollbarElement as unknown as ScrollbarInstance
-    if (scrollbar?.containerRef) {
-      scrollbar.scrollTo({
-        top: scrollbar.containerRef.scrollHeight,
-        behavior: 'smooth',
-      })
+    if (virtualListRef.value) {
+      // 使用虚拟列表组件提供的scrollTo方法滚动到最底部
+      virtualListRef.value.scrollTo({ index: displayedLogs.value.length - 1 })
     }
   })
 }
 
-// 处理滚动
-const handleScroll = (e: ScrollEvent) => {
-  const { scrollTop, scrollHeight, clientHeight } = e.target
-  // 如果用户向上滚动，关闭自动滚动
-  if (scrollHeight - scrollTop - clientHeight > 100) {
-    autoScroll.value = false
-  }
-}
-
-onMounted(() => {
-  updateDisplayedLogs()
-  if (autoScroll.value) {
-    scrollToBottom()
-  }
-})
-
 const clearLogs = () => {
-  infoStore.logs = []
+  // 使用store提供的方法清空日志
+  infoStore.clearLogs()
   displayedLogs.value = []
   message.success('日志已清空')
 }
@@ -329,13 +356,15 @@ const getLogClass = (type: string): string => {
   box-shadow: var(--shadow-medium);
 }
 
-.log-scrollbar {
+.log-content-wrapper {
   height: 100%;
-  padding: 0 4px;
+  padding: 8px 4px;
+  position: relative;
 }
 
-.log-content {
-  padding: 8px 4px;
+.log-virtual-list {
+  height: calc(100vh - 200px);
+  padding: 4px;
 }
 
 .log-item {

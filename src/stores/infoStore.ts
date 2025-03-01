@@ -35,7 +35,8 @@ export const useInfoStore = defineStore(
     })
 
     // 日志信息
-    const MAX_LOGS = 300
+    // 减少最大日志数量以减轻内存压力
+    const MAX_LOGS = 200
 
     interface LogEntry {
       type: string
@@ -47,6 +48,8 @@ export const useInfoStore = defineStore(
 
     // 存储 WebSocket 清理函数
     let cleanupFunctions: Array<() => void> = []
+    // 记录是否存在活跃的WebSocket连接
+    let activeConnections = false
 
     // 获取最新版本
     const getLatestVersion = async () => {
@@ -98,8 +101,13 @@ export const useInfoStore = defineStore(
 
     // 初始化 WebSocket 连接
     const initWebSocket = () => {
-      // 清理现有连接
-      cleanupWebSockets()
+      // 如果已经有活跃的连接，先清理
+      if (activeConnections) {
+        cleanupWebSockets()
+      }
+
+      // 设置活跃标志
+      activeConnections = true
 
       // 流量监控
       const cleanupTraffic = createWebSocket('ws://127.0.0.1:9090/traffic?token=', (data) => {
@@ -129,17 +137,21 @@ export const useInfoStore = defineStore(
           typeof data.type === 'string' &&
           typeof data.payload === 'string'
         ) {
+          // 日志条目添加到数组前端，并限制最大数量
           logs.value.unshift({
             type: data.type,
             payload: data.payload,
             timestamp: Date.now(),
           })
+
+          // 超过最大数量时，移除多余日志
           if (logs.value.length > MAX_LOGS) {
             logs.value = logs.value.slice(0, MAX_LOGS)
           }
         }
       })
 
+      // 过滤掉null值，存储清理函数
       cleanupFunctions = [cleanupTraffic, cleanupMemory, cleanupLogs].filter(Boolean) as Array<
         () => void
       >
@@ -147,8 +159,11 @@ export const useInfoStore = defineStore(
 
     // 清理所有 WebSocket 连接
     const cleanupWebSockets = () => {
-      cleanupFunctions.forEach((cleanup) => cleanup())
-      cleanupFunctions = []
+      if (cleanupFunctions.length > 0) {
+        cleanupFunctions.forEach((cleanup) => cleanup())
+        cleanupFunctions = []
+        activeConnections = false
+      }
     }
 
     // 启动内核
@@ -195,13 +210,16 @@ export const useInfoStore = defineStore(
 
     // 停止内核
     const stopKernel = async () => {
-      await tauriApi.kernel.stopKernel()
-      // 清理 WebSocket 连接
-      cleanupWebSockets()
-      // 重置状态
-      memory.value = { inuse: 0, oslimit: 0 }
-      traffic.value = { up: 0, down: 0, total: 0 }
-      logs.value = []
+      try {
+        await tauriApi.kernel.stopKernel()
+      } finally {
+        // 无论成功与否，都清理WebSocket连接和状态
+        cleanupWebSockets()
+        // 重置状态
+        memory.value = { inuse: 0, oslimit: 0 }
+        traffic.value = { up: 0, down: 0, total: 0 }
+        logs.value = []
+      }
     }
 
     // 重启内核
@@ -218,6 +236,11 @@ export const useInfoStore = defineStore(
         console.error('获取版本信息失败:', error)
         version.value = { version: '', meta: false, premium: false }
       }
+    }
+
+    // 清理日志
+    const clearLogs = () => {
+      logs.value = []
     }
 
     // 组件卸载时清理
@@ -237,6 +260,8 @@ export const useInfoStore = defineStore(
       initWebSocket,
       updateVersion,
       checkKernelVersion,
+      clearLogs,
+      cleanupWebSockets,
     }
   },
   {
