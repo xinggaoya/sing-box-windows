@@ -137,7 +137,7 @@ impl ProcessManager {
 
         let sing_box_dir = Path::new(&work_dir).join("sing-box");
         let kernel_path = sing_box_dir.join("sing-box.exe");
-        let _config_path = sing_box_dir.join("config.json");
+        let config_path = sing_box_dir.join("config.json");
 
         // 检查 sing-box 目录是否存在
         if !sing_box_dir.exists() {
@@ -148,7 +148,37 @@ impl ProcessManager {
         if !kernel_path.exists() {
             return Err(ProcessError::StartFailed("内核文件不存在".to_string()));
         }
+        
+        // 检查配置文件是否存在
+        if !config_path.exists() {
+            return Err(ProcessError::ConfigError("配置文件不存在".to_string()));
+        }
+        
+        // 使用 sing-box 的 check 命令验证配置
+        match self.check_config_validity(&kernel_path, &sing_box_dir).await {
+            Ok(_) => info!("配置文件检查通过"),
+            Err(e) => return Err(e),
+        }
 
+        Ok(())
+    }
+    
+    // 使用 sing-box check 验证配置有效性
+    async fn check_config_validity(&self, kernel_path: &Path, work_dir: &Path) -> Result<()> {
+        let output = Command::new(kernel_path)
+            .arg("check")
+            .current_dir(work_dir)
+            .creation_flags(0x08000000)
+            .output()
+            .await
+            .map_err(|e| ProcessError::ConfigError(format!("无法执行配置检查: {}", e)))?;
+        
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(ProcessError::ConfigError(format!("配置无效: {}", stderr)));
+        }
+        
+        // 如果输出为空，则配置有效
         Ok(())
     }
 
