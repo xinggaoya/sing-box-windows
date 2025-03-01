@@ -128,7 +128,7 @@ sing-box-windows/
 - 🎯 [Tauri 2.0](https://tauri.app/) - 现代化跨平台应用框架
 - ⚡ [Vue 3](https://vuejs.org/) - 响应式前端框架
 - 🎨 [Naive UI](https://www.naiveui.com/) - 高质量 Vue 3 组件库
-- 📊 [ECharts](https://echarts.apache.org/) - 专业的数据可视化库
+- 📊 [Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API) - 高性能的图形渲染
 - 🦀 [Rust](https://www.rust-lang.org/) - 高性能系统编程语言
 - 🔧 [TypeScript](https://www.typescriptlang.org/) - 类型安全的 JavaScript
 

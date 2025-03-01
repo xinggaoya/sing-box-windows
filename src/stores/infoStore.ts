@@ -32,7 +32,13 @@ export const useInfoStore = defineStore(
       up: 0,
       down: 0,
       total: 0,
+      totalUp: 0, // 上传总流量
+      totalDown: 0, // 下载总流量
     })
+
+    // 程序运行时间（秒）
+    const uptime = ref(0)
+    let uptimeInterval: NodeJS.Timeout | null = null
 
     // 日志信息
     // 减少最大日志数量以减轻内存压力
@@ -109,15 +115,28 @@ export const useInfoStore = defineStore(
       // 设置活跃标志
       activeConnections = true
 
+      // 开始计算运行时间
+      uptime.value = 0
+      uptimeInterval = setInterval(() => {
+        uptime.value += 1
+      }, 1000)
+
       // 流量监控
       const cleanupTraffic = createWebSocket('ws://127.0.0.1:9090/traffic?token=', (data) => {
         if ('up' in data && 'down' in data) {
           const currentUp = Number(data.up) || 0
           const currentDown = Number(data.down) || 0
+
+          // 安全地更新总流量计数
+          const currentTotalUp = Number(traffic.value.totalUp) || 0
+          const currentTotalDown = Number(traffic.value.totalDown) || 0
+
           traffic.value = {
             up: currentUp,
             down: currentDown,
             total: traffic.value.total + currentUp + currentDown,
+            totalUp: currentTotalUp + currentUp,
+            totalDown: currentTotalDown + currentDown,
           }
         }
       })
@@ -164,11 +183,27 @@ export const useInfoStore = defineStore(
         cleanupFunctions = []
         activeConnections = false
       }
+
+      // 清理运行时间计时器
+      if (uptimeInterval) {
+        clearInterval(uptimeInterval)
+        uptimeInterval = null
+      }
     }
 
     // 启动内核
     const startKernel = async () => {
       await tauriApi.kernel.startKernel()
+
+      // 确保初始化时重置所有计数器
+      traffic.value = {
+        up: 0,
+        down: 0,
+        total: 0,
+        totalUp: 0,
+        totalDown: 0,
+      }
+      uptime.value = 0
 
       // 等待内核启动并检查状态
       return new Promise((resolve, reject) => {
@@ -217,7 +252,8 @@ export const useInfoStore = defineStore(
         cleanupWebSockets()
         // 重置状态
         memory.value = { inuse: 0, oslimit: 0 }
-        traffic.value = { up: 0, down: 0, total: 0 }
+        traffic.value = { up: 0, down: 0, total: 0, totalUp: 0, totalDown: 0 }
+        uptime.value = 0
         logs.value = []
       }
     }
@@ -254,6 +290,7 @@ export const useInfoStore = defineStore(
       memory,
       traffic,
       logs,
+      uptime,
       startKernel,
       stopKernel,
       restartKernel,

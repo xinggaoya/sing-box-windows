@@ -34,6 +34,11 @@ const router = createRouter({
           name: 'Setting',
           component: () => import('@/views/SettingView.vue'),
         },
+        {
+          path: '/blank',
+          name: 'Blank',
+          component: () => import('@/views/BlankView.vue'),
+        },
       ],
     },
   ],

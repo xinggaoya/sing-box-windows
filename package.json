@@ -26,11 +26,9 @@
     "@vicons/ionicons5": "^0.12.0",
     "@vicons/material": "^0.13.0",
     "@vueuse/core": "^12.7.0",
-    "echarts": "^5.5.1",
     "pinia": "^2.2.6",
     "pinia-plugin-persistedstate": "^4.1.3",
     "vue": "^3.5.12",
-    "vue-echarts": "^7.0.3",
     "vue-router": "^4.4.5"
   },
   "devDependencies": {

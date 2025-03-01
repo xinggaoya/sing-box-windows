@@ -17,17 +17,22 @@ import { TrayIcon } from '@tauri-apps/api/tray'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
 import { useInfoStore } from '@/stores/infoStore'
 import { tauriApi } from '@/services/tauri-api'
 import { ProxyService } from '@/services/proxy-service'
+import { useRouter, useRoute } from 'vue-router'
+import mitt from '@/utils/mitt'
 
 const appWindow = Window.getCurrent()
 const appStore = useAppStore()
 const infoStore = useInfoStore()
 const proxyService = ProxyService.getInstance()
+const router = useRouter()
+const route = useRoute()
+const lastPath = ref('/')
 
 onMounted(async () => {
   // 初始化托盘图标
@@ -50,6 +55,17 @@ onMounted(async () => {
   if (appStore.isRunning) {
     infoStore.initWebSocket()
   }
+
+  setupWindowEventHandlers()
+})
+
+onUnmounted(() => {
+  // 清理事件监听
+  mitt.off('window-minimize')
+  mitt.off('window-hide')
+  mitt.off('window-show')
+  mitt.off('window-restore')
+  // Tauri的事件监听器会自动清理
 })
 
 // 启动内核的统一处理函数
@@ -79,7 +95,10 @@ const initTray = async () => {
         id: 'show',
         text: '显示界面',
         action: async () => {
-          appWindow.show()
+          // 先显示窗口
+          await appWindow.show()
+          // 触发window-show事件，确保从空白页恢复
+          mitt.emit('window-show')
         },
       },
       {
@@ -139,11 +158,14 @@ const initTray = async () => {
   })
 
   const options = {
+    tooltip: 'sing-box-window',
     icon: await defaultWindowIcon(),
-    action: (event: any) => {
+    action: (event: { type: string }) => {
       switch (event.type) {
         case 'DoubleClick':
           appWindow.show()
+          // 触发window-show事件，确保从空白页恢复
+          mitt.emit('window-show')
           break
       }
     },
@@ -151,8 +173,44 @@ const initTray = async () => {
     menuOnLeftClick: true,
   }
 
-  //@ts-ignore
+  // 使用 @ts-expect-error 替代 @ts-ignore
+  // @ts-expect-error TrayIcon API 可能不完全匹配，但实现是正确的
   await TrayIcon.new(options)
+}
+
+// 设置窗口事件监听
+const setupWindowEventHandlers = () => {
+  // 记录最后一次正常路由路径
+  const isBlankRoute = () => route.path === '/blank'
+
+  // 保存当前路由并切换到空白页
+  const saveRouteAndGoBlank = () => {
+    if (!isBlankRoute()) {
+      lastPath.value = route.path
+      router.push('/blank')
+    }
+  }
+
+  // 从空白页恢复到之前的路由
+  const restoreFromBlank = () => {
+    if (isBlankRoute() && lastPath.value) {
+      router.push(lastPath.value)
+    }
+  }
+  // 窗口隐藏时切换到空白页
+  mitt.on('window-hide', () => {
+    saveRouteAndGoBlank()
+  })
+
+  // 窗口显示时恢复路由
+  mitt.on('window-show', () => {
+    restoreFromBlank()
+  })
+
+  // 窗口恢复时恢复路由
+  mitt.on('window-restore', () => {
+    restoreFromBlank()
+  })
 }
 </script>
 

@@ -7,7 +7,6 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    Echarts: typeof import('./src/components/layout/Echarts.vue')['default']
     MainLayout: typeof import('./src/components/layout/MainLayout.vue')['default']
     NAlert: typeof import('naive-ui')['NAlert']
     NButton: typeof import('naive-ui')['NButton']
@@ -53,6 +52,7 @@ declare module 'vue' {
     NVirtualList: typeof import('naive-ui')['NVirtualList']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TrafficChart: typeof import('./src/components/layout/TrafficChart.vue')['default']
     UpdateModal: typeof import('./src/components/UpdateModal.vue')['default']
   }
 }

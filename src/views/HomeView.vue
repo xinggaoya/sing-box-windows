@@ -2,7 +2,7 @@
   <div class="home-container">
     <!-- 状态控制卡片 -->
     <n-card class="control-card" :bordered="false">
-      <n-space vertical :size="24">
+      <n-space vertical :size="16">
         <!-- 状态指示器和控制按钮 -->
         <n-space justify="space-between" align="center">
           <n-space align="center" :size="16">
@@ -61,7 +61,7 @@
         <div class="traffic-monitor">
           <div class="traffic-card upload">
             <div class="traffic-icon-container">
-              <n-icon size="24"><arrow-up-outline /></n-icon>
+              <n-icon size="22"><arrow-up-outline /></n-icon>
             </div>
             <div class="traffic-info">
               <span class="traffic-label">上传速度</span>
@@ -70,39 +70,56 @@
           </div>
           <div class="traffic-card download">
             <div class="traffic-icon-container">
-              <n-icon size="24"><arrow-down-outline /></n-icon>
+              <n-icon size="22"><arrow-down-outline /></n-icon>
             </div>
             <div class="traffic-info">
               <span class="traffic-label">下载速度</span>
               <span class="traffic-value">{{ trafficStr.down }}</span>
             </div>
           </div>
+          <div class="traffic-card upload-total">
+            <div class="traffic-icon-container">
+              <n-icon size="22"><cloud-upload-outline /></n-icon>
+            </div>
+            <div class="traffic-info">
+              <span class="traffic-label">上传总流量</span>
+              <span class="traffic-value">{{ uploadTotalTraffic }}</span>
+            </div>
+          </div>
+          <div class="traffic-card download-total">
+            <div class="traffic-icon-container">
+              <n-icon size="22"><cloud-download-outline /></n-icon>
+            </div>
+            <div class="traffic-info">
+              <span class="traffic-label">下载总流量</span>
+              <span class="traffic-value">{{ downloadTotalTraffic }}</span>
+            </div>
+          </div>
           <div class="traffic-card memory">
             <div class="traffic-icon-container">
-              <n-icon size="24"><hardware-chip-outline /></n-icon>
+              <n-icon size="22"><hardware-chip-outline /></n-icon>
             </div>
             <div class="traffic-info">
               <span class="traffic-label">内存占用</span>
               <span class="traffic-value">{{ memoryStr }}</span>
             </div>
           </div>
-          <div class="traffic-card total">
+          <div class="traffic-card uptime">
             <div class="traffic-icon-container">
-              <n-icon size="24"><analytics-outline /></n-icon>
+              <n-icon size="22"><time-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">总流量</span>
-              <span class="traffic-value">{{ useTotalTraffic }}</span>
+              <span class="traffic-label">运行时间</span>
+              <span class="traffic-value">{{ formattedUptime }}</span>
             </div>
           </div>
         </div>
 
         <!-- 流量图表 -->
         <div class="chart-wrapper">
-          <Echarts
-            :download-speed="infoStore.traffic.up"
-            :upload-speed="infoStore.traffic.down"
-            :is-visible="isWindowVisible"
+          <TrafficChart
+            :upload-speed="infoStore.traffic.up"
+            :download-speed="infoStore.traffic.down"
           />
         </div>
       </n-space>
@@ -112,10 +129,10 @@
 
 <script setup lang="ts">
 import { useMessage, useDialog } from 'naive-ui'
-import { computed, ref, onUnmounted, onMounted } from 'vue'
+import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
-import mitt from '@/utils/mitt'
 import {
   PowerOutline,
   RepeatOutline,
@@ -125,9 +142,12 @@ import {
   AnalyticsOutline,
   GlobeOutline,
   FlashOutline,
+  CloudUploadOutline,
+  CloudDownloadOutline,
+  TimeOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/AppStore'
-import Echarts from '@/components/layout/Echarts.vue'
+import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useInfoStore } from '@/stores/infoStore'
 import { ProxyService } from '@/services/proxy-service'
 
@@ -138,48 +158,49 @@ const infoStore = useInfoStore()
 const proxyService = ProxyService.getInstance()
 const isStarting = ref(false)
 const isStopping = ref(false)
-const isWindowVisible = ref(true)
 
-// 监听窗口事件
-const setupWindowListeners = () => {
-  mitt.on('window-minimize', () => {
-    isWindowVisible.value = false
-  })
+// 监听路由可见性变化，简化为只用于计算属性的控制
+const route = useRoute()
+const isRouteActive = computed(() => route.path === '/')
 
-  mitt.on('window-hide', () => {
-    isWindowVisible.value = false
-  })
-
-  mitt.on('window-show', () => {
-    isWindowVisible.value = true
-  })
-
-  mitt.on('window-restore', () => {
-    isWindowVisible.value = true
-  })
-}
-
-onMounted(() => {
-  setupWindowListeners()
-})
-
-onUnmounted(() => {
-  mitt.off('window-minimize')
-  mitt.off('window-hide')
-  mitt.off('window-show')
-  mitt.off('window-restore')
-})
-
+// 保留计算属性的可见性检查，但简化逻辑
 const useTotalTraffic = computed(() => {
+  if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
   return formatBandwidth(infoStore.traffic.total)
 })
 
-const memoryStr = computed(() => formatBandwidth(infoStore.memory.inuse))
+const memoryStr = computed(() => {
+  if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
+  return formatBandwidth(infoStore.memory.inuse)
+})
 
-const trafficStr = computed(() => ({
-  up: formatBandwidth(Number(infoStore.traffic.up) || 0),
-  down: formatBandwidth(Number(infoStore.traffic.down) || 0),
-}))
+const trafficStr = computed(() => {
+  if (!isRouteActive.value) return { up: '0 B/s', down: '0 B/s' } // 不在当前路由时不计算
+  return {
+    up: formatBandwidth(Number(infoStore.traffic.up) || 0),
+    down: formatBandwidth(Number(infoStore.traffic.down) || 0),
+  }
+})
+
+const uploadTotalTraffic = computed(() => {
+  if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
+  return formatBandwidth(Number(infoStore.traffic.totalUp) || 0)
+})
+
+const downloadTotalTraffic = computed(() => {
+  if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
+  return formatBandwidth(Number(infoStore.traffic.totalDown) || 0)
+})
+
+const formattedUptime = computed(() => {
+  if (!isRouteActive.value) return '00:00:00' // 不在当前路由时不计算
+
+  const uptime = Number(infoStore.uptime) || 0
+  const hours = Math.floor(uptime / 3600)
+  const minutes = Math.floor((uptime % 3600) / 60)
+  const seconds = Math.floor(uptime % 60)
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+})
 
 const runKernel = async () => {
   try {
@@ -234,13 +255,17 @@ const onModeChange = async (value: string) => {
 .home-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 16px 8px;
+  padding: 12px 8px;
 }
 
 .control-card {
   border-radius: 16px;
   transition: all 0.3s ease;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.control-card :deep(.n-card__content) {
+  padding: 16px;
 }
 
 .control-card:hover {
@@ -304,7 +329,7 @@ const onModeChange = async (value: string) => {
 
 .mode-tag {
   padding: 0 12px;
-  height: 32px;
+  height: 30px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -314,17 +339,17 @@ const onModeChange = async (value: string) => {
 
 .traffic-monitor {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
   margin: 0;
 }
 
 .traffic-card {
-  padding: 20px;
+  padding: 14px;
   border-radius: 14px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   transition: all 0.3s ease;
   border: 1px solid var(--n-border-color);
 }
@@ -342,8 +367,8 @@ const onModeChange = async (value: string) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   border-radius: 12px;
   flex-shrink: 0;
 }
@@ -368,6 +393,21 @@ const onModeChange = async (value: string) => {
   color: var(--warning-color);
 }
 
+.upload-total .traffic-icon-container {
+  background-color: rgba(60, 180, 100, 0.08);
+  color: #2a9d8f;
+}
+
+.download-total .traffic-icon-container {
+  background-color: rgba(80, 140, 220, 0.08);
+  color: #4c6ef5;
+}
+
+.uptime .traffic-icon-container {
+  background-color: rgba(160, 100, 200, 0.08);
+  color: #9d4edd;
+}
+
 :deep(.dark) .upload .traffic-icon-container {
   background-color: rgba(24, 160, 88, 0.15);
 }
@@ -384,26 +424,38 @@ const onModeChange = async (value: string) => {
   background-color: rgba(240, 160, 32, 0.15);
 }
 
+:deep(.dark) .upload-total .traffic-icon-container {
+  background-color: rgba(60, 180, 100, 0.15);
+}
+
+:deep(.dark) .download-total .traffic-icon-container {
+  background-color: rgba(80, 140, 220, 0.15);
+}
+
+:deep(.dark) .uptime .traffic-icon-container {
+  background-color: rgba(160, 100, 200, 0.15);
+}
+
 .traffic-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .traffic-label {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--n-text-color-2);
 }
 
 .traffic-value {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--n-text-color-1);
 }
 
 .chart-wrapper {
-  margin-top: 8px;
-  height: 300px;
+  margin-top: 6px;
+  height: 260px;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.05);
