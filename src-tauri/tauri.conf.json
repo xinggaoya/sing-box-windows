@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "sing-box-windows",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "identifier": "cn.moncn.app",
   "build": {
     "frontendDist": "../dist",
