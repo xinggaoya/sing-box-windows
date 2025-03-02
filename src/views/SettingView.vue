@@ -134,14 +134,14 @@
         <n-list-item>
           <n-space justify="space-between" align="center" style="width: 100%">
             <div class="setting-item">
-              <div class="setting-title">开机自启</div>
+              <div class="setting-title">开机自启动</div>
               <div class="setting-desc">
-                {{ appStore.autoStart ? '应用将在系统启动时自动运行' : '应用需要手动启动' }}
+                {{ appStore.autoStartApp ? '应用将在系统启动时自动运行' : '应用需要手动启动' }}
               </div>
             </div>
-            <n-switch v-model:value="appStore.autoStart" @update-value="onAutoStartChange">
-              <template #checked>开启</template>
-              <template #unchecked>关闭</template>
+            <n-switch v-model:value="appStore.autoStartApp" @update-value="onAutoStartChange">
+              <template #checked>开</template>
+              <template #unchecked>关</template>
             </n-switch>
           </n-space>
         </n-list-item>
@@ -386,19 +386,20 @@ const downloadTheKernel = async () => {
   }
 }
 
+// 开机自启动设置
 const onAutoStartChange = async (value: boolean) => {
   try {
-    if (!value) {
-      await disable()
-      message.success('已关闭开机自启')
-    } else {
+    if (value) {
       await enable()
-      message.success('已开启开机自启')
+      message.success('已设置开机启动')
+    } else {
+      await disable()
+      message.success('已关闭开机启动')
     }
   } catch (error) {
-    message.error('设置失败')
-    // 回滚状态
-    appStore.autoStart = !value
+    message.error(`设置失败: ${error}`)
+    // 恢复原来的设置
+    appStore.autoStartApp = !value
   }
 }
 

@@ -3,6 +3,9 @@ import { ref, onUnmounted } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { createWebSocket } from '@/utils'
 
+// 定义消息类型
+export type MessageType = 'success' | 'info' | 'error' | 'warning'
+
 // 定义版本信息接口
 interface VersionInfo {
   version: string
@@ -280,17 +283,13 @@ export const useInfoStore = defineStore(
     }
 
     // 消息通知功能
-    let messageCallback:
-      | ((type: 'success' | 'info' | 'error' | 'warning', content: string) => void)
-      | null = null
+    let messageCallback: ((type: MessageType, content: string) => void) | null = null
 
-    const setMessageCallback = (
-      callback: (type: 'success' | 'info' | 'error' | 'warning', content: string) => void,
-    ) => {
+    const setMessageCallback = (callback: (type: MessageType, content: string) => void) => {
       messageCallback = callback
     }
 
-    const showMessage = (type: 'success' | 'info' | 'error' | 'warning', content: string) => {
+    const showMessage = (type: MessageType, content: string) => {
       if (messageCallback) {
         messageCallback(type, content)
       } else {
