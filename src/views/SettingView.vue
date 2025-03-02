@@ -362,7 +362,7 @@ const handleCheckUpdate = async () => {
 
 const hasNewVersion = computed(() => {
   if (!infoStore.newVersion || !infoStore.version.version) return false
-  return infoStore.newVersion.includes(infoStore.version.version)
+  return infoStore.newVersion != infoStore.version.version
 })
 
 const downloadTheKernel = async () => {

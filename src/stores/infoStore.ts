@@ -62,7 +62,7 @@ export const useInfoStore = defineStore(
       try {
         const res = await fetch('https://api.github.com/repos/SagerNet/sing-box/releases/latest')
         const json = await res.json()
-        newVersion.value = json.tag_name
+        newVersion.value = json.tag_name.replace('v', '')
       } catch (error) {
         console.error('获取最新版本失败:', error)
       }

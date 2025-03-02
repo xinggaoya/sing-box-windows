@@ -34,6 +34,24 @@ const router = useRouter()
 const route = useRoute()
 const lastPath = ref('/')
 
+// 记录最后一次正常路由路径
+const isBlankRoute = () => route.path === '/blank'
+
+// 保存当前路由并切换到空白页
+const saveRouteAndGoBlank = () => {
+  if (!isBlankRoute()) {
+    lastPath.value = route.path
+    router.push('/blank')
+  }
+}
+
+// 从空白页恢复到之前的路由
+const restoreFromBlank = () => {
+  if (isBlankRoute() && lastPath.value) {
+    router.push(lastPath.value)
+  }
+}
+
 onMounted(async () => {
   // 初始化托盘图标
   await initTray()
@@ -47,6 +65,10 @@ onMounted(async () => {
   if (appStore.autoStartKernel) {
     try {
       await startKernel()
+      // 判断当前是否关闭窗口
+      if (!await appWindow.isVisible()){
+        saveRouteAndGoBlank()
+      }
     } catch (error) {
       console.error('自动启动内核失败:', error)
     }
@@ -180,23 +202,7 @@ const initTray = async () => {
 
 // 设置窗口事件监听
 const setupWindowEventHandlers = () => {
-  // 记录最后一次正常路由路径
-  const isBlankRoute = () => route.path === '/blank'
 
-  // 保存当前路由并切换到空白页
-  const saveRouteAndGoBlank = () => {
-    if (!isBlankRoute()) {
-      lastPath.value = route.path
-      router.push('/blank')
-    }
-  }
-
-  // 从空白页恢复到之前的路由
-  const restoreFromBlank = () => {
-    if (isBlankRoute() && lastPath.value) {
-      router.push(lastPath.value)
-    }
-  }
   // 窗口隐藏时切换到空白页
   mitt.on('window-hide', () => {
     saveRouteAndGoBlank()
@@ -210,6 +216,13 @@ const setupWindowEventHandlers = () => {
   // 窗口恢复时恢复路由
   mitt.on('window-restore', () => {
     restoreFromBlank()
+  })
+
+  // 线程检查
+  appWindow.isVisible().then((visible) => {
+    if (visible) {
+      restoreFromBlank()
+    }
   })
 }
 </script>

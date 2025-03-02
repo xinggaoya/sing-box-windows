@@ -1,6 +1,6 @@
 use crate::app::kernel_service::{
-    download_latest_kernel, get_memory_usage, restart_kernel, start_kernel,
-    stop_kernel, get_process_status, check_kernel_version,
+    check_kernel_version, download_latest_kernel, get_memory_usage, get_process_status,
+    restart_kernel, start_kernel, stop_kernel,
 };
 use crate::app::proxy_service::{set_system_proxy, set_tun_proxy, toggle_ip_version};
 use crate::app::subscription_service::download_subscription;
@@ -10,10 +10,10 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 
 pub mod app;
+pub mod config;
 pub mod entity;
 pub mod process;
 pub mod utils;
-pub mod config;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
