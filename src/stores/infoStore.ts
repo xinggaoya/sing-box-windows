@@ -279,6 +279,42 @@ export const useInfoStore = defineStore(
       logs.value = []
     }
 
+    // 消息通知功能
+    let messageCallback:
+      | ((type: 'success' | 'info' | 'error' | 'warning', content: string) => void)
+      | null = null
+
+    const setMessageCallback = (
+      callback: (type: 'success' | 'info' | 'error' | 'warning', content: string) => void,
+    ) => {
+      messageCallback = callback
+    }
+
+    const showMessage = (type: 'success' | 'info' | 'error' | 'warning', content: string) => {
+      if (messageCallback) {
+        messageCallback(type, content)
+      } else {
+        console.log(`[${type}] ${content}`)
+      }
+    }
+
+    // IP版本切换
+    const toggleIpVersion = async () => {
+      // 实现IP版本切换逻辑
+    }
+
+    // 重置统计信息
+    const resetStats = () => {
+      traffic.value = {
+        up: 0,
+        down: 0,
+        total: 0,
+        totalUp: 0,
+        totalDown: 0,
+      }
+      uptime.value = 0
+    }
+
     // 组件卸载时清理
     onUnmounted(() => {
       cleanupWebSockets()
@@ -299,6 +335,12 @@ export const useInfoStore = defineStore(
       checkKernelVersion,
       clearLogs,
       cleanupWebSockets,
+      // 消息通知
+      setMessageCallback,
+      showMessage,
+      // 内核操作
+      toggleIpVersion,
+      resetStats,
     }
   },
   {

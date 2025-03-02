@@ -30,22 +30,40 @@
               </n-icon>
             </template>
           </n-button>
-          <n-button quaternary circle size="medium" @click="handleFullScreen" class="header-button">
+          <n-button
+            quaternary
+            circle
+            size="medium"
+            @click="onToggleFullScreen"
+            class="header-button"
+          >
             <template #icon>
               <n-icon>
-                <expand-outline v-if="!isFullscreen" />
+                <expand-outline v-if="!appStore.windowState.isFullscreen" />
                 <contract-outline v-else />
               </n-icon>
             </template>
           </n-button>
-          <n-button quaternary circle size="medium" @click="handleMinimize" class="header-button">
+          <n-button
+            quaternary
+            circle
+            size="medium"
+            @click="appStore.minimizeWindow"
+            class="header-button"
+          >
             <template #icon>
               <n-icon>
                 <remove-outline />
               </n-icon>
             </template>
           </n-button>
-          <n-button quaternary circle size="medium" @click="handleClose" class="header-button">
+          <n-button
+            quaternary
+            circle
+            size="medium"
+            @click="appStore.hideWindow"
+            class="header-button"
+          >
             <template #icon>
               <n-icon>
                 <close-outline />
@@ -191,20 +209,8 @@ const toggleTheme = () => {
   theme.value = isDark.value ? darkTheme : null
 }
 
-const handleFullScreen = async () => {
-  isFullscreen.value = await appWindow.isFullscreen()
-  await appWindow.setFullscreen(!isFullscreen.value)
-  isFullscreen.value = !isFullscreen.value
-}
-
-const handleMinimize = async () => {
-  mitt.emit('window-minimize')
-  await appWindow.minimize()
-}
-
-const handleClose = async () => {
-  mitt.emit('window-hide')
-  await appWindow.hide()
+const onToggleFullScreen = async () => {
+  await appStore.toggleFullScreen()
 }
 
 const menuOptions = computed(() => [

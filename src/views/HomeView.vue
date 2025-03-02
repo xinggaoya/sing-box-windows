@@ -12,17 +12,17 @@
             </div>
             <n-tag
               :bordered="false"
-              :type="appState.mode === 'system' ? 'info' : 'warning'"
+              :type="appState.proxyMode === 'system' ? 'info' : 'warning'"
               size="medium"
               class="mode-tag"
             >
               <template #icon>
                 <n-icon size="16">
-                  <globe-outline v-if="appState.mode === 'system'" />
+                  <globe-outline v-if="appState.proxyMode === 'system'" />
                   <flash-outline v-else />
                 </n-icon>
               </template>
-              {{ appState.mode === 'system' ? '系统代理' : 'TUN 模式' }}
+              {{ appState.proxyMode === 'system' ? '系统代理' : 'TUN 模式' }}
             </n-tag>
           </n-space>
           <n-space :size="16">
@@ -31,7 +31,7 @@
               type="info"
               size="medium"
               :disabled="!appState.isRunning"
-              @click="onModeChange(appState.mode === 'system' ? 'tun' : 'system')"
+              @click="onModeChange(appState.proxyMode === 'system' ? 'tun' : 'system')"
               class="control-button"
             >
               <template #icon>

@@ -17,42 +17,32 @@ import { TrayIcon } from '@tauri-apps/api/tray'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
-import { onMounted, onUnmounted, ref } from 'vue'
-import { Window } from '@tauri-apps/api/window'
+import { onMounted, onUnmounted, inject } from 'vue'
 import { useAppStore } from '@/stores/AppStore'
 import { useInfoStore } from '@/stores/infoStore'
-import { tauriApi } from '@/services/tauri-api'
+import { useRouter } from 'vue-router'
+import { NotificationService } from '@/services/notification-service'
+import { Window } from '@tauri-apps/api/window'
 import { ProxyService } from '@/services/proxy-service'
-import { useRouter, useRoute } from 'vue-router'
 import mitt from '@/utils/mitt'
 
-const appWindow = Window.getCurrent()
+// 初始化 store
 const appStore = useAppStore()
 const infoStore = useInfoStore()
-const proxyService = ProxyService.getInstance()
 const router = useRouter()
-const route = useRoute()
-const lastPath = ref('/')
+const notificationService = NotificationService.getInstance()
+const proxyService = ProxyService.getInstance()
 
-// 记录最后一次正常路由路径
-const isBlankRoute = () => route.path === '/blank'
-
-// 保存当前路由并切换到空白页
-const saveRouteAndGoBlank = () => {
-  if (!isBlankRoute()) {
-    lastPath.value = route.path
-    router.push('/blank')
-  }
-}
-
-// 从空白页恢复到之前的路由
-const restoreFromBlank = () => {
-  if (isBlankRoute() && lastPath.value) {
-    router.push(lastPath.value)
-  }
+// 初始化通知服务
+const initNotificationService = () => {
+  // 这里的具体实现会在组件中通过provide/inject进行处理
+  // 这样可以在其他组件中获取Naive UI的消息提示函数
 }
 
 onMounted(async () => {
+  // 设置窗口事件处理器
+  appStore.setupWindowEventHandlers(router)
+
   // 初始化托盘图标
   await initTray()
 
@@ -64,10 +54,13 @@ onMounted(async () => {
   // 如果开启了自动启动内核
   if (appStore.autoStartKernel) {
     try {
-      await startKernel()
-      // 判断当前是否关闭窗口
-      if (!await appWindow.isVisible()){
-        saveRouteAndGoBlank()
+      await infoStore.startKernel()
+      appStore.isRunning = true
+
+      // 判断当前是否需要隐藏窗口
+      const appWindow = Window.getCurrent()
+      if (!(await appWindow.isVisible())) {
+        appStore.saveRouteAndGoBlank(router)
       }
     } catch (error) {
       console.error('自动启动内核失败:', error)
@@ -77,12 +70,11 @@ onMounted(async () => {
   if (appStore.isRunning) {
     infoStore.initWebSocket()
   }
-
-  setupWindowEventHandlers()
 })
 
 onUnmounted(() => {
   // 清理事件监听
+  appStore.cleanupWindowEvents()
   mitt.off('window-minimize')
   mitt.off('window-hide')
   mitt.off('window-show')
@@ -90,26 +82,7 @@ onUnmounted(() => {
   // Tauri的事件监听器会自动清理
 })
 
-// 启动内核的统一处理函数
-const startKernel = async () => {
-  try {
-    // 检查是否有管理员权限
-    const isAdmin = await tauriApi.proxy.checkAdmin()
-
-    if (!isAdmin) {
-      // 如果不是管理员权限，切换到系统代理模式
-      await appStore.switchProxyMode('system')
-    }
-
-    // 启动内核
-    await infoStore.startKernel()
-    appStore.isRunning = true
-  } catch (error) {
-    console.error('启动内核失败:', error)
-    throw error
-  }
-}
-
+// 初始化托盘菜单
 const initTray = async () => {
   const menu = await Menu.new({
     items: [
@@ -117,17 +90,19 @@ const initTray = async () => {
         id: 'show',
         text: '显示界面',
         action: async () => {
-          // 先显示窗口
-          await appWindow.show()
-          // 触发window-show事件，确保从空白页恢复
-          mitt.emit('window-show')
+          await appStore.showWindow()
         },
       },
       {
         id: 'start',
         text: '启动内核',
         action: async () => {
-          await startKernel()
+          try {
+            await infoStore.startKernel()
+            appStore.isRunning = true
+          } catch (error) {
+            console.error('启动内核失败:', error)
+          }
         },
       },
       {
@@ -149,21 +124,18 @@ const initTray = async () => {
         id: 'system_proxy',
         text: '系统代理模式',
         action: async () => {
-          const showMessage = (type: 'success' | 'info' | 'error', content: string) => {
-            console.log(`${type}: ${content}`)
-          }
-          await proxyService.switchMode('system', showMessage)
+          await proxyService.switchMode('system')
+          appStore.proxyMode = 'system'
         },
       },
       {
         id: 'tun_mode',
         text: 'TUN 模式',
         action: async () => {
-          const showMessage = (type: 'success' | 'info' | 'error', content: string) => {
-            console.log(`${type}: ${content}`)
-          }
-          const needClose = await proxyService.switchMode('tun', showMessage)
+          const needClose = await proxyService.switchMode('tun')
+          appStore.proxyMode = 'tun'
           if (needClose) {
+            const appWindow = Window.getCurrent()
             await appWindow.close()
           }
         },
@@ -173,6 +145,7 @@ const initTray = async () => {
         text: '退出',
         action: async () => {
           await infoStore.stopKernel()
+          const appWindow = Window.getCurrent()
           await appWindow.close()
         },
       },
@@ -185,9 +158,7 @@ const initTray = async () => {
     action: (event: { type: string }) => {
       switch (event.type) {
         case 'DoubleClick':
-          appWindow.show()
-          // 触发window-show事件，确保从空白页恢复
-          mitt.emit('window-show')
+          appStore.showWindow()
           break
       }
     },
@@ -195,35 +166,8 @@ const initTray = async () => {
     menuOnLeftClick: true,
   }
 
-  // 使用 @ts-expect-error 替代 @ts-ignore
   // @ts-expect-error TrayIcon API 可能不完全匹配，但实现是正确的
   await TrayIcon.new(options)
-}
-
-// 设置窗口事件监听
-const setupWindowEventHandlers = () => {
-
-  // 窗口隐藏时切换到空白页
-  mitt.on('window-hide', () => {
-    saveRouteAndGoBlank()
-  })
-
-  // 窗口显示时恢复路由
-  mitt.on('window-show', () => {
-    restoreFromBlank()
-  })
-
-  // 窗口恢复时恢复路由
-  mitt.on('window-restore', () => {
-    restoreFromBlank()
-  })
-
-  // 线程检查
-  appWindow.isVisible().then((visible) => {
-    if (visible) {
-      restoreFromBlank()
-    }
-  })
 }
 </script>
 
