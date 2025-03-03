@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use tracing::info;
+use base64;
 
 // 下载订阅
 #[tauri::command]
@@ -20,11 +21,45 @@ pub async fn download_subscription(url: String) -> Result<(), String> {
 async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
     let mut headers = reqwest::header::HeaderMap::new();
-    let user_agent = reqwest::header::HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
+    let user_agent = reqwest::header::HeaderValue::from_static("sing-box-windows/1.0 (sing-box; compatible; Windows NT 10.0)");
     headers.insert(reqwest::header::USER_AGENT, user_agent);
 
     let response = client.get(url).headers(headers).send().await?;
-    let text = response.text().await?;
+    let response_text = response.text().await?;
+
+    // 检查内容是否为base64编码，并在需要时进行解码
+    let text = if is_base64_encoded(&response_text) {
+        info!("检测到base64编码内容，正在解码...");
+        let decoded = match base64::decode(&response_text.trim()) {
+            Ok(data) => data,
+            Err(_) => {
+                // 如果标准解码失败，尝试URL安全的base64变体
+                base64::decode_config(&response_text.trim(), base64::URL_SAFE)
+                    .map_err(|e| format!("Base64解码失败: {}", e))?
+            }
+        };
+        
+        // 尝试将解码后的内容解析为有效的UTF-8字符串
+        match String::from_utf8(decoded.clone()) {
+            Ok(s) => {
+                // 检查解码后的内容是否是有效的JSON或配置格式
+                if s.trim_start().starts_with('{') || s.contains("proxies:") {
+                    s // 返回解码后的文本
+                } else {
+                    // 解码后的内容不像是有效的配置，可能是误判，使用原始文本
+                    info!("解码后的内容不是有效的配置格式，使用原始内容");
+                    response_text
+                }
+            },
+            Err(_) => {
+                // 如果不是有效的UTF-8，返回原始文本
+                info!("解码后的内容不是有效的UTF-8，使用原始内容");
+                response_text
+            }
+        }
+    } else {
+        response_text
+    };
 
     let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/config.json");
@@ -48,4 +83,43 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
 
     info!("订阅已更新");
     Ok(())
+}
+
+// 改进base64检测逻辑
+fn is_base64_encoded(text: &str) -> bool {
+    // 先进行基本字符集检查
+    let is_valid_charset = text.trim().chars().all(|c| 
+        c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=' || 
+        c == '-' || c == '_' // 支持URL安全变体
+    );
+    
+    if !is_valid_charset {
+        return false;
+    }
+    
+    let trimmed = text.trim();
+    
+    // 检查长度（标准base64长度应为4的倍数，可能有结尾的'='填充）
+    if trimmed.len() % 4 != 0 && !trimmed.ends_with('=') {
+        return false;
+    }
+    
+    // 避免误判普通文本
+    if trimmed.len() < 8 || trimmed.contains(" ") {
+        return false;
+    }
+    
+    // 尝试解码看是否成功（更准确但性能较低的方法）
+    let standard_decode_ok = base64::decode(trimmed).is_ok();
+    let url_safe_decode_ok = base64::decode_config(trimmed, base64::URL_SAFE).is_ok();
+    
+    // 如果能成功解码，再检查解码后内容是否合理（避免误判）
+    if standard_decode_ok || url_safe_decode_ok {
+        // 检查是否为常见订阅格式特征
+        if trimmed.starts_with("ey") || trimmed.starts_with("dm") {
+            return true; // 常见的JSON或YAML base64编码的开头特征
+        }
+    }
+    
+    false
 } 
