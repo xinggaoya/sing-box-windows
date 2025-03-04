@@ -18,6 +18,33 @@ pub async fn download_subscription(url: String) -> Result<(), String> {
     Ok(())
 }
 
+// 手动添加订阅内容
+#[tauri::command]
+pub async fn add_manual_subscription(content: String) -> Result<(), String> {
+    process_subscription_content(content)
+        .map_err(|e| format!("处理订阅内容失败: {}", e))?;
+    let _ = crate::app::proxy_service::set_system_proxy();
+    Ok(())
+}
+
+// 获取当前配置文件内容
+#[tauri::command]
+pub fn get_current_config() -> Result<String, String> {
+    let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/config.json");
+    
+    // 检查文件是否存在
+    if !path.exists() {
+        return Err("配置文件不存在".to_string());
+    }
+    
+    // 读取文件内容
+    match std::fs::read_to_string(path) {
+        Ok(content) => Ok(content),
+        Err(e) => Err(format!("读取配置文件失败: {}", e)),
+    }
+}
+
 async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
     let mut headers = reqwest::header::HeaderMap::new();
@@ -65,6 +92,32 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     let path = Path::new(&work_dir).join("sing-box/config.json");
     let mut file = File::create(path.to_str().unwrap())?;
     file.write_all(text.as_bytes())?;
+
+    let mut json_util = ConfigUtil::new(path.to_str().unwrap())?;
+    let target_keys = vec!["experimental"];
+    let config = Config {
+        clash_api: ClashApiConfig {
+            external_controller: "127.0.0.1:9090".to_string(),
+            external_ui: "metacubexd".to_string(),
+            external_ui_download_url: "".to_string(),
+            external_ui_download_detour: "手动切换".to_string(),
+            default_mode: "rule".to_string(),
+        },
+        cache_file: CacheFileConfig { enabled: true },
+    };
+    json_util.modify_property(&target_keys, serde_json::to_value(config)?);
+    json_util.save()?;
+
+    info!("订阅已更新");
+    Ok(())
+}
+
+// 处理订阅内容（无论是从URL获取还是手动添加）
+fn process_subscription_content(content: String) -> Result<(), Box<dyn Error>> {
+    let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/config.json");
+    let mut file = File::create(path.to_str().unwrap())?;
+    file.write_all(content.as_bytes())?;
 
     let mut json_util = ConfigUtil::new(path.to_str().unwrap())?;
     let target_keys = vec!["experimental"];

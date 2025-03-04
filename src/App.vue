@@ -17,9 +17,10 @@ import { TrayIcon } from '@tauri-apps/api/tray'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
-import { onMounted, onUnmounted, inject } from 'vue'
+import { onMounted, onUnmounted, inject, watch } from 'vue'
 import { useAppStore } from '@/stores/AppStore'
 import { useInfoStore } from '@/stores/infoStore'
+import { useSubStore } from '@/stores/SubStore'
 import { useRouter } from 'vue-router'
 import { NotificationService } from '@/services/notification-service'
 import { Window } from '@tauri-apps/api/window'
@@ -29,9 +30,13 @@ import mitt from '@/utils/mitt'
 // 初始化 store
 const appStore = useAppStore()
 const infoStore = useInfoStore()
+const subStore = useSubStore()
 const router = useRouter()
 const notificationService = NotificationService.getInstance()
 const proxyService = ProxyService.getInstance()
+
+// 托盘实例引用
+let trayInstance: TrayIcon | null = null
 
 // 初始化通知服务
 const initNotificationService = () => {
@@ -81,6 +86,30 @@ onUnmounted(() => {
   mitt.off('window-restore')
   // Tauri的事件监听器会自动清理
 })
+
+// 更新托盘提示信息
+const updateTrayTooltip = () => {
+  if (trayInstance) {
+    const status = appStore.isRunning ? '运行中' : '已停止'
+    const mode = appStore.proxyMode === 'system' ? '系统代理' : 'TUN模式'
+
+    // 获取当前使用的配置名称
+    let configName = ''
+    if (subStore.activeIndex !== null && subStore.list.length > 0) {
+      configName = subStore.list[subStore.activeIndex].name
+    }
+
+    // 构建提示文本
+    let tooltipText = `sing-box-window - 内核${status}, ${mode}`
+
+    // 如果有配置名称，则显示
+    if (configName) {
+      tooltipText += `, 配置: ${configName}`
+    }
+
+    trayInstance.setTooltip(tooltipText)
+  }
+}
 
 // 初始化托盘菜单
 const initTray = async () => {
@@ -153,7 +182,6 @@ const initTray = async () => {
   })
 
   const options = {
-    tooltip: 'sing-box-window',
     icon: await defaultWindowIcon(),
     action: (event: { type: string }) => {
       switch (event.type) {
@@ -167,7 +195,19 @@ const initTray = async () => {
   }
 
   // @ts-expect-error TrayIcon API 可能不完全匹配，但实现是正确的
-  await TrayIcon.new(options)
+  trayInstance = await TrayIcon.new(options)
+
+  // 初始化提示文本
+  updateTrayTooltip()
+
+  // 监听状态变化以更新提示
+  watch(() => appStore.isRunning, updateTrayTooltip)
+  watch(() => appStore.proxyMode, updateTrayTooltip)
+  watch(() => [subStore.activeIndex, subStore.list.length], updateTrayTooltip)
+
+  // 添加事件处理
+  mitt.on('process-status', () => updateTrayTooltip())
+  mitt.on('proxy-mode-changed', () => updateTrayTooltip())
 }
 </script>
 

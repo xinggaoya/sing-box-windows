@@ -6,6 +6,8 @@ export interface Subscription {
   url: string
   isLoading: boolean
   lastUpdate?: number
+  isManual: boolean
+  manualContent?: string
 }
 
 export const useSubStore = defineStore(
@@ -14,12 +16,14 @@ export const useSubStore = defineStore(
     const list = ref<Subscription[]>([])
     const activeIndex = ref<number | null>(null)
 
-    const add = (name: string, url: string) => {
+    const add = (name: string, url: string, isManual: boolean = false, manualContent?: string) => {
       list.value.push({
         name,
         url,
         isLoading: false,
         lastUpdate: undefined,
+        isManual,
+        manualContent,
       })
     }
 

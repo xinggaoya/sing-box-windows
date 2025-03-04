@@ -3,7 +3,7 @@ use crate::app::kernel_service::{
     restart_kernel, start_kernel, stop_kernel,
 };
 use crate::app::proxy_service::{set_system_proxy, set_tun_proxy, toggle_ip_version};
-use crate::app::subscription_service::download_subscription;
+use crate::app::subscription_service::{download_subscription, add_manual_subscription, get_current_config};
 use crate::app::system_service::{check_admin, get_traffic_data, restart_as_admin};
 use crate::app::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
@@ -49,6 +49,8 @@ pub fn run() {
             start_kernel,
             download_latest_kernel,
             download_subscription,
+            add_manual_subscription,
+            get_current_config,
             stop_kernel,
             set_system_proxy,
             set_tun_proxy,
