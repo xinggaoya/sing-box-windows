@@ -7,8 +7,7 @@ import { useOsTheme } from 'naive-ui'
 import { Window } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
-import { useRouter } from 'vue-router'
-import { Router } from 'vue-router'
+import { useRouter, Router } from 'vue-router'
 
 // 定义更新信息类型
 interface UpdateInfo {
@@ -51,135 +50,172 @@ export const useAppStore = defineStore(
     const latestVersion = ref('')
     const downloadUrl = ref('')
 
-    // 主题相关状态
-    const osThemeRef = useOsTheme()
-    const isDark = ref(osThemeRef.value === 'dark')
-    const theme = computed(() => (isDark.value ? darkTheme : null))
-
-    // 窗口状态管理
+    // 窗口状态
     const windowState = ref<WindowState>({
       isVisible: true,
       isFullscreen: false,
       lastVisiblePath: '/',
     })
 
-    // 切换主题
+    // 主题相关状态
+    const osTheme = useOsTheme()
+    const isDark = ref(osTheme.value === 'dark')
+    const theme = computed(() => (isDark.value ? darkTheme : null))
+
+    // 主题切换
     const toggleTheme = () => {
       isDark.value = !isDark.value
     }
 
-    // 获取应用版本号
+    // 获取应用版本
     const fetchAppVersion = async () => {
       try {
         appVersion.value = await getVersion()
       } catch (error) {
-        console.error('获取版本号失败:', error)
+        console.error('获取应用版本失败:', error)
       }
     }
 
     // 检查更新
     const checkUpdate = async (silent: boolean = false): Promise<UpdateInfo | null> => {
       try {
-        await fetchAppVersion() // 确保有最新版本号
-        const result = await tauriApi.update.checkUpdate(appVersion.value)
-        if (result.has_update) {
+        const updateInfo = await tauriApi.update.checkUpdate(appVersion.value)
+
+        if (updateInfo && updateInfo.has_update) {
           hasUpdate.value = true
-          latestVersion.value = result.latest_version
-          downloadUrl.value = result.download_url
-          return result
-        }
-        if (!silent) {
-          return {
-            has_update: false,
-            latest_version: appVersion.value,
-            download_url: '',
+          latestVersion.value = updateInfo.latest_version
+          downloadUrl.value = updateInfo.download_url
+
+          // 只有在非静默模式下才通知
+          if (!silent) {
+            mitt.emit('update-available', updateInfo)
           }
+
+          return updateInfo
         }
+
+        return null
       } catch (error) {
         console.error('检查更新失败:', error)
-        if (!silent) {
-          throw error
-        }
+        return null
       }
-      return null
     }
 
     // 下载并安装更新
     const downloadAndInstallUpdate = async () => {
-      try {
-        await tauriApi.update.downloadAndInstallUpdate(downloadUrl.value)
-      } catch (error) {
-        console.error('更新失败:', error)
-        throw error
-      }
-    }
+      if (!hasUpdate.value || !downloadUrl.value) return false
 
-    // 切换代理模式
-    const switchProxyMode = async (targetMode: 'system' | 'tun') => {
       try {
-        if (targetMode === 'system') {
-          await tauriApi.proxy.setSystemProxy()
-          proxyMode.value = 'system'
-        } else {
-          const isAdmin = await tauriApi.proxy.checkAdmin()
-          if (!isAdmin) {
-            await tauriApi.proxy.restartAsAdmin()
-            return false
-          }
-          await tauriApi.proxy.setTunProxy()
-          proxyMode.value = 'tun'
-        }
-        return true
+        // 通知下载开始
+        mitt.emit('download-progress', {
+          status: 'checking',
+          progress: 0,
+          message: '准备下载更新...',
+        })
+
+        // 开始下载和安装
+        const result = await tauriApi.update.downloadAndInstallUpdate(downloadUrl.value)
+        return result
       } catch (error) {
-        console.error('切换代理模式失败:', error)
+        console.error('下载更新失败:', error)
         return false
       }
     }
 
-    // 私有方法：获取当前窗口引用
+    // 应用运行状态变更
+    const setRunningState = (state: boolean) => {
+      if (isRunning.value !== state) {
+        isRunning.value = state
+        // 发送进程状态变更事件
+        mitt.emit('process-status')
+      }
+    }
+
+    // 代理模式切换
+    const switchProxyMode = async (targetMode: 'system' | 'tun') => {
+      // 如果当前模式与目标模式相同，则不需要切换
+      if (proxyMode.value === targetMode) return
+
+      // 根据模式调用对应服务
+      try {
+        if (targetMode === 'system') {
+          await tauriApi.proxy.setSystemProxy()
+        } else {
+          // TUN模式可能需要管理员权限，检查并处理
+          const isAdmin = await tauriApi.proxy.checkAdmin()
+          if (!isAdmin) {
+            // 需要管理员权限，实现重启
+            await tauriApi.proxy.restartAsAdmin()
+            return
+          }
+          await tauriApi.proxy.setTunProxy()
+        }
+
+        // 切换成功后更新状态
+        proxyMode.value = targetMode
+
+        // 发出代理模式变更事件，通知其他组件
+        mitt.emit('proxy-mode-changed')
+      } catch (error) {
+        console.error('切换代理模式失败:', error)
+        throw error
+      }
+    }
+
+    // 获取应用窗口
     const getAppWindow = () => Window.getCurrent()
 
-    // === 窗口操作方法 ===
     // 最小化窗口
     const minimizeWindow = async () => {
       const appWindow = getAppWindow()
-      mitt.emit('window-minimize')
       await appWindow.minimize()
+      // 触发最小化事件
+      mitt.emit('window-minimize')
     }
 
     // 隐藏窗口
     const hideWindow = async () => {
       const appWindow = getAppWindow()
-      mitt.emit('window-hide')
       await appWindow.hide()
+      windowState.value.isVisible = false
+      // 触发隐藏事件
+      mitt.emit('window-hide')
     }
 
     // 显示窗口
     const showWindow = async () => {
       const appWindow = getAppWindow()
       await appWindow.show()
+      await appWindow.setFocus()
+      windowState.value.isVisible = true
+      // 触发显示事件
       mitt.emit('window-show')
     }
 
-    // 置顶窗口
+    // 设置窗口置顶
     const setWindowAlwaysOnTop = async () => {
       const appWindow = getAppWindow()
       await appWindow.setAlwaysOnTop(true)
     }
 
-    // 获取是否显示窗口
+    // 获取窗口可见状态
     const getWindowVisible = async () => {
       const appWindow = getAppWindow()
       return await appWindow.isVisible()
     }
 
-    // 切换全屏
+    // 切换全屏模式
     const toggleFullScreen = async () => {
       const appWindow = getAppWindow()
       const isFullscreen = await appWindow.isFullscreen()
-      await appWindow.setFullscreen(!isFullscreen)
+
+      if (isFullscreen) {
+        await appWindow.setFullscreen(false)
+      } else {
+        await appWindow.setFullscreen(true)
+      }
+
       windowState.value.isFullscreen = !isFullscreen
-      return !isFullscreen
     }
 
     // 保存路由状态并切换到空白页
@@ -260,12 +296,15 @@ export const useAppStore = defineStore(
       hideWindow,
       showWindow,
       toggleFullScreen,
+      getWindowVisible,
+      setWindowAlwaysOnTop,
+      // 窗口事件处理
       saveRouteAndGoBlank,
       restoreFromBlank,
       setupWindowEventHandlers,
       cleanupWindowEvents,
-      setWindowAlwaysOnTop,
-      getWindowVisible,
+      // 运行状态更新
+      setRunningState,
     }
   },
   {

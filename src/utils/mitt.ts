@@ -8,15 +8,24 @@ interface DownloadProgress {
   message: string
 }
 
+// 定义更新信息接口
+interface UpdateInfo {
+  latest_version: string
+  download_url: string
+  has_update: boolean
+}
+
 // 定义事件类型
 type Events = {
-  'process-status': string
+  'process-status': void
   'download-progress': DownloadProgress
-  'proxy-mode-changed': string
+  'proxy-mode-changed': void
   'window-minimize': void
   'window-hide': void
   'window-show': void
   'window-restore': void
+  'refresh-tray-menu': void
+  'update-available': UpdateInfo
   error: string
 }
 

@@ -4,15 +4,16 @@ import { ref, watch } from 'vue'
 import { TrayIcon, TrayIconEvent } from '@tauri-apps/api/tray'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
-import { MenuItem } from '@tauri-apps/api/menu/menuItem'
-import { Submenu } from '@tauri-apps/api/menu/submenu'
-import { CheckMenuItem } from '@tauri-apps/api/menu/checkMenuItem'
+import { MenuItem, type MenuItemOptions } from '@tauri-apps/api/menu/menuItem'
+import { Submenu, type SubmenuOptions } from '@tauri-apps/api/menu/submenu'
+import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from './AppStore'
 import { useInfoStore } from './infoStore'
 import { useSubStore } from './SubStore'
 import { ProxyService } from '@/services/proxy-service'
 import mitt from '@/utils/mitt'
 import { Window } from '@tauri-apps/api/window'
+import { useRouter } from 'vue-router'
 
 // 声明mitt事件类型
 declare module '@/utils/mitt' {
@@ -52,17 +53,20 @@ export const useTrayStore = defineStore(
     const appStore = useAppStore()
     const infoStore = useInfoStore()
     const subStore = useSubStore()
+    const router = useRouter()
     const proxyService = ProxyService.getInstance()
 
-    // 托盘实例引用
-    const trayInstance = ref<TrayIcon | null>(null)
+    // 添加一个内部状态，记录上次菜单刷新时的代理模式
+    const lastProxyMode = ref<'system' | 'tun'>(appStore.proxyMode)
+
+    // 只存储托盘ID，不存储实例
     const trayInstanceId = ref<string | null>(null)
 
     /**
      * 更新托盘提示信息
      */
-    const updateTrayTooltip = () => {
-      if (trayInstance.value) {
+    const updateTrayTooltip = async () => {
+      if (trayInstanceId.value) {
         const status = appStore.isRunning ? '运行中' : '已停止'
         const mode = appStore.proxyMode === 'system' ? '系统代理' : 'TUN模式'
 
@@ -79,8 +83,14 @@ export const useTrayStore = defineStore(
         if (configName) {
           tooltipText += `, 配置: ${configName}`
         }
-
-        trayInstance.value.setTooltip(tooltipText)
+        try {
+          const tray = await TrayIcon.getById(trayInstanceId.value)
+          if (tray) {
+            await tray.setTooltip(tooltipText)
+          }
+        } catch (e) {
+          console.error('备用方法更新托盘提示也失败:', e)
+        }
       }
     }
 
@@ -89,12 +99,21 @@ export const useTrayStore = defineStore(
      */
     const createTrayMenu = async () => {
       try {
+        // 同步当前代理模式，确保菜单使用最新的状态
+        const currentProxyMode = appStore.proxyMode
+
+        // 更新上次菜单刷新时的代理模式
+        lastProxyMode.value = currentProxyMode
+
+        console.log(`创建托盘菜单, 当前代理模式: ${currentProxyMode}`)
+
         // 创建基本菜单项
         const showMenuItem = await MenuItem.new({
           id: 'show',
           text: '显示界面',
           enabled: true,
           action: async () => {
+            await appStore.restoreFromBlank(router)
             await appStore.showWindow()
           },
         })
@@ -107,7 +126,8 @@ export const useTrayStore = defineStore(
           action: async () => {
             try {
               await infoStore.startKernel()
-              appStore.isRunning = true
+              appStore.setRunningState(true)
+              await refreshTrayMenu() // 刷新菜单以更新状态
             } catch (error) {
               console.error('启动内核失败:', error)
             }
@@ -120,7 +140,8 @@ export const useTrayStore = defineStore(
           enabled: appStore.isRunning,
           action: async () => {
             await infoStore.stopKernel()
-            appStore.isRunning = false
+            appStore.setRunningState(false)
+            await refreshTrayMenu() // 刷新菜单以更新状态
           },
         })
 
@@ -130,6 +151,7 @@ export const useTrayStore = defineStore(
           enabled: appStore.isRunning,
           action: async () => {
             await infoStore.restartKernel()
+            await refreshTrayMenu() // 刷新菜单以更新状态
           },
         })
 
@@ -140,47 +162,59 @@ export const useTrayStore = defineStore(
           items: [startMenuItem, stopMenuItem, restartMenuItem],
         })
 
-        // 创建代理模式子菜单项
-        const systemProxyMenuItem = await CheckMenuItem.new({
+        // 创建代理模式子菜单项 - 使用普通MenuItem而不是CheckMenuItem
+        const systemProxyMenuItem = await MenuItem.new({
           id: 'system_proxy',
           text: '系统代理模式',
-          checked: appStore.proxyMode === 'system',
+          // 当前为系统代理模式时禁用按钮
+          enabled: currentProxyMode !== 'system',
           action: async () => {
-            await proxyService.switchMode('system')
-            appStore.proxyMode = 'system'
+            try {
+              console.log('切换到系统代理模式')
+              await proxyService.switchMode('system')
+              appStore.proxyMode = 'system'
+              // 强制立即刷新菜单
+              await refreshTrayMenu()
+            } catch (error) {
+              console.error('切换到系统代理模式失败:', error)
+            }
           },
         })
 
-        const tunProxyMenuItem = await CheckMenuItem.new({
+        const tunProxyMenuItem = await MenuItem.new({
           id: 'tun_mode',
           text: 'TUN 模式',
-          checked: appStore.proxyMode === 'tun',
+          // 当前为TUN模式时禁用按钮
+          enabled: currentProxyMode !== 'tun',
           action: async () => {
-            const needClose = await proxyService.switchMode('tun')
-            appStore.proxyMode = 'tun'
-            if (needClose) {
-              const appWindow = Window.getCurrent()
-              await appWindow.close()
+            try {
+              console.log('切换到TUN模式')
+              const needClose = await proxyService.switchMode('tun')
+              appStore.proxyMode = 'tun'
+              // 强制立即刷新菜单
+              await refreshTrayMenu()
+              if (needClose) {
+                const appWindow = Window.getCurrent()
+                await appWindow.close()
+              }
+            } catch (error) {
+              console.error('切换到TUN模式失败:', error)
             }
           },
+        })
+
+        // 当前模式指示器菜单项（仅作为标签，不可点击）
+        const currentModeMenuItem = await MenuItem.new({
+          id: 'current_mode',
+          text: `当前模式: ${currentProxyMode === 'system' ? '系统代理' : 'TUN模式'}`,
+          enabled: false,
         })
 
         // 创建代理模式子菜单
         const proxyModeSubmenu = await Submenu.new({
           id: 'proxy_mode',
           text: '代理模式',
-          items: [systemProxyMenuItem, tunProxyMenuItem],
-        })
-
-        // 创建退出菜单项
-        const quitMenuItem = await MenuItem.new({
-          id: 'quit',
-          text: '退出',
-          action: async () => {
-            await infoStore.stopKernel()
-            const appWindow = Window.getCurrent()
-            await appWindow.close()
-          },
+          items: [currentModeMenuItem, systemProxyMenuItem, tunProxyMenuItem],
         })
 
         // 创建分隔符菜单项
@@ -194,6 +228,17 @@ export const useTrayStore = defineStore(
           id: 'separator2',
           text: '-',
           enabled: false,
+        })
+
+        // 创建退出菜单项
+        const quitMenuItem = await MenuItem.new({
+          id: 'quit',
+          text: '退出',
+          action: async () => {
+            await infoStore.stopKernel()
+            const appWindow = Window.getCurrent()
+            await appWindow.close()
+          },
         })
 
         // 创建主菜单
@@ -232,13 +277,22 @@ export const useTrayStore = defineStore(
         const menu = await createTrayMenu()
 
         // 设置托盘图标
+        const icon = await defaultWindowIcon()
+
+        // 确保图标不为null
+        if (!icon) {
+          throw new Error('无法获取默认窗口图标')
+        }
+
         const options = {
-          icon: await defaultWindowIcon(),
+          icon, // 直接使用非null的图标
+          tooltip: 'sing-box-window', // 初始化工具提示
           action: async (event: TrayIconEvent) => {
             switch (event.type) {
               case 'Click':
                 // 如果点击的是左键，则显示界面
                 if (event.button === 'Left') {
+                  await appStore.restoreFromBlank(router)
                   await appStore.showWindow()
                 }
                 break
@@ -248,26 +302,61 @@ export const useTrayStore = defineStore(
           menuOnLeftClick: false,
         }
 
-        // @ts-expect-error TrayIcon API 可能不完全匹配，但实现是正确的
-        trayInstance.value = await TrayIcon.new(options)
-
-        // 保存托盘实例 ID
-        trayInstanceId.value = trayInstance.value.id
-        appStore.trayInstanceId = trayInstanceId.value
+        try {
+          // 创建托盘实例，但不存储引用，只存储ID
+          const trayInstance = await TrayIcon.new(options)
+          trayInstanceId.value = trayInstance.id
+          appStore.trayInstanceId = trayInstance.id
+        } catch (error) {
+          console.error('创建托盘实例失败:', error)
+          throw error
+        }
 
         // 初始化提示文本
-        updateTrayTooltip()
+        await updateTrayTooltip()
 
-        // 监听状态变化以更新提示
-        watch(() => appStore.isRunning, updateTrayTooltip)
-        watch(() => appStore.proxyMode, updateTrayTooltip)
+        // 监听状态变化以更新提示和菜单
+        watch(
+          () => appStore.isRunning,
+          () => {
+            updateTrayTooltip()
+            refreshTrayMenu() // 当运行状态变化时刷新菜单
+          },
+        )
+
+        // 直接监听代理模式变化并强制刷新菜单
+        watch(
+          () => appStore.proxyMode,
+          (newMode) => {
+            console.log(`代理模式变更为: ${newMode}, 上次菜单模式: ${lastProxyMode.value}`)
+            updateTrayTooltip()
+            // 如果模式确实发生了变化，则强制刷新菜单
+            if (newMode !== lastProxyMode.value) {
+              console.log('模式已变化，强制刷新托盘菜单')
+              refreshTrayMenu()
+            }
+          },
+        )
+
         watch(() => [subStore.activeIndex, subStore.list.length], updateTrayTooltip)
 
         // 添加事件处理
-        mitt.on('process-status', () => updateTrayTooltip())
-        mitt.on('proxy-mode-changed', () => updateTrayTooltip())
-        // @ts-expect-error mitt事件类型定义问题
-        mitt.on('refresh-tray-menu', refreshTrayMenu)
+        mitt.on('process-status', () => {
+          updateTrayTooltip()
+          refreshTrayMenu() // 当进程状态变化时刷新菜单
+        })
+
+        mitt.on('proxy-mode-changed', () => {
+          console.log('收到代理模式变更事件，刷新托盘菜单')
+          updateTrayTooltip()
+          refreshTrayMenu() // 当代理模式变化时刷新菜单
+        })
+
+        // 监听菜单刷新事件
+        mitt.on('refresh-tray-menu', () => {
+          console.log('收到刷新托盘菜单事件')
+          refreshTrayMenu()
+        })
 
         return true
       } catch (error) {
@@ -280,14 +369,25 @@ export const useTrayStore = defineStore(
      * 刷新托盘菜单
      */
     const refreshTrayMenu = async () => {
-      if (!trayInstance.value) return
+      if (!trayInstanceId.value) return
 
+      // 接使用TrayIcon实例的方法
       try {
+        const tray = await TrayIcon.getById(trayInstanceId.value)
         const menu = await createTrayMenu()
-        await trayInstance.value.setMenu(menu)
-        updateTrayTooltip()
-      } catch (error) {
-        console.error('刷新托盘菜单失败:', error)
+        if (tray) {
+          await tray.setMenu(menu)
+          await updateTrayTooltip()
+          console.log('使用TrayIcon实例刷新菜单成功')
+        } else {
+          throw new Error('无法获取托盘实例')
+        }
+      } catch (trayError) {
+        console.error('使用托盘实例设置菜单也失败:', trayError)
+
+        // 如果还是失败，最后的办法是重新创建托盘
+        await destroyTray()
+        await initTray()
       }
     }
 
@@ -295,11 +395,12 @@ export const useTrayStore = defineStore(
      * 清理托盘资源
      */
     const destroyTray = async () => {
-      if (trayInstance.value) {
+      if (trayInstanceId.value) {
         try {
-          await TrayIcon.removeById(trayInstance.value.id)
-          trayInstance.value = null
+          // 使用静态方法关闭托盘
+          await TrayIcon.removeById(trayInstanceId.value)
           trayInstanceId.value = null
+          appStore.trayInstanceId = null
         } catch (error) {
           console.error('销毁托盘失败:', error)
         }
@@ -308,7 +409,6 @@ export const useTrayStore = defineStore(
       // 移除事件监听
       mitt.off('process-status')
       mitt.off('proxy-mode-changed')
-      // @ts-expect-error mitt事件类型定义问题
       mitt.off('refresh-tray-menu')
     }
 

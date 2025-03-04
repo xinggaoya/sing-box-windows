@@ -206,7 +206,7 @@ const runKernel = async () => {
   try {
     isStarting.value = true
     await infoStore.startKernel()
-    appState.isRunning = true
+    appState.setRunningState(true)
     message.success('内核已启动')
   } catch (error) {
     message.error(error as string)
@@ -219,7 +219,7 @@ const stopKernel = async () => {
   try {
     isStopping.value = true
     await infoStore.stopKernel()
-    appState.isRunning = false
+    appState.setRunningState(false)
     message.success('内核已停止')
   } catch (error) {
     message.error(error as string)
