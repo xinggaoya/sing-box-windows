@@ -8,6 +8,7 @@ import { Window } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
 import { useRouter } from 'vue-router'
+import { Router } from 'vue-router'
 
 // 定义更新信息类型
 interface UpdateInfo {
@@ -28,6 +29,9 @@ export const useAppStore = defineStore(
   () => {
     // 应用运行状态
     const isRunning = ref(false)
+
+    // 托盘实例ID - 由TrayStore使用
+    const trayInstanceId = ref<string | null>(null)
 
     // 代理模式
     const proxyMode = ref<'system' | 'tun'>('system')
@@ -157,6 +161,18 @@ export const useAppStore = defineStore(
       mitt.emit('window-show')
     }
 
+    // 置顶窗口
+    const setWindowAlwaysOnTop = async () => {
+      const appWindow = getAppWindow()
+      await appWindow.setAlwaysOnTop(true)
+    }
+
+    // 获取是否显示窗口
+    const getWindowVisible = async () => {
+      const appWindow = getAppWindow()
+      return await appWindow.isVisible()
+    }
+
     // 切换全屏
     const toggleFullScreen = async () => {
       const appWindow = getAppWindow()
@@ -167,7 +183,7 @@ export const useAppStore = defineStore(
     }
 
     // 保存路由状态并切换到空白页
-    const saveRouteAndGoBlank = (router: any) => {
+    const saveRouteAndGoBlank = (router: Router) => {
       windowState.value.lastVisiblePath = router.currentRoute.value.path
       if (windowState.value.lastVisiblePath !== '/blank') {
         router.push('/blank')
@@ -175,14 +191,14 @@ export const useAppStore = defineStore(
     }
 
     // 从空白页恢复到上次的路由
-    const restoreFromBlank = (router: any) => {
+    const restoreFromBlank = (router: Router) => {
       if (router.currentRoute.value.path === '/blank' && windowState.value.lastVisiblePath) {
         router.push(windowState.value.lastVisiblePath)
       }
     }
 
     // 设置窗口事件处理器
-    const setupWindowEventHandlers = (router: any) => {
+    const setupWindowEventHandlers = (router: Router) => {
       // 窗口隐藏时切换到空白页
       mitt.on('window-hide', () => {
         saveRouteAndGoBlank(router)
@@ -218,6 +234,7 @@ export const useAppStore = defineStore(
     }
 
     return {
+      trayInstanceId,
       isRunning,
       proxyMode,
       autoStartApp,
@@ -247,6 +264,8 @@ export const useAppStore = defineStore(
       restoreFromBlank,
       setupWindowEventHandlers,
       cleanupWindowEvents,
+      setWindowAlwaysOnTop,
+      getWindowVisible,
     }
   },
   {

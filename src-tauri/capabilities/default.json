@@ -15,6 +15,7 @@
     "core:window:allow-show",
     "core:app:allow-default-window-icon",
     "core:window:allow-maximize",
+    "core:window:allow-set-always-on-top",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled"
