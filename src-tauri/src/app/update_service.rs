@@ -51,10 +51,10 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
         })
         .ok_or("未找到可执行文件")?;
 
-    let download_url = exe_asset["browser_download_url"]
+        let download_url = format!("https://gh-proxy.com/{}", exe_asset["browser_download_url"]
         .as_str()
-        .ok_or("无法获取下载链接")?
-        .to_string();
+        .ok_or("无法获取下载链接")?);
+
 
     // 比较版本号
     let has_update = latest_version != current_version;
@@ -70,8 +70,9 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
 #[tauri::command]
 pub async fn download_and_install_update(
     window: tauri::Window,
-    download_url: String,
+     download_url: String,
 ) -> Result<(), String> {
+    
     let work_dir = get_work_dir();
     let download_path = Path::new(&work_dir).join("update.exe");
 

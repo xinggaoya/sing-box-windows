@@ -160,25 +160,23 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
     let target_asset_name = format!("sing-box-{}-{}-{}.zip", version, platform, arch);
     info!("目标文件名: {}", target_asset_name);
 
-    // 查找对应平台的资源
+    // 查找Windows版本资源
     let assets = release["assets"].as_array().ok_or("无法获取发布资源")?;
-    let download_url = assets
+    let asset = assets
         .iter()
         .find(|asset| {
-            asset["name"]
-                .as_str()
-                .map(|name| name == target_asset_name && !name.contains("legacy"))
-                .unwrap_or(false)
+            if let Some(name) = asset["name"].as_str() {
+                name.contains("windows-amd64") && name.ends_with(".zip")
+            } else {
+                false
+            }
         })
-        .and_then(|asset| asset["browser_download_url"].as_str())
-        .ok_or_else(|| {
-            format!(
-                "未找到对应平台的下载文件。\n请访问 https://github.com/SagerNet/sing-box/releases/latest 手动下载 {} 并解压到 {}/sing-box/ 目录下",
-                target_asset_name,
-                get_work_dir()
-            )
-        })?
-        .to_string();
+        .ok_or("未找到适用于Windows的资源")?;
+
+    // 获取下载链接并替换为自建代理域名
+    let download_url = format!("https://gh-proxy.com/{}", asset["browser_download_url"]
+    .as_str()
+    .ok_or("无法获取下载链接")?);
 
     info!("找到下载链接: {}", download_url);
 
@@ -197,33 +195,22 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
 
     // 下载文件
     let window_clone = window.clone();
-    match download_file(
-        download_url.clone(),
-        download_path.to_str().unwrap(),
-        move |progress| {
-            let real_progress = 20 + (progress as f64 * 0.6) as u32; // 20-80%的进度用于下载
-            let _ = window_clone.emit(
-                "download-progress",
-                json!({
-                    "status": "downloading",
-                    "progress": real_progress,
-                    "message": format!("正在下载: {}%", progress)
-                }),
-            );
-        },
-    )
-    .await
-    {
-        Ok(_) => {
-            info!("下载成功");
-        }
-        Err(e) => {
-            error!("下载失败: {}", e);
-            return Err(format!(
-                "下载失败: {}。\n您可以尝试手动下载：\n1. 访问 https://github.com/SagerNet/sing-box/releases/latest\n2. 下载 {}\n3. 解压并将文件放置在 {}/sing-box/ 目录下",
-                e, target_asset_name, get_work_dir()
-            ));
-        }
+    if let Err(e) = download_file(download_url, download_path.to_str().unwrap(), move |progress| {
+        let real_progress = 20 + (progress as f64 * 0.6) as u32; // 20-80%的进度用于下载
+        let _ = window_clone.emit(
+            "download-progress",
+            json!({
+                "status": "downloading",
+                "progress": real_progress,
+                "message": format!("正在下载: {}%", progress)
+            }),
+        );
+    }).await {
+        error!("下载失败: {}", e);
+        return Err(format!(
+            "下载失败: {}。\n您可以尝试手动下载：\n1. 访问 https://github.com/SagerNet/sing-box/releases/latest\n2. 下载 {}\n3. 解压并将文件放置在 {}/sing-box/ 目录下",
+            e, target_asset_name, get_work_dir()
+        ));
     }
 
     // 解压文件
