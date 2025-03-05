@@ -1,5 +1,4 @@
 use crate::utils::app_util::get_work_dir;
-use crate::utils::file_util::download_file;
 use serde_json::json;
 use std::os::windows::process::CommandExt;
 use std::path::Path;
@@ -51,17 +50,16 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
         })
         .ok_or("未找到可执行文件")?;
 
-        let download_url = format!("https://gh-proxy.com/{}", exe_asset["browser_download_url"]
+    let original_url = exe_asset["browser_download_url"]
         .as_str()
-        .ok_or("无法获取下载链接")?);
-
+        .ok_or("无法获取下载链接")?;
 
     // 比较版本号
     let has_update = latest_version != current_version;
 
     Ok(UpdateInfo {
         latest_version,
-        download_url,
+        download_url: original_url.to_string(),
         has_update,
     })
 }
@@ -70,7 +68,7 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
 #[tauri::command]
 pub async fn download_and_install_update(
     window: tauri::Window,
-     download_url: String,
+    download_url: String,
 ) -> Result<(), String> {
     
     let work_dir = get_work_dir();
@@ -88,8 +86,9 @@ pub async fn download_and_install_update(
 
     // 下载更新文件
     let window_clone = window.clone();
-    download_file(
-        download_url.to_string(),
+    // 使用fallback下载函数
+    if let Err(e) = crate::utils::file_util::download_with_fallback(
+        &download_url,
         download_path.to_str().unwrap(),
         move |progress| {
             let _ = window_clone.emit(
@@ -101,9 +100,9 @@ pub async fn download_and_install_update(
                 }),
             );
         },
-    )
-    .await
-    .map_err(|e| format!("下载更新失败: {}", e))?;
+    ).await {
+        return Err(format!("下载更新失败: {}", e));
+    }
 
     // 发送下载完成事件
     let _ = window.emit(

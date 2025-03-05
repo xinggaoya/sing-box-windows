@@ -4,7 +4,7 @@ use tracing::{error, info};
 use serde_json::json;
 use std::path::Path;
 use crate::utils::app_util::get_work_dir;
-use crate::utils::file_util::{download_file, unzip_file};
+use crate::utils::file_util::{ unzip_file};
 use std::os::windows::process::CommandExt;
 use tauri::Emitter;
 
@@ -173,12 +173,12 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
         })
         .ok_or("未找到适用于Windows的资源")?;
 
-    // 获取下载链接并替换为自建代理域名
-    let download_url = format!("https://gh-proxy.com/{}", asset["browser_download_url"]
-    .as_str()
-    .ok_or("无法获取下载链接")?);
+    // 获取下载链接
+    let original_url = asset["browser_download_url"]
+        .as_str()
+        .ok_or("无法获取下载链接")?;
 
-    info!("找到下载链接: {}", download_url);
+    info!("找到下载链接: {}", original_url);
 
     let download_path = Path::new(&path).join(&target_asset_name);
     info!("目标下载路径: {}", download_path.display());
@@ -195,17 +195,20 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
 
     // 下载文件
     let window_clone = window.clone();
-    if let Err(e) = download_file(download_url, download_path.to_str().unwrap(), move |progress| {
-        let real_progress = 20 + (progress as f64 * 0.6) as u32; // 20-80%的进度用于下载
-        let _ = window_clone.emit(
-            "download-progress",
-            json!({
-                "status": "downloading",
-                "progress": real_progress,
-                "message": format!("正在下载: {}%", progress)
-            }),
-        );
-    }).await {
+    if let Err(e) = crate::utils::file_util::download_with_fallback(
+        original_url, 
+        download_path.to_str().unwrap(), 
+        move |progress| {
+            let real_progress = 20 + (progress as f64 * 0.6) as u32; // 20-80%的进度用于下载
+            let _ = window_clone.emit(
+                "download-progress",
+                json!({
+                    "status": "downloading",
+                    "progress": real_progress,
+                    "message": format!("正在下载: {}%", progress)
+                }),
+            );
+        }).await {
         error!("下载失败: {}", e);
         return Err(format!(
             "下载失败: {}。\n您可以尝试手动下载：\n1. 访问 https://github.com/SagerNet/sing-box/releases/latest\n2. 下载 {}\n3. 解压并将文件放置在 {}/sing-box/ 目录下",
