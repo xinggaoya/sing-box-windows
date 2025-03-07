@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use crate::app::constants::{log, server, database, jwt, rate_limit};
 
 #[derive(Debug, Deserialize)]
 pub struct LogConfig {
@@ -55,12 +56,47 @@ pub struct RateLimitConfig {
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            level: "debug".to_string(),
-            dir: "logs".to_string(),
-            file_name_prefix: "app".to_string(),
-            rotation: "daily".to_string(),
-            max_file_size: 100,
-            max_files: 30,
+            level: log::DEFAULT_LEVEL.to_string(),
+            dir: log::DEFAULT_DIR.to_string(),
+            file_name_prefix: log::DEFAULT_FILE_PREFIX.to_string(),
+            rotation: log::rotation::DEFAULT.to_string(),
+            max_file_size: log::DEFAULT_MAX_FILE_SIZE,
+            max_files: log::DEFAULT_MAX_FILES,
+        }
+    }
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            host: server::DEFAULT_HOST.to_string(),
+            port: server::DEFAULT_PORT,
+        }
+    }
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            url: database::DEFAULT_URL.to_string(),
+        }
+    }
+}
+
+impl Default for JwtConfig {
+    fn default() -> Self {
+        Self {
+            secret: jwt::DEFAULT_SECRET.to_string(),
+            expiration: jwt::DEFAULT_EXPIRATION,
+        }
+    }
+}
+
+impl Default for RateLimitConfig {
+    fn default() -> Self {
+        Self {
+            window_secs: rate_limit::DEFAULT_WINDOW_SECS,
+            max_requests: rate_limit::DEFAULT_MAX_REQUESTS,
         }
     }
 }

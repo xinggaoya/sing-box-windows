@@ -97,7 +97,6 @@ export const useInfoStore = defineStore(
               versionInfo.cgo = line.split(':')[1].trim()
             }
           }
-
           version.value = versionInfo
           return true
         }
@@ -125,7 +124,7 @@ export const useInfoStore = defineStore(
       }, 1000)
 
       // 流量监控
-      const cleanupTraffic = createWebSocket('ws://127.0.0.1:9090/traffic?token=', (data) => {
+      const cleanupTraffic = createWebSocket('ws://127.0.0.1:12081/traffic?token=', (data) => {
         if ('up' in data && 'down' in data) {
           const currentUp = Number(data.up) || 0
           const currentDown = Number(data.down) || 0
@@ -145,14 +144,14 @@ export const useInfoStore = defineStore(
       })
 
       // 内存监控
-      const cleanupMemory = createWebSocket('ws://127.0.0.1:9090/memory?token=', (data) => {
+      const cleanupMemory = createWebSocket('ws://127.0.0.1:12081/memory?token=', (data) => {
         if ('inuse' in data && 'oslimit' in data) {
           memory.value = data
         }
       })
 
       // 日志监控
-      const cleanupLogs = createWebSocket('ws://127.0.0.1:9090/logs?token=', (data) => {
+      const cleanupLogs = createWebSocket('ws://127.0.0.1:12081/logs?token=', (data) => {
         if (
           'type' in data &&
           'payload' in data &&
@@ -215,7 +214,7 @@ export const useInfoStore = defineStore(
 
         const checkStatus = async () => {
           try {
-            const res = await fetch('http://127.0.0.1:9090/version')
+            const res = await fetch('http://127.0.0.1:12081/version')
             if (!res.ok) {
               throw new Error(`HTTP error! status: ${res.status}`)
             }

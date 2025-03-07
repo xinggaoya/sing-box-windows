@@ -7,6 +7,7 @@ use crate::utils::app_util::get_work_dir;
 use crate::utils::file_util::{ unzip_file};
 use std::os::windows::process::CommandExt;
 use tauri::Emitter;
+use crate::app::constants::{paths, process, messages};
 
 // 全局进程管理器
 lazy_static::lazy_static! {
@@ -16,22 +17,21 @@ lazy_static::lazy_static! {
 // 检查内核版本
 #[tauri::command]
 pub async fn check_kernel_version() -> Result<String, String> {
-    let work_dir = get_work_dir();
-    let kernel_path = Path::new(&work_dir).join("sing-box").join("sing-box.exe");
+    let kernel_path = paths::get_kernel_path();
 
     if !kernel_path.exists() {
-        return Err("内核文件不存在".to_string());
+        return Err(messages::ERR_KERNEL_NOT_FOUND.to_string());
     }
 
     let output = std::process::Command::new(kernel_path)
         .arg("version")
-        .creation_flags(0x08000000)
+        .creation_flags(process::CREATE_NO_WINDOW)
         .output()
-        .map_err(|e| format!("执行版本检查失败: {}", e))?;
+        .map_err(|e| format!("{}: {}", messages::ERR_VERSION_CHECK_FAILED, e))?;
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("获取版本信息失败: {}", error));
+        return Err(format!("{}: {}", messages::ERR_GET_VERSION_FAILED, error));
     }
 
     let version_info = String::from_utf8_lossy(&output.stdout);
@@ -58,9 +58,13 @@ pub async fn restart_kernel() -> Result<(), String> {
 
 // 获取进程状态
 #[tauri::command]
-pub async fn get_process_status() -> Result<String, String> {
-    let status = PROCESS_MANAGER.get_status().await;
-    serde_json::to_string(&status).map_err(|e| e.to_string())
+pub async fn get_process_status() -> serde_json::Value {
+    let info = PROCESS_MANAGER.get_status().await;
+    json!({
+        "status": info.status,
+        "pid": info.pid,
+        "last_error": info.last_error
+    })
 }
 
 // 获取内存使用情况

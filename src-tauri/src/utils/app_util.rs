@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use tracing::error;
+use crate::app::constants::messages;
 
 // 获取工作目录
 pub fn get_work_dir() -> String {
@@ -17,7 +18,7 @@ pub fn get_work_dir() -> String {
 
     // 确保目录存在
     if let Err(e) = std::fs::create_dir_all(&cache_dir) {
-        error!("创建缓存目录失败: {}", e);
+        error!("{}: {}", messages::ERR_CREATE_DIR_FAILED, e);
     }
 
     cache_dir.to_str().unwrap_or(".").to_string()

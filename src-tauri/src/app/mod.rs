@@ -1,3 +1,4 @@
+pub mod constants;
 pub mod kernel_service;
 pub mod proxy_service;
 pub mod subscription_service;

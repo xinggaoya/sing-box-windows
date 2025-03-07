@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use crate::app::constants::process as process_constants;
 
 pub mod manager;
 
@@ -75,10 +76,10 @@ pub struct ProcessConfig {
 impl Default for ProcessConfig {
     fn default() -> Self {
         Self {
-            graceful_timeout: 5,
-            health_check_interval: 30,
-            max_restart_attempts: 3,
-            restart_delay: 1,
+            graceful_timeout: process_constants::GRACEFUL_TIMEOUT,
+            health_check_interval: process_constants::HEALTH_CHECK_INTERVAL,
+            max_restart_attempts: process_constants::MAX_RESTART_ATTEMPTS,
+            restart_delay: process_constants::RESTART_DELAY,
         }
     }
 }

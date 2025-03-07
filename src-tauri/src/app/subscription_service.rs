@@ -1,6 +1,7 @@
 use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
-use crate::utils::app_util::get_work_dir;
+use crate::app::constants::{paths, messages};
 use crate::utils::config_util::ConfigUtil;
+use crate::utils::app_util::get_work_dir;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
@@ -13,7 +14,7 @@ use base64;
 pub async fn download_subscription(url: String) -> Result<(), String> {
     download_and_process_subscription(url)
         .await
-        .map_err(|e| format!("下载订阅失败: {}", e))?;
+        .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
     let _ = crate::app::proxy_service::set_system_proxy();
     Ok(())
 }
@@ -22,7 +23,7 @@ pub async fn download_subscription(url: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn add_manual_subscription(content: String) -> Result<(), String> {
     process_subscription_content(content)
-        .map_err(|e| format!("处理订阅内容失败: {}", e))?;
+        .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
     let _ = crate::app::proxy_service::set_system_proxy();
     Ok(())
 }
@@ -30,18 +31,17 @@ pub async fn add_manual_subscription(content: String) -> Result<(), String> {
 // 获取当前配置文件内容
 #[tauri::command]
 pub fn get_current_config() -> Result<String, String> {
-    let work_dir = get_work_dir();
-    let path = Path::new(&work_dir).join("sing-box/config.json");
+    let config_path = paths::get_config_path();
     
     // 检查文件是否存在
-    if !path.exists() {
-        return Err("配置文件不存在".to_string());
+    if !config_path.exists() {
+        return Err(messages::ERR_CONFIG_READ_FAILED.to_string());
     }
     
     // 读取文件内容
-    match std::fs::read_to_string(path) {
+    match std::fs::read_to_string(config_path) {
         Ok(content) => Ok(content),
-        Err(e) => Err(format!("读取配置文件失败: {}", e)),
+        Err(e) => Err(format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e)),
     }
 }
 
@@ -97,7 +97,7 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     let target_keys = vec!["experimental"];
     let config = Config {
         clash_api: ClashApiConfig {
-            external_controller: "127.0.0.1:9090".to_string(),
+            external_controller: "127.0.0.1:12081".to_string(),
             external_ui: "metacubexd".to_string(),
             external_ui_download_url: "".to_string(),
             external_ui_download_detour: "手动切换".to_string(),
@@ -123,7 +123,7 @@ fn process_subscription_content(content: String) -> Result<(), Box<dyn Error>> {
     let target_keys = vec!["experimental"];
     let config = Config {
         clash_api: ClashApiConfig {
-            external_controller: "127.0.0.1:9090".to_string(),
+            external_controller: "127.0.0.1:12081".to_string(),
             external_ui: "metacubexd".to_string(),
             external_ui_download_url: "".to_string(),
             external_ui_download_detour: "手动切换".to_string(),

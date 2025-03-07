@@ -1,7 +1,8 @@
 use serde::ser::Error;
 use serde::Deserialize;
-use serde_json::{Result, Value};
+use serde_json::{Result, Value, json};
 use std::fs;
+use crate::app::constants::messages;
 
 pub struct ConfigUtil {
     json: Value,
@@ -17,8 +18,8 @@ impl ConfigUtil {
             Ok(data) => data,
             Err(err) => {
                 return Err(serde_json::Error::custom(format!(
-                    "Error reading file: {}",
-                    err
+                    "{}: {}",
+                    messages::ERR_READ_FILE_FAILED, err
                 )));
             }
         };
@@ -72,10 +73,36 @@ impl ConfigUtil {
         }
     }
 
+    /// 修改或添加键值对
+    pub fn update_key(&mut self, target_keys: Vec<&str>, new_value: Value) {
+        let mut current = &mut self.json;
+        
+        for key in &target_keys[0..target_keys.len()-1] {
+            if !current.get(key).is_some() {
+                current[key] = json!({});
+            }
+            current = current.get_mut(key).unwrap();
+        }
+        
+        let last_key = target_keys[target_keys.len()-1];
+        current[last_key] = new_value;
+    }
+
     /// 将修改后的 JSON 写回到文件
     pub fn save(&self) -> Result<()> {
         let updated_data = serde_json::to_string_pretty(&self.json)?;
-        fs::write(&self.file_path, updated_data).expect("Failed to write to file");
+        fs::write(&self.file_path, updated_data).map_err(|e| {
+            serde_json::Error::custom(format!("{}: {}", messages::ERR_WRITE_FILE_FAILED, e))
+        })?;
+        Ok(())
+    }
+    
+    /// 将修改后的 JSON 写回到文件
+    pub fn save_to_file(&self) -> Result<()> {
+        let updated_data = serde_json::to_string_pretty(&self.json)?;
+        fs::write(&self.file_path, updated_data).map_err(|e| {
+            serde_json::Error::custom(format!("{}: {}", messages::ERR_WRITE_FILE_FAILED, e))
+        })?;
         Ok(())
     }
 }

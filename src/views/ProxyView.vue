@@ -176,7 +176,7 @@ onMounted(() => {
 const init = async () => {
   isLoading.value = true
   try {
-    const res = await fetch('http://127.0.0.1:9090/proxies', {
+    const res = await fetch('http://127.0.0.1:12081/proxies', {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -231,7 +231,7 @@ const getDelay = async (
 
   try {
     const res = await fetch(
-      `http://127.0.0.1:9090/proxies/${name}/delay?url=${server}&timeout=5000`,
+      `http://127.0.0.1:12081/proxies/${name}/delay?url=${server}&timeout=5000`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -252,7 +252,7 @@ const getDelay = async (
 
 const changeProxy = async (type: string, name: string, index: number) => {
   try {
-    const res = await fetch(`http://127.0.0.1:9090/proxies/${type}`, {
+    const res = await fetch(`http://127.0.0.1:12081/proxies/${type}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

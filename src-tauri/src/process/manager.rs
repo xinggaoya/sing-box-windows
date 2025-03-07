@@ -1,13 +1,13 @@
 use super::{ProcessError, ProcessInfo, ProcessStatus, Result};
 use crate::utils::app_util::get_work_dir;
 use std::os::windows::process::CommandExt;
-use std::path::Path;
 use std::sync::Arc;
 use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 use crate::utils::proxy_util::disable_system_proxy;
+use crate::app::constants::{paths, process, messages};
 
 pub struct ProcessManager {
     process_info: Arc<RwLock<ProcessInfo>>,
@@ -31,52 +31,49 @@ impl ProcessManager {
         self.process_info.read().await.clone()
     }
 
-    // 检查进程是否真实存在
-    async fn check_process_exists(&self, pid: Option<u32>) -> bool {
-        if let Some(pid) = pid {
-            match std::process::Command::new("tasklist")
-                .arg("/FI")
-                .arg(format!("PID eq {}", pid))
-                .creation_flags(0x08000000)
-                .output()
-            {
-                Ok(output) => {
-                    let output_str = String::from_utf8_lossy(&output.stdout);
-                    output_str.contains(&pid.to_string())
-                }
-                Err(_) => false,
-            }
-        } else {
-            false
-        }
-    }
-
     // 检查是否存在其他 sing-box 进程
     async fn check_other_sing_box_process(&self) -> Option<u32> {
+        // 获取自己的PID以排除
+        let self_pid = {
+            let info = self.process_info.read().await;
+            info.pid
+        };
+        
         match std::process::Command::new("tasklist")
             .arg("/FI")
             .arg("IMAGENAME eq sing-box.exe")
             .arg("/FO")
             .arg("CSV")
             .arg("/NH")
-            .creation_flags(0x08000000)
+            .creation_flags(process::CREATE_NO_WINDOW)
             .output()
         {
             Ok(output) => {
                 let output_str = String::from_utf8_lossy(&output.stdout);
-                // CSV 格式: "sing-box.exe","1234",...
-                if let Some(line) = output_str.lines().next() {
+                if output_str.trim().is_empty() {
+                    return None; // 没有sing-box进程
+                }
+                
+                // 解析所有sing-box进程的PID
+                for line in output_str.lines() {
                     let parts: Vec<&str> = line.split(',').collect();
                     if parts.len() >= 2 {
-                        // 提取 PID
-                        if let Some(pid_str) = parts[1].trim_matches('"').parse::<u32>().ok() {
-                            return Some(pid_str);
+                        // 提取PID并转换为u32
+                        if let Ok(pid) = parts[1].trim_matches('"').parse::<u32>() {
+                            // 排除自己的PID
+                            if self_pid != Some(pid) {
+                                info!("发现其他sing-box进程: PID={}", pid);
+                                return Some(pid);
+                            }
                         }
                     }
                 }
                 None
             }
-            Err(_) => None,
+            Err(e) => {
+                error!("检查其他sing-box进程失败: {}", e);
+                None
+            }
         }
     }
 
@@ -93,90 +90,139 @@ impl ProcessManager {
 
     // 检查进程是否在运行
     pub async fn is_running(&self) -> bool {
-        let info = self.process_info.read().await;
-        let status_running = matches!(
-            info.status,
-            ProcessStatus::Running | ProcessStatus::Starting
-        );
-
-        // 如果状态显示运行中，但实际进程不存在，则重置状态
-        if status_running && !self.check_process_exists(info.pid).await {
-            drop(info); // 释放读锁
-            self.reset_process_state().await;
-            return false;
-        }
-
-        status_running
+        self._is_running(false).await
     }
 
     // 启动前检查
     async fn pre_start_check(&self) -> Result<()> {
-        // 检查是否有其他 sing-box 进程在运行
-        if let Some(pid) = self.check_other_sing_box_process().await {
-            // 尝试停止其他进程
-            info!("检测到其他 sing-box 进程 (PID: {}), 尝试停止", pid);
-            if let Err(e) = self.send_signal(pid) {
-                warn!("停止其他进程失败: {}, 尝试强制停止", e);
-                if let Err(e) = self.kill_process(pid) {
-                    error!("强制停止其他进程失败: {}", e);
+        // 强制检查进程状态，确保状态与实际一致
+        let force_check = true;
+        let is_running = self._is_running(force_check).await;
+        
+        // 如果当前实例的进程在运行，先尝试停止它
+        if is_running {
+            info!("检测到应用内核已运行，尝试强制停止");
+            match self.force_stop().await {
+                Ok(_) => info!("成功停止当前运行的内核"),
+                Err(e) => {
+                    warn!("无法停止当前运行的内核: {}", e);
+                    // 即使当前无法停止，仍然继续尝试下一步
                 }
             }
-                    // 如果超时后进程仍然存在，强制终止
-        if self.check_process_exists(Some(pid)).await {
-            warn!("进程停止超时，尝试强制终止");
-            if let Err(e) = self.kill_process(pid) {
-                return Err(ProcessError::StopFailed(format!("强制停止失败: {}", e)));
-            }
+            
+            // 重置状态，以确保干净的启动环境
+            self.reset_process_state().await;
         }
+
+        // 检查是否有其他sing-box进程在运行（通过进程名称匹配）
+        if self.is_process_running_by_name("sing-box.exe").await {
+            info!("检测到其他sing-box进程正在运行，尝试强制停止所有实例");
+            if let Err(e) = self.kill_process_by_name("sing-box.exe").await {
+                warn!("无法停止部分sing-box进程: {}", e);
+            }
+            
             // 等待进程完全停止
             sleep(Duration::from_secs(1)).await;
+            
+            // 再次检查进程是否已全部停止
+            if self.is_process_running_by_name("sing-box.exe").await {
+                warn!("仍有sing-box进程在运行，将继续尝试启动");
+            }
         }
 
-        let work_dir = get_work_dir();
-        info!("当前工作目录: {}", work_dir);
-
-        let sing_box_dir = Path::new(&work_dir).join("sing-box");
-        let kernel_path = sing_box_dir.join("sing-box.exe");
-        let config_path = sing_box_dir.join("config.json");
-
-        // 检查 sing-box 目录是否存在
-        if !sing_box_dir.exists() {
-            return Err(ProcessError::StartFailed("sing-box 目录不存在".to_string()));
-        }
-
-        // 检查内核文件是否存在
-        if !kernel_path.exists() {
-            return Err(ProcessError::StartFailed("内核文件不存在".to_string()));
-        }
-        
-        // 检查配置文件是否存在
-        if !config_path.exists() {
-            return Err(ProcessError::ConfigError("配置文件不存在".to_string()));
-        }
-        
-        // 使用 sing-box 的 check 命令验证配置
-        match self.check_config_validity(&kernel_path, &sing_box_dir).await {
-            Ok(_) => info!("配置文件检查通过"),
-            Err(e) => return Err(e),
-        }
+        // 检查配置文件
+        self.check_config().await?;
 
         Ok(())
     }
-    
-    // 使用 sing-box check 验证配置有效性
-    async fn check_config_validity(&self, kernel_path: &Path, work_dir: &Path) -> Result<()> {
-        let output = Command::new(kernel_path)
-            .arg("check")
-            .current_dir(work_dir)
-            .creation_flags(0x08000000)
+
+    // 通过进程名称检查进程是否在运行
+    async fn is_process_running_by_name(&self, process_name: &str) -> bool {
+        let query = format!("IMAGENAME eq {}", process_name);
+        
+        match std::process::Command::new("tasklist")
+            .arg("/FI")
+            .arg(query)
+            .arg("/FO")
+            .arg("CSV")
+            .arg("/NH")
+            .creation_flags(process::CREATE_NO_WINDOW)
             .output()
-            .await
-            .map_err(|e| ProcessError::ConfigError(format!("无法执行配置检查: {}", e)))?;
+        {
+            Ok(output) => {
+                let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                !output_str.is_empty() && output_str.contains(process_name)
+            }
+            Err(e) => {
+                error!("检查进程名称失败: {}", e);
+                false
+            }
+        }
+    }
+
+    // 通过进程名称终止所有匹配的进程
+    async fn kill_process_by_name(&self, process_name: &str) -> std::io::Result<()> {
+        // 使用taskkill /IM 命令强制终止所有匹配的进程
+        let output = std::process::Command::new("taskkill")
+            .arg("/F") // 强制终止
+            .arg("/IM")
+            .arg(process_name)
+            .creation_flags(process::CREATE_NO_WINDOW)
+            .output()?;
         
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(ProcessError::ConfigError(format!("配置无效: {}", stderr)));
+            let error = String::from_utf8_lossy(&output.stderr);
+            if error.contains("没有运行的任务") {
+                // 忽略"没有运行的任务"错误，这意味着没有找到匹配的进程
+                return Ok(());
+            }
+            error!("终止进程失败: {}", error);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other, 
+                format!("终止进程失败: {}", error)
+            ));
         }
+        
+        info!("已终止所有 {} 进程", process_name);
+        Ok(())
+    }
+
+    // 检查配置文件
+    async fn check_config(&self) -> Result<()> {
+        info!("当前工作目录: {}", get_work_dir());
+        
+        // 检查配置文件是否存在
+        let config_path = paths::get_config_path();
+        if !config_path.exists() {
+            return Err(ProcessError::ConfigError(messages::ERR_CONFIG_READ_FAILED.to_string()));
+        }
+
+        // 验证配置文件
+        let config_str = std::fs::read_to_string(&config_path)
+            .map_err(|e| ProcessError::ConfigError(format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e)))?;
+
+        // 解析JSON
+        let json_result: serde_json::Result<serde_json::Value> = serde_json::from_str(&config_str);
+        if let Err(e) = json_result {
+            return Err(ProcessError::ConfigError(format!("配置文件JSON格式错误: {}", e)));
+        }
+
+        // 验证配置有效性 - 使用sing-box自带的验证功能
+        let kernel_path = paths::get_kernel_path();
+        let output = std::process::Command::new(&kernel_path)
+            .arg("check")
+            .arg("-c")
+            .arg(&config_path)
+            .creation_flags(process::CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| ProcessError::ConfigError(format!("无法验证配置: {}", e)))?;
+
+        if !output.status.success() {
+            let error_output = String::from_utf8_lossy(&output.stderr);
+            return Err(ProcessError::ConfigError(format!("配置无效: {}", error_output)));
+        }
+
+        info!("配置文件检查通过");
         
         // 如果输出为空，则配置有效
         Ok(())
@@ -197,17 +243,16 @@ impl ProcessManager {
             return Err(e);
         }
 
-        // 获取工作目录
-        let work_dir = get_work_dir();
-        let kernel_work_dir = Path::new(&work_dir).join("sing-box");
-        let kernel_path = kernel_work_dir.join("sing-box.exe");
+        // 获取工作目录和内核路径
+        let kernel_work_dir = paths::get_kernel_work_dir();
+        let kernel_path = paths::get_kernel_path();
 
         // 启动进程
         let child = match Command::new(kernel_path.to_str().unwrap())
             .arg("run")
             .arg("-D")
             .arg(kernel_work_dir.to_str().unwrap())
-            .creation_flags(0x08000000)
+            .creation_flags(process::CREATE_NO_WINDOW)
             .spawn()
         {
             Ok(child) => child,
@@ -231,14 +276,15 @@ impl ProcessManager {
             *process = Some(child);
         }
 
-        info!("进程启动成功");
+        info!("{}", messages::INFO_PROCESS_STARTED);
         Ok(())
     }
 
     // 停止进程
     pub async fn stop(&self) -> Result<()> {
         // 检查进程状态
-        if !self.is_running().await {
+        let status = self.get_status().await.status;
+        if matches!(status, ProcessStatus::Stopped) {
             return Ok(());
         }
 
@@ -248,39 +294,30 @@ impl ProcessManager {
             info.status = ProcessStatus::Stopping;
         }
 
-        // 获取PID
-        let pid = {
-            let info = self.process_info.read().await;
-            info.pid.ok_or(ProcessError::NotRunning)?
-        };
-
-        // 尝试优雅停止
-        if let Err(e) = self.send_signal(pid) {
-            warn!("优雅停止失败: {}, 尝试强制停止", e);
-            if let Err(e) = self.kill_process(pid) {
-                return Err(ProcessError::StopFailed(format!("强制停止失败: {}", e)));
-            }
-        }
-
-        // 如果超时后进程仍然存在，强制终止
-        if self.check_process_exists(Some(pid)).await {
+        // 首先尝试优雅地停止进程
+        // let stop_result = self.graceful_stop().await;
+        
+        // 如果优雅停止失败，则强制终止
+        // if stop_result.is_err() {
             warn!("进程停止超时，尝试强制终止");
-            if let Err(e) = self.kill_process(pid) {
-                return Err(ProcessError::StopFailed(format!("强制停止失败: {}", e)));
-            }
-        }
-
+            self.force_stop().await?;
+        // }
+        
         // 关闭系统代理
         if let Err(e) = disable_system_proxy() {
             warn!("关闭系统代理失败: {}", e);
         } else {
-            info!("系统代理已关闭");
+            info!("{}", messages::INFO_SYSTEM_PROXY_DISABLED);
         }
 
-        // 重置进程状态
-        self.reset_process_state().await;
+        // 更新进程状态
+        {
+            let mut info = self.process_info.write().await;
+            info.status = ProcessStatus::Stopped;
+            info.pid = None;
+        }
 
-        info!("进程已停止");
+        info!("{}", messages::INFO_PROCESS_STOPPED);
         Ok(())
     }
 
@@ -289,7 +326,7 @@ impl ProcessManager {
         std::process::Command::new("taskkill")
             .arg("/PID")
             .arg(pid.to_string())
-            .creation_flags(0x08000000)
+            .creation_flags(process::CREATE_NO_WINDOW)
             .output()?;
         Ok(())
     }
@@ -300,7 +337,7 @@ impl ProcessManager {
             .arg("/F")
             .arg("/PID")
             .arg(pid.to_string())
-            .creation_flags(0x08000000)
+            .creation_flags(process::CREATE_NO_WINDOW)
             .output()?;
         Ok(())
     }
@@ -315,30 +352,139 @@ impl ProcessManager {
     }
 
     // 错误处理
-    async fn handle_error(&self, error: ProcessError) -> Result<()> {
+    async fn handle_error(&self, err: ProcessError) -> Result<()> {
         let mut info = self.process_info.write().await;
-        info.status = ProcessStatus::Failed(error.to_string());
-        info.last_error = Some(error.to_string());
+        info.status = ProcessStatus::Failed(err.to_string());
+        info.last_error = Some(err.to_string());
+        error!("进程错误: {}", err);
+        Ok(())
+    }
 
-        // 根据错误类型记录不同级别的日志
-        match &error {
-            ProcessError::AlreadyRunning => warn!("进程已在运行中: {}", error),
-            ProcessError::NotRunning => warn!("进程未运行: {}", error),
-            ProcessError::StartFailed(msg) => error!("启动失败: {}", msg),
-            ProcessError::StopFailed(msg) => error!("停止失败: {}", msg),
-            ProcessError::StatusCheckFailed(msg) => error!("状态检查失败: {}", msg),
-            ProcessError::ConfigError(msg) => error!("配置错误: {}", msg),
-            ProcessError::SystemError(msg) => error!("系统错误: {}", msg),
-            ProcessError::PermissionError(msg) => error!("权限错误: {}", msg),
-            ProcessError::NetworkError(msg) => error!("网络错误: {}", msg),
-            ProcessError::Unknown(msg) => error!("未知错误: {}", msg),
+    // 优雅停止进程
+    async fn graceful_stop(&self) -> Result<()> {
+        let pid = {
+            let info = self.process_info.read().await;
+            info.pid.ok_or(ProcessError::NotRunning)?
+        };
+
+        // 尝试发送正常停止信号
+        if let Err(e) = self.send_signal(pid) {
+            return Err(ProcessError::StopFailed(format!("发送停止信号失败: {}", e)));
         }
 
-        // 记录额外的系统信息
-        if let Some(pid) = info.pid {
-            info!("相关进程PID: {}", pid);
+        // 等待进程停止的超时时间
+        let timeout = Duration::from_secs(process::GRACEFUL_TIMEOUT);
+        let start = std::time::Instant::now();
+
+        // 等待进程停止
+        while self.check_process_exists(Some(pid)).await {
+            if start.elapsed() > timeout {
+                return Err(ProcessError::StopFailed("进程停止超时".to_string()));
+            }
+            sleep(Duration::from_millis(100)).await;
         }
 
         Ok(())
     }
+
+    // 强制停止进程
+    async fn force_stop(&self) -> Result<()> {
+        let pid = {
+            let info = self.process_info.read().await;
+            info.pid.ok_or(ProcessError::NotRunning)?
+        };
+
+        // 强制结束进程
+        if let Err(e) = self.kill_process(pid) {
+            return Err(ProcessError::StopFailed(format!("强制停止失败: {}", e)));
+        }
+
+        // 短暂等待确保进程已终止
+        sleep(Duration::from_millis(500)).await;
+        
+        // 检查进程是否仍存在
+        if self.check_process_exists(Some(pid)).await {
+            return Err(ProcessError::StopFailed("强制停止失败，进程仍在运行".to_string()));
+        }
+
+        Ok(())
+    }
+
+    // 检查进程是否存在
+    async fn check_process_exists(&self, pid: Option<u32>) -> bool {
+        if let Some(pid) = pid {
+            // 使用具体的PID格式化查询，确保准确匹配
+            let query = format!("PID eq {}", pid);
+            
+            match std::process::Command::new("tasklist")
+                .arg("/FI")
+                .arg(query)
+                .arg("/FO")
+                .arg("CSV")
+                .arg("/NH") // 不显示标题行
+                .creation_flags(process::CREATE_NO_WINDOW)
+                .output()
+            {
+                Ok(output) => {
+                    let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    // 检查输出是否包含PID
+                    // 输出格式应该是 "sing-box.exe","PID",...
+                    if output_str.is_empty() {
+                        return false;
+                    }
+                    
+                    // 更严格地检查PID是否匹配
+                    output_str.contains(&format!(",\"{}\"", pid))
+                }
+                Err(_) => {
+                    error!("查询进程状态失败");
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    }
+
+    // 内部是否运行中检查函数，可以强制检查实际进程
+    async fn _is_running(&self, force_check: bool) -> bool {
+        // 首先检查进程信息
+        let info = self.process_info.read().await;
+        let status_running = matches!(
+            info.status,
+            ProcessStatus::Running | ProcessStatus::Starting
+        );
+
+        // 如果状态显示为非运行，且不强制检查，直接返回false
+        if !status_running && !force_check {
+            return false;
+        }
+
+        // 如果没有PID，说明进程未运行
+        if info.pid.is_none() {
+            if status_running {
+                // 状态不一致，需要重置
+                drop(info); // 释放读锁
+                self.reset_process_state().await;
+                warn!("进程状态显示运行中，但没有PID，已重置状态");
+            }
+            return false;
+        }
+
+        // 检查进程是否实际存在
+        let pid = info.pid.unwrap(); // 安全，因为已经检查了is_none
+        let exists = self.check_process_exists(Some(pid)).await;
+        
+        if !exists && status_running {
+            // 进程不存在但状态显示运行中，重置状态
+            drop(info); // 释放读锁
+            self.reset_process_state().await;
+            warn!("进程状态显示运行中 (PID: {})，但实际进程不存在，已重置状态", pid);
+            return false;
+        }
+
+        // 返回实际进程存在状态
+        exists
+    }
 }
+

@@ -3,6 +3,7 @@ use serde_json::json;
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use tauri::Emitter;
+use crate::app::constants::{api, messages};
 
 // 添加新的结构体用于版本信息
 #[derive(serde::Serialize)]
@@ -18,48 +19,53 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
     let client = reqwest::Client::new();
 
     // 获取最新版本信息
-    let releases_url = "https://api.github.com/repos/xinggaoya/sing-box-windows/releases/latest";
     let response = client
-        .get(releases_url)
-        .header("User-Agent", "sing-box-windows")
+        .get(api::GITHUB_API_URL)
+        .header("User-Agent", api::USER_AGENT)
         .send()
         .await
-        .map_err(|e| format!("获取版本信息失败: {}", e))?;
+        .map_err(|e| format!("{}: {}", messages::ERR_GET_VERSION_FAILED, e))?;
 
     let release: serde_json::Value = response
         .json()
         .await
-        .map_err(|e| format!("解析版本信息失败: {}", e))?;
+        .map_err(|e| format!("{}: {}", messages::ERR_GET_VERSION_FAILED, e))?;
 
-    let latest_version = release["tag_name"]
+    // 获取最新版本号
+    let tag_name = release["tag_name"]
         .as_str()
-        .ok_or("无法获取最新版本号")?
-        .trim_start_matches('v')
-        .to_string();
+        .ok_or_else(|| format!("{}: 无法解析版本号", messages::ERR_GET_VERSION_FAILED))
+        .map(|v| v.trim_start_matches('v').to_string())?;
+    
 
-    // 查找 .exe 资源
-    let assets = release["assets"].as_array().ok_or("无法获取发布资源")?;
+    // 获取下载链接
+    let assets = release["assets"].as_array().ok_or_else(|| {
+        format!("{}: 无法获取下载资源", messages::ERR_GET_VERSION_FAILED)
+    })?;
 
-    let exe_asset = assets
-        .iter()
-        .find(|asset| {
-            asset["name"]
+    // 查找Windows安装程序
+    let mut download_url = String::new();
+    for asset in assets {
+        let name = asset["name"].as_str().unwrap_or("");
+        if name.ends_with(".msi") || name.ends_with(".exe") {
+            download_url = asset["browser_download_url"]
                 .as_str()
-                .map(|name| name.ends_with(".exe"))
-                .unwrap_or(false)
-        })
-        .ok_or("未找到可执行文件")?;
+                .unwrap_or("")
+                .to_string();
+            break;
+        }
+    }
 
-    let original_url = exe_asset["browser_download_url"]
-        .as_str()
-        .ok_or("无法获取下载链接")?;
+    if download_url.is_empty() {
+        return Err(format!("{}: 无法获取下载链接", messages::ERR_GET_VERSION_FAILED));
+    }
 
-    // 比较版本号
-    let has_update = latest_version != current_version;
+    // 简单比较版本号
+    let has_update = tag_name != current_version;
 
     Ok(UpdateInfo {
-        latest_version,
-        download_url: original_url.to_string(),
+        latest_version: tag_name.to_string(),
+        download_url,
         has_update,
     })
 }

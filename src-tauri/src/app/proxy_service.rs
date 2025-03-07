@@ -4,22 +4,22 @@ use crate::utils::config_util::ConfigUtil;
 use std::error::Error;
 use std::path::Path;
 use tracing::info;
+use crate::app::constants::{paths, network, config as config_constants, messages};
 
 // 修改代理模式为系统代理
 #[tauri::command]
 pub fn set_system_proxy() -> Result<(), String> {
-    let work_dir = get_work_dir();
-    let path = Path::new(&work_dir).join("sing-box/config.json");
+    let config_path = paths::get_config_path();
     let json_util =
-        ConfigUtil::new(path.to_str().unwrap()).map_err(|e| format!("读取配置文件失败: {}", e))?;
+        ConfigUtil::new(config_path.to_str().unwrap()).map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
 
     let mut json_util = json_util;
     let target_keys = vec!["inbounds"];
     let new_structs = vec![config_model::Inbound {
-        r#type: "mixed".to_string(),
-        tag: "mixed-in".to_string(),
-        listen: Some("0.0.0.0".to_string()),
-        listen_port: Some(2080),
+        r#type: config_constants::DEFAULT_INBOUND_TYPE.to_string(),
+        tag: config_constants::DEFAULT_INBOUND_TAG.to_string(),
+        listen: Some(network::DEFAULT_LISTEN_ADDRESS.to_string()),
+        listen_port: Some(network::DEFAULT_PROXY_PORT),
         address: None,
         auto_route: None,
         strict_route: None,
@@ -28,16 +28,14 @@ pub fn set_system_proxy() -> Result<(), String> {
         set_system_proxy: Some(true),
     }];
 
-    json_util.modify_property(
-        &target_keys,
-        serde_json::to_value(new_structs).map_err(|e| format!("序列化配置失败: {}", e))?,
-    );
-    json_util
-        .save()
-        .map_err(|e| format!("保存配置文件失败: {}", e))?;
-
-    info!("代理模式已修改");
-    Ok(())
+    json_util.update_key(target_keys.clone(), serde_json::to_value(new_structs).unwrap());
+    match json_util.save_to_file() {
+        Ok(_) => {
+            info!("{}", messages::INFO_PROXY_MODE_ENABLED);
+            Ok(())
+        }
+        Err(e) => Err(format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e)),
+    }
 }
 
 // 修改TUN 模式为代理模式

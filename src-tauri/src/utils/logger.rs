@@ -1,5 +1,5 @@
 use tracing_appender::{
-    non_blocking::{WorkerGuard, NonBlocking},
+    non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
 use tracing_subscriber::{
@@ -9,11 +9,11 @@ use tracing_subscriber::{
     filter::LevelFilter,
     EnvFilter, Registry,
 };
-use tracing::Level;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
+use crate::app::constants::log;
 
 use crate::config::LogConfig;
 
@@ -53,9 +53,9 @@ impl Logger {
 
             // 配置文件输出轮换
             let rotation = match config.rotation.as_str() {
-                "hourly" => Rotation::HOURLY,
-                "daily" => Rotation::DAILY,
-                "never" => Rotation::NEVER,
+                log::rotation::HOURLY => Rotation::HOURLY,
+                log::rotation::DAILY => Rotation::DAILY,
+                log::rotation::NEVER => Rotation::NEVER,
                 _ => Rotation::DAILY, // 默认每天轮转
             };
             
@@ -168,12 +168,7 @@ impl Logger {
             tracing::subscriber::set_global_default(registry)
                 .expect("设置全局日志订阅器失败");
 
-            // 记录初始化成功消息
-            tracing::error!("日志系统初始化完成 - ERROR测试");
-            tracing::warn!("日志系统初始化完成 - WARN测试");
-            tracing::info!("日志系统初始化完成 - INFO测试");
-            tracing::debug!("日志系统初始化完成 - DEBUG测试");
-            tracing::trace!("日志系统初始化完成 - TRACE测试");
+
             
             // 将guards移动到全局静态存储中
             if let Ok(mut global_guards) = GLOBAL_GUARDS.lock() {
