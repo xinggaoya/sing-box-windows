@@ -4,9 +4,9 @@ use crate::utils::config_util::ConfigUtil;
 use crate::utils::app_util::get_work_dir;
 use std::error::Error;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
-use tracing::info;
+use tracing::{info, error};
 use base64;
 
 // 下载订阅
@@ -43,6 +43,65 @@ pub fn get_current_config() -> Result<String, String> {
         Ok(content) => Ok(content),
         Err(e) => Err(format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e)),
     }
+}
+
+// 切换代理模式（global、rule或tun）
+#[tauri::command]
+pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
+    // 验证模式参数
+    if !["global", "rule", "tun"].contains(&mode.as_str()) {
+        return Err(format!("无效的代理模式: {}", mode));
+    }
+    
+    info!("正在切换代理模式为: {}", mode);
+    
+    let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/config.json");
+    
+    // 检查文件是否存在
+    if !path.exists() {
+        return Err("配置文件不存在，请先添加订阅".to_string());
+    }
+    
+    // 修改配置文件
+    match modify_default_mode(&path, mode.clone()) {
+        Ok(_) => {
+            info!("代理模式已切换为: {}", mode);
+            Ok(format!("代理模式已切换为: {}", mode))
+        },
+        Err(e) => {
+            error!("切换代理模式失败: {}", e);
+            Err(format!("切换代理模式失败: {}", e))
+        }
+    }
+}
+
+// 修改配置文件中的default_mode
+fn modify_default_mode(config_path: &Path, mode: String) -> Result<(), Box<dyn Error>> {
+    // 读取现有配置
+    let mut json_util = ConfigUtil::new(config_path.to_str().unwrap())?;
+    
+    // 我们不使用get_value方法，因为它不存在
+    // 而是直接创建新的配置并修改
+    let target_keys = vec!["experimental"];
+    
+    // 创建新的配置，设置mode
+    let config = Config {
+        clash_api: ClashApiConfig {
+            external_controller: "127.0.0.1:12081".to_string(),
+            external_ui: "metacubexd".to_string(),
+            external_ui_download_url: "".to_string(),
+            external_ui_download_detour: "手动切换".to_string(),
+            default_mode: mode, // 设置为传入的模式
+        },
+        cache_file: CacheFileConfig { enabled: true },
+    };
+    
+    // 更新配置
+    json_util.modify_property(&target_keys, serde_json::to_value(config)?);
+    json_util.save()?;
+    
+    Ok(())
 }
 
 async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Error>> {
@@ -175,4 +234,55 @@ fn is_base64_encoded(text: &str) -> bool {
     }
     
     false
+}
+
+// 获取当前代理模式
+#[tauri::command]
+pub fn get_current_proxy_mode() -> Result<String, String> {
+    info!("正在获取当前代理模式");
+    
+    let work_dir = get_work_dir();
+    let path = Path::new(&work_dir).join("sing-box/config.json");
+    
+    // 检查配置文件是否存在
+    if !path.exists() {
+        return Ok("rule".to_string()); // 默认返回rule模式
+    }
+    
+    // 读取配置文件
+    match read_proxy_mode_from_config(&path) {
+        Ok(mode) => {
+            info!("当前代理模式为: {}", mode);
+            Ok(mode)
+        },
+        Err(e) => {
+            error!("获取代理模式失败: {}", e);
+            Ok("rule".to_string()) // 出错时默认返回rule模式
+        }
+    }
+}
+
+// 从配置文件中读取代理模式
+fn read_proxy_mode_from_config(config_path: &Path) -> Result<String, Box<dyn Error>> {
+    // 读取配置文件
+    let mut file = File::open(config_path)?;
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+    
+    // 解析JSON
+    let json: serde_json::Value = serde_json::from_str(&content)?;
+    
+    // 尝试读取experimental.clash_api.default_mode
+    if let Some(experimental) = json.get("experimental") {
+        if let Some(clash_api) = experimental.get("clash_api") {
+            if let Some(default_mode) = clash_api.get("default_mode") {
+                if let Some(mode) = default_mode.as_str() {
+                    return Ok(mode.to_string());
+                }
+            }
+        }
+    }
+    
+    // 如果找不到，返回默认的rule模式
+    Ok("rule".to_string())
 } 

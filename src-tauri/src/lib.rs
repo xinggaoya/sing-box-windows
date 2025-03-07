@@ -3,7 +3,7 @@ use crate::app::kernel_service::{
     restart_kernel, start_kernel, stop_kernel,
 };
 use crate::app::proxy_service::{set_system_proxy, set_tun_proxy, toggle_ip_version};
-use crate::app::subscription_service::{download_subscription, add_manual_subscription, get_current_config};
+use crate::app::subscription_service::{download_subscription, add_manual_subscription, get_current_config, toggle_proxy_mode, get_current_proxy_mode};
 use crate::app::system_service::{check_admin, get_traffic_data, restart_as_admin};
 use crate::app::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
@@ -64,6 +64,8 @@ pub fn run() {
             download_and_install_update,
             get_process_status,
             check_kernel_version,
+            toggle_proxy_mode,
+            get_current_proxy_mode,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

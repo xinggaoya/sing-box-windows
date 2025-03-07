@@ -16,12 +16,7 @@
           </n-h2>
         </n-space>
         <n-space :size="16">
-          <n-button
-            quaternary
-            size="medium"
-            @click="appStore.toggleTheme"
-            class="header-button"
-          >
+          <n-button quaternary size="medium" @click="appStore.toggleTheme" class="header-button">
             <template #icon>
               <n-icon>
                 <moon-outline v-if="appStore.isDark" />
@@ -29,12 +24,7 @@
               </n-icon>
             </template>
           </n-button>
-          <n-button
-            quaternary
-            size="medium"
-            @click="onToggleFullScreen"
-            class="header-button"
-          >
+          <n-button quaternary size="medium" @click="onToggleFullScreen" class="header-button">
             <template #icon>
               <n-icon>
                 <expand-outline v-if="!appStore.windowState.isFullscreen" />
@@ -42,24 +32,14 @@
               </n-icon>
             </template>
           </n-button>
-          <n-button
-            quaternary
-            size="medium"
-            @click="appStore.minimizeWindow"
-            class="header-button"
-          >
+          <n-button quaternary size="medium" @click="appStore.minimizeWindow" class="header-button">
             <template #icon>
               <n-icon>
                 <remove-outline />
               </n-icon>
             </template>
           </n-button>
-          <n-button
-            quaternary
-            size="medium"
-            @click="appStore.hideWindow"
-            class="header-button"
-          >
+          <n-button quaternary size="medium" @click="appStore.hideWindow" class="header-button">
             <template #icon>
               <n-icon>
                 <close-outline />
@@ -92,17 +72,13 @@
             }"
             @click="!item.disabled && onSelect(item.key)"
           >
+            <div class="menu-indicator" :class="{ active: currentMenu === item.key }" />
             <div class="menu-item-content">
               <n-icon :size="24" class="menu-icon">
                 <component :is="item.icon" />
               </n-icon>
               <span v-show="!collapsed" class="menu-label">{{ item.label }}</span>
             </div>
-            <div
-              v-show="!collapsed"
-              class="menu-indicator"
-              :class="{ active: currentMenu === item.key }"
-            />
           </div>
         </div>
       </n-layout-sider>
@@ -304,12 +280,15 @@ onMounted(async () => {
   cursor: pointer;
   transition: all 0.3s ease;
   user-select: none;
+  overflow: hidden;
 }
 
 .menu-item-content {
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
+  z-index: 2;
 }
 
 .menu-label {
@@ -326,23 +305,27 @@ onMounted(async () => {
 
 .menu-item:hover {
   color: var(--primary-color);
+  background-color: rgba(64, 128, 255, 0.08);
 }
 
 .menu-item-active {
   color: var(--primary-color);
+  background-color: rgba(64, 128, 255, 0.15);
+  box-shadow: 0 2px 8px rgba(64, 128, 255, 0.1);
 }
 
 .menu-item-active .menu-icon,
 .menu-item-active .menu-label {
   color: var(--primary-color);
+  font-weight: 600;
 }
 
 .menu-indicator {
   position: absolute;
-  right: 0;
+  left: 0;
   top: 50%;
   height: 60%;
-  width: 3px;
+  width: 4px;
   border-radius: 4px;
   transform: translateY(-50%);
   background-color: transparent;
@@ -351,6 +334,7 @@ onMounted(async () => {
 
 .menu-indicator.active {
   background-color: var(--primary-color);
+  box-shadow: 0 0 8px rgba(64, 128, 255, 0.5);
 }
 
 .menu-item-disabled {
@@ -366,16 +350,34 @@ onMounted(async () => {
   transform: translateY(-1px);
 }
 
+/* 增加选中特效 */
+.menu-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent;
+  z-index: 1;
+  transition: all 0.3s ease;
+}
+
+.menu-item-active::before {
+  background-color: rgba(64, 128, 255, 0.05);
+}
+
 :deep(.dark) .custom-sider {
   background-color: rgba(34, 34, 38, 0.95);
 }
 
 :deep(.dark) .menu-item:hover {
-  background-color: rgba(64, 128, 255, 0.1);
+  background-color: rgba(64, 128, 255, 0.15);
 }
 
 :deep(.dark) .menu-item-active {
-  background-color: rgba(64, 128, 255, 0.15);
+  background-color: rgba(64, 128, 255, 0.25);
+  box-shadow: 0 2px 10px rgba(64, 128, 255, 0.2);
 }
 
 :deep(.dark) .header-button:hover {

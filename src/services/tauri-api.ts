@@ -40,6 +40,12 @@ export const proxyApi = {
 
   // 切换 IP 版本
   toggleIpVersion: (preferIpv6: boolean) => invoke<void>('toggle_ip_version', { preferIpv6 }),
+
+  // 切换代理模式（global, rule, tun）
+  toggleProxyMode: (mode: string) => invoke<string>('toggle_proxy_mode', { mode }),
+
+  // 获取当前代理模式
+  getCurrentProxyMode: () => invoke<string>('get_current_proxy_mode'),
 }
 
 // 订阅相关接口
@@ -49,6 +55,9 @@ export const subscriptionApi = {
 
   // 下载最新内核
   downloadLatestKernel: () => invoke<void>('download_latest_kernel'),
+
+  // 获取当前配置
+  getCurrentConfig: () => invoke<string>('get_current_config'),
 }
 
 // 统一导出所有 API
