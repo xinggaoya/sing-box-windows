@@ -170,7 +170,7 @@ pub async fn download_with_fallback<F>(
 where
     F: Fn(u32) + Send + Clone + 'static,
 {
-    // 首先尝试通过代理下载
+    // 首先尝试通过代理下载 https://gh-proxy.com/https://github.com/...
     let proxy_url = format!("https://gh-proxy.com/{}", original_url);
     info!("尝试通过代理下载: {}", proxy_url);
     

@@ -55,7 +55,7 @@ pub struct RateLimitConfig {
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            level: "info".to_string(),
+            level: "debug".to_string(),
             dir: "logs".to_string(),
             file_name_prefix: "app".to_string(),
             rotation: "daily".to_string(),

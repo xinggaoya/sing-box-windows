@@ -18,7 +18,6 @@
         <n-space :size="16">
           <n-button
             quaternary
-            circle
             size="medium"
             @click="appStore.toggleTheme"
             class="header-button"
@@ -32,7 +31,6 @@
           </n-button>
           <n-button
             quaternary
-            circle
             size="medium"
             @click="onToggleFullScreen"
             class="header-button"
@@ -46,7 +44,6 @@
           </n-button>
           <n-button
             quaternary
-            circle
             size="medium"
             @click="appStore.minimizeWindow"
             class="header-button"
@@ -59,7 +56,6 @@
           </n-button>
           <n-button
             quaternary
-            circle
             size="medium"
             @click="appStore.hideWindow"
             class="header-button"
