@@ -425,7 +425,7 @@ const showManualDownloadModal = () => {
 1. 访问 https://github.com/SagerNet/sing-box/releases/latest
 2. 下载对应系统版本的 sing-box
 3. 将解压后的 sing-box.exe 放置在以下目录：
-${appDataPath.value}sing-box/
+用户目录/AppData/Local/sing-box-windows/sing-box/
 
 完成后点击"检查安装"按钮验证安装是否成功。`,
     positiveText: '我知道了',

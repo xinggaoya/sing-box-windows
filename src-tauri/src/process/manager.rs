@@ -32,6 +32,7 @@ impl ProcessManager {
     }
 
     // 检查是否存在其他 sing-box 进程
+    #[allow(dead_code)]
     async fn check_other_sing_box_process(&self) -> Option<u32> {
         // 获取自己的PID以排除
         let self_pid = {
@@ -322,6 +323,7 @@ impl ProcessManager {
     }
 
     // 发送停止信号
+    #[allow(dead_code)]
     fn send_signal(&self, pid: u32) -> std::io::Result<()> {
         std::process::Command::new("taskkill")
             .arg("/PID")
@@ -361,6 +363,7 @@ impl ProcessManager {
     }
 
     // 优雅停止进程
+    #[allow(dead_code)]
     async fn graceful_stop(&self) -> Result<()> {
         let pid = {
             let info = self.process_info.read().await;

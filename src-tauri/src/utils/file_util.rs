@@ -29,9 +29,13 @@ where
         return Err(format!("{}: {}", messages::ERR_SERVER_ERROR, response.status()));
     }
 
-    let total_size = response
-        .content_length()
-        .ok_or_else(|| messages::ERR_FILE_SIZE_UNKNOWN.to_string())?;
+    // 获取文件大小，如果不存在则为0
+    let total_size = response.content_length().unwrap_or(0);
+    let unknown_size = total_size == 0;
+    
+    if unknown_size {
+        info!("无法获取文件大小，将使用流式下载");
+    }
 
     // 创建目录
     if let Some(parent) = file_path.parent() {
@@ -48,6 +52,7 @@ where
     let mut downloaded = 0u64;
     let mut stream = response.bytes_stream();
     let mut last_percent = 0u32;
+    let mut last_progress_update = std::time::Instant::now();
 
     // 开始下载
     while let Some(item) = stream.next().await {
@@ -56,12 +61,27 @@ where
             .map_err(|e| format!("{}: {}", messages::ERR_WRITE_FILE_FAILED, e))?;
 
         downloaded += chunk.len() as u64;
-        let percent = ((downloaded as f64 / total_size as f64) * 100.0) as u32;
-
-        // 只在进度变化时回调
-        if percent != last_percent {
-            last_percent = percent;
-            progress_callback(percent);
+        
+        // 根据是否知道文件大小，使用不同的进度计算方式
+        if unknown_size {
+            // 对于未知大小的文件，每1MB更新一次进度，使用已下载的大小作为进度指示
+            // 下载的越多，进度条增长越慢，给用户一种持续下载的感觉
+            let now = std::time::Instant::now();
+            if now.duration_since(last_progress_update).as_millis() > 500 { // 每500ms更新一次
+                let percent = ((downloaded as f64 / 1_000_000.0).min(100.0)) as u32;
+                if percent != last_percent {
+                    last_percent = percent;
+                    progress_callback(percent);
+                    last_progress_update = now;
+                }
+            }
+        } else {
+            // 已知文件大小，正常计算百分比
+            let percent = ((downloaded as f64 / total_size as f64) * 100.0) as u32;
+            if percent != last_percent {
+                last_percent = percent;
+                progress_callback(percent);
+            }
         }
     }
 
