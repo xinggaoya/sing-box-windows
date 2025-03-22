@@ -106,6 +106,10 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
+### 更多开发文档
+
+详细的开发文档请查看 [开发文档](./docs/development.md)，其中包含了项目结构、核心功能模块、开发规范等更多内容。
+
 ### 项目结构
 
 ```
