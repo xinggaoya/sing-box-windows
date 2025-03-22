@@ -1,5 +1,33 @@
 import { invoke } from '@tauri-apps/api/core'
 
+// 定义接口类型
+interface ProxyData {
+  type: string
+  name: string
+  now: string
+  all: string[]
+  history: Array<{ time: string; delay: number }>
+  udp: boolean
+}
+
+interface ProxiesData {
+  proxies: Record<string, ProxyData>
+}
+
+interface NodeDelay {
+  delay: number
+}
+
+interface VersionInfo {
+  version: string
+  meta: boolean
+  premium: boolean
+  environment?: string
+  tags?: string[]
+  revision?: string
+  cgo?: string
+}
+
 // 内核管理相关接口
 export const kernelApi = {
   // 获取内存使用情况
@@ -22,6 +50,9 @@ export const kernelApi = {
 
   // 检查内核版本
   checkKernelVersion: () => invoke<string>('check_kernel_version'),
+
+  // 启动WebSocket数据中继
+  startWebsocketRelay: () => invoke<void>('start_websocket_relay'),
 }
 
 // 代理模式相关接口
@@ -46,6 +77,27 @@ export const proxyApi = {
 
   // 获取当前代理模式
   getCurrentProxyMode: () => invoke<string>('get_current_proxy_mode'),
+
+  // 获取代理列表
+  getProxies: () => invoke<ProxiesData>('get_proxies'),
+
+  // 切换代理
+  changeProxy: (group: string, proxy: string) => invoke<void>('change_proxy', { group, proxy }),
+
+  // 测试节点延迟
+  testNodeDelay: (name: string, server?: string) =>
+    invoke<NodeDelay>('test_node_delay', { name, server }),
+
+  // 批量测试节点延迟
+  batchTestNodes: (nodes: string[], server?: string) =>
+    invoke<void>('batch_test_nodes', { nodes, server }),
+
+  // 获取版本信息
+  getVersionInfo: () => invoke<VersionInfo>('get_version_info'),
+
+  // 获取规则列表
+  getRules: () =>
+    invoke<{ rules: Array<{ type: string; payload: string; proxy: string }> }>('get_rules'),
 }
 
 // 订阅相关接口

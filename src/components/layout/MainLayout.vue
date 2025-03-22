@@ -119,6 +119,8 @@ import {
   ContractOutline,
   RemoveOutline,
   CloseOutline,
+  FilterOutline,
+  LinkOutline,
 } from '@vicons/ionicons5'
 import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
@@ -198,18 +200,30 @@ const menuOptions = computed(() => [
     icon: SwapHorizontalOutline,
   },
   {
-    label: '订阅',
+    label: '规则',
     key: 2,
+    disabled: !appStore.isRunning,
+    icon: FilterOutline,
+  },
+  {
+    label: '连接',
+    key: 3,
+    disabled: !appStore.isRunning,
+    icon: LinkOutline,
+  },
+  {
+    label: '订阅',
+    key: 4,
     icon: AtCircleOutline,
   },
   {
     label: '日志',
-    key: 3,
+    key: 5,
     icon: DocumentTextOutline,
   },
   {
     label: '设置',
-    key: 4,
+    key: 6,
     icon: SettingsOutline,
   },
 ])
@@ -223,12 +237,18 @@ function onSelect(key: number) {
       router.push('/proxy')
       break
     case 2:
-      router.push('/sub')
+      router.push('/rules')
       break
     case 3:
-      router.push('/log')
+      router.push('/connections')
       break
     case 4:
+      router.push('/sub')
+      break
+    case 5:
+      router.push('/log')
+      break
+    case 6:
       router.push('/setting')
       break
     default:

@@ -8,6 +8,13 @@ use crate::utils::file_util::{ unzip_file};
 use std::os::windows::process::CommandExt;
 use tauri::Emitter;
 use crate::app::constants::{paths, process, messages};
+use tauri::{Runtime, Window};
+use tokio::task;
+use tokio::sync::mpsc;
+use futures_util::StreamExt;
+use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+use url::Url;
+use serde_json::Value;
 
 // 全局进程管理器
 lazy_static::lazy_static! {
@@ -252,5 +259,205 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
         }
     }
 
+    Ok(())
+}
+
+/// 启动WebSocket数据中继
+#[tauri::command]
+pub async fn start_websocket_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+    // 启动四个不同类型的WebSocket中继
+    start_traffic_relay(window.clone()).await?;
+    start_memory_relay(window.clone()).await?;
+    start_logs_relay(window.clone()).await?;
+    start_connections_relay(window.clone()).await?;
+    
+    Ok(())
+}
+
+/// 启动流量数据中继
+async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+    let window_clone = window.clone();
+    let (tx, mut rx) = mpsc::channel(32);
+    let token = crate::app::proxy_service::get_api_token();
+    
+    // 启动WebSocket连接和数据处理任务
+    let _handle = task::spawn(async move {
+        let url = Url::parse(&format!("ws://127.0.0.1:12081/traffic?token={}", token)).unwrap();
+        
+        match connect_async(url).await {
+            Ok((ws_stream, _)) => {
+                let (mut _write, mut read) = ws_stream.split();
+                
+                // 持续读取WebSocket消息
+                while let Some(message) = read.next().await {
+                    match message {
+                        Ok(Message::Text(text)) => {
+                            if let Ok(data) = serde_json::from_str::<Value>(&text) {
+                                let _ = tx.send(data).await;
+                            }
+                        },
+                        Ok(Message::Close(_)) => break,
+                        Err(e) => {
+                            error!("WebSocket流量数据读取错误: {}", e);
+                            break;
+                        },
+                        _ => {}
+                    }
+                }
+            },
+            Err(e) => {
+                error!("WebSocket流量连接失败: {}", e);
+            }
+        }
+    });
+    
+    // 启动事件发送任务
+    task::spawn(async move {
+        while let Some(data) = rx.recv().await {
+            let _ = window_clone.emit("traffic-data", data);
+        }
+    });
+    
+    Ok(())
+}
+
+/// 启动内存数据中继
+async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+    let window_clone = window.clone();
+    let (tx, mut rx) = mpsc::channel(32);
+    let token = crate::app::proxy_service::get_api_token();
+    
+    // 启动WebSocket连接和数据处理任务
+    let _handle = task::spawn(async move {
+        let url = Url::parse(&format!("ws://127.0.0.1:12081/memory?token={}", token)).unwrap();
+        
+        match connect_async(url).await {
+            Ok((ws_stream, _)) => {
+                let (mut _write, mut read) = ws_stream.split();
+                
+                // 持续读取WebSocket消息
+                while let Some(message) = read.next().await {
+                    match message {
+                        Ok(Message::Text(text)) => {
+                            if let Ok(data) = serde_json::from_str::<Value>(&text) {
+                                let _ = tx.send(data).await;
+                            }
+                        },
+                        Ok(Message::Close(_)) => break,
+                        Err(e) => {
+                            error!("WebSocket内存数据读取错误: {}", e);
+                            break;
+                        },
+                        _ => {}
+                    }
+                }
+            },
+            Err(e) => {
+                error!("WebSocket内存连接失败: {}", e);
+            }
+        }
+    });
+    
+    // 启动事件发送任务
+    task::spawn(async move {
+        while let Some(data) = rx.recv().await {
+            let _ = window_clone.emit("memory-data", data);
+        }
+    });
+    
+    Ok(())
+}
+
+/// 启动日志数据中继
+async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+    let window_clone = window.clone();
+    let (tx, mut rx) = mpsc::channel(32);
+    let token = crate::app::proxy_service::get_api_token();
+    
+    // 启动WebSocket连接和数据处理任务
+    let _handle = task::spawn(async move {
+        let url = Url::parse(&format!("ws://127.0.0.1:12081/logs?token={}", token)).unwrap();
+        
+        match connect_async(url).await {
+            Ok((ws_stream, _)) => {
+                let (mut _write, mut read) = ws_stream.split();
+                
+                // 持续读取WebSocket消息
+                while let Some(message) = read.next().await {
+                    match message {
+                        Ok(Message::Text(text)) => {
+                            if let Ok(data) = serde_json::from_str::<Value>(&text) {
+                                let _ = tx.send(data).await;
+                            }
+                        },
+                        Ok(Message::Close(_)) => break,
+                        Err(e) => {
+                            error!("WebSocket日志数据读取错误: {}", e);
+                            break;
+                        },
+                        _ => {}
+                    }
+                }
+            },
+            Err(e) => {
+                error!("WebSocket日志连接失败: {}", e);
+            }
+        }
+    });
+    
+    // 启动事件发送任务
+    task::spawn(async move {
+        while let Some(data) = rx.recv().await {
+            let _ = window_clone.emit("log-data", data);
+        }
+    });
+    
+    Ok(())
+}
+
+/// 启动连接数据中继
+async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+    let window_clone = window.clone();
+    let (tx, mut rx) = mpsc::channel(32);
+    let token = crate::app::proxy_service::get_api_token();
+    
+    // 启动WebSocket连接和数据处理任务
+    let _handle = task::spawn(async move {
+        let url = Url::parse(&format!("ws://127.0.0.1:12081/connections?token={}", token)).unwrap();
+        
+        match connect_async(url).await {
+            Ok((ws_stream, _)) => {
+                let (mut _write, mut read) = ws_stream.split();
+                
+                // 持续读取WebSocket消息
+                while let Some(message) = read.next().await {
+                    match message {
+                        Ok(Message::Text(text)) => {
+                            if let Ok(data) = serde_json::from_str::<Value>(&text) {
+                                let _ = tx.send(data).await;
+                            }
+                        },
+                        Ok(Message::Close(_)) => break,
+                        Err(e) => {
+                            error!("WebSocket连接数据读取错误: {}", e);
+                            break;
+                        },
+                        _ => {}
+                    }
+                }
+            },
+            Err(e) => {
+                error!("WebSocket连接数据连接失败: {}", e);
+            }
+        }
+    });
+    
+    // 启动事件发送任务
+    task::spawn(async move {
+        while let Some(data) = rx.recv().await {
+            let _ = window_clone.emit("connections-data", data);
+        }
+    });
+    
     Ok(())
 } 

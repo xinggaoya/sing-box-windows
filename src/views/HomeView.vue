@@ -104,13 +104,13 @@
               <span class="traffic-value">{{ memoryStr }}</span>
             </div>
           </div>
-          <div class="traffic-card uptime">
+          <div class="traffic-card active-connections">
             <div class="traffic-icon-container">
-              <n-icon size="22"><time-outline /></n-icon>
+              <n-icon size="22"><git-network-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">运行时间</span>
-              <span class="traffic-value">{{ formattedUptime }}</span>
+              <span class="traffic-label">活动连接</span>
+              <span class="traffic-value">{{ activeConnectionsCount }}</span>
             </div>
           </div>
         </div>
@@ -145,6 +145,7 @@ import {
   CloudUploadOutline,
   CloudDownloadOutline,
   TimeOutline,
+  GitNetworkOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/AppStore'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
@@ -184,12 +185,17 @@ const trafficStr = computed(() => {
 
 const uploadTotalTraffic = computed(() => {
   if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
-  return formatBandwidth(Number(infoStore.traffic.totalUp) || 0)
+  return formatBandwidth(Number(infoStore.connectionsTotal.upload) || 0)
 })
 
 const downloadTotalTraffic = computed(() => {
   if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
-  return formatBandwidth(Number(infoStore.traffic.totalDown) || 0)
+  return formatBandwidth(Number(infoStore.connectionsTotal.download) || 0)
+})
+
+const activeConnectionsCount = computed(() => {
+  if (!isRouteActive.value) return '0'
+  return infoStore.connections.length.toString()
 })
 
 const formattedUptime = computed(() => {
@@ -408,6 +414,11 @@ const onModeChange = async (value: string) => {
   color: #9d4edd;
 }
 
+.active-connections .traffic-icon-container {
+  background-color: rgba(100, 160, 200, 0.08);
+  color: #3598db;
+}
+
 :deep(.dark) .upload .traffic-icon-container {
   background-color: rgba(24, 160, 88, 0.15);
 }
@@ -434,6 +445,10 @@ const onModeChange = async (value: string) => {
 
 :deep(.dark) .uptime .traffic-icon-container {
   background-color: rgba(160, 100, 200, 0.15);
+}
+
+:deep(.dark) .active-connections .traffic-icon-container {
+  background-color: rgba(100, 160, 200, 0.15);
 }
 
 .traffic-info {

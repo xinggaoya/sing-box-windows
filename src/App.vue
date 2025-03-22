@@ -93,7 +93,7 @@ onMounted(async () => {
   }
   // 如果内核正在运行，初始化 WebSocket 连接
   if (appStore.isRunning) {
-    infoStore.initWebSocket()
+    infoStore.initEventListeners()
   }
 })
 

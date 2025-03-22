@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, onUnmounted } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
-import { createWebSocket } from '@/utils'
+import { listen } from '@tauri-apps/api/event'
 
 // 定义消息类型
 export type MessageType = 'success' | 'info' | 'error' | 'warning'
@@ -15,6 +15,37 @@ interface VersionInfo {
   tags?: string[]
   revision?: string
   cgo?: string
+}
+
+// 定义连接数据接口
+interface ConnectionMetadata {
+  destinationIP: string
+  destinationPort: string
+  dnsMode: string
+  host: string
+  network: string
+  processPath: string
+  sourceIP: string
+  sourcePort: string
+  type: string
+}
+
+interface Connection {
+  chains: string[]
+  download: number
+  id: string
+  metadata: ConnectionMetadata
+  rule: string
+  rulePayload: string
+  start: string
+  upload: number
+}
+
+interface ConnectionsData {
+  connections: Connection[]
+  downloadTotal: number
+  uploadTotal: number
+  memory: number
 }
 
 export const useInfoStore = defineStore(
@@ -39,6 +70,13 @@ export const useInfoStore = defineStore(
       totalDown: 0, // 下载总流量
     })
 
+    // 连接信息
+    const connections = ref<Connection[]>([])
+    const connectionsTotal = ref({
+      upload: 0,
+      download: 0,
+    })
+
     // 程序运行时间（秒）
     const uptime = ref(0)
     let uptimeInterval: NodeJS.Timeout | null = null
@@ -55,9 +93,9 @@ export const useInfoStore = defineStore(
 
     const logs = ref<LogEntry[]>([])
 
-    // 存储 WebSocket 清理函数
+    // 存储事件监听器清理函数
     let cleanupFunctions: Array<() => void> = []
-    // 记录是否存在活跃的WebSocket连接
+    // 记录是否存在活跃的事件监听器
     let activeConnections = false
 
     // 获取最新版本
@@ -107,11 +145,11 @@ export const useInfoStore = defineStore(
       }
     }
 
-    // 初始化 WebSocket 连接
-    const initWebSocket = () => {
+    // 初始化事件监听器
+    const initEventListeners = async () => {
       // 如果已经有活跃的连接，先清理
       if (activeConnections) {
-        cleanupWebSockets()
+        cleanupEventListeners()
       }
 
       // 设置活跃标志
@@ -123,63 +161,96 @@ export const useInfoStore = defineStore(
         uptime.value += 1
       }, 1000)
 
-      // 流量监控
-      const cleanupTraffic = createWebSocket('ws://127.0.0.1:12081/traffic?token=', (data) => {
-        if ('up' in data && 'down' in data) {
-          const currentUp = Number(data.up) || 0
-          const currentDown = Number(data.down) || 0
+      try {
+        // 启动后端的WebSocket中继
+        await tauriApi.kernel.startWebsocketRelay()
 
-          // 安全地更新总流量计数
-          const currentTotalUp = Number(traffic.value.totalUp) || 0
-          const currentTotalDown = Number(traffic.value.totalDown) || 0
-
-          traffic.value = {
-            up: currentUp,
-            down: currentDown,
-            total: traffic.value.total + currentUp + currentDown,
-            totalUp: currentTotalUp + currentUp,
-            totalDown: currentTotalDown + currentDown,
+        // 监听流量数据
+        const unlistenTraffic = await listen('traffic-data', (event) => {
+          const data = event.payload as {
+            up: number
+            down: number
           }
-        }
-      })
+          if ('up' in data && 'down' in data) {
+            const currentUp = Number(data.up) || 0
+            const currentDown = Number(data.down) || 0
 
-      // 内存监控
-      const cleanupMemory = createWebSocket('ws://127.0.0.1:12081/memory?token=', (data) => {
-        if ('inuse' in data && 'oslimit' in data) {
-          memory.value = data
-        }
-      })
+            // 安全地更新总流量计数
+            const currentTotalUp = Number(traffic.value.totalUp) || 0
+            const currentTotalDown = Number(traffic.value.totalDown) || 0
 
-      // 日志监控
-      const cleanupLogs = createWebSocket('ws://127.0.0.1:12081/logs?token=', (data) => {
-        if (
-          'type' in data &&
-          'payload' in data &&
-          typeof data.type === 'string' &&
-          typeof data.payload === 'string'
-        ) {
-          // 日志条目添加到数组前端，并限制最大数量
-          logs.value.unshift({
-            type: data.type,
-            payload: data.payload,
-            timestamp: Date.now(),
-          })
-
-          // 超过最大数量时，移除多余日志
-          if (logs.value.length > MAX_LOGS) {
-            logs.value = logs.value.slice(0, MAX_LOGS)
+            traffic.value = {
+              up: currentUp,
+              down: currentDown,
+              total: traffic.value.total + currentUp + currentDown,
+              totalUp: currentTotalUp + currentUp,
+              totalDown: currentTotalDown + currentDown,
+            }
           }
-        }
-      })
+        })
 
-      // 过滤掉null值，存储清理函数
-      cleanupFunctions = [cleanupTraffic, cleanupMemory, cleanupLogs].filter(Boolean) as Array<
-        () => void
-      >
+        // 监听内存数据
+        const unlistenMemory = await listen('memory-data', (event) => {
+          const data = event.payload as {
+            inuse: number
+            oslimit: number
+          }
+          if ('inuse' in data && 'oslimit' in data) {
+            memory.value = data
+          }
+        })
+
+        // 监听日志数据
+        const unlistenLogs = await listen('log-data', (event) => {
+          const data = event.payload as {
+            type: string
+            payload: string
+          }
+          if (
+            'type' in data &&
+            'payload' in data &&
+            typeof data.type === 'string' &&
+            typeof data.payload === 'string'
+          ) {
+            // 日志条目添加到数组前端，并限制最大数量
+            logs.value.unshift({
+              type: data.type,
+              payload: data.payload,
+              timestamp: Date.now(),
+            })
+
+            // 超过最大数量时，移除多余日志
+            if (logs.value.length > MAX_LOGS) {
+              logs.value = logs.value.slice(0, MAX_LOGS)
+            }
+          }
+        })
+
+        // 监听连接数据
+        const unlistenConnections = await listen('connections-data', (event) => {
+          const data = event.payload as ConnectionsData
+          if ('connections' in data && Array.isArray(data.connections)) {
+            connections.value = data.connections
+
+            // 更新总流量数据
+            if ('downloadTotal' in data && 'uploadTotal' in data) {
+              connectionsTotal.value = {
+                download: data.downloadTotal || 0,
+                upload: data.uploadTotal || 0,
+              }
+            }
+          }
+        })
+
+        // 存储清理函数
+        cleanupFunctions = [unlistenTraffic, unlistenMemory, unlistenLogs, unlistenConnections]
+      } catch (error) {
+        console.error('初始化事件监听失败:', error)
+      }
     }
 
-    // 清理所有 WebSocket 连接
-    const cleanupWebSockets = () => {
+    // 清理所有事件监听器
+    const cleanupEventListeners = () => {
       if (cleanupFunctions.length > 0) {
         cleanupFunctions.forEach((cleanup) => cleanup())
         cleanupFunctions = []
@@ -206,6 +277,8 @@ export const useInfoStore = defineStore(
         totalDown: 0,
       }
       uptime.value = 0
+      connections.value = []
+      connectionsTotal.value = { upload: 0, download: 0 }
 
       // 等待内核启动并检查状态
       return new Promise((resolve, reject) => {
@@ -214,19 +287,15 @@ export const useInfoStore = defineStore(
 
         const checkStatus = async () => {
           try {
-            const res = await fetch('http://127.0.0.1:12081/version')
-            if (!res.ok) {
-              throw new Error(`HTTP error! status: ${res.status}`)
-            }
-
-            const json = await res.json()
+            // 使用Tauri API获取版本信息
+            const json = await tauriApi.proxy.getVersionInfo()
             version.value = json
 
             // 获取最新版本信息
             await getLatestVersion()
 
-            // 初始化 WebSocket 连接
-            initWebSocket()
+            // 初始化事件监听器
+            await initEventListeners()
 
             resolve(true)
           } catch (error) {
@@ -236,7 +305,18 @@ export const useInfoStore = defineStore(
               console.log(`重试第 ${retryCount} 次，共 ${maxRetries} 次`)
               setTimeout(checkStatus, 1000)
             } else {
-              reject(new Error(`启动失败，已重试 ${maxRetries} 次: ${error}`))
+              // 在无法获取版本信息的情况下，使用默认值，不阻止程序运行
+              console.warn('无法获取版本信息，使用默认值')
+              version.value = { version: 'sing-box 未知版本', meta: true, premium: true }
+
+              // 尽管无法获取版本信息，仍然初始化事件监听器
+              try {
+                await initEventListeners()
+                resolve(true)
+              } catch (initError) {
+                console.error('初始化事件监听器失败:', initError)
+                reject(new Error(`初始化失败: ${initError}`))
+              }
             }
           }
         }
@@ -250,13 +330,15 @@ export const useInfoStore = defineStore(
       try {
         await tauriApi.kernel.stopKernel()
       } finally {
-        // 无论成功与否，都清理WebSocket连接和状态
-        cleanupWebSockets()
+        // 无论成功与否，都清理事件监听器和状态
+        cleanupEventListeners()
         // 重置状态
         memory.value = { inuse: 0, oslimit: 0 }
         traffic.value = { up: 0, down: 0, total: 0, totalUp: 0, totalDown: 0 }
         uptime.value = 0
         logs.value = []
+        connections.value = []
+        connectionsTotal.value = { upload: 0, download: 0 }
       }
     }
 
@@ -315,7 +397,7 @@ export const useInfoStore = defineStore(
 
     // 组件卸载时清理
     onUnmounted(() => {
-      cleanupWebSockets()
+      cleanupEventListeners()
     })
 
     return {
@@ -325,14 +407,16 @@ export const useInfoStore = defineStore(
       traffic,
       logs,
       uptime,
+      connections,
+      connectionsTotal,
       startKernel,
       stopKernel,
       restartKernel,
-      initWebSocket,
+      initEventListeners,
       updateVersion,
       checkKernelVersion,
       clearLogs,
-      cleanupWebSockets,
+      cleanupEventListeners,
       // 消息通知
       setMessageCallback,
       showMessage,

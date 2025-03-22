@@ -53,6 +53,9 @@ pub mod network {
     /// 默认 Clash API 端口
     pub const DEFAULT_CLASH_API_PORT: u16 = 12081;
     
+    /// 默认 API Token
+    pub const DEFAULT_API_TOKEN: &str = "";
+    
     /// 网络请求超时时间（秒）
     pub const HTTP_TIMEOUT_SECONDS: u64 = 30;
 }

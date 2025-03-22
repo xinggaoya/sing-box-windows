@@ -253,16 +253,42 @@
           <!-- 节点选项卡 -->
           <n-tab-pane name="nodes" tab="所有节点">
             <div class="nodes-filter">
-              <n-input
-                v-model:value="searchText"
-                placeholder="搜索节点名称..."
-                clearable
-                class="search-input"
+              <n-space :size="16" align="center">
+                <n-input
+                  v-model:value="searchText"
+                  placeholder="搜索节点名称..."
+                  clearable
+                  class="search-input"
+                >
+                  <template #prefix>
+                    <n-icon><search-outline /></n-icon>
+                  </template>
+                </n-input>
+
+                <n-button
+                  @click="batchTestAllNodes"
+                  :loading="batchTesting"
+                  type="primary"
+                  ghost
+                  size="medium"
+                >
+                  <template #icon>
+                    <n-icon><flash-outline /></n-icon>
+                  </template>
+                  批量测速
+                </n-button>
+              </n-space>
+
+              <!-- 批量测试进度条 -->
+              <n-progress
+                v-if="batchTesting"
+                type="line"
+                :percentage="batchTestProgress.percentage"
+                :indicator-placement="'inside'"
+                class="batch-test-progress"
               >
-                <template #prefix>
-                  <n-icon><search-outline /></n-icon>
-                </template>
-              </n-input>
+                {{ batchTestProgress.text }}
+              </n-progress>
             </div>
 
             <n-grid :x-gap="16" :y-gap="16" :cols="gridCols" responsive="screen">
@@ -292,7 +318,7 @@
                       </n-tag>
                     </n-flex>
 
-                    <n-flex justify="space-between" align="center">
+                    <n-flex justify="center" align="center">
                       <n-button
                         @click="testNodeDelay(node.name)"
                         :loading="testingNodes[node.name]"
@@ -306,19 +332,6 @@
                           <n-icon><speedometer-outline /></n-icon>
                         </template>
                         测速
-                      </n-button>
-                      <n-button
-                        @click="addToFavorites(node.name)"
-                        secondary
-                        size="small"
-                        type="warning"
-                        ghost
-                        class="proxy-button"
-                      >
-                        <template #icon>
-                          <n-icon><star-outline /></n-icon>
-                        </template>
-                        收藏
                       </n-button>
                     </n-flex>
                   </n-space>
@@ -339,7 +352,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, computed, reactive, h } from 'vue'
+import { onMounted, ref, computed, reactive, h, onUnmounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   RefreshOutline,
@@ -350,13 +363,14 @@ import {
   LayersOutline,
   HardwareChipOutline,
   SearchOutline,
-  StarOutline,
+  FlashOutline,
   ChevronDownOutline,
   InformationCircleOutline,
 } from '@vicons/ionicons5'
 import { useWindowSize } from '@vueuse/core'
 import { Component } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
+import { listen } from '@tauri-apps/api/event'
 
 // 接口定义
 interface ProxyHistory {
@@ -401,6 +415,20 @@ const isChangingMode = ref(false)
 const showModeChangeModal = ref(false)
 const targetProxyMode = ref('')
 
+// 批量测试相关
+const batchTesting = ref(false)
+const batchTestProgress = reactive({
+  percentage: 0,
+  text: '准备测试...',
+  current: 0,
+  total: 0,
+})
+
+// 注册事件监听器
+let unlistenTestProgress: (() => void) | null = null
+let unlistenTestResult: (() => void) | null = null
+let unlistenTestComplete: (() => void) | null = null
+
 // 代理模式选项
 const proxyModeOptions = [
   {
@@ -412,11 +440,6 @@ const proxyModeOptions = [
     label: '规则模式',
     key: 'rule',
     icon: renderIcon(LayersOutline),
-  },
-  {
-    label: 'TUN模式',
-    key: 'tun',
-    icon: renderIcon(HardwareChipOutline),
   },
 ]
 
@@ -450,7 +473,45 @@ onMounted(() => {
   init()
   // 读取当前代理模式
   getCurrentProxyMode()
+  // 注册事件监听器
+  setupEventListeners()
 })
+
+onUnmounted(() => {
+  // 清理事件监听器
+  if (unlistenTestProgress) unlistenTestProgress()
+  if (unlistenTestResult) unlistenTestResult()
+  if (unlistenTestComplete) unlistenTestComplete()
+})
+
+// 设置事件监听器
+const setupEventListeners = async () => {
+  unlistenTestProgress = await listen('test-nodes-progress', (event) => {
+    const data = event.payload as any
+    batchTestProgress.current = data.current
+    batchTestProgress.total = data.total
+    batchTestProgress.percentage = (data.current / data.total) * 100
+    batchTestProgress.text = `测试中: ${data.current}/${data.total} (${data.node})`
+  })
+
+  unlistenTestResult = await listen('test-node-result', (event) => {
+    const data = event.payload as any
+    // 更新节点延迟信息
+    const nodeIndex = allNodes.value.findIndex((node) => node.name === data.name)
+    if (nodeIndex !== -1) {
+      allNodes.value[nodeIndex].delay = data.success ? data.delay : 0
+    }
+    // 对于失败的情况，可以考虑显示错误信息
+    if (!data.success) {
+      console.warn(`测试节点 ${data.name} 失败: ${data.error}`)
+    }
+  })
+
+  unlistenTestComplete = await listen('test-nodes-complete', () => {
+    batchTesting.value = false
+    message.success('批量测速完成')
+  })
+}
 
 /**
  * 初始化并获取代理信息
@@ -458,15 +519,8 @@ onMounted(() => {
 const init = async () => {
   isLoading.value = true
   try {
-    // 获取代理信息
-    const res = await fetch('http://127.0.0.1:12081/proxies', {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      method: 'GET',
-    })
-
-    const data = (await res.json()) as Proxies
+    // 使用Tauri API获取代理信息
+    const data = await tauriApi.proxy.getProxies()
     rawProxies.value = data.proxies
 
     // 提取全局组
@@ -613,17 +667,7 @@ const testNodeDelay = async (
   testingNodes[name] = true
 
   try {
-    const res = await fetch(
-      `http://127.0.0.1:12081/proxies/${encodeURIComponent(name)}/delay?url=${encodeURIComponent(server)}&timeout=5000`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        method: 'GET',
-      },
-    )
-
-    const data = await res.json()
+    const data = await tauriApi.proxy.testNodeDelay(name, server)
 
     // 更新节点的延迟信息
     const nodeIndex = allNodes.value.findIndex((node) => node.name === name)
@@ -642,43 +686,53 @@ const testNodeDelay = async (
 }
 
 /**
+ * 批量测试所有节点
+ */
+const batchTestAllNodes = async () => {
+  if (batchTesting.value) return
+
+  // 筛选出要测试的节点
+  const nodesToTest = allNodes.value
+    .filter((node) => !['Direct', 'Reject'].includes(node.type))
+    .map((node) => node.name)
+
+  if (nodesToTest.length === 0) {
+    message.warning('没有可测试的节点')
+    return
+  }
+
+  // 重置进度
+  batchTesting.value = true
+  batchTestProgress.current = 0
+  batchTestProgress.total = nodesToTest.length
+  batchTestProgress.percentage = 0
+  batchTestProgress.text = '准备测试...'
+
+  try {
+    // 调用后端API进行批量测试
+    await tauriApi.proxy.batchTestNodes(nodesToTest)
+  } catch (error) {
+    console.error('批量测试失败', error)
+    message.error('批量测试失败: ' + error)
+    batchTesting.value = false
+  }
+}
+
+/**
  * 切换代理
  * @param group 代理组名称
  * @param proxy 要切换到的代理名称
  */
 const changeProxy = async (group: string, proxy: string) => {
   try {
-    const res = await fetch(`http://127.0.0.1:12081/proxies/${encodeURIComponent(group)}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name: proxy }),
-    })
-
-    if (res.status === 400) {
-      message.error('切换失败，可能是不可切换的代理组')
-      return
-    }
-
-    if (res.status === 204) {
-      message.success(`已切换 ${group} 到 ${proxy}`)
-      // 重新加载数据
-      await init()
-    }
+    await tauriApi.proxy.changeProxy(group, proxy)
+    message.success(`已切换 ${group} 到 ${proxy}`)
+    // 重新加载数据
+    await init()
   } catch (error) {
     console.error('切换失败', error)
     message.error('切换失败，请检查Sing-Box是否已启动')
   }
-}
-
-/**
- * 添加节点到收藏夹
- * @param name 节点名称
- */
-const addToFavorites = (name: string) => {
-  // 这里只是示例功能，实际上需要与后端通信来实现
-  message.info('收藏功能在开发中')
 }
 
 /**
@@ -955,6 +1009,12 @@ const confirmProxyModeChange = async () => {
 
 :deep(.n-card.proxy-node-card:hover) {
   background-color: var(--card-color-hover);
+}
+
+.batch-test-progress {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  width: 100%;
 }
 
 @keyframes slide-up {

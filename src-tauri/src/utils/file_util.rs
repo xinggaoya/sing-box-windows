@@ -16,6 +16,7 @@ where
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(network::HTTP_TIMEOUT_SECONDS))
+        .no_proxy() // 禁用代理
         .build()
         .map_err(|e| format!("{}: {}", messages::ERR_HTTP_CLIENT_FAILED, e))?;
 

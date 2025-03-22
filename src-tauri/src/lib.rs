@@ -1,8 +1,11 @@
 use crate::app::kernel_service::{
     check_kernel_version, download_latest_kernel, get_memory_usage, get_process_status,
-    restart_kernel, start_kernel, stop_kernel,
+    restart_kernel, start_kernel, stop_kernel, start_websocket_relay
 };
-use crate::app::proxy_service::{set_system_proxy, set_tun_proxy, toggle_ip_version};
+use crate::app::proxy_service::{
+    set_system_proxy, set_tun_proxy, toggle_ip_version, get_proxies, change_proxy, 
+    test_node_delay, batch_test_nodes, get_version_info, get_rules
+};
 use crate::app::subscription_service::{download_subscription, add_manual_subscription, get_current_config, toggle_proxy_mode, get_current_proxy_mode};
 use crate::app::system_service::{check_admin, get_traffic_data, restart_as_admin};
 use crate::app::update_service::{check_update, download_and_install_update};
@@ -66,6 +69,13 @@ pub fn run() {
             check_kernel_version,
             toggle_proxy_mode,
             get_current_proxy_mode,
+            get_proxies,
+            change_proxy,
+            test_node_delay,
+            batch_test_nodes,
+            get_version_info,
+            get_rules,
+            start_websocket_relay,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

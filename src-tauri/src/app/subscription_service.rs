@@ -157,9 +157,9 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     let config = Config {
         clash_api: ClashApiConfig {
             external_controller: "127.0.0.1:12081".to_string(),
-            external_ui: "metacubexd".to_string(),
+            external_ui: "".to_string(),
             external_ui_download_url: "".to_string(),
-            external_ui_download_detour: "手动切换".to_string(),
+            external_ui_download_detour: "".to_string(),
             default_mode: "rule".to_string(),
         },
         cache_file: CacheFileConfig { enabled: true },

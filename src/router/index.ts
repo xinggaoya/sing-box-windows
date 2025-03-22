@@ -35,6 +35,16 @@ const router = createRouter({
           component: () => import('@/views/SettingView.vue'),
         },
         {
+          path: '/rules',
+          name: 'Rules',
+          component: () => import('@/views/RulesView.vue'),
+        },
+        {
+          path: '/connections',
+          name: 'Connections',
+          component: () => import('@/views/ConnectionsView.vue'),
+        },
+        {
           path: '/blank',
           name: 'Blank',
           component: () => import('@/views/BlankView.vue'),
