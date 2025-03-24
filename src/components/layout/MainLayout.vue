@@ -200,6 +200,11 @@ const menuOptions = computed(() => [
     icon: SwapHorizontalOutline,
   },
   {
+    label: '订阅',
+    key: 4,
+    icon: AtCircleOutline,
+  },
+  {
     label: '规则',
     key: 2,
     disabled: !appStore.isRunning,
@@ -210,11 +215,6 @@ const menuOptions = computed(() => [
     key: 3,
     disabled: !appStore.isRunning,
     icon: LinkOutline,
-  },
-  {
-    label: '订阅',
-    key: 4,
-    icon: AtCircleOutline,
   },
   {
     label: '日志',
