@@ -74,35 +74,6 @@ pub async fn get_process_status() -> serde_json::Value {
     })
 }
 
-// 获取内存使用情况
-#[tauri::command]
-pub async fn get_memory_usage() -> Result<String, String> {
-    let output = std::process::Command::new("wmic")
-        .args([
-            "process",
-            "where",
-            "name='sing-box.exe'",
-            "get",
-            "WorkingSetSize",
-        ])
-        .creation_flags(0x08000000)
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    let output_str = String::from_utf8_lossy(&output.stdout);
-    let lines: Vec<&str> = output_str.lines().collect();
-    if lines.len() < 2 {
-        return Ok("0".to_string());
-    }
-
-    let memory = lines[1].trim();
-    if memory.is_empty() {
-        Ok("0".to_string())
-    } else {
-        Ok((memory.parse::<u64>().unwrap_or(0) / 1024 / 1024).to_string())
-    }
-}
-
 // 下载内核
 #[tauri::command]
 pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String> {

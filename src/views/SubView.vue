@@ -311,7 +311,6 @@
 </template>
 
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
 import { useMessage } from 'naive-ui'
 import { ref, computed } from 'vue'
 import { useSubStore } from '@/stores/SubStore'
@@ -327,6 +326,7 @@ import {
 } from '@vicons/ionicons5'
 import type { FormInst, FormRules } from 'naive-ui'
 import { useWindowSize } from '@vueuse/core'
+import { tauriApi } from '@/services/tauri-api'
 
 interface Subscription {
   name: string
@@ -439,12 +439,12 @@ const handleConfirm = () => {
           // 如果是手动编辑模式且有内容，直接保存内容
           if (editIndex.value === null) {
             // 如果是新建订阅，同时使用这个内容
-            await invoke('add_manual_subscription', { content: formValue.value.manualContent })
+            await tauriApi.subscription.addManualSubscription(formValue.value.manualContent)
           }
         } else if (!isManual) {
           // 如果是URL模式且是新建订阅
           if (editIndex.value === null) {
-            await invoke('download_subscription', { url: formValue.value.url })
+            await tauriApi.subscription.downloadSubscription(formValue.value.url)
           }
         }
 
@@ -510,10 +510,10 @@ const useSubscription = async (url: string, index: number) => {
 
     if (item.isManual && item.manualContent) {
       // 如果是手动配置，直接使用保存的内容
-      await invoke('add_manual_subscription', { content: item.manualContent })
+      await tauriApi.subscription.addManualSubscription(item.manualContent)
     } else {
       // 否则从URL下载内容
-      await invoke('download_subscription', { url })
+      await tauriApi.subscription.downloadSubscription(url)
     }
 
     // 更新订阅状态
@@ -547,7 +547,7 @@ const editCurrentConfig = async () => {
   try {
     isConfigLoading.value = true
     // 获取当前配置内容
-    const config = await invoke('get_current_config')
+    const config = await tauriApi.subscription.getCurrentConfig()
     if (typeof config === 'string') {
       currentConfig.value = config
       showConfigModal.value = true
@@ -564,9 +564,7 @@ const saveCurrentConfig = async () => {
     isConfigLoading.value = true
 
     // 保存配置内容
-    await invoke('add_manual_subscription', {
-      content: currentConfig.value,
-    })
+    await tauriApi.subscription.addManualSubscription(currentConfig.value)
 
     // 如果当前活跃订阅是手动配置，更新其内容
     if (subStore.activeIndex !== null) {

@@ -171,7 +171,6 @@ sing-box-windows/
 
 - `check_admin`：检查管理员权限
 - `restart_as_admin`：以管理员身份重启
-- `get_traffic_data`：获取流量数据
 
 ### 更新服务 (update_service.rs)
 

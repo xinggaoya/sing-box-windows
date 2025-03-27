@@ -1,13 +1,16 @@
 use crate::app::kernel_service::{
-    check_kernel_version, download_latest_kernel, get_memory_usage, get_process_status,
-    restart_kernel, start_kernel, stop_kernel, start_websocket_relay
+    check_kernel_version, download_latest_kernel, get_process_status,
+    restart_kernel, start_kernel, start_websocket_relay, stop_kernel,
 };
 use crate::app::proxy_service::{
-    set_system_proxy, set_tun_proxy, toggle_ip_version, get_proxies, change_proxy, 
-    test_node_delay, batch_test_nodes, get_version_info, get_rules
+    batch_test_nodes, change_proxy, get_proxies, get_rules, get_version_info, set_system_proxy,
+    set_tun_proxy, test_node_delay, toggle_ip_version,
 };
-use crate::app::subscription_service::{download_subscription, add_manual_subscription, get_current_config, toggle_proxy_mode, get_current_proxy_mode};
-use crate::app::system_service::{check_admin, get_traffic_data, restart_as_admin};
+use crate::app::subscription_service::{
+    add_manual_subscription, download_subscription, get_current_config, get_current_proxy_mode,
+    toggle_proxy_mode,
+};
+use crate::app::system_service::{check_admin, restart_as_admin};
 use crate::app::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
@@ -57,8 +60,6 @@ pub fn run() {
             stop_kernel,
             set_system_proxy,
             set_tun_proxy,
-            get_memory_usage,
-            get_traffic_data,
             check_admin,
             restart_as_admin,
             restart_kernel,

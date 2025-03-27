@@ -1,18 +1,5 @@
-use serde_json::json;
+use crate::app::constants::{messages, process};
 use std::os::windows::process::CommandExt;
-use crate::app::constants::{process, messages};
-
-// 获取流量数据
-#[tauri::command]
-pub async fn get_traffic_data() -> Result<String, String> {
-    // 这里实现获取流量数据的逻辑
-    // 由于需要实际的网络接口数据，这里返回一个示例数据
-    Ok(json!({
-        "upload": 0,
-        "download": 0
-    })
-    .to_string())
-}
 
 // 以管理员权限重启
 #[tauri::command]

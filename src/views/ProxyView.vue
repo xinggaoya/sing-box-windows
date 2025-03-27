@@ -86,27 +86,35 @@
     <!-- 代理列表卡片 -->
     <n-spin :show="isLoading">
       <n-card class="proxy-list-card" :bordered="false">
-        <n-tabs type="segment" animated class="proxy-tabs" v-model:value="activeTab">
-          <!-- 全局设置选项卡 -->
-          <n-tab-pane name="global" tab="全局设置">
-            <div v-if="globalGroup" class="proxy-group">
+        <!-- 代理分组内容 -->
+        <n-tabs type="line" animated v-model:value="activeGroupTab">
+          <n-tab-pane
+            v-for="(group, index) in [...proxyGroups].reverse()"
+            :key="index"
+            :name="group.name"
+            :tab="group.name"
+          >
+            <div class="proxy-group">
               <div class="proxy-group-info">
                 <n-space align="center" :size="12">
                   <n-tag :bordered="false" type="success" size="medium" class="proxy-tag">
-                    当前使用: {{ globalGroup.now }}
+                    当前节点: {{ group.now }}
                   </n-tag>
                   <n-tag :bordered="false" type="info" size="medium" class="proxy-tag">
-                    {{ globalGroup.all.length }} 个可选项
+                    {{ group.all.length }} 个节点
+                  </n-tag>
+                  <n-tag :bordered="false" type="warning" size="medium" class="proxy-tag">
+                    {{ group.type }}
                   </n-tag>
                 </n-space>
               </div>
 
               <n-grid :x-gap="16" :y-gap="16" :cols="gridCols" responsive="screen">
-                <n-grid-item v-for="(proxy, i) in globalGroup.all" :key="i">
+                <n-grid-item v-for="(proxy, i) in group.all" :key="i">
                   <n-card
                     :class="{
                       'proxy-node-card': true,
-                      'proxy-node-card-active': globalGroup.now === proxy,
+                      'proxy-node-card-active': group.now === proxy,
                     }"
                     :bordered="false"
                     hoverable
@@ -119,32 +127,47 @@
                           </n-ellipsis>
                         </div>
                         <n-tag
-                          :type="getProxyTypeColor(getProxyType(proxy))"
+                          :type="getNodeDelayType(getNodeDelay(proxy))"
                           size="small"
                           :bordered="false"
                           round
-                          class="type-tag"
+                          class="delay-tag"
                         >
-                          {{ getProxyType(proxy) }}
+                          {{ getNodeDelay(proxy) === 0 ? '未测速' : getNodeDelay(proxy) + 'ms' }}
                         </n-tag>
                       </n-flex>
 
                       <n-flex justify="space-between" align="center">
                         <n-button
-                          @click="changeProxy('GLOBAL', proxy)"
-                          :type="globalGroup.now === proxy ? 'default' : 'primary'"
+                          @click="changeProxy(group.name, proxy)"
+                          :type="group.now === proxy ? 'default' : 'primary'"
                           size="small"
-                          :disabled="globalGroup.now === proxy"
-                          :ghost="globalGroup.now !== proxy"
+                          :disabled="group.now === proxy"
+                          :ghost="group.now !== proxy"
                           class="proxy-button"
                         >
                           <template #icon>
                             <n-icon>
-                              <checkmark-circle-outline v-if="globalGroup.now === proxy" />
+                              <checkmark-circle-outline v-if="group.now === proxy" />
                               <swap-horizontal-outline v-else />
                             </n-icon>
                           </template>
-                          {{ globalGroup.now === proxy ? '使用中' : '切换' }}
+                          {{ group.now === proxy ? '使用中' : '切换' }}
+                        </n-button>
+                        <n-button
+                          @click="testNodeDelay(proxy)"
+                          :loading="testingNodes[proxy]"
+                          secondary
+                          size="small"
+                          type="info"
+                          ghost
+                          class="proxy-button"
+                          v-if="isRealNode(proxy)"
+                        >
+                          <template #icon>
+                            <n-icon><speedometer-outline /></n-icon>
+                          </template>
+                          测速
                         </n-button>
                       </n-flex>
                     </n-space>
@@ -152,198 +175,6 @@
                 </n-grid-item>
               </n-grid>
             </div>
-          </n-tab-pane>
-
-          <!-- 分组选项卡 -->
-          <n-tab-pane name="groups" tab="代理分组">
-            <n-tabs type="line" animated v-model:value="activeGroupTab">
-              <n-tab-pane
-                v-for="(group, index) in proxyGroups"
-                :key="index"
-                :name="group.name"
-                :tab="group.name"
-              >
-                <div class="proxy-group">
-                  <div class="proxy-group-info">
-                    <n-space align="center" :size="12">
-                      <n-tag :bordered="false" type="success" size="medium" class="proxy-tag">
-                        当前节点: {{ group.now }}
-                      </n-tag>
-                      <n-tag :bordered="false" type="info" size="medium" class="proxy-tag">
-                        {{ group.all.length }} 个节点
-                      </n-tag>
-                      <n-tag :bordered="false" type="warning" size="medium" class="proxy-tag">
-                        {{ group.type }}
-                      </n-tag>
-                    </n-space>
-                  </div>
-
-                  <n-grid :x-gap="16" :y-gap="16" :cols="gridCols" responsive="screen">
-                    <n-grid-item v-for="(proxy, i) in group.all" :key="i">
-                      <n-card
-                        :class="{
-                          'proxy-node-card': true,
-                          'proxy-node-card-active': group.now === proxy,
-                        }"
-                        :bordered="false"
-                        hoverable
-                      >
-                        <n-space vertical :size="14">
-                          <n-flex justify="space-between" align="center">
-                            <div class="proxy-name-container">
-                              <n-ellipsis style="max-width: 100%" :tooltip="{ width: 'trigger' }">
-                                {{ proxy }}
-                              </n-ellipsis>
-                            </div>
-                            <n-tag
-                              :type="getNodeDelayType(getNodeDelay(proxy))"
-                              size="small"
-                              :bordered="false"
-                              round
-                              class="delay-tag"
-                            >
-                              {{
-                                getNodeDelay(proxy) === 0 ? '未测速' : getNodeDelay(proxy) + 'ms'
-                              }}
-                            </n-tag>
-                          </n-flex>
-
-                          <n-flex justify="space-between" align="center">
-                            <n-button
-                              @click="changeProxy(group.name, proxy)"
-                              :type="group.now === proxy ? 'default' : 'primary'"
-                              size="small"
-                              :disabled="group.now === proxy"
-                              :ghost="group.now !== proxy"
-                              class="proxy-button"
-                            >
-                              <template #icon>
-                                <n-icon>
-                                  <checkmark-circle-outline v-if="group.now === proxy" />
-                                  <swap-horizontal-outline v-else />
-                                </n-icon>
-                              </template>
-                              {{ group.now === proxy ? '使用中' : '切换' }}
-                            </n-button>
-                            <n-button
-                              @click="testNodeDelay(proxy)"
-                              :loading="testingNodes[proxy]"
-                              secondary
-                              size="small"
-                              type="info"
-                              ghost
-                              class="proxy-button"
-                              v-if="isRealNode(proxy)"
-                            >
-                              <template #icon>
-                                <n-icon><speedometer-outline /></n-icon>
-                              </template>
-                              测速
-                            </n-button>
-                          </n-flex>
-                        </n-space>
-                      </n-card>
-                    </n-grid-item>
-                  </n-grid>
-                </div>
-              </n-tab-pane>
-            </n-tabs>
-          </n-tab-pane>
-
-          <!-- 节点选项卡 -->
-          <n-tab-pane name="nodes" tab="所有节点">
-            <div class="nodes-filter">
-              <n-space :size="16" align="center">
-                <n-input
-                  v-model:value="searchText"
-                  placeholder="搜索节点名称..."
-                  clearable
-                  class="search-input"
-                >
-                  <template #prefix>
-                    <n-icon><search-outline /></n-icon>
-                  </template>
-                </n-input>
-
-                <n-button
-                  @click="batchTestAllNodes"
-                  :loading="batchTesting"
-                  type="primary"
-                  ghost
-                  size="medium"
-                >
-                  <template #icon>
-                    <n-icon><flash-outline /></n-icon>
-                  </template>
-                  批量测速
-                </n-button>
-              </n-space>
-
-              <!-- 批量测试进度条 -->
-              <n-progress
-                v-if="batchTesting"
-                type="line"
-                :percentage="batchTestProgress.percentage"
-                :indicator-placement="'inside'"
-                class="batch-test-progress"
-              >
-                {{ batchTestProgress.text }}
-              </n-progress>
-            </div>
-
-            <n-grid :x-gap="16" :y-gap="16" :cols="gridCols" responsive="screen">
-              <n-grid-item v-for="(node, i) in filteredNodes" :key="i">
-                <n-card class="proxy-node-card node-card" :bordered="false" hoverable>
-                  <n-space vertical :size="14">
-                    <n-flex justify="space-between" align="center">
-                      <div class="proxy-name-container">
-                        <n-ellipsis style="max-width: 100%" :tooltip="{ width: 'trigger' }">
-                          {{ node.name }}
-                        </n-ellipsis>
-                      </div>
-                      <n-tag
-                        :type="getNodeDelayType(node.delay)"
-                        size="small"
-                        :bordered="false"
-                        round
-                        class="delay-tag"
-                      >
-                        {{ node.delay === 0 ? '未测速' : node.delay + 'ms' }}
-                      </n-tag>
-                    </n-flex>
-
-                    <n-flex align="center" class="node-type">
-                      <n-tag size="small" :bordered="false" :type="getProxyTypeColor(node.type)">
-                        {{ node.type }}
-                      </n-tag>
-                    </n-flex>
-
-                    <n-flex justify="center" align="center">
-                      <n-button
-                        @click="testNodeDelay(node.name)"
-                        :loading="testingNodes[node.name]"
-                        secondary
-                        size="small"
-                        type="info"
-                        ghost
-                        class="proxy-button"
-                      >
-                        <template #icon>
-                          <n-icon><speedometer-outline /></n-icon>
-                        </template>
-                        测速
-                      </n-button>
-                    </n-flex>
-                  </n-space>
-                </n-card>
-              </n-grid-item>
-            </n-grid>
-
-            <n-empty
-              v-if="filteredNodes.length === 0"
-              description="未找到节点"
-              class="empty-container"
-            />
           </n-tab-pane>
         </n-tabs>
       </n-card>
@@ -362,8 +193,6 @@ import {
   GlobeOutline,
   LayersOutline,
   HardwareChipOutline,
-  SearchOutline,
-  FlashOutline,
   ChevronDownOutline,
   InformationCircleOutline,
 } from '@vicons/ionicons5'
@@ -391,12 +220,6 @@ interface Proxies {
   proxies: Record<string, ProxyData>
 }
 
-interface NodeInfo {
-  name: string
-  type: string
-  delay: number
-}
-
 // 状态定义
 const message = useMessage()
 const isLoading = ref(false)
@@ -404,9 +227,7 @@ const { width } = useWindowSize()
 
 // 代理数据
 const rawProxies = ref<Record<string, ProxyData>>({})
-const globalGroup = ref<ProxyData | null>(null)
 const proxyGroups = ref<ProxyData[]>([])
-const allNodes = ref<NodeInfo[]>([])
 const testingNodes = reactive<Record<string, boolean>>({})
 const currentProxyMode = ref('rule') // 默认为规则模式
 
@@ -414,15 +235,6 @@ const currentProxyMode = ref('rule') // 默认为规则模式
 const isChangingMode = ref(false)
 const showModeChangeModal = ref(false)
 const targetProxyMode = ref('')
-
-// 批量测试相关
-const batchTesting = ref(false)
-const batchTestProgress = reactive({
-  percentage: 0,
-  text: '准备测试...',
-  current: 0,
-  total: 0,
-})
 
 // 注册事件监听器
 let unlistenTestProgress: (() => void) | null = null
@@ -449,9 +261,7 @@ function renderIcon(icon: Component) {
 }
 
 // 选项卡状态
-const activeTab = ref('global')
 const activeGroupTab = ref('')
-const searchText = ref('')
 
 // 根据窗口宽度调整网格列数
 const gridCols = computed(() => {
@@ -459,13 +269,6 @@ const gridCols = computed(() => {
   if (width.value < 960) return 2
   if (width.value < 1280) return 3
   return 4
-})
-
-// 过滤节点
-const filteredNodes = computed(() => {
-  if (!searchText.value) return allNodes.value
-  const keyword = searchText.value.toLowerCase()
-  return allNodes.value.filter((node) => node.name.toLowerCase().includes(keyword))
 })
 
 // 生命周期钩子
@@ -488,27 +291,23 @@ onUnmounted(() => {
 const setupEventListeners = async () => {
   unlistenTestProgress = await listen('test-nodes-progress', (event) => {
     const data = event.payload as any
-    batchTestProgress.current = data.current
-    batchTestProgress.total = data.total
-    batchTestProgress.percentage = (data.current / data.total) * 100
-    batchTestProgress.text = `测试中: ${data.current}/${data.total} (${data.node})`
+    console.log('测试进度:', data)
   })
 
   unlistenTestResult = await listen('test-node-result', (event) => {
     const data = event.payload as any
     // 更新节点延迟信息
-    const nodeIndex = allNodes.value.findIndex((node) => node.name === data.name)
-    if (nodeIndex !== -1) {
-      allNodes.value[nodeIndex].delay = data.success ? data.delay : 0
-    }
-    // 对于失败的情况，可以考虑显示错误信息
-    if (!data.success) {
-      console.warn(`测试节点 ${data.name} 失败: ${data.error}`)
+    if (rawProxies.value[data.name]) {
+      rawProxies.value[data.name].history = [
+        {
+          time: new Date().toISOString(),
+          delay: data.success ? data.delay : 0,
+        },
+      ]
     }
   })
 
   unlistenTestComplete = await listen('test-nodes-complete', () => {
-    batchTesting.value = false
     message.success('批量测速完成')
   })
 }
@@ -523,14 +322,8 @@ const init = async () => {
     const data = await tauriApi.proxy.getProxies()
     rawProxies.value = data.proxies
 
-    // 提取全局组
-    if (data.proxies.GLOBAL) {
-      globalGroup.value = data.proxies.GLOBAL
-    }
-
     // 提取代理组
     const groups: ProxyData[] = []
-    const nodes: NodeInfo[] = []
 
     Object.entries(data.proxies).forEach(([key, item]) => {
       // 排除特殊组和直连
@@ -545,22 +338,11 @@ const init = async () => {
           activeGroupTab.value = item.name
         }
       }
-
-      // 如果不是组类型，添加到节点列表
-      if (!['Selector', 'URLTest', 'Fallback'].includes(item.type)) {
-        const delay = item.history.length > 0 ? item.history[0].delay : 0
-        nodes.push({
-          name: item.name,
-          type: item.type,
-          delay,
-        })
-      }
     })
 
     proxyGroups.value = groups
-    allNodes.value = nodes
 
-    if (groups.length > 0 || nodes.length > 0) {
+    if (groups.length > 0) {
       message.success('代理列表加载成功')
     }
   } catch (error) {
@@ -569,38 +351,6 @@ const init = async () => {
   } finally {
     isLoading.value = false
   }
-}
-
-/**
- * 获取节点类型
- * @param name 节点名称
- * @returns 节点类型
- */
-const getProxyType = (name: string): string => {
-  if (rawProxies.value[name]) {
-    return rawProxies.value[name].type
-  }
-  return '未知'
-}
-
-/**
- * 获取节点类型对应的颜色
- * @param type 节点类型
- * @returns 颜色类型
- */
-const getProxyTypeColor = (type: string): string => {
-  const typeMap: Record<string, string> = {
-    Selector: 'info',
-    URLTest: 'success',
-    Fallback: 'warning',
-    Direct: 'default',
-    Hysteria2: 'error',
-    Shadowsocks: 'warning',
-    Trojan: 'primary',
-    VMess: 'info',
-    Socks5: 'default',
-  }
-  return typeMap[type] || 'default'
 }
 
 /**
@@ -668,13 +418,6 @@ const testNodeDelay = async (
 
   try {
     const data = await tauriApi.proxy.testNodeDelay(name, server)
-
-    // 更新节点的延迟信息
-    const nodeIndex = allNodes.value.findIndex((node) => node.name === name)
-    if (nodeIndex !== -1) {
-      allNodes.value[nodeIndex].delay = data.delay
-    }
-
     message.success(`测速完成: ${data.delay}ms`)
   } catch (error) {
     console.error('测速失败', error)
@@ -682,39 +425,6 @@ const testNodeDelay = async (
   } finally {
     // 清除测试状态
     testingNodes[name] = false
-  }
-}
-
-/**
- * 批量测试所有节点
- */
-const batchTestAllNodes = async () => {
-  if (batchTesting.value) return
-
-  // 筛选出要测试的节点
-  const nodesToTest = allNodes.value
-    .filter((node) => !['Direct', 'Reject'].includes(node.type))
-    .map((node) => node.name)
-
-  if (nodesToTest.length === 0) {
-    message.warning('没有可测试的节点')
-    return
-  }
-
-  // 重置进度
-  batchTesting.value = true
-  batchTestProgress.current = 0
-  batchTestProgress.total = nodesToTest.length
-  batchTestProgress.percentage = 0
-  batchTestProgress.text = '准备测试...'
-
-  try {
-    // 调用后端API进行批量测试
-    await tauriApi.proxy.batchTestNodes(nodesToTest)
-  } catch (error) {
-    console.error('批量测试失败', error)
-    message.error('批量测试失败: ' + error)
-    batchTesting.value = false
   }
 }
 
@@ -935,10 +645,6 @@ const confirmProxyModeChange = async () => {
   border-left: 3px solid var(--success-color);
 }
 
-.node-card {
-  border-left: 3px solid var(--primary-color);
-}
-
 .proxy-name-container {
   font-weight: 500;
   flex: 1;
@@ -946,14 +652,9 @@ const confirmProxyModeChange = async () => {
   color: var(--n-text-color-1);
 }
 
-.delay-tag,
-.type-tag {
+.delay-tag {
   font-weight: 500;
   transition: all 0.3s ease;
-}
-
-.node-type {
-  margin-top: -8px;
 }
 
 .proxy-button {
@@ -971,34 +672,6 @@ const confirmProxyModeChange = async () => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
-.nodes-filter {
-  margin-bottom: 20px;
-}
-
-.search-input {
-  max-width: 320px;
-  border-radius: 20px;
-}
-
-.empty-container {
-  margin: 60px 0;
-  opacity: 0.8;
-}
-
-:deep(.proxy-tabs .n-tabs-tab) {
-  padding: 8px 16px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-:deep(.proxy-tabs .n-tabs-tab.n-tabs-tab--active) {
-  font-weight: 600;
-}
-
-:deep(.proxy-tabs .n-tabs-tab-wrapper) {
-  padding: 4px;
-}
-
 :deep(.n-tabs .n-tab-pane) {
   padding: 16px 0;
 }
@@ -1009,12 +682,6 @@ const confirmProxyModeChange = async () => {
 
 :deep(.n-card.proxy-node-card:hover) {
   background-color: var(--card-color-hover);
-}
-
-.batch-test-progress {
-  margin-top: 16px;
-  margin-bottom: 16px;
-  width: 100%;
 }
 
 @keyframes slide-up {

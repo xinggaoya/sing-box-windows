@@ -30,12 +30,6 @@ interface VersionInfo {
 
 // 内核管理相关接口
 export const kernelApi = {
-  // 获取内存使用情况
-  getMemoryUsage: () => invoke<string>('get_memory_usage'),
-
-  // 获取流量数据
-  getTrafficData: () => invoke<string>('get_traffic_data'),
-
   // 启动内核
   startKernel: () => invoke<void>('start_kernel'),
 
@@ -110,6 +104,9 @@ export const subscriptionApi = {
 
   // 获取当前配置
   getCurrentConfig: () => invoke<string>('get_current_config'),
+
+  // 添加手动配置
+  addManualSubscription: (content: string) => invoke<void>('add_manual_subscription', { content }),
 }
 
 // 统一导出所有 API
