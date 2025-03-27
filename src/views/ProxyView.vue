@@ -332,17 +332,22 @@ const init = async () => {
       // 如果是Selector或URLTest类型，添加到代理组
       if (item.type === 'Selector' || item.type === 'URLTest') {
         groups.push(item)
-
-        // 如果还没有设置活动组，设置第一个找到的组为活动组
-        if (!activeGroupTab.value && item.type === 'Selector') {
-          activeGroupTab.value = item.name
-        }
       }
     })
 
     proxyGroups.value = groups
 
+    // 默认选中第三个选项卡（注意列表使用了reverse）
     if (groups.length > 0) {
+      // 直接设置要选择的标签名称
+      if (groups.length >= 3) {
+        // 选择倒数第三个组（在UI中会显示为第三个）
+        activeGroupTab.value = groups[groups.length - 3].name
+      } else {
+        // 如果不足三个，选择第一个
+        activeGroupTab.value = groups[0].name
+      }
+
       message.success('代理列表加载成功')
     }
   } catch (error) {

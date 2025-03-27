@@ -108,25 +108,44 @@ pub fn toggle_ip_version(prefer_ipv6: bool) -> Result<(), String> {
 
     // 读取文件内容
     let content = std::fs::read_to_string(&path).map_err(|e| format!("读取配置文件失败: {}", e))?;
-
-    // 直接替换字符串
-    let modified_content = if prefer_ipv6 {
-        content.replace("\"ipv4_only\"", "\"prefer_ipv6\"")
-    } else {
-        content.replace("\"prefer_ipv6\"", "\"ipv4_only\"")
-    };
-
-    // 验证修改后的内容是否是有效的 JSON
-    serde_json::from_str::<serde_json::Value>(&modified_content)
-        .map_err(|e| format!("修改后的配置不是有效的 JSON: {}", e))?;
-
+    
+    // 先尝试解析为JSON以验证是否有效
+    let json_config: Value = serde_json::from_str(&content)
+        .map_err(|e| format!("解析配置文件失败: {}", e))?;
+    
+    // 检查DNS配置结构是否存在
+    if !json_config.get("dns").and_then(|dns| dns.get("servers")).is_some() {
+        return Err("配置文件缺少DNS服务器配置".to_string());
+    }
+    
+    // 对服务器配置中的每个策略进行修改
+    let mut modified_content = content;
+    
+    // 识别现有策略和目标策略
+    let current_strategy = if prefer_ipv6 { "ipv4_only" } else { "prefer_ipv6" };
+    let target_strategy = if prefer_ipv6 { "prefer_ipv6" } else { "ipv4_only" };
+    
+    // 替换策略字符串，但确保是在正确的上下文中
+    // 通过查找 "strategy": "current_strategy" 模式来定位
+    let pattern = format!("\"strategy\": \"{}\"", current_strategy);
+    let replacement = format!("\"strategy\": \"{}\"", target_strategy);
+    
+    // 执行替换
+    modified_content = modified_content.replace(&pattern, &replacement);
+    
+    // 验证修改后的内容仍然是有效的JSON
+    let _: Value = serde_json::from_str(&modified_content)
+        .map_err(|e| format!("修改后的配置不是有效的JSON: {}", e))?;
+    
     // 保存修改后的内容
-    std::fs::write(&path, modified_content).map_err(|e| format!("保存配置文件失败: {}", e))?;
-
+    std::fs::write(&path, modified_content)
+        .map_err(|e| format!("保存配置文件失败: {}", e))?;
+    
     info!(
         "IP版本模式已成功切换为: {}",
         if prefer_ipv6 { "IPv6优先" } else { "仅IPv4" }
     );
+    
     Ok(())
 }
 

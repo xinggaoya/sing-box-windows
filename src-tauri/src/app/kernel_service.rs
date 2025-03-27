@@ -7,7 +7,7 @@ use crate::utils::app_util::get_work_dir;
 use crate::utils::file_util::{ unzip_file};
 use std::os::windows::process::CommandExt;
 use tauri::Emitter;
-use crate::app::constants::{paths, process, messages};
+use crate::app::constants::{paths, process, messages, network};
 use tauri::{Runtime, Window};
 use tokio::task;
 use tokio::sync::mpsc;
@@ -253,7 +253,8 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
     
     // 启动WebSocket连接和数据处理任务
     let _handle = task::spawn(async move {
-        let url = Url::parse(&format!("ws://127.0.0.1:12081/traffic?token={}", token)).unwrap();
+        let url = Url::parse(&format!("ws://127.0.0.1:{}/traffic?token={}", 
+                                     network::DEFAULT_CLASH_API_PORT, token)).unwrap();
         
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
@@ -300,7 +301,8 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
     
     // 启动WebSocket连接和数据处理任务
     let _handle = task::spawn(async move {
-        let url = Url::parse(&format!("ws://127.0.0.1:12081/memory?token={}", token)).unwrap();
+        let url = Url::parse(&format!("ws://127.0.0.1:{}/memory?token={}", 
+                                     network::DEFAULT_CLASH_API_PORT, token)).unwrap();
         
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
@@ -347,7 +349,8 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
     
     // 启动WebSocket连接和数据处理任务
     let _handle = task::spawn(async move {
-        let url = Url::parse(&format!("ws://127.0.0.1:12081/logs?token={}", token)).unwrap();
+        let url = Url::parse(&format!("ws://127.0.0.1:{}/logs?token={}", 
+                                     network::DEFAULT_CLASH_API_PORT, token)).unwrap();
         
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
@@ -394,7 +397,8 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
     
     // 启动WebSocket连接和数据处理任务
     let _handle = task::spawn(async move {
-        let url = Url::parse(&format!("ws://127.0.0.1:12081/connections?token={}", token)).unwrap();
+        let url = Url::parse(&format!("ws://127.0.0.1:{}/connections?token={}", 
+                                     network::DEFAULT_CLASH_API_PORT, token)).unwrap();
         
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
