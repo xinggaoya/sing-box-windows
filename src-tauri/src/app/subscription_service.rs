@@ -177,7 +177,12 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     // 使用模板和提取的节点信息创建新的配置
     let work_dir = get_work_dir();
     let config_path = Path::new(&work_dir).join("sing-box/config.json");
-    
+    let dir = Path::new(&work_dir).join("sing-box");
+    // 确保目录存在
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        error!("{}: {}", messages::ERR_CREATE_DIR_FAILED, e);
+    }
+
     // 读取模板文件
     let template_path = get_template_path();
     let mut template_file = File::open(&template_path)?;
