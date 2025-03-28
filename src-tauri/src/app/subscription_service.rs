@@ -82,7 +82,6 @@ fn modify_default_mode(config_path: &Path, mode: String) -> Result<(), Box<dyn E
     // 读取现有配置
     let mut json_util = ConfigUtil::new(config_path.to_str().unwrap())?;
     
-    // 我们不使用get_value方法，因为它不存在
     // 而是直接创建新的配置并修改
     let target_keys = vec!["experimental"];
     
@@ -111,49 +110,75 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     let user_agent = reqwest::header::HeaderValue::from_static("sing-box-windows/1.0 (sing-box; compatible; Windows NT 10.0)");
     headers.insert(reqwest::header::USER_AGENT, user_agent);
 
-    let response = client.get(url).headers(headers).send().await?;
+    info!("开始下载订阅内容，URL: {}", url);
+    let response = client.get(url.trim()).headers(headers).send().await?;
     let response_text = response.text().await?;
-
-    // 检查内容是否为base64编码，并在需要时进行解码
-    let text = if is_base64_encoded(&response_text) {
-        info!("检测到base64编码内容，正在解码...");
-        let decoded = match base64::decode(&response_text.trim()) {
-            Ok(data) => data,
-            Err(_) => {
-                // 如果标准解码失败，尝试URL安全的base64变体
-                base64::decode_config(&response_text.trim(), base64::URL_SAFE)
-                    .map_err(|e| format!("Base64解码失败: {}", e))?
-            }
-        };
+    
+    // 直接尝试从原始内容提取节点
+    info!("正在从原始内容中提取节点...");
+    let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
+    info!("从原始内容提取到 {} 个节点", extracted_nodes.len());
+    
+    // 如果没有提取到节点，尝试base64解码后重新提取
+    if extracted_nodes.is_empty() {
+        info!("未从原始内容提取到节点，尝试base64解码...");
         
-        // 尝试将解码后的内容解析为有效的UTF-8字符串
-        match String::from_utf8(decoded.clone()) {
-            Ok(s) => {
-                // 检查解码后的内容是否是有效的JSON或配置格式
-                if s.trim_start().starts_with('{') || s.contains("proxies:") {
-                    s // 返回解码后的文本
+        // 尝试标准base64解码
+        let decoded_result = base64::decode(&response_text.trim());
+        if let Ok(decoded) = decoded_result {
+            if let Ok(decoded_text) = String::from_utf8(decoded.clone()) {
+                info!("base64标准解码成功，重新从解码内容提取节点...");
+                extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
+                info!("从标准base64解码内容提取到 {} 个节点", extracted_nodes.len());
+            } else {
+                info!("base64解码成功但无法转换为UTF-8文本");
+            }
+        } else {
+            info!("标准base64解码失败，尝试URL安全base64解码...");
+            
+            // 尝试URL安全的base64变体
+            let url_safe_decoded = base64::decode_config(&response_text.trim(), base64::URL_SAFE);
+            if let Ok(decoded) = url_safe_decoded {
+                if let Ok(decoded_text) = String::from_utf8(decoded.clone()) {
+                    info!("URL安全base64解码成功，重新从解码内容提取节点...");
+                    extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
+                    info!("从URL安全base64解码内容提取到 {} 个节点", extracted_nodes.len());
                 } else {
-                    // 解码后的内容不像是有效的配置，可能是误判，使用原始文本
-                    info!("解码后的内容不是有效的配置格式，使用原始内容");
-                    response_text
+                    info!("URL安全base64解码成功但无法转换为UTF-8文本");
                 }
-            },
-            Err(_) => {
-                // 如果不是有效的UTF-8，返回原始文本
-                info!("解码后的内容不是有效的UTF-8，使用原始内容");
-                response_text
+            } else {
+                info!("URL安全base64解码也失败");
             }
         }
-    } else {
-        response_text
-    };
+    }
+    
+    // 如果依然没有提取到节点，再尝试移除可能的前缀后再解码
+    if extracted_nodes.is_empty() {
+        info!("标准解码方法均未提取到节点，尝试移除前缀后再解码...");
+        
+        // 移除可能的前缀 (例如: "ss://", "vmess://")
+        let stripped_text = response_text.trim().replace("vmess://", "").replace("ss://", "")
+            .replace("trojan://", "").replace("vless://", "");
+        
+        if let Ok(decoded) = base64::decode(&stripped_text) {
+            if let Ok(decoded_text) = String::from_utf8(decoded) {
+                extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
+                info!("从移除前缀后解码内容提取到 {} 个节点", extracted_nodes.len());
+            }
+        }
+    }
+    
+    // 如果依然没有提取到节点，返回错误
+    if extracted_nodes.is_empty() {
+        error!("无法从订阅内容提取节点信息，已尝试所有解码方式");
+        return Err("无法从订阅内容提取节点信息，请检查订阅链接或内容格式".into());
+    }
 
+    info!("成功提取到 {} 个节点，准备应用到配置", extracted_nodes.len());
+    
     // 使用模板和提取的节点信息创建新的配置
     let work_dir = get_work_dir();
     let config_path = Path::new(&work_dir).join("sing-box/config.json");
-    
-    // 提取订阅内容中的节点信息
-    let extracted_nodes = extract_nodes_from_subscription(&text)?;
     
     // 读取模板文件
     let template_path = get_template_path();
@@ -213,53 +238,293 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     let config_str = serde_json::to_string_pretty(&config)?;
     config_file.write_all(config_str.as_bytes())?;
 
-    info!("订阅已更新并应用到模板");
+    info!("订阅已更新并应用到模板，配置已保存");
     Ok(())
 }
 
 // 从订阅内容中提取节点信息
 fn extract_nodes_from_subscription(content: &str) -> Result<Vec<Value>, Box<dyn Error>> {
+    // 清理内容中的非法字符
+    let cleaned_content = clean_json_content(content);
+    
     // 解析内容为JSON（如果是JSON格式）
-    let content_json: Result<Value, _> = serde_json::from_str(content);
+    let content_json: Result<Value, _> = serde_json::from_str(&cleaned_content);
     
     let mut nodes = Vec::new();
     
     match content_json {
         Ok(json) => {
+            info!("成功解析内容为JSON格式");
+            
             // 如果是JSON格式，尝试从中提取outbounds或proxies
             if let Some(outbounds) = json.get("outbounds").and_then(|o| o.as_array()) {
+                info!("检测到sing-box格式，outbounds数组长度: {}", outbounds.len());
+                
                 // 从sing-box格式的配置中提取节点
-                for outbound in outbounds {
+                for (_i, outbound) in outbounds.iter().enumerate() {
                     let outbound_type = outbound.get("type").and_then(|t| t.as_str());
+                    
+                    // 确保每个节点都有tag属性，如果没有则创建一个
+                    let node_with_tag = if outbound.get("tag").is_none() {
+                        // 如果没有tag，创建一个包含tag的节点副本
+                        let server = outbound.get("server").and_then(|s| s.as_str()).unwrap_or("unknown");
+                        let node_type = outbound_type.unwrap_or("unknown");
+                        let tag = format!("{}-{}", node_type, server);
+                        
+                        // 创建新的节点对象，添加tag属性
+                        let mut node_obj = outbound.clone();
+                        if let Some(obj) = node_obj.as_object_mut() {
+                            obj.insert("tag".to_string(), json!(tag));
+                        }
+                        node_obj
+                    } else {
+                        // 已有tag，直接使用
+                        outbound.clone()
+                    };
+                    
                     match outbound_type {
                         Some("vless") | Some("vmess") | Some("trojan") | Some("shadowsocks") | 
                         Some("shadowsocksr") | Some("socks") | Some("http") => {
-                            nodes.push(outbound.clone());
+                            nodes.push(node_with_tag);
                         },
                         _ => {} // 忽略其他类型的出站
                     }
                 }
+                
+                // 如果仍然没找到节点，尝试递归解析所有outbound
+                if nodes.is_empty() {
+                    info!("在顶级outbounds中未找到支持的节点，尝试递归解析...");
+                    for outbound in outbounds {
+                        // 检查是否有子outbounds
+                        if let Some(sub_outbounds) = outbound.get("outbounds").and_then(|o| o.as_array()) {
+                            for sub_outbound in sub_outbounds {
+                                if let Some(sub_tag) = sub_outbound.as_str() {
+                                    // 这是一个引用，尝试在主outbounds中找到对应的节点
+                                    if let Some(actual_node) = find_outbound_by_tag(&outbounds, sub_tag) {
+                                        let node_type = actual_node.get("type").and_then(|t| t.as_str());
+                                        if let Some(type_str) = node_type {
+                                            if ["vless", "vmess", "trojan", "shadowsocks", "shadowsocksr", "socks", "http"].contains(&type_str) {
+                                                // 确保节点有tag
+                                                let node_with_tag = if actual_node.get("tag").is_none() {
+                                                    let mut node_obj = actual_node.clone();
+                                                    if let Some(obj) = node_obj.as_object_mut() {
+                                                        obj.insert("tag".to_string(), json!(sub_tag));
+                                                    }
+                                                    node_obj
+                                                } else {
+                                                    actual_node.clone()
+                                                };
+                                                nodes.push(node_with_tag);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             } else if let Some(proxies) = json.get("proxies").and_then(|p| p.as_array()) {
+                info!("检测到Clash格式，proxies数组长度: {}", proxies.len());
+                
                 // 从Clash格式的配置中提取节点并转换为sing-box格式
                 for proxy in proxies {
                     if let Some(converted_node) = convert_clash_node_to_singbox(proxy) {
                         nodes.push(converted_node);
                     }
                 }
+            } else {
+                // 尝试查找其他可能的位置
+                info!("未找到标准的outbounds或proxies数组，尝试解析其他位置...");
+                
+                // 输出JSON的顶级键，帮助诊断
+                if let Some(obj) = json.as_object() {
+                    let keys: Vec<&String> = obj.keys().collect();
+                    info!("JSON顶级键: {:?}", keys);
+                    
+                    // 如果是sing-box配置但outbounds在不同位置
+                    for (_key, value) in obj {
+                        if let Some(arr) = value.as_array() {
+                            // 检查数组中的每个元素是否可能是节点
+                            for item in arr {
+                                if let Some(item_obj) = item.as_object() {
+                                    // 如果对象有type和tag/name字段，可能是节点
+                                    let has_type = item_obj.contains_key("type");
+                                    let has_tag = item_obj.contains_key("tag") || item_obj.contains_key("name");
+                                    let has_server = item_obj.contains_key("server");
+                                    
+                                    if has_type && (has_tag || has_server) {
+                                        let item_type = item.get("type").and_then(|t| t.as_str());
+                                        
+                                        if let Some(t) = item_type {
+                                            if ["vless", "vmess", "trojan", "shadowsocks", "shadowsocksr", "socks", "http"].contains(&t) {
+                                                // 确保节点有tag
+                                                let node_with_tag = if !has_tag {
+                                                    let server = item.get("server").and_then(|s| s.as_str()).unwrap_or("unknown");
+                                                    let tag = format!("{}-{}", t, server);
+                                                    
+                                                    let mut node_obj = item.clone();
+                                                    if let Some(obj) = node_obj.as_object_mut() {
+                                                        obj.insert("tag".to_string(), json!(tag));
+                                                    }
+                                                    node_obj
+                                                } else {
+                                                    item.clone()
+                                                };
+                                                nodes.push(node_with_tag);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
-        Err(_) => {
+        Err(e) => {
+            info!("内容不是有效的JSON格式: {}", e);
+            
             // 尝试解析为Clash YAML格式（简化处理，实际中可能需要更复杂的YAML解析）
-            if content.contains("proxies:") {
-                info!("检测到可能的Clash YAML格式，需要更多处理...");
+            if cleaned_content.contains("proxies:") {
+                info!("检测到可能的Clash YAML格式");
                 // 这里应该添加YAML格式解析逻辑，简化实现
                 // 实际中需要使用yaml解析库提取节点并转换
+            }
+            
+            // 检查是否包含URI格式的节点
+            if cleaned_content.contains("vmess://") || cleaned_content.contains("ss://") || 
+               cleaned_content.contains("trojan://") || cleaned_content.contains("vless://") {
+                info!("检测到可能包含URI格式的节点");
+                // TODO: 解析URI格式的节点
             }
         }
     }
     
-    info!("从订阅中提取了 {} 个节点", nodes.len());
-    Ok(nodes)
+    // 确保所有节点都有有效的tag
+    let mut fixed_nodes = Vec::new();
+    for (i, node) in nodes.iter().enumerate() {
+        let tag = node.get("tag").and_then(|t| t.as_str());
+        if tag.is_none() || tag.unwrap().is_empty() {
+            // 没有tag或tag为空，创建一个新的
+            let node_type = node.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
+            let server = node.get("server").and_then(|s| s.as_str()).unwrap_or("unknown");
+            let new_tag = format!("{}-{}-{}", node_type, server, i);
+            
+            let mut node_obj = node.clone();
+            if let Some(obj) = node_obj.as_object_mut() {
+                obj.insert("tag".to_string(), json!(new_tag));
+            }
+            fixed_nodes.push(node_obj);
+        } else {
+            fixed_nodes.push(node.clone());
+        }
+    }
+    
+    info!("从订阅中提取了 {} 个节点", fixed_nodes.len());
+    Ok(fixed_nodes)
+}
+
+// 清理JSON内容中的非法字符
+fn clean_json_content(content: &str) -> String {
+    let mut cleaned = String::with_capacity(content.len());
+    let mut in_string = false;
+    let mut escape_next = false;
+    let mut last_char: Option<char> = None;
+    
+    // 首先移除BOM标记
+    let content = content.trim_start_matches('\u{FEFF}');
+    
+    for c in content.chars() {
+        // 跳过零宽字符和其他控制字符
+        if c == '\u{200B}' || c == '\u{200C}' || c == '\u{200D}' || 
+           (c.is_control() && c != '\n' && c != '\r' && c != '\t') {
+            continue;
+        }
+        
+        if in_string {
+            if escape_next {
+                // 在转义状态下，只允许JSON规范的转义字符
+                match c {
+                    '"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | 'u' => {
+                        cleaned.push('\\');
+                        cleaned.push(c);
+                    },
+                    _ => {
+                        // 无效的转义序列，添加空格替代
+                        cleaned.push(' ');
+                    }
+                }
+                escape_next = false;
+            } else if c == '\\' {
+                // 遇到反斜杠，进入转义状态
+                escape_next = true;
+            } else if c == '"' {
+                // 非转义的引号表示字符串结束
+                in_string = false;
+                cleaned.push(c);
+            } else if c.is_ascii_graphic() || c == ' ' || c.is_ascii_whitespace() || !c.is_ascii() {
+                // 保留ASCII可见字符、空白字符和所有非ASCII字符（包括中文等Unicode字符）
+                cleaned.push(c);
+            } else {
+                // 不可见或不可打印的ASCII控制字符替换为空格
+                cleaned.push(' ');
+            }
+        } else {
+            // 字符串外部
+            if c == '"' {
+                // 开始一个新的字符串
+                in_string = true;
+                cleaned.push(c);
+            } else if c == '{' || c == '}' || c == '[' || c == ']' || 
+                      c == ':' || c == ',' || c == '.' || c == '-' || 
+                      c == '+' || c.is_ascii_digit() {
+                // 保留JSON结构字符和数字
+                cleaned.push(c);
+            } else if c.is_ascii_whitespace() {
+                // 保留空白字符，但避免连续的空白字符
+                if let Some(last) = last_char {
+                    if !last.is_ascii_whitespace() {
+                        cleaned.push(c);
+                    }
+                } else {
+                    cleaned.push(c);
+                }
+            } else if c.is_ascii_alphabetic() || !c.is_ascii() {
+                // 保留字母字符（对于JSON里的true/false/null很重要）和所有非ASCII字符
+                cleaned.push(c);
+            } else {
+                // 其他不相关的字符替换为空格，但避免连续的空白字符
+                if let Some(last) = last_char {
+                    if !last.is_ascii_whitespace() {
+                        cleaned.push(' ');
+                    }
+                } else {
+                    cleaned.push(' ');
+                }
+            }
+        }
+        last_char = Some(c);
+    }
+    
+    // 如果字符串还没结束但已到达内容末尾，强制闭合
+    if in_string {
+        cleaned.push('"');
+    }
+    
+    // 移除开头和结尾的空白字符，并确保没有连续的空白字符
+    cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+// 根据标签查找outbound
+fn find_outbound_by_tag<'a>(outbounds: &'a [Value], tag: &str) -> Option<&'a Value> {
+    for outbound in outbounds {
+        if let Some(outbound_tag) = outbound.get("tag").and_then(|t| t.as_str()) {
+            if outbound_tag == tag {
+                return Some(outbound);
+            }
+        }
+    }
+    None
 }
 
 // 将Clash格式的节点转换为sing-box格式
@@ -546,45 +811,6 @@ fn process_subscription_content(content: String) -> Result<(), Box<dyn Error>> {
 
     info!("订阅内容已处理并应用到模板");
     Ok(())
-}
-
-// 改进base64检测逻辑
-fn is_base64_encoded(text: &str) -> bool {
-    // 先进行基本字符集检查
-    let is_valid_charset = text.trim().chars().all(|c| 
-        c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=' || 
-        c == '-' || c == '_' // 支持URL安全变体
-    );
-    
-    if !is_valid_charset {
-        return false;
-    }
-    
-    let trimmed = text.trim();
-    
-    // 检查长度（标准base64长度应为4的倍数，可能有结尾的'='填充）
-    if trimmed.len() % 4 != 0 && !trimmed.ends_with('=') {
-        return false;
-    }
-    
-    // 避免误判普通文本
-    if trimmed.len() < 8 || trimmed.contains(" ") {
-        return false;
-    }
-    
-    // 尝试解码看是否成功（更准确但性能较低的方法）
-    let standard_decode_ok = base64::decode(trimmed).is_ok();
-    let url_safe_decode_ok = base64::decode_config(trimmed, base64::URL_SAFE).is_ok();
-    
-    // 如果能成功解码，再检查解码后内容是否合理（避免误判）
-    if standard_decode_ok || url_safe_decode_ok {
-        // 检查是否为常见订阅格式特征
-        if trimmed.starts_with("ey") || trimmed.starts_with("dm") {
-            return true; // 常见的JSON或YAML base64编码的开头特征
-        }
-    }
-    
-    false
 }
 
 // 获取当前代理模式
