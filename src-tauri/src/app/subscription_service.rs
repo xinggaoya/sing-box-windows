@@ -110,12 +110,10 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     let user_agent = reqwest::header::HeaderValue::from_static("sing-box-windows/1.0 (sing-box; compatible; Windows NT 10.0)");
     headers.insert(reqwest::header::USER_AGENT, user_agent);
 
-    info!("开始下载订阅内容，URL: {}", url);
     let response = client.get(url.trim()).headers(headers).send().await?;
     let response_text = response.text().await?;
     
     // 直接尝试从原始内容提取节点
-    info!("正在从原始内容中提取节点...");
     let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
     info!("从原始内容提取到 {} 个节点", extracted_nodes.len());
     
