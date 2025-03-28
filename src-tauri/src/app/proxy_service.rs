@@ -224,17 +224,23 @@ pub async fn change_proxy(group: String, proxy: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 测试节点延迟
+/// 测试节点组延迟
 #[tauri::command]
-pub async fn test_node_delay(name: String) -> Result<u64, String> {
-    // 使用默认测试URL
-    let test_url = "https://www.gstatic.com/generate_204";
+pub async fn test_group_delay<R: Runtime>(
+    window: tauri::Window<R>,
+    group: String,
+    server: Option<String>
+) -> Result<(), String> {
+    // 使用默认测试URL或指定的URL
+    let test_url = server.unwrap_or_else(|| "https://www.gstatic.com/generate_204".to_string());
     let token = get_api_token();
-    let url = format!("http://{}:{}/proxies/{}/delay?url={}&timeout=5000&token={}", 
+    
+    // 构建请求URL
+    let url = format!("http://{}:{}/group/{}/delay?url={}&timeout=2000&token={}", 
         network::DEFAULT_CLASH_API_ADDRESS, 
-        network::DEFAULT_CLASH_API_PORT, 
-        name, 
-        urlencoding::encode(test_url),
+        network::DEFAULT_CLASH_API_PORT,
+        urlencoding::encode(&group),
+        urlencoding::encode(&test_url),
         token);
     
     // 创建禁用代理的HTTP客户端
@@ -243,107 +249,40 @@ pub async fn test_node_delay(name: String) -> Result<u64, String> {
         .build()
         .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
     
-    // 发送请求并获取响应
-    let response = client.get(&url)
+    // 发送请求并获取结果
+    match client.get(&url)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
-        .send()
-        .await
-        .map_err(|e| format!("测试节点延迟失败: {}", e))?;
-    
-    // 解析响应为JSON
-    let json = response.json::<Value>()
-        .await
-        .map_err(|e| format!("解析测试结果失败: {}", e))?;
-    
-    // 获取延迟值
-    let delay = json["delay"]
-        .as_u64()
-        .unwrap_or(0);
-    
-    Ok(delay)
-}
-
-/// 批量测试节点延迟
-#[tauri::command]
-pub async fn batch_test_nodes<R: Runtime>(
-    window: tauri::Window<R>,
-    nodes: Vec<String>, 
-    server: Option<String>
-) -> Result<(), String> {
-    // 使用默认测试URL或指定的URL
-    let test_url = server.unwrap_or_else(|| "https://www.gstatic.com/generate_204".to_string());
-    let token = get_api_token();
-    
-    // 创建禁用代理的HTTP客户端
-    let client = Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-    
-    // 遍历节点列表进行测试
-    for (index, name) in nodes.iter().enumerate() {
-        // 构建请求URL
-        let url = format!("http://{}:{}/proxies/{}/delay?url={}&timeout=5000&token={}", 
-            network::DEFAULT_CLASH_API_ADDRESS, 
-            network::DEFAULT_CLASH_API_PORT,
-            name,
-            urlencoding::encode(&test_url),
-            token);
-        
-        // 发送进度事件
-        let _ = window.emit("test-nodes-progress", json!({
-            "current": index + 1,
-            "total": nodes.len(),
-            "node": name,
-            "status": "testing"
-        }));
-        
-        // 发送请求并获取结果
-        match client.get(&url)
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .send().await {
-            Ok(response) => {
-                match response.json::<Value>().await {
-                    Ok(data) => {
-                        // 发送测试结果事件
-                        let _ = window.emit("test-node-result", json!({
-                            "name": name,
-                            "delay": data["delay"],
-                            "success": true
-                        }));
-                    },
-                    Err(e) => {
-                        // 发送测试失败事件
-                        let _ = window.emit("test-node-result", json!({
-                            "name": name,
-                            "delay": 0,
-                            "success": false,
-                            "error": format!("解析结果失败: {}", e)
-                        }));
-                    }
+        .send().await {
+        Ok(response) => {
+            match response.json::<Value>().await {
+                Ok(data) => {
+                    // 发送测试结果事件
+                    let _ = window.emit("test-group-result", json!({
+                        "group": group,
+                        "results": data,
+                        "success": true
+                    }));
+                },
+                Err(e) => {
+                    // 发送测试失败事件
+                    let _ = window.emit("test-group-result", json!({
+                        "group": group,
+                        "success": false,
+                        "error": format!("解析结果失败: {}", e)
+                    }));
                 }
-            },
-            Err(e) => {
-                // 发送测试失败事件
-                let _ = window.emit("test-node-result", json!({
-                    "name": name,
-                    "delay": 0,
-                    "success": false,
-                    "error": format!("请求失败: {}", e)
-                }));
             }
+        },
+        Err(e) => {
+            // 发送测试失败事件
+            let _ = window.emit("test-group-result", json!({
+                "group": group,
+                "success": false,
+                "error": format!("请求失败: {}", e)
+            }));
         }
-        
-        // 短暂延迟以避免过快发送请求
-        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
     }
-    
-    // 发送测试完成事件
-    let _ = window.emit("test-nodes-complete", json!({
-        "total": nodes.len()
-    }));
     
     Ok(())
 }

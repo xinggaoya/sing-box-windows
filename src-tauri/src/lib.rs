@@ -3,8 +3,8 @@ use crate::app::kernel_service::{
     restart_kernel, start_kernel, start_websocket_relay, stop_kernel,
 };
 use crate::app::proxy_service::{
-    batch_test_nodes, change_proxy, get_proxies, get_rules, get_version_info, set_system_proxy,
-    set_tun_proxy, test_node_delay, toggle_ip_version,
+    change_proxy, get_proxies, get_rules, get_version_info, set_system_proxy,
+    set_tun_proxy, test_group_delay, toggle_ip_version,
 };
 use crate::app::subscription_service::{
     add_manual_subscription, download_subscription, get_current_config, get_current_proxy_mode,
@@ -72,8 +72,7 @@ pub fn run() {
             get_current_proxy_mode,
             get_proxies,
             change_proxy,
-            test_node_delay,
-            batch_test_nodes,
+            test_group_delay,
             get_version_info,
             get_rules,
             start_websocket_relay,

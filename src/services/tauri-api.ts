@@ -78,13 +78,8 @@ export const proxyApi = {
   // 切换代理
   changeProxy: (group: string, proxy: string) => invoke<void>('change_proxy', { group, proxy }),
 
-  // 测试节点延迟
-  testNodeDelay: (name: string, server?: string) =>
-    invoke<NodeDelay>('test_node_delay', { name, server }),
-
-  // 批量测试节点延迟
-  batchTestNodes: (nodes: string[], server?: string) =>
-    invoke<void>('batch_test_nodes', { nodes, server }),
+  // 测试节点组延迟
+  testGroupDelay: (group: string) => invoke<void>('test_group_delay', { group }),
 
   // 获取版本信息
   getVersionInfo: () => invoke<VersionInfo>('get_version_info'),

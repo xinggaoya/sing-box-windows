@@ -106,6 +106,20 @@
                   <n-tag :bordered="false" type="warning" size="medium" class="proxy-tag">
                     {{ group.type }}
                   </n-tag>
+                  <n-button
+                    @click="testNodeDelay(group.name)"
+                    :loading="testingGroup === group.name"
+                    secondary
+                    size="small"
+                    type="info"
+                    ghost
+                    class="proxy-button"
+                  >
+                    <template #icon>
+                      <n-icon><speedometer-outline /></n-icon>
+                    </template>
+                    测速
+                  </n-button>
                 </n-space>
               </div>
 
@@ -153,21 +167,6 @@
                             </n-icon>
                           </template>
                           {{ group.now === proxy ? '使用中' : '切换' }}
-                        </n-button>
-                        <n-button
-                          @click="testNodeDelay(proxy)"
-                          :loading="testingNodes[proxy]"
-                          secondary
-                          size="small"
-                          type="info"
-                          ghost
-                          class="proxy-button"
-                          v-if="isRealNode(proxy)"
-                        >
-                          <template #icon>
-                            <n-icon><speedometer-outline /></n-icon>
-                          </template>
-                          测速
                         </n-button>
                       </n-flex>
                     </n-space>
@@ -218,6 +217,14 @@ interface ProxyData {
 
 interface Proxies {
   proxies: Record<string, ProxyData>
+}
+
+// 添加类型定义
+interface TestGroupResult {
+  group: string
+  results: Record<string, number>
+  success: boolean
+  error?: string
 }
 
 // 状态定义
@@ -271,6 +278,10 @@ const gridCols = computed(() => {
   return 4
 })
 
+// 在 script setup 部分添加新的状态和方法
+const testingGroup = ref('')
+const testResults = reactive<Record<string, number>>({})
+
 // 生命周期钩子
 onMounted(() => {
   init()
@@ -290,21 +301,20 @@ onUnmounted(() => {
 // 设置事件监听器
 const setupEventListeners = async () => {
   unlistenTestProgress = await listen('test-nodes-progress', (event) => {
-    const data = event.payload as any
+    const data = event.payload as { current: number; total: number; node: string; status: string }
     console.log('测试进度:', data)
   })
 
-  unlistenTestResult = await listen('test-node-result', (event) => {
-    const data = event.payload as any
-    // 更新节点延迟信息
-    if (rawProxies.value[data.name]) {
-      rawProxies.value[data.name].history = [
-        {
-          time: new Date().toISOString(),
-          delay: data.success ? data.delay : 0,
-        },
-      ]
+  unlistenTestResult = await listen('test-group-result', (event) => {
+    const data = event.payload as TestGroupResult
+    if (data.success) {
+      // 更新测试结果
+      Object.assign(testResults, data.results)
+      message.success('组测速完成')
+    } else {
+      message.error(`测速失败: ${data.error}`)
     }
+    testingGroup.value = ''
   })
 
   unlistenTestComplete = await listen('test-nodes-complete', () => {
@@ -364,10 +374,7 @@ const init = async () => {
  * @returns 延迟值（毫秒）
  */
 const getNodeDelay = (name: string): number => {
-  if (rawProxies.value[name] && rawProxies.value[name].history.length > 0) {
-    return rawProxies.value[name].history[0].delay
-  }
-  return 0
+  return testResults[name] || 0
 }
 
 /**
@@ -409,27 +416,18 @@ const isRealNode = (name: string): boolean => {
 
 /**
  * 测试节点延迟
- * @param name 节点名称
- * @param server 测试服务器URL
+ * @param group 代理组名称
  */
-const testNodeDelay = async (
-  name: string,
-  server: string = 'https://www.gstatic.com/generate_204',
-) => {
-  if (!rawProxies.value[name]) return
+const testNodeDelay = async (group: string) => {
+  if (testingGroup.value === group) return
 
-  // 设置正在测试状态
-  testingNodes[name] = true
-
+  testingGroup.value = group
   try {
-    const data = await tauriApi.proxy.testNodeDelay(name, server)
-    message.success(`测速完成: ${data.delay}ms`)
+    await tauriApi.proxy.testGroupDelay(group)
   } catch (error) {
     console.error('测速失败', error)
     message.error('测速失败，可能是节点无法连接或API未响应')
-  } finally {
-    // 清除测试状态
-    testingNodes[name] = false
+    testingGroup.value = ''
   }
 }
 
@@ -444,6 +442,8 @@ const changeProxy = async (group: string, proxy: string) => {
     message.success(`已切换 ${group} 到 ${proxy}`)
     // 重新加载数据
     await init()
+    // 重新测试当前组
+    await testNodeDelay(group)
   } catch (error) {
     console.error('切换失败', error)
     message.error('切换失败，请检查Sing-Box是否已启动')
@@ -484,17 +484,11 @@ const confirmProxyModeChange = async () => {
 
   isChangingMode.value = true
   try {
-    // 调用后端API切换代理模式
     await tauriApi.proxy.toggleProxyMode(targetProxyMode.value)
-
-    // 重启内核以应用更改
     await tauriApi.kernel.restartKernel()
-
-    // 更新当前模式
     currentProxyMode.value = targetProxyMode.value
     message.success(`已切换到${getProxyModeText(targetProxyMode.value)}并重启内核`)
-
-    // 重新加载代理信息
+    // 重新加载数据
     await init()
   } catch (error) {
     console.error('切换代理模式失败', error)
