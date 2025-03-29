@@ -3,13 +3,13 @@
     <n-card class="connections-card" :bordered="false">
       <template #header>
         <div class="card-header">
-          <h2>连接列表</h2>
+          <h2>{{ $t('connections.title') }}</h2>
           <n-space>
             <n-button type="primary" @click="refreshConnections" :loading="loading">
               <template #icon>
                 <n-icon><refresh-outline /></n-icon>
               </template>
-              刷新
+              {{ $t('connections.refresh') }}
             </n-button>
           </n-space>
         </div>
@@ -18,14 +18,14 @@
       <n-spin :show="loading">
         <div class="stats-bar">
           <n-space justify="space-between" align="center">
-            <n-statistic label="活跃连接">
+            <n-statistic :label="$t('connections.active_connections')">
               {{ connections.length }}
             </n-statistic>
             <n-space>
-              <n-statistic label="上传总流量">
+              <n-statistic :label="$t('connections.total_upload')">
                 {{ formatBytes(connectionsTotal.upload) }}
               </n-statistic>
-              <n-statistic label="下载总流量">
+              <n-statistic :label="$t('connections.total_download')">
                 {{ formatBytes(connectionsTotal.download) }}
               </n-statistic>
             </n-space>
@@ -42,7 +42,7 @@
             striped
           />
         </div>
-        <n-empty v-else description="暂无活跃连接" />
+        <n-empty v-else :description="$t('connections.no_active_connections')" />
       </n-spin>
     </n-card>
   </div>
@@ -53,16 +53,19 @@ import { ref, onMounted, h, computed } from 'vue'
 import { useMessage, NTag, DataTableColumns, NSpace, NTooltip, NText } from 'naive-ui'
 import { RefreshOutline } from '@vicons/ionicons5'
 import { useInfoStore } from '@/stores/infoStore'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const message = useMessage()
 const loading = ref(false)
 const infoStore = useInfoStore()
 
-// 使用计算属性来获取连接信息
+// Получаем данные соединений из infoStore
 const connections = computed(() => infoStore.connections)
 const connectionsTotal = computed(() => infoStore.connectionsTotal)
 
-// 定义连接数据接口
+// Интерфейсы для соединения
 interface ConnectionMetadata {
   destinationIP: string
   destinationPort: string
@@ -86,7 +89,7 @@ interface Connection {
   upload: number
 }
 
-// 格式化字节大小的函数
+// Функция для форматирования байт
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -95,7 +98,7 @@ const formatBytes = (bytes: number) => {
   return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i]
 }
 
-// 格式化时间
+// Функция для форматирования времени
 const formatTime = (timeString: string) => {
   try {
     const date = new Date(timeString)
@@ -105,18 +108,16 @@ const formatTime = (timeString: string) => {
   }
 }
 
-// 定义表格列
+// Определяем колонки таблицы
 const columns: DataTableColumns<Connection> = [
   {
-    title: 'ID',
+    title: t('connections.columns.id'),
     key: 'id',
     width: 100,
-    ellipsis: {
-      tooltip: true,
-    },
+    ellipsis: { tooltip: true },
   },
   {
-    title: '开始时间',
+    title: t('connections.columns.start_time'),
     key: 'start',
     width: 160,
     render(row: Connection) {
@@ -124,7 +125,7 @@ const columns: DataTableColumns<Connection> = [
     },
   },
   {
-    title: '网络/类型',
+    title: t('connections.columns.network_type'),
     key: 'network',
     width: 120,
     render(row: Connection) {
@@ -158,7 +159,7 @@ const columns: DataTableColumns<Connection> = [
     },
   },
   {
-    title: '源地址',
+    title: t('connections.columns.source_address'),
     key: 'source',
     width: 200,
     render(row: Connection) {
@@ -169,13 +170,16 @@ const columns: DataTableColumns<Connection> = [
         {
           trigger: () => `${sourceIP}:${sourcePort}`,
           default: () =>
-            h('div', {}, [h('div', {}, `IP: ${sourceIP}`), h('div', {}, `端口: ${sourcePort}`)]),
+            h('div', {}, [
+              h('div', {}, t('connections.tooltip.ip', { ip: sourceIP })),
+              h('div', {}, t('connections.tooltip.port', { port: sourcePort })),
+            ]),
         },
       )
     },
   },
   {
-    title: '目标地址',
+    title: t('connections.columns.destination_address'),
     key: 'destination',
     width: 200,
     render(row: Connection) {
@@ -187,16 +191,16 @@ const columns: DataTableColumns<Connection> = [
           trigger: () => host || `${destinationIP}:${destinationPort}`,
           default: () =>
             h('div', {}, [
-              host ? h('div', {}, `主机: ${host}`) : null,
-              h('div', {}, `IP: ${destinationIP}`),
-              h('div', {}, `端口: ${destinationPort}`),
+              host ? h('div', {}, t('connections.tooltip.host', { host })) : null,
+              h('div', {}, t('connections.tooltip.ip', { ip: destinationIP })),
+              h('div', {}, t('connections.tooltip.port', { port: destinationPort })),
             ]),
         },
       )
     },
   },
   {
-    title: '规则',
+    title: t('connections.columns.rule'),
     key: 'rule',
     width: 160,
     render(row: Connection) {
@@ -207,11 +211,7 @@ const columns: DataTableColumns<Connection> = [
           default: () => [
             h(
               NTag,
-              {
-                type: 'success',
-                size: 'small',
-                bordered: false,
-              },
+              { type: 'success', size: 'small', bordered: false },
               { default: () => row.rule },
             ),
             row.rulePayload
@@ -223,17 +223,15 @@ const columns: DataTableColumns<Connection> = [
     },
   },
   {
-    title: '进程',
+    title: t('connections.columns.process'),
     key: 'process',
-    ellipsis: {
-      tooltip: true,
-    },
+    ellipsis: { tooltip: true },
     render(row: Connection) {
-      return row.metadata.processPath || '未知'
+      return row.metadata.processPath || t('connections.unknown')
     },
   },
   {
-    title: '流量',
+    title: t('connections.columns.traffic'),
     key: 'traffic',
     width: 160,
     render(row: Connection) {
@@ -261,7 +259,11 @@ const columns: DataTableColumns<Connection> = [
               { align: 'center', size: 'small' },
               {
                 default: () => [
-                  h(NTag, { type: 'info', size: 'small', bordered: false }, { default: () => '↓' }),
+                  h(
+                    NTag,
+                    { type: 'info', size: 'small', bordered: false },
+                    { default: () => '↓' },
+                  ),
                   h(NText, {}, { default: () => formatBytes(row.download) }),
                 ],
               },
@@ -273,12 +275,12 @@ const columns: DataTableColumns<Connection> = [
   },
 ]
 
-// 分页设置
+// Параметры пагинации
 const pagination = {
   pageSize: 10,
 }
 
-// 刷新连接列表
+// Функция для обновления списка соединений
 const refreshConnections = async () => {
   loading.value = true
   try {
@@ -294,7 +296,6 @@ const refreshConnections = async () => {
 }
 
 onMounted(() => {
-  // 当组件挂载时，确保infoStore中的连接数据已经初始化
   if (!connections.value.length && infoStore.uptime > 0) {
     refreshConnections()
   }

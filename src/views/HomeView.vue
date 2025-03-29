@@ -8,7 +8,9 @@
           <n-space align="center" :size="16">
             <div class="status-indicator">
               <div class="status-dot" :class="{ active: appState.isRunning }"></div>
-              <span class="status-text">{{ appState.isRunning ? '运行中' : '已停止' }}</span>
+              <span class="status-text">
+                {{ appState.isRunning ? $t('status.running') : $t('status.stopped') }}
+              </span>
             </div>
             <n-tag
               :bordered="false"
@@ -22,7 +24,7 @@
                   <flash-outline v-else />
                 </n-icon>
               </template>
-              {{ appState.proxyMode === 'system' ? '系统代理' : 'TUN 模式' }}
+              {{ appState.proxyMode === 'system' ? $t('proxy.system') : $t('proxy.tun') }}
             </n-tag>
           </n-space>
           <n-space :size="16">
@@ -37,7 +39,7 @@
               <template #icon>
                 <n-icon><repeat-outline /></n-icon>
               </template>
-              切换模式
+              {{ $t('action.switch_mode') }}
             </n-button>
             <n-button
               secondary
@@ -52,7 +54,7 @@
                   <power-outline />
                 </n-icon>
               </template>
-              {{ appState.isRunning ? '停止' : '启动' }}
+              {{ appState.isRunning ? $t('action.stop') : $t('action.start') }}
             </n-button>
           </n-space>
         </n-space>
@@ -64,7 +66,7 @@
               <n-icon size="22"><arrow-up-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">上传速度</span>
+              <span class="traffic-label">{{ $t('traffic.upload_speed') }}</span>
               <span class="traffic-value">{{ trafficStr.up }}</span>
             </div>
           </div>
@@ -73,7 +75,7 @@
               <n-icon size="22"><arrow-down-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">下载速度</span>
+              <span class="traffic-label">{{ $t('traffic.download_speed') }}</span>
               <span class="traffic-value">{{ trafficStr.down }}</span>
             </div>
           </div>
@@ -82,7 +84,7 @@
               <n-icon size="22"><cloud-upload-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">上传总流量</span>
+              <span class="traffic-label">{{ $t('traffic.total_upload') }}</span>
               <span class="traffic-value">{{ uploadTotalTraffic }}</span>
             </div>
           </div>
@@ -91,7 +93,7 @@
               <n-icon size="22"><cloud-download-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">下载总流量</span>
+              <span class="traffic-label">{{ $t('traffic.total_download') }}</span>
               <span class="traffic-value">{{ downloadTotalTraffic }}</span>
             </div>
           </div>
@@ -100,7 +102,7 @@
               <n-icon size="22"><hardware-chip-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">内存占用</span>
+              <span class="traffic-label">{{ $t('traffic.memory_usage') }}</span>
               <span class="traffic-value">{{ memoryStr }}</span>
             </div>
           </div>
@@ -109,7 +111,7 @@
               <n-icon size="22"><git-network-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">活动连接</span>
+              <span class="traffic-label">{{ $t('traffic.active_connections') }}</span>
               <span class="traffic-value">{{ activeConnectionsCount }}</span>
             </div>
           </div>
@@ -128,6 +130,9 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
+
 import { useMessage, useDialog } from 'naive-ui'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -139,12 +144,10 @@ import {
   ArrowUpOutline,
   ArrowDownOutline,
   HardwareChipOutline,
-  AnalyticsOutline,
   GlobeOutline,
   FlashOutline,
   CloudUploadOutline,
   CloudDownloadOutline,
-  TimeOutline,
   GitNetworkOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/AppStore'
@@ -164,19 +167,19 @@ const isStopping = ref(false)
 const route = useRoute()
 const isRouteActive = computed(() => route.path === '/')
 
-// 保留计算属性的可见性检查，但简化逻辑
+// 保留计算属性的可见ность проверки
 const useTotalTraffic = computed(() => {
-  if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
+  if (!isRouteActive.value) return '0 B' // не вычислять, если не на текущем маршруте
   return formatBandwidth(infoStore.traffic.total)
 })
 
 const memoryStr = computed(() => {
-  if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
+  if (!isRouteActive.value) return '0 B'
   return formatBandwidth(infoStore.memory.inuse)
 })
 
 const trafficStr = computed(() => {
-  if (!isRouteActive.value) return { up: '0 B/s', down: '0 B/s' } // 不在当前路由时不计算
+  if (!isRouteActive.value) return { up: '0 B/s', down: '0 B/s' }
   return {
     up: formatBandwidth(Number(infoStore.traffic.up) || 0),
     down: formatBandwidth(Number(infoStore.traffic.down) || 0),
@@ -184,12 +187,12 @@ const trafficStr = computed(() => {
 })
 
 const uploadTotalTraffic = computed(() => {
-  if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
+  if (!isRouteActive.value) return '0 B'
   return formatBandwidth(Number(infoStore.connectionsTotal.upload) || 0)
 })
 
 const downloadTotalTraffic = computed(() => {
-  if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
+  if (!isRouteActive.value) return '0 B'
   return formatBandwidth(Number(infoStore.connectionsTotal.download) || 0)
 })
 
@@ -199,8 +202,7 @@ const activeConnectionsCount = computed(() => {
 })
 
 const formattedUptime = computed(() => {
-  if (!isRouteActive.value) return '00:00:00' // 不在当前路由时不计算
-
+  if (!isRouteActive.value) return '00:00:00'
   const uptime = Number(infoStore.uptime) || 0
   const hours = Math.floor(uptime / 3600)
   const minutes = Math.floor((uptime % 3600) / 60)
@@ -213,7 +215,7 @@ const runKernel = async () => {
     isStarting.value = true
     await infoStore.startKernel()
     appState.setRunningState(true)
-    message.success('内核已启动')
+    message.success(t('message.kernel_started'))
   } catch (error) {
     message.error(error as string)
   } finally {
@@ -226,7 +228,7 @@ const stopKernel = async () => {
     isStopping.value = true
     await infoStore.stopKernel()
     appState.setRunningState(false)
-    message.success('内核已停止')
+    message.success(t('message.kernel_stopped'))
   } catch (error) {
     message.error(error as string)
   } finally {
@@ -258,6 +260,7 @@ const onModeChange = async (value: string) => {
 </script>
 
 <style scoped>
+/* Стили оставлены без изменений */
 .home-container {
   max-width: 1200px;
   margin: 0 auto;
