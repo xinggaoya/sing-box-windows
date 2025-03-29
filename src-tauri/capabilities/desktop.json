@@ -1,0 +1,15 @@
+{
+  "identifier": "desktop-capability",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "permissions": [
+    "autostart:default",
+    "window-state:default",
+    "window-state:default",
+    "positioner:default",
+    "positioner:default"
+  ]
+}
