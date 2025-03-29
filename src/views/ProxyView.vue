@@ -9,7 +9,7 @@
               <n-icon size="24" class="card-icon">
                 <swap-horizontal-outline />
               </n-icon>
-              代理设置
+              {{ t('proxy.settings') }}
             </n-h3>
           </div>
           <div class="header-right">
@@ -20,8 +20,8 @@
                   <n-tag class="mode-tag" :bordered="false" type="success" size="medium" hoverable>
                     <n-icon size="18" class="mode-icon">
                       <globe-outline v-if="currentProxyMode === 'global'" />
-                      <layers-outline v-if="currentProxyMode === 'rule'" />
-                      <hardware-chip-outline v-if="currentProxyMode === 'tun'" />
+                      <layers-outline v-else-if="currentProxyMode === 'rule'" />
+                      <hardware-chip-outline v-else-if="currentProxyMode === 'tun'" />
                     </n-icon>
                     {{ getProxyModeText(currentProxyMode) }}
                     <n-icon size="16" class="dropdown-icon">
@@ -29,7 +29,7 @@
                     </n-icon>
                   </n-tag>
                 </template>
-                点击切换代理模式
+                {{ t('proxy.click_to_change_mode') }}
               </n-tooltip>
             </n-dropdown>
 
@@ -49,7 +49,7 @@
                   </template>
                 </n-button>
               </template>
-              刷新代理列表
+              {{ t('proxy.refresh_list') }}
             </n-tooltip>
           </div>
         </div>
@@ -60,23 +60,25 @@
     <n-modal
       v-model:show="showModeChangeModal"
       preset="dialog"
-      :title="`切换到${targetProxyMode ? getProxyModeText(targetProxyMode) : ''}`"
+      :title="t('proxy.modal_title', { mode: targetProxyMode ? getProxyModeText(targetProxyMode) : '' })"
     >
       <template #header>
         <div class="modal-header">
           <n-icon size="22" class="modal-icon">
             <information-circle-outline />
           </n-icon>
-          <span>切换到{{ targetProxyMode ? getProxyModeText(targetProxyMode) : '' }}</span>
+          <span>{{ t('proxy.modal_header', { mode: targetProxyMode ? getProxyModeText(targetProxyMode) : '' }) }}</span>
         </div>
       </template>
-      <div class="modal-content">切换代理模式需要重启内核才能生效。确定要切换并重启内核吗？</div>
+      <div class="modal-content">
+        {{ t('proxy.modal_content') }}
+      </div>
       <template #action>
         <div class="modal-footer">
           <n-space justify="end">
-            <n-button @click="showModeChangeModal = false">取消</n-button>
+            <n-button @click="showModeChangeModal = false">{{ t('proxy.cancel') }}</n-button>
             <n-button type="primary" :loading="isChangingMode" @click="confirmProxyModeChange">
-              确认切换
+              {{ t('proxy.confirm_switch') }}
             </n-button>
           </n-space>
         </div>
@@ -98,10 +100,10 @@
               <div class="proxy-group-info">
                 <n-space align="center" :size="12">
                   <n-tag :bordered="false" type="success" size="medium" class="proxy-tag">
-                    当前节点: {{ group.now }}
+                    {{ t('proxy.current_node', { node: group.now }) }}
                   </n-tag>
                   <n-tag :bordered="false" type="info" size="medium" class="proxy-tag">
-                    {{ group.all.length }} 个节点
+                    {{ group.all.length }} {{ t('proxy.nodes') }}
                   </n-tag>
                   <n-tag :bordered="false" type="warning" size="medium" class="proxy-tag">
                     {{ group.type }}
@@ -118,7 +120,7 @@
                     <template #icon>
                       <n-icon><speedometer-outline /></n-icon>
                     </template>
-                    测速
+                    {{ t('proxy.test_speed') }}
                   </n-button>
                 </n-space>
               </div>
@@ -147,7 +149,7 @@
                           round
                           class="delay-tag"
                         >
-                          {{ getNodeDelay(proxy) === 0 ? '未测速' : getNodeDelay(proxy) + 'ms' }}
+                          {{ getNodeDelay(proxy) === 0 ? t('proxy.not_tested') : getNodeDelay(proxy) + 'ms' }}
                         </n-tag>
                       </n-flex>
 
@@ -166,7 +168,7 @@
                               <swap-horizontal-outline v-else />
                             </n-icon>
                           </template>
-                          {{ group.now === proxy ? '使用中' : '切换' }}
+                          {{ group.now === proxy ? t('proxy.in_use') : t('proxy.switch') }}
                         </n-button>
                       </n-flex>
                     </n-space>
@@ -199,6 +201,7 @@ import { useWindowSize } from '@vueuse/core'
 import { Component } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { listen } from '@tauri-apps/api/event'
+import { useI18n } from 'vue-i18n'
 
 // 接口定义
 interface ProxyHistory {
@@ -228,13 +231,14 @@ interface TestGroupResult {
 }
 
 // 状态定义
+const { t } = useI18n()
 const message = useMessage()
 const isLoading = ref(false)
 const { width } = useWindowSize()
 
 // 代理数据
-const rawProxies = ref<Record<string, ProxyData>>({})
-const proxyGroups = ref<ProxyData[]>([])
+const rawProxies = ref<Record<string, any>>({})
+const proxyGroups = ref<any[]>([])
 const testingNodes = reactive<Record<string, boolean>>({})
 const currentProxyMode = ref('rule') // 默认为规则模式
 
@@ -251,26 +255,26 @@ let unlistenTestComplete: (() => void) | null = null
 // 代理模式选项
 const proxyModeOptions = [
   {
-    label: '全局模式',
+    label: t('proxy.mode_options.global'),
     key: 'global',
     icon: renderIcon(GlobeOutline),
   },
   {
-    label: '规则模式',
+    label: t('proxy.mode_options.rule'),
     key: 'rule',
     icon: renderIcon(LayersOutline),
   },
 ]
 
-// 动态渲染图标的辅助函数
+// Динамическая отрисовка иконок
 function renderIcon(icon: Component) {
   return () => h('div', { class: 'dropdown-option-icon' }, h(icon))
 }
 
-// 选项卡状态
+// Состояние вкладок
 const activeGroupTab = ref('')
 
-// 根据窗口宽度调整网格列数
+// Подсчет количества столбцов в сетке в зависимости от ширины окна
 const gridCols = computed(() => {
   if (width.value < 640) return 1
   if (width.value < 960) return 2
@@ -278,27 +282,22 @@ const gridCols = computed(() => {
   return 4
 })
 
-// 在 script setup 部分添加新的状态和方法
+// Новые состояния и методы для тестирования
 const testingGroup = ref('')
 const testResults = reactive<Record<string, number>>({})
 
-// 生命周期钩子
 onMounted(() => {
   init()
-  // 读取当前代理模式
   getCurrentProxyMode()
-  // 注册事件监听器
   setupEventListeners()
 })
 
 onUnmounted(() => {
-  // 清理事件监听器
   if (unlistenTestProgress) unlistenTestProgress()
   if (unlistenTestResult) unlistenTestResult()
   if (unlistenTestComplete) unlistenTestComplete()
 })
 
-// 设置事件监听器
 const setupEventListeners = async () => {
   unlistenTestProgress = await listen('test-nodes-progress', (event) => {
     const data = event.payload as { current: number; total: number; node: string; status: string }
@@ -306,81 +305,60 @@ const setupEventListeners = async () => {
   })
 
   unlistenTestResult = await listen('test-group-result', (event) => {
-    const data = event.payload as TestGroupResult
+    const data = event.payload as { group: string; results: Record<string, number>; success: boolean; error?: string }
     if (data.success) {
-      // 更新测试结果
       Object.assign(testResults, data.results)
-      message.success('组测速完成')
+      message.success(t('proxy.test_group_success'))
     } else {
-      message.error(`测速失败: ${data.error}`)
+      message.error(t('proxy.test_group_fail', { error: data.error }))
     }
     testingGroup.value = ''
   })
 
   unlistenTestComplete = await listen('test-nodes-complete', () => {
-    message.success('批量测速完成')
+    message.success(t('proxy.test_batch_success'))
   })
 }
 
 /**
- * 初始化并获取代理信息
+ * Инициализация и получение информации о прокси
  */
 const init = async () => {
   isLoading.value = true
   try {
-    // 使用Tauri API获取代理信息
     const data = await tauriApi.proxy.getProxies()
     rawProxies.value = data.proxies
 
-    // 提取代理组
-    const groups: ProxyData[] = []
-
+    const groups: any[] = []
     Object.entries(data.proxies).forEach(([key, item]) => {
-      // 排除特殊组和直连
       if (key === 'GLOBAL' || key === 'direct') return
-
-      // 如果是Selector或URLTest类型，添加到代理组
       if (item.type === 'Selector' || item.type === 'URLTest') {
         groups.push(item)
       }
     })
-
     proxyGroups.value = groups
 
-    // 默认选中第三个选项卡（注意列表使用了reverse）
     if (groups.length > 0) {
-      // 直接设置要选择的标签名称
-      if (groups.length >= 3) {
-        // 选择倒数第三个组（在UI中会显示为第三个）
-        activeGroupTab.value = groups[groups.length - 3].name
-      } else {
-        // 如果不足三个，选择第一个
-        activeGroupTab.value = groups[0].name
-      }
-
-      message.success('代理列表加载成功')
+      activeGroupTab.value = groups.length >= 3 ? groups[groups.length - 3].name : groups[0].name
+      message.success(t('proxy.load_success'))
     }
   } catch (error) {
     console.error('获取代理列表失败', error)
-    message.error('获取代理列表失败，请检查Sing-Box是否已启动')
+    message.error(t('proxy.load_fail'))
   } finally {
     isLoading.value = false
   }
 }
 
 /**
- * 获取节点的延迟
- * @param name 节点名称
- * @returns 延迟值（毫秒）
+ * Получение задержки узла
  */
 const getNodeDelay = (name: string): number => {
   return testResults[name] || 0
 }
 
 /**
- * 获取延迟对应的颜色类型
- * @param delay 延迟（毫秒）
- * @returns 颜色类型
+ * Определение типа задержки для отображения цвета
  */
 const getNodeDelayType = (delay: number): string => {
   if (delay === 0) return 'default'
@@ -391,95 +369,74 @@ const getNodeDelayType = (delay: number): string => {
 }
 
 /**
- * 获取代理模式对应的文本
- * @param mode 代理模式
- * @returns 模式文本
+ * Получение текста для режима прокси с использованием i18n
  */
 const getProxyModeText = (mode: string): string => {
   const modeMap: Record<string, string> = {
-    global: '全局模式',
-    rule: '规则模式',
-    tun: 'TUN模式',
+    global: t('proxy.mode.global'),
+    rule: t('proxy.mode.rule'),
+    tun: t('proxy.mode.tun'),
   }
-  return modeMap[mode] || '未知模式'
+  return modeMap[mode] || t('proxy.mode.unknown')
 }
 
 /**
- * 判断是否为真实节点（非组）
- * @param name 节点名称
- * @returns 是否为真实节点
- */
-const isRealNode = (name: string): boolean => {
-  if (!rawProxies.value[name]) return false
-  return !['Selector', 'URLTest', 'Fallback'].includes(rawProxies.value[name].type)
-}
-
-/**
- * 测试节点延迟
- * @param group 代理组名称
+ * Тестирование задержки группы узлов
  */
 const testNodeDelay = async (group: string) => {
   if (testingGroup.value === group) return
-
   testingGroup.value = group
   try {
     await tauriApi.proxy.testGroupDelay(group)
   } catch (error) {
     console.error('测速失败', error)
-    message.error('测速失败，可能是节点无法连接或API未响应')
+    message.error(t('proxy.test_failed'))
     testingGroup.value = ''
   }
 }
 
 /**
- * 切换代理
- * @param group 代理组名称
- * @param proxy 要切换到的代理名称
+ * Смена прокси
  */
 const changeProxy = async (group: string, proxy: string) => {
   try {
     await tauriApi.proxy.changeProxy(group, proxy)
-    message.success(`已切换 ${group} 到 ${proxy}`)
-    // 重新加载数据
+    message.success(t('proxy.changed', { group, proxy }))
     await init()
-    // 重新测试当前组
     await testNodeDelay(group)
   } catch (error) {
     console.error('切换失败', error)
-    message.error('切换失败，请检查Sing-Box是否已启动')
+    message.error(t('proxy.switch_error'))
   }
 }
 
 /**
- * 获取当前代理模式
+ * Получение текущего режима прокси
  */
 const getCurrentProxyMode = async () => {
   try {
-    // 调用后端API获取当前代理模式
     const mode = await tauriApi.proxy.getCurrentProxyMode()
     currentProxyMode.value = mode
     console.log('当前代理模式:', mode)
   } catch (error) {
     console.error('获取代理模式失败', error)
-    // 出错时仍使用默认的规则模式
     currentProxyMode.value = 'rule'
   }
 }
 
 /**
- * 处理代理模式变更
+ * Обработка изменения режима прокси
  */
 const handleProxyModeChange = (key: string) => {
   if (key === currentProxyMode.value) return
-
   targetProxyMode.value = key
   showModeChangeModal.value = true
 }
 
 /**
- * 确认切换代理模式
+ * Подтверждение смены режима прокси
  */
-const confirmProxyModeChange = async () => {
+ const confirmProxyModeChange = async () => {
   if (!targetProxyMode.value) return
 
   isChangingMode.value = true
@@ -501,6 +458,7 @@ const confirmProxyModeChange = async () => {
 </script>
 
 <style scoped>
+/* Стили оставлены без изменений */
 .proxy-container {
   max-width: 1200px;
   margin: 0 auto;

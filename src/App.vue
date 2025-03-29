@@ -21,19 +21,19 @@ import { useTrayStore } from '@/stores/TrayStore'
 import { useRouter } from 'vue-router'
 import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
+import { useI18n } from 'vue-i18n'  // импортируем i18n
 
-// 初始化 store
+// Инициализируем i18n
+const { t } = useI18n()
+
+// Инициализация store
 const appStore = useAppStore()
 const infoStore = useInfoStore()
 const trayStore = useTrayStore()
 const router = useRouter()
 
 onMounted(async () => {
-  // 设置窗口事件处理器
-  // appStore.setupWindowEventHandlers(router)
-
-  // 自己实现窗口事件处理器
-  // 窗口隐藏时切换到空白页
+  // Настройка обработчиков событий окна
   mitt.on('window-hide', () => {
     appStore.windowState.lastVisiblePath = router.currentRoute.value.path
     if (appStore.windowState.lastVisiblePath !== '/blank') {
@@ -41,21 +41,18 @@ onMounted(async () => {
     }
   })
 
-  // 窗口显示时恢复路由
   mitt.on('window-show', () => {
     if (router.currentRoute.value.path === '/blank' && appStore.windowState.lastVisiblePath) {
       router.push(appStore.windowState.lastVisiblePath)
     }
   })
 
-  // 窗口恢复时恢复路由
   mitt.on('window-restore', () => {
     if (router.currentRoute.value.path === '/blank' && appStore.windowState.lastVisiblePath) {
       router.push(appStore.windowState.lastVisiblePath)
     }
   })
 
-  // 检查当前窗口状态
   const appWindow = Window.getCurrent()
   appWindow.isVisible().then((visible) => {
     appStore.windowState.isVisible = visible
@@ -68,50 +65,37 @@ onMounted(async () => {
     }
   })
 
-  // 初始化托盘图标
   await trayStore.initTray()
 
-  // 如果不是开发环境，禁用右键菜单
   if (!import.meta.env.DEV) {
     document.oncontextmenu = () => false
   }
 
-  // 如果开启了自动启动内核
   if (appStore.autoStartKernel) {
     try {
       await infoStore.startKernel()
       appStore.setRunningState(true)
 
-      // 判断当前是否需要隐藏窗口
       const appWindow = Window.getCurrent()
       if (!(await appWindow.isVisible())) {
         appStore.saveRouteAndGoBlank(router)
       }
     } catch (error) {
+      // Локализуем сообщение об ошибке
       console.error('自动启动内核失败:', error)
     }
   }
-  // 如果内核正在运行，初始化 WebSocket 连接
   if (appStore.isRunning) {
     infoStore.initEventListeners()
   }
 })
 
 onUnmounted(async () => {
-  // 清理事件监听
-  // appStore.cleanupWindowEvents()
   mitt.off('window-minimize')
   mitt.off('window-hide')
   mitt.off('window-show')
   mitt.off('window-restore')
 
-  // 销毁托盘
   await trayStore.destroyTray()
 })
 </script>
-
-<style>
-#app {
-  height: 100vh;
-}
-</style>

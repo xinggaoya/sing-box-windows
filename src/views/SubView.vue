@@ -1,6 +1,6 @@
 <template>
   <div class="sub-container">
-    <!-- 订阅管理卡片 -->
+    <!-- 订阅管理卡片 (Subscription Management Card) -->
     <n-card class="sub-card" :bordered="false">
       <template #header>
         <div class="card-header">
@@ -9,10 +9,10 @@
               <n-icon size="24" class="card-icon">
                 <link-outline />
               </n-icon>
-              订阅管理
+              {{ t('sub.subscription_management') }}
             </n-h3>
             <n-tag :bordered="false" type="info" size="medium" class="sub-count-tag">
-              {{ subStore.list.length }} 个订阅
+              {{ t('sub.subscription_count', { count: subStore.list.length }) }}
             </n-tag>
           </div>
           <n-tooltip trigger="hover" placement="top">
@@ -32,7 +32,7 @@
                 </template>
               </n-button>
             </template>
-            添加订阅
+            {{ t('sub.add_subscription') }}
           </n-tooltip>
         </div>
       </template>
@@ -70,7 +70,7 @@
                       :bordered="false"
                       class="active-tag"
                     >
-                      使用中
+                      {{ t('sub.reuse') }}
                     </n-tag>
                     <n-tag
                       v-if="item.isManual"
@@ -79,7 +79,7 @@
                       :bordered="false"
                       class="manual-tag"
                     >
-                      手动
+                      {{ t('sub.manual') }}
                     </n-tag>
                   </div>
                 </n-space>
@@ -100,7 +100,7 @@
                         </template>
                       </n-button>
                     </template>
-                    复制链接
+                    {{ t('sub.copy_link') }}
                   </n-tooltip>
 
                   <n-tooltip trigger="hover" placement="top">
@@ -119,10 +119,10 @@
                         </template>
                       </n-button>
                     </template>
-                    编辑订阅
+                    {{ t('sub.edit_subscription') }}
                   </n-tooltip>
 
-                  <!-- 新增：查看/编辑当前配置按钮 -->
+                  <!-- Кнопка для редактирования текущей конфигурации -->
                   <n-tooltip v-if="subStore.activeIndex === index" trigger="hover" placement="top">
                     <template #trigger>
                       <n-button
@@ -140,13 +140,13 @@
                         </template>
                       </n-button>
                     </template>
-                    编辑当前配置
+                    {{ t('sub.edit_current_config') }}
                   </n-tooltip>
 
                   <n-popconfirm
                     @positive-click="deleteSubscription(index)"
-                    positive-text="删除"
-                    negative-text="取消"
+                    positive-text="{{ t('sub.delete') }}"
+                    negative-text="{{ t('sub.cancel') }}"
                   >
                     <template #trigger>
                       <n-button
@@ -164,7 +164,7 @@
                         </template>
                       </n-button>
                     </template>
-                    确定要删除这个订阅吗？
+                    {{ t('sub.delete_confirm') }}
                   </n-popconfirm>
                 </n-space>
               </n-flex>
@@ -177,7 +177,7 @@
 
               <n-flex justify="space-between" align="center">
                 <n-text depth="3" class="update-time">
-                  {{ item.lastUpdate ? formatTime(item.lastUpdate) : '从未使用' }}
+                  {{ item.lastUpdate ? formatTime(item.lastUpdate) : t('sub.never_used') }}
                 </n-text>
                 <n-button
                   secondary
@@ -194,7 +194,7 @@
                       <play-circle-outline v-else />
                     </n-icon>
                   </template>
-                  {{ subStore.activeIndex === index ? '重新使用' : '使用' }}
+                  {{ subStore.activeIndex === index ? t('sub.reuse') : t('sub.use') }}
                 </n-button>
               </n-flex>
             </n-space>
@@ -202,25 +202,25 @@
         </n-grid-item>
       </n-grid>
 
-      <n-empty v-if="!subStore.list.length" description="暂无订阅" class="empty-container">
+      <n-empty v-if="!subStore.list.length" :description="t('sub.no_subscription')" class="empty-container">
         <template #extra>
           <n-button type="primary" @click="showAddModal = true" class="add-sub-button">
             <template #icon>
               <n-icon><add-outline /></n-icon>
             </template>
-            添加订阅
+            {{ t('sub.add_subscription') }}
           </n-button>
         </template>
       </n-empty>
     </n-card>
   </div>
 
-  <!-- 添加/编辑订阅对话框 -->
+  <!-- Модальное окно добавления/редактирования подписки -->
   <n-modal
     v-model:show="showAddModal"
     :mask-closable="false"
     preset="dialog"
-    :title="editIndex === null ? '添加订阅' : '编辑订阅'"
+    :title="editIndex === null ? t('sub.add_subscription') : t('sub.edit_subscription')"
     :bordered="false"
     style="width: 600px"
     class="sub-modal"
@@ -233,33 +233,33 @@
       label-width="80"
       require-mark-placement="right-hanging"
     >
-      <n-form-item label="名称" path="name">
+      <n-form-item :label="t('sub.name')" path="name">
         <n-input
           v-model:value="formValue.name"
-          placeholder="请输入订阅名称"
+          :placeholder="t('sub.enter_subscription_name')"
           @keydown.enter.prevent
           class="form-input"
         />
       </n-form-item>
 
       <n-tabs type="line" animated v-model:value="activeTab" class="sub-tabs">
-        <n-tab-pane name="url" tab="URL添加">
-          <n-form-item label="链接" path="url">
+        <n-tab-pane name="url" :tab="t('sub.url_add')">
+          <n-form-item :label="t('sub.link')" path="url">
             <n-input
               v-model:value="formValue.url"
               type="textarea"
-              placeholder="请输入订阅链接"
+              :placeholder="t('sub.enter_subscription_link')"
               :autosize="{ minRows: 2, maxRows: 4 }"
               class="form-input"
             />
           </n-form-item>
         </n-tab-pane>
-        <n-tab-pane name="manual" tab="手动编辑">
-          <n-form-item label="内容" path="manualContent">
+        <n-tab-pane name="manual" :tab="t('sub.manual_edit')">
+          <n-form-item :label="t('sub.content')" path="manualContent">
             <n-input
               v-model:value="formValue.manualContent"
               type="textarea"
-              placeholder="请输入配置内容（JSON格式）"
+              :placeholder="t('sub.enter_config_content')"
               :autosize="{ minRows: 8, maxRows: 20 }"
               class="form-input code-input"
             />
@@ -269,20 +269,20 @@
     </n-form>
     <template #action>
       <n-space justify="end">
-        <n-button @click="handleCancel" class="modal-button">取消</n-button>
+        <n-button @click="handleCancel" class="modal-button">{{ t('sub.cancel') }}</n-button>
         <n-button type="primary" @click="handleConfirm" :loading="isLoading" class="modal-button">
-          确认
+          {{ t('sub.confirm') }}
         </n-button>
       </n-space>
     </template>
   </n-modal>
 
-  <!-- 编辑当前配置对话框 -->
+  <!-- Модальное окно редактирования текущей конфигурации -->
   <n-modal
     v-model:show="showConfigModal"
     :mask-closable="false"
     preset="dialog"
-    title="编辑当前配置"
+    :title="t('sub.edit_current_config')"
     :bordered="false"
     style="width: 800px"
     class="config-modal"
@@ -290,20 +290,15 @@
     <n-input
       v-model:value="currentConfig"
       type="textarea"
-      placeholder="配置内容（JSON格式）"
+      :placeholder="t('sub.config_content_json')"
       :autosize="{ minRows: 15, maxRows: 30 }"
       class="form-input code-input"
     />
     <template #action>
       <n-space justify="end">
-        <n-button @click="showConfigModal = false" class="modal-button">取消</n-button>
-        <n-button
-          type="primary"
-          @click="saveCurrentConfig"
-          :loading="isConfigLoading"
-          class="modal-button"
-        >
-          保存并应用
+        <n-button @click="showConfigModal = false" class="modal-button">{{ t('sub.cancel') }}</n-button>
+        <n-button type="primary" @click="saveCurrentConfig" :loading="isConfigLoading" class="modal-button">
+          {{ t('sub.save_and_apply') }}
         </n-button>
       </n-space>
     </template>
@@ -327,16 +322,9 @@ import {
 import type { FormInst, FormRules } from 'naive-ui'
 import { useWindowSize } from '@vueuse/core'
 import { tauriApi } from '@/services/tauri-api'
+import { useI18n } from 'vue-i18n'
 
-interface Subscription {
-  name: string
-  url: string
-  lastUpdate?: number
-  isLoading: boolean
-  isManual: boolean
-  manualContent?: string
-}
-
+const { t } = useI18n()
 const message = useMessage()
 const subStore = useSubStore()
 const showAddModal = ref(false)
@@ -346,12 +334,12 @@ const isLoading = ref(false)
 const { width } = useWindowSize()
 const activeTab = ref('url')
 
-// 当前配置编辑相关变量
+// Переменные для редактирования текущей конфигурации
 const showConfigModal = ref(false)
 const currentConfig = ref('')
 const isConfigLoading = ref(false)
 
-// 根据窗口宽度调整网格列数
+// Подгонка числа столбцов в сетке в зависимости от ширины окна
 const gridCols = computed(() => {
   if (width.value < 768) return 1
   if (width.value < 1200) return 2
@@ -366,24 +354,31 @@ const formValue = ref<Subscription>({
   manualContent: '',
 })
 
+interface Subscription {
+  name: string
+  url: string
+  lastUpdate?: number
+  isLoading: boolean
+  isManual: boolean
+  manualContent?: string
+}
+
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入订阅名称', trigger: 'blur' }],
+  name: [{ required: true, message: t('sub.enter_subscription_name'), trigger: 'blur' }],
   url: [
     {
       required: true,
-      message: '请输入订阅链接',
+      message: t('sub.enter_subscription_link'),
       trigger: 'blur',
       validator: (rule, value) => {
-        // 如果是URL模式，验证URL；如果是手动编辑模式，不验证URL
         return activeTab.value === 'url' ? !!value : true
       },
     },
     {
       type: 'url',
-      message: '请输入有效的URL',
+      message: t('sub.enter_valid_url'),
       trigger: 'blur',
       validator: (rule, value) => {
-        // 只在URL模式下验证URL格式
         return activeTab.value === 'url' ? true : true
       },
     },
@@ -391,10 +386,9 @@ const rules: FormRules = {
   manualContent: [
     {
       required: true,
-      message: '请输入配置内容',
+      message: t('sub.enter_config_content'),
       trigger: 'blur',
       validator: (rule, value) => {
-        // 如果是手动编辑模式，验证内容；如果是URL模式，不验证内容
         return activeTab.value === 'manual' ? !!value : true
       },
     },
@@ -421,7 +415,6 @@ const handleEdit = (index: number, item: Subscription) => {
     isManual: item.isManual,
     manualContent: item.manualContent,
   }
-  // 根据订阅类型设置activeTab
   activeTab.value = item.isManual ? 'manual' : 'url'
   showAddModal.value = true
 }
@@ -431,25 +424,17 @@ const handleConfirm = () => {
     if (!errors) {
       try {
         isLoading.value = true
-
-        // 确定是否是手动编辑模式
         const isManual = activeTab.value === 'manual'
-
         if (isManual && formValue.value.manualContent) {
-          // 如果是手动编辑模式且有内容，直接保存内容
           if (editIndex.value === null) {
-            // 如果是新建订阅，同时使用这个内容
             await tauriApi.subscription.addManualSubscription(formValue.value.manualContent)
           }
         } else if (!isManual) {
-          // 如果是URL模式且是新建订阅
           if (editIndex.value === null) {
             await tauriApi.subscription.downloadSubscription(formValue.value.url)
           }
         }
-
         if (editIndex.value === null) {
-          // 添加新订阅
           subStore.list.push({
             name: formValue.value.name,
             url: formValue.value.url,
@@ -458,15 +443,11 @@ const handleConfirm = () => {
             isManual: isManual,
             manualContent: isManual ? formValue.value.manualContent : undefined,
           })
-
-          // 如果是新添加的手动配置，自动设为当前活跃订阅
           if (isManual) {
             subStore.activeIndex = subStore.list.length - 1
           }
-
-          message.success('订阅添加成功')
+          message.success(t('sub.subscription_add_success'))
         } else {
-          // 更新订阅
           subStore.list[editIndex.value] = {
             ...subStore.list[editIndex.value],
             name: formValue.value.name,
@@ -474,12 +455,12 @@ const handleConfirm = () => {
             isManual: isManual,
             manualContent: isManual ? formValue.value.manualContent : undefined,
           }
-          message.success('订阅更新成功')
+          message.success(t('sub.subscription_update_success'))
         }
         showAddModal.value = false
         resetForm()
       } catch (error) {
-        message.error('操作失败：' + error)
+        message.error(t('sub.operation_fail', { error: error }))
       } finally {
         isLoading.value = false
       }
@@ -494,34 +475,27 @@ const handleCancel = () => {
 
 const deleteSubscription = (index: number) => {
   if (subStore.activeIndex === index) {
-    message.warning('不能删除当前正在使用的订阅')
+    message.warning(t('sub.cannot_delete_active_subscription'))
     return
   }
   subStore.list.splice(index, 1)
-  message.success('订阅已删除')
+  message.success(t('sub.subscription_deleted'))
 }
 
 const useSubscription = async (url: string, index: number) => {
   try {
-    // 标记正在加载
     subStore.list[index].isLoading = true
-
     const item = subStore.list[index]
-
     if (item.isManual && item.manualContent) {
-      // 如果是手动配置，直接使用保存的内容
       await tauriApi.subscription.addManualSubscription(item.manualContent)
     } else {
-      // 否则从URL下载内容
       await tauriApi.subscription.downloadSubscription(url)
     }
-
-    // 更新订阅状态
     subStore.list[index].lastUpdate = Date.now()
     subStore.activeIndex = index
-    message.success('订阅使用成功')
+    message.success(t('sub.subscription_use_success'))
   } catch (error) {
-    message.error('订阅使用失败：' + error)
+    message.error(t('sub.subscription_use_fail', { error: error }))
   } finally {
     subStore.list[index].isLoading = false
   }
@@ -529,31 +503,24 @@ const useSubscription = async (url: string, index: number) => {
 
 const copyUrl = (url: string) => {
   navigator.clipboard.writeText(url)
-  message.success('链接已复制到剪贴板')
+  message.success(t('sub.link_copied'))
 }
 
 const formatTime = (timestamp: number): string => {
   const date = new Date(timestamp)
-  return `最后更新: ${date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })}`
+  return t('sub.last_update', { time: date.toLocaleString() })
 }
 
 const editCurrentConfig = async () => {
   try {
     isConfigLoading.value = true
-    // 获取当前配置内容
     const config = await tauriApi.subscription.getCurrentConfig()
     if (typeof config === 'string') {
       currentConfig.value = config
       showConfigModal.value = true
     }
   } catch (error) {
-    message.error('读取配置失败：' + error)
+    message.error(t('sub.read_config_fail', { error: error }))
   } finally {
     isConfigLoading.value = false
   }
@@ -562,11 +529,7 @@ const editCurrentConfig = async () => {
 const saveCurrentConfig = async () => {
   try {
     isConfigLoading.value = true
-
-    // 保存配置内容
     await tauriApi.subscription.addManualSubscription(currentConfig.value)
-
-    // 如果当前活跃订阅是手动配置，更新其内容
     if (subStore.activeIndex !== null) {
       const activeItem = subStore.list[subStore.activeIndex]
       if (activeItem.isManual) {
@@ -574,11 +537,10 @@ const saveCurrentConfig = async () => {
         subStore.list[subStore.activeIndex].lastUpdate = Date.now()
       }
     }
-
-    message.success('配置已保存并应用')
+    message.success(t('sub.config_save_success'))
     showConfigModal.value = false
   } catch (error) {
-    message.error('保存配置失败：' + error)
+    message.error(t('sub.config_save_fail', { error: error }))
   } finally {
     isConfigLoading.value = false
   }
@@ -586,6 +548,7 @@ const saveCurrentConfig = async () => {
 </script>
 
 <style scoped>
+/* Стили остаются без изменений */
 .sub-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -778,7 +741,6 @@ const saveCurrentConfig = async () => {
   font-weight: 500;
 }
 
-/* 新增样式 */
 .sub-tabs {
   margin-top: 10px;
 }

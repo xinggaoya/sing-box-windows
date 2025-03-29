@@ -4,7 +4,7 @@
     :mask-closable="false"
     class="update-modal"
     preset="card"
-    title="发现新版本"
+    :title="t('update.modal_title')"
     size="small"
     :bordered="false"
     :segmented="true"
@@ -17,11 +17,11 @@
           <n-icon size="24" color="var(--primary-color)" class="update-icon">
             <download-outline />
           </n-icon>
-          <span>新版本 {{ latestVersion }} 已发布</span>
+          <span>{{ t('update.new_version_released', { version: latestVersion }) }}</span>
         </div>
         <div class="update-description">
-          <p>是否立即更新？</p>
-          <p class="current-version">当前版本：{{ currentVersion }}</p>
+          <p>{{ t('update.prompt_update') }}</p>
+          <p class="current-version">{{ t('update.current_version', { version: currentVersion }) }}</p>
         </div>
       </div>
 
@@ -39,7 +39,7 @@
 
       <n-space justify="end" :size="16">
         <n-button size="medium" @click="onCancel" :disabled="isUpdating" class="update-button">
-          下次再说
+          {{ t('update.later') }}
         </n-button>
         <n-button
           type="primary"
@@ -49,7 +49,12 @@
           @click="onUpdate"
           class="update-button"
         >
-          {{ isUpdating ? '正在下载更新' : '立即更新' }}
+          <template v-if="isUpdating">
+            {{ t('update.downloading') }}
+          </template>
+          <template v-else>
+            {{ t('update.update_now') }}
+          </template>
         </n-button>
       </n-space>
     </n-space>
@@ -61,6 +66,9 @@ import { ref, defineProps, defineEmits, watch, onMounted, onBeforeUnmount } from
 import { useMessage } from 'naive-ui'
 import { DownloadOutline } from '@vicons/ionicons5'
 import { listen } from '@tauri-apps/api/event'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   show: {
@@ -89,21 +97,19 @@ const updateProgress = ref(0)
 const localShow = ref(false)
 let unlisten: (() => void) | null = null
 
-// 监听props.show的变化并更新本地状态
+// Синхронизируем props.show с локальным состоянием
 watch(
   () => props.show,
   (newVal) => {
     localShow.value = newVal
-  },
+  }
 )
 
-// 处理本地状态变化并发出事件
 const handleUpdateShow = (value: boolean) => {
   localShow.value = value
   emits('update:show', value)
 }
 
-// 监听更新进度
 const setupProgressListener = async () => {
   try {
     unlisten = await listen(
@@ -115,14 +121,13 @@ const setupProgressListener = async () => {
           updateProgress.value = progress
         } else if (status === 'completed') {
           isUpdating.value = false
-          message.success('更新下载完成，即将安装...')
-          // 关闭对话框
+          message.success(t('update.download_complete_install'))
           handleUpdateShow(false)
         }
-      },
+      }
     )
   } catch (error) {
-    console.error('设置更新进度监听失败:', error)
+    console.error(t('update.progress_listener_fail'), error)
   }
 }
 
@@ -132,7 +137,7 @@ const onUpdate = async () => {
     emits('update', props.downloadUrl)
   } catch (error) {
     isUpdating.value = false
-    message.error(`更新失败: ${error}`)
+    message.error(t('update.update_fail', { error: error }))
   }
 }
 
@@ -142,7 +147,6 @@ const onCancel = () => {
   emits('cancel')
 }
 
-// 清理监听器
 const cleanup = () => {
   if (unlisten) {
     unlisten()
@@ -150,7 +154,6 @@ const cleanup = () => {
   }
 }
 
-// 监听本地状态变化来设置或清理监听器
 watch(localShow, (newVal) => {
   if (newVal) {
     setupProgressListener()

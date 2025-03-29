@@ -2,6 +2,7 @@
   <n-layout position="absolute">
     <n-layout-header bordered style="height: 64px; padding: 12px 24px">
       <n-flex justify="space-between" align="center" data-tauri-drag-region>
+        <!-- Левая часть: логотип и название -->
         <n-space align="center" :size="16">
           <n-image
             :src="logo"
@@ -15,6 +16,11 @@
             <n-text depth="3" style="font-size: 14px; margin-left: 4px">Windows</n-text>
           </n-h2>
         </n-space>
+
+        <!-- Переключатель языков -->
+        <LanguageSwitcher />
+
+        <!-- Правая часть: кнопки управления (темы, полноэкранный режим и т.д.) -->
         <n-space :size="16">
           <n-button quaternary size="medium" @click="appStore.toggleTheme" class="header-button">
             <template #icon>
@@ -90,7 +96,7 @@
     </n-layout>
   </n-layout>
 
-  <!-- 更新对话框 -->
+  <!-- Обновление (Update) модальное окно -->
   <update-modal
     v-model:show="showUpdateModal"
     :latest-version="updateInfo.latest_version"
@@ -102,10 +108,9 @@
 </template>
 
 <script setup lang="ts">
-import { darkTheme, useOsTheme, NIcon, useNotification, NButton, NProgress } from 'naive-ui'
-import type { NotificationReactive } from 'naive-ui'
-import { h, ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted, h } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import mitt from '@/utils/mitt'
 import {
   HomeOutline,
@@ -124,22 +129,20 @@ import {
 } from '@vicons/ionicons5'
 import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/AppStore'
+import { useNotification } from 'naive-ui'
 import { listen } from '@tauri-apps/api/event'
 import logo from '@/assets/icon.png'
 import UpdateModal from '@/components/UpdateModal.vue'
+import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 
+const { t } = useI18n()
 const router = useRouter()
 const appWindow = Window.getCurrent()
 const appStore = useAppStore()
 const notification = useNotification()
-const osThemeRef = useOsTheme()
-const isDark = ref(osThemeRef.value === 'dark')
-const theme = ref(isDark.value ? darkTheme : null)
 const collapsed = ref(false)
 const currentMenu = ref(0)
-const isFullscreen = ref(false)
 
-// 更新对话框相关状态
 const showUpdateModal = ref(false)
 const updateInfo = ref({
   latest_version: '',
@@ -147,7 +150,7 @@ const updateInfo = ref({
   has_update: false,
 })
 
-// 检查更新
+// Проверка обновлений с уведомлением
 const checkUpdateWithNotification = async () => {
   try {
     const result = await appStore.checkUpdate()
@@ -160,27 +163,19 @@ const checkUpdateWithNotification = async () => {
   }
 }
 
-// 处理更新
 const handleUpdate = async (downloadUrl: string) => {
   try {
     await appStore.downloadAndInstallUpdate()
   } catch (error) {
     notification.error({
-      title: '更新失败',
-      content: String(error),
+      title: t('settings.update_fail', { error: String(error) }),
       duration: 5000,
     })
   }
 }
 
-// 取消更新
 const handleCancelUpdate = () => {
   showUpdateModal.value = false
-}
-
-const toggleTheme = () => {
-  isDark.value = !isDark.value
-  theme.value = isDark.value ? darkTheme : null
 }
 
 const onToggleFullScreen = async () => {
@@ -189,40 +184,40 @@ const onToggleFullScreen = async () => {
 
 const menuOptions = computed(() => [
   {
-    label: '主页',
+    label: t('menu.home'),
     key: 0,
     icon: HomeOutline,
   },
   {
-    label: '代理',
+    label: t('menu.proxy'),
     key: 1,
     disabled: !appStore.isRunning,
     icon: SwapHorizontalOutline,
   },
   {
-    label: '订阅',
+    label: t('menu.subscription'),
     key: 4,
     icon: AtCircleOutline,
   },
   {
-    label: '规则',
+    label: t('menu.rules'),
     key: 2,
     disabled: !appStore.isRunning,
     icon: FilterOutline,
   },
   {
-    label: '连接',
+    label: t('menu.connections'),
     key: 3,
     disabled: !appStore.isRunning,
     icon: LinkOutline,
   },
   {
-    label: '日志',
+    label: t('menu.log'),
     key: 5,
     icon: DocumentTextOutline,
   },
   {
-    label: '设置',
+    label: t('menu.settings'),
     key: 6,
     icon: SettingsOutline,
   },
@@ -257,18 +252,13 @@ function onSelect(key: number) {
   currentMenu.value = key
 }
 
-// 监听窗口事件
+// Слушаем события окна
 onMounted(async () => {
-  // 获取当前版本号并检查更新
   await appStore.fetchAppVersion()
   await checkUpdateWithNotification()
-
-  // 监听窗口显示
   await appWindow.listen('tauri://show', () => {
     mitt.emit('window-show')
   })
-
-  // 监听窗口恢复
   await appWindow.listen('tauri://restore', () => {
     mitt.emit('window-restore')
   })
@@ -370,7 +360,7 @@ onMounted(async () => {
   transform: translateY(-1px);
 }
 
-/* 增加选中特效 */
+/* Дополнительные стили для эффектов */
 .menu-item::before {
   content: '';
   position: absolute;
