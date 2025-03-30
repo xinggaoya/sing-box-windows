@@ -324,6 +324,8 @@ import { supportedLocales } from '@/locales'
 import { Locale } from '@/stores/AppStore'
 import { useI18n } from 'vue-i18n'
 import mitt from '@/utils/mitt'
+import { getVersion } from '@tauri-apps/api/app'
+import i18n from '@/locales'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -520,8 +522,8 @@ listen(
 
 // 切换语言
 const handleChangeLanguage = async (value: string) => {
-  appStore.language = value
-  i18n.global.locale.value = value
+  appStore.setLocale(value as Locale)
+  i18n.global.locale.value = value as 'zh-CN' | 'en-US' | 'ru-RU' | 'ja-JP'
   // 发送语言变更事件，通知托盘菜单刷新
   mitt.emit('language-changed')
 }

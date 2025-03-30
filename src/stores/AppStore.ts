@@ -25,7 +25,7 @@ export interface WindowState {
 }
 
 // 语言类型
-export type Locale = 'zh-CN' | 'en-US' | 'auto'
+export type Locale = 'zh-CN' | 'en-US' | 'ru-RU' | 'ja-JP' | 'auto'
 
 export const useAppStore = defineStore(
   'app',
@@ -330,8 +330,6 @@ export const useAppStore = defineStore(
     }
   },
   {
-    persist: {
-      paths: ['isDark', 'proxyMode', 'autoStartApp', 'autoStartKernel', 'preferIpv6', 'locale'],
-    },
+    persist: true,
   },
 )
