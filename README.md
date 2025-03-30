@@ -3,151 +3,155 @@
 <div align="center">
     <img src="./src/assets/icon.png" alt="Sing-Box Windows Logo" width="128" height="128" />
     <h1>Sing-Box Windows</h1>
-    <p>🚀 一个优雅的 Sing-Box Windows GUI 客户端</p>
+    <p>🚀 An elegant Sing-Box Windows GUI client</p>
     <p>
         <img src="https://img.shields.io/github/license/xinggaoya/sing-box-windows" alt="license" />
         <img src="https://img.shields.io/github/stars/xinggaoya/sing-box-windows" alt="stars" />
         <img src="https://img.shields.io/github/downloads/xinggaoya/sing-box-windows/total" alt="downloads" />
         <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows" alt="release" />
     </p>
+    <p>
+        <a href="README.zh.md">中文</a> | 
+        <a href="README.md">English</a>
+    </p>
 </div>
 
-## 🎯 特性
+## 🎯 Features
 
-- 🖥️ 现代化的用户界面，基于 [Tauri 2.0](https://tauri.app/) 和 [Vue 3](https://vuejs.org/)
-- 🌙 支持亮色/暗色主题，自动跟随系统
-- 🔄 支持多种订阅链接导入和自动更新
-- 🌐 全面的代理模式支持
-- 📊 丰富的统计功能
-- 🔍 完整的日志系统
-- ⚡ 优化的性能表现
-- 🔒 安全特性
+- 🖥️ Modern user interface based on [Tauri 2.0](https://tauri.app/) and [Vue 3](https://vuejs.org/)
+- 🌙 Support for light/dark themes, automatically following system settings
+- 🔄 Support for multiple subscription links import and automatic updates
+- 🌐 Comprehensive proxy mode support
+- 📊 Rich statistical features
+- 🔍 Complete logging system
+- ⚡ Optimized performance
+- 🔒 Security features
+- 🌍 Internationalization support
 
-## 📸 预览
+## 📸 Preview
 
-<img src="./public/image.png" alt="sing-box-windows 预览" width="800">
+<img src="./public/image.png" alt="sing-box-windows preview" width="800">
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 下载安装
+### Download and Install
 
-1. 从 [Releases](https://github.com/xinggaoya/sing-box-windows/releases) 页面下载最新版本
-2. 运行安装程序（支持自动更新）
-3. 首次启动会自动完成必要配置
+1. Download the latest version from the [Releases](https://github.com/xinggaoya/sing-box-windows/releases) page
+2. Run the installer (supports automatic updates)
+3. The necessary configuration will be automatically completed on first launch
 
-### 基本使用
+### Basic Usage
 
-1. 首次使用请在【设置】中下载并安装 Sing-Box 内核
-2. 在【订阅】页面添加或导入您的订阅链接
-   - 支持直接输入链接
-   - 支持sing-box json的配置，base64自动解码
-3. 在【主页】中选择节点并连接
-   - 支持快速切换节点
-   - 支持节点延迟测试
-   - 支持节点分组管理
+1. For first-time use, please download and install the Sing-Box core in the [Settings] page
+2. Add or import your subscription links on the [Subscriptions] page
+   - Support direct link input
+   - Support sing-box json configuration with automatic base64 decoding
+3. Select and connect to nodes on the [Home] page
+   - Support quick node switching
+   - Support node latency testing
+   - Support node group management
 
-> 提示：使用 TUN 模式时，程序会请求管理员权限并自动配置系统设置
+> Tip: When using TUN mode, the program will request administrator privileges and automatically configure system settings
 
-### 进阶功能
+### Advanced Features
 
-- **规则设置**：支持自定义分流规则
-- **快捷操作**：支持系统托盘快速操作
-- **配置备份**：支持配置导出和恢复
-- **自动化**：支持开机自启和自动连接
+- **Rule Settings**: Support for custom routing rules
+- **Quick Operations**: Support for system tray quick actions
+- **Configuration Backup**: Support for configuration export and restore
+- **Automation**: Support for auto-start on boot and auto-connect
 
-## 🛠️ 开发指南
+## 🛠️ Development Guide
 
-### 环境要求
+### Environment Requirements
 
-- [Node.js](https://nodejs.org/) 18.0 或更高版本
-- [Rust](https://www.rust-lang.org/) 最新稳定版
-- [Visual Studio](https://visualstudio.microsoft.com/) 2019 或更高版本（需包含 C++ 开发工具）
-- [Git](https://git-scm.com/) 最新版本
-- [pnpm](https://pnpm.io/) 包管理器
+- [Node.js](https://nodejs.org/) 18.0 or higher
+- [Rust](https://www.rust-lang.org/) latest stable version
+- [Visual Studio](https://visualstudio.microsoft.com/) 2019 or higher (with C++ development tools)
+- [Git](https://git-scm.com/) latest version
+- [pnpm](https://pnpm.io/) package manager
 
-### 本地开发
+### Local Development
 
 ```bash
-# 克隆项目
+# Clone the project
 git clone https://github.com/xinggaoya/sing-box-windows.git
 cd sing-box-windows
 
-# 安装依赖
+# Install dependencies
 pnpm install
 
-# 启动开发服务器
+# Start development server
 pnpm tauri dev
 
-# 构建生产版本
+# Build production version
 pnpm tauri build
 ```
 
-### 更多开发文档
+### More Development Documentation
 
-详细的开发文档请查看 [开发文档](./docs/development.md)，其中包含了项目结构、核心功能模块、开发规范等更多内容。
+For detailed development documentation, please check the [Development Documentation](./docs/development.md), which includes project structure, core functional modules, development specifications, and more.
 
-### 项目结构
+### Project Structure
 
 ```
 sing-box-windows/
-├── src/                # 前端源代码
-│   ├── assets/        # 静态资源
-│   ├── components/    # 通用组件
-│   ├── router/        # 路由配置
-│   ├── stores/        # 状态管理
-│   ├── utils/         # 工具函数
-│   └── views/         # 页面组件
-├── src-tauri/         # Rust 后端代码
-│   ├── src/           # 源代码
-│   └── Cargo.toml     # Rust 依赖配置
-└── package.json       # 项目配置
+├── src/                # Frontend source code
+│   ├── assets/        # Static resources
+│   ├── components/    # Common components
+│   ├── router/        # Route configuration
+│   ├── stores/        # State management
+│   ├── utils/         # Utility functions
+│   └── views/         # Page components
+├── src-tauri/         # Rust backend code
+│   ├── src/           # Source code
+│   └── Cargo.toml     # Rust dependency configuration
+└── package.json       # Project configuration
 ```
 
-## 📦 技术栈
+## 📦 Technology Stack
 
-- 🎯 [Tauri 2.0](https://tauri.app/) - 现代化跨平台应用框架
-- ⚡ [Vue 3](https://vuejs.org/) - 响应式前端框架
-- 🎨 [Naive UI](https://www.naiveui.com/) - 高质量 Vue 3 组件库
-- 📊 [Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API) - 高性能的图形渲染
-- 🦀 [Rust](https://www.rust-lang.org/) - 高性能系统编程语言
-- 🔧 [TypeScript](https://www.typescriptlang.org/) - 类型安全的 JavaScript
+- 🎯 [Tauri 2.0](https://tauri.app/) - Modern cross-platform application framework
+- ⚡ [Vue 3](https://vuejs.org/) - Reactive frontend framework
+- 🎨 [Naive UI](https://www.naiveui.com/) - High-quality Vue 3 component library
+- 📊 [Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API) - High-performance graphics rendering
+- 🦀 [Rust](https://www.rust-lang.org/) - High-performance systems programming language
+- 🔧 [TypeScript](https://www.typescriptlang.org/) - Type-safe JavaScript
 
-## 🤝 贡献指南
+## 🤝 Contribution Guidelines
 
-我们非常欢迎各种形式的贡献，包括但不限于：
+We welcome all forms of contributions, including but not limited to:
 
-- 🐛 问题报告和建议
-- 📝 文档改进
-- 🔧 代码修复
-- ✨ 新功能开发
-- 🌍 多语言支持
+- 🐛 Issue reports and suggestions
+- 📝 Documentation improvements
+- 🔧 Code fixes
+- ✨ New feature development
+- 🌍 Multi-language support
 
-贡献流程：
+Contribution process:
 
-1. Fork 本仓库
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Submit a Pull Request
 
-## 📄 许可证
+## 📄 License
 
-本项目采用 [MIT 许可证](LICENSE)。
+This project is licensed under the [MIT License](LICENSE).
 
-## 📮 联系方式
+## 📮 Contact
 
-- 📧 邮箱：[xinggaoya@qq.com](mailto:xinggaoya@qq.com)
-- 🐛 问题反馈：[GitHub Issues](https://github.com/xinggaoya/sing-box-windows/issues)
-- 💬 讨论：[GitHub Discussions](https://github.com/xinggaoya/sing-box-windows/discussions)
+- 🐛 Issue Feedback: [GitHub Issues](https://github.com/xinggaoya/sing-box-windows/issues)
+- 💬 Discussion: [GitHub Discussions](https://github.com/xinggaoya/sing-box-windows/discussions)
 
-## ⭐ 鸣谢
+## ⭐ Acknowledgements
 
-- [sing-box](https://github.com/SagerNet/sing-box) - 核心代理引擎
-- [Tauri](https://tauri.app/) - 应用框架
-- [Vue](https://vuejs.org/) - 前端框架
-- [Naive UI](https://www.naiveui.com/) - UI 组件库
-- [社区贡献者们](https://github.com/xinggaoya/sing-box-windows/graphs/contributors)
+- [sing-box](https://github.com/SagerNet/sing-box) - Core proxy engine
+- [Tauri](https://tauri.app/) - Application framework
+- [Vue](https://vuejs.org/) - Frontend framework
+- [Naive UI](https://www.naiveui.com/) - UI component library
+- [Community contributors](https://github.com/xinggaoya/sing-box-windows/graphs/contributors)
 
 ---
 
-如果这个项目对你有帮助，欢迎给一个 Star ⭐️
+If this project is helpful to you, please give it a Star ⭐️

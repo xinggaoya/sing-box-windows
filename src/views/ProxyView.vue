@@ -9,7 +9,7 @@
               <n-icon size="24" class="card-icon">
                 <swap-horizontal-outline />
               </n-icon>
-              代理设置
+              {{ t('proxy.title') }}
             </n-h3>
           </div>
           <div class="header-right">
@@ -29,7 +29,7 @@
                     </n-icon>
                   </n-tag>
                 </template>
-                点击切换代理模式
+                {{ t('proxy.modeSwitchTip') }}
               </n-tooltip>
             </n-dropdown>
 
@@ -49,7 +49,7 @@
                   </template>
                 </n-button>
               </template>
-              刷新代理列表
+              {{ t('proxy.refreshList') }}
             </n-tooltip>
           </div>
         </div>
@@ -60,23 +60,26 @@
     <n-modal
       v-model:show="showModeChangeModal"
       preset="dialog"
-      :title="`切换到${targetProxyMode ? getProxyModeText(targetProxyMode) : ''}`"
+      :title="`${t('proxy.switchTo')}${targetProxyMode ? getProxyModeText(targetProxyMode) : ''}`"
     >
       <template #header>
         <div class="modal-header">
           <n-icon size="22" class="modal-icon">
             <information-circle-outline />
           </n-icon>
-          <span>切换到{{ targetProxyMode ? getProxyModeText(targetProxyMode) : '' }}</span>
+          <span
+            >{{ t('proxy.switchTo')
+            }}{{ targetProxyMode ? getProxyModeText(targetProxyMode) : '' }}</span
+          >
         </div>
       </template>
-      <div class="modal-content">切换代理模式需要重启内核才能生效。确定要切换并重启内核吗？</div>
+      <div class="modal-content">{{ t('proxy.switchModeConfirm') }}</div>
       <template #action>
         <div class="modal-footer">
           <n-space justify="end">
-            <n-button @click="showModeChangeModal = false">取消</n-button>
+            <n-button @click="showModeChangeModal = false">{{ t('common.cancel') }}</n-button>
             <n-button type="primary" :loading="isChangingMode" @click="confirmProxyModeChange">
-              确认切换
+              {{ t('proxy.confirmSwitch') }}
             </n-button>
           </n-space>
         </div>
@@ -98,10 +101,10 @@
               <div class="proxy-group-info">
                 <n-space align="center" :size="12">
                   <n-tag :bordered="false" type="success" size="medium" class="proxy-tag">
-                    当前节点: {{ group.now }}
+                    {{ t('proxy.currentNode') }}: {{ group.now }}
                   </n-tag>
                   <n-tag :bordered="false" type="info" size="medium" class="proxy-tag">
-                    {{ group.all.length }} 个节点
+                    {{ group.all.length }} {{ t('proxy.nodeCount') }}
                   </n-tag>
                   <n-tag :bordered="false" type="warning" size="medium" class="proxy-tag">
                     {{ group.type }}
@@ -118,7 +121,7 @@
                     <template #icon>
                       <n-icon><speedometer-outline /></n-icon>
                     </template>
-                    测速
+                    {{ t('proxy.speedTest') }}
                   </n-button>
                 </n-space>
               </div>
@@ -147,7 +150,11 @@
                           round
                           class="delay-tag"
                         >
-                          {{ getNodeDelay(proxy) === 0 ? '未测速' : getNodeDelay(proxy) + 'ms' }}
+                          {{
+                            getNodeDelay(proxy) === 0
+                              ? t('proxy.notTested')
+                              : getNodeDelay(proxy) + 'ms'
+                          }}
                         </n-tag>
                       </n-flex>
 
@@ -166,7 +173,7 @@
                               <swap-horizontal-outline v-else />
                             </n-icon>
                           </template>
-                          {{ group.now === proxy ? '使用中' : '切换' }}
+                          {{ group.now === proxy ? t('proxy.inUse') : t('proxy.switch') }}
                         </n-button>
                       </n-flex>
                     </n-space>
@@ -199,6 +206,7 @@ import { useWindowSize } from '@vueuse/core'
 import { Component } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { listen } from '@tauri-apps/api/event'
+import { useI18n } from 'vue-i18n'
 
 // 接口定义
 interface ProxyHistory {
@@ -231,6 +239,7 @@ interface TestGroupResult {
 const message = useMessage()
 const isLoading = ref(false)
 const { width } = useWindowSize()
+const { t } = useI18n()
 
 // 代理数据
 const rawProxies = ref<Record<string, ProxyData>>({})
@@ -251,12 +260,12 @@ let unlistenTestComplete: (() => void) | null = null
 // 代理模式选项
 const proxyModeOptions = [
   {
-    label: '全局模式',
+    label: t('proxy.mode.global'),
     key: 'global',
     icon: renderIcon(GlobeOutline),
   },
   {
-    label: '规则模式',
+    label: t('proxy.mode.rule'),
     key: 'rule',
     icon: renderIcon(LayersOutline),
   },
@@ -302,7 +311,7 @@ onUnmounted(() => {
 const setupEventListeners = async () => {
   unlistenTestProgress = await listen('test-nodes-progress', (event) => {
     const data = event.payload as { current: number; total: number; node: string; status: string }
-    console.log('测试进度:', data)
+    console.log(t('proxy.testProgress'), data)
   })
 
   unlistenTestResult = await listen('test-group-result', (event) => {
@@ -310,15 +319,15 @@ const setupEventListeners = async () => {
     if (data.success) {
       // 更新测试结果
       Object.assign(testResults, data.results)
-      message.success('组测速完成')
+      message.success(t('proxy.groupTestComplete'))
     } else {
-      message.error(`测速失败: ${data.error}`)
+      message.error(`${t('proxy.testFailed')}: ${data.error}`)
     }
     testingGroup.value = ''
   })
 
   unlistenTestComplete = await listen('test-nodes-complete', () => {
-    message.success('批量测速完成')
+    message.success(t('proxy.batchTestComplete'))
   })
 }
 
@@ -358,11 +367,11 @@ const init = async () => {
         activeGroupTab.value = groups[0].name
       }
 
-      message.success('代理列表加载成功')
+      message.success(t('proxy.loadSuccess'))
     }
   } catch (error) {
-    console.error('获取代理列表失败', error)
-    message.error('获取代理列表失败，请检查Sing-Box是否已启动')
+    console.error(t('proxy.loadFailed'), error)
+    message.error(t('proxy.loadFailedCheck'))
   } finally {
     isLoading.value = false
   }
@@ -397,11 +406,11 @@ const getNodeDelayType = (delay: number): string => {
  */
 const getProxyModeText = (mode: string): string => {
   const modeMap: Record<string, string> = {
-    global: '全局模式',
-    rule: '规则模式',
-    tun: 'TUN模式',
+    global: t('proxy.mode.global'),
+    rule: t('proxy.mode.rule'),
+    tun: t('proxy.mode.tun'),
   }
-  return modeMap[mode] || '未知模式'
+  return modeMap[mode] || t('proxy.mode.unknown')
 }
 
 /**
@@ -425,8 +434,8 @@ const testNodeDelay = async (group: string) => {
   try {
     await tauriApi.proxy.testGroupDelay(group)
   } catch (error) {
-    console.error('测速失败', error)
-    message.error('测速失败，可能是节点无法连接或API未响应')
+    console.error(t('proxy.testFailed'), error)
+    message.error(t('proxy.testErrorMessage'))
     testingGroup.value = ''
   }
 }
@@ -439,14 +448,14 @@ const testNodeDelay = async (group: string) => {
 const changeProxy = async (group: string, proxy: string) => {
   try {
     await tauriApi.proxy.changeProxy(group, proxy)
-    message.success(`已切换 ${group} 到 ${proxy}`)
+    message.success(t('proxy.switchSuccess', { group: group, proxy: proxy }))
     // 重新加载数据
     await init()
     // 重新测试当前组
     await testNodeDelay(group)
   } catch (error) {
-    console.error('切换失败', error)
-    message.error('切换失败，请检查Sing-Box是否已启动')
+    console.error(t('proxy.switchFailed'), error)
+    message.error(t('proxy.switchErrorMessage'))
   }
 }
 
@@ -458,9 +467,9 @@ const getCurrentProxyMode = async () => {
     // 调用后端API获取当前代理模式
     const mode = await tauriApi.proxy.getCurrentProxyMode()
     currentProxyMode.value = mode
-    console.log('当前代理模式:', mode)
+    console.log(t('proxy.currentMode'), mode)
   } catch (error) {
-    console.error('获取代理模式失败', error)
+    console.error(t('proxy.getModeError'), error)
     // 出错时仍使用默认的规则模式
     currentProxyMode.value = 'rule'
   }
@@ -487,12 +496,12 @@ const confirmProxyModeChange = async () => {
     await tauriApi.proxy.toggleProxyMode(targetProxyMode.value)
     await tauriApi.kernel.restartKernel()
     currentProxyMode.value = targetProxyMode.value
-    message.success(`已切换到${getProxyModeText(targetProxyMode.value)}并重启内核`)
+    message.success(t('proxy.modeChangeSuccess', { mode: getProxyModeText(targetProxyMode.value) }))
     // 重新加载数据
     await init()
   } catch (error) {
-    console.error('切换代理模式失败', error)
-    message.error(`切换代理模式失败: ${error}`)
+    console.error(t('proxy.modeChangeFailed'), error)
+    message.error(`${t('proxy.modeChangeError')}: ${error}`)
   } finally {
     isChangingMode.value = false
     showModeChangeModal.value = false

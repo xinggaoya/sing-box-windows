@@ -14,19 +14,30 @@
 
 <script setup lang="ts">
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '@/stores/AppStore'
 import { useInfoStore } from '@/stores/infoStore'
 import { useTrayStore } from '@/stores/TrayStore'
 import { useRouter } from 'vue-router'
 import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
+import { useI18n } from 'vue-i18n'
 
 // 初始化 store
 const appStore = useAppStore()
 const infoStore = useInfoStore()
 const trayStore = useTrayStore()
 const router = useRouter()
+const { locale } = useI18n()
+
+// 监听语言变化
+watch(
+  () => appStore.currentLocale,
+  (newLocale) => {
+    locale.value = newLocale
+  },
+  { immediate: true },
+)
 
 onMounted(async () => {
   // 设置窗口事件处理器

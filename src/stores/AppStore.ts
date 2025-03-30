@@ -8,6 +8,7 @@ import { Window } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
 import { useRouter, Router } from 'vue-router'
+import { supportedLocales } from '@/locales'
 
 // 定义更新信息类型
 interface UpdateInfo {
@@ -22,6 +23,9 @@ export interface WindowState {
   isFullscreen: boolean
   lastVisiblePath: string
 }
+
+// 语言类型
+export type Locale = 'zh-CN' | 'en-US' | 'auto'
 
 export const useAppStore = defineStore(
   'app',
@@ -50,6 +54,9 @@ export const useAppStore = defineStore(
     const latestVersion = ref('')
     const downloadUrl = ref('')
 
+    // 添加语言设置
+    const locale = ref<Locale>('auto')
+
     // 窗口状态
     const windowState = ref<WindowState>({
       isVisible: true,
@@ -61,6 +68,23 @@ export const useAppStore = defineStore(
     const osTheme = useOsTheme()
     const isDark = ref(osTheme.value === 'dark')
     const theme = computed(() => (isDark.value ? darkTheme : null))
+
+    // 计算实际使用的语言
+    const currentLocale = computed(() => {
+      if (locale.value === 'auto') {
+        // 获取浏览器语言
+        const browserLang = navigator.language
+        // 检查是否支持这个语言
+        const isSupported = supportedLocales.some((loc) => loc.code === browserLang)
+        return isSupported ? browserLang : 'zh-CN'
+      }
+      return locale.value
+    })
+
+    // 语言切换
+    const setLocale = (newLocale: Locale) => {
+      locale.value = newLocale
+    }
 
     // 主题切换
     const toggleTheme = () => {
@@ -276,38 +300,38 @@ export const useAppStore = defineStore(
       autoStartApp,
       autoStartKernel,
       preferIpv6,
-      switchProxyMode,
       appVersion,
-      fetchAppVersion,
-      // 导出更新相关方法和状态
       hasUpdate,
       latestVersion,
       downloadUrl,
-      checkUpdate,
-      downloadAndInstallUpdate,
-      // 导出主题相关状态和方法
+      windowState,
       isDark,
       theme,
+      locale,
+      currentLocale,
       toggleTheme,
-      // 窗口状态
-      windowState,
-      // 窗口操作
+      setLocale,
+      fetchAppVersion,
+      checkUpdate,
+      downloadAndInstallUpdate,
+      setRunningState,
+      switchProxyMode,
+      getAppWindow,
       minimizeWindow,
       hideWindow,
       showWindow,
-      toggleFullScreen,
-      getWindowVisible,
       setWindowAlwaysOnTop,
-      // 窗口事件处理
+      getWindowVisible,
+      toggleFullScreen,
       saveRouteAndGoBlank,
       restoreFromBlank,
       setupWindowEventHandlers,
       cleanupWindowEvents,
-      // 运行状态更新
-      setRunningState,
     }
   },
   {
-    persist: true, // 使用默认的持久化配置
+    persist: {
+      paths: ['isDark', 'proxyMode', 'autoStartApp', 'autoStartKernel', 'preferIpv6', 'locale'],
+    },
   },
 )

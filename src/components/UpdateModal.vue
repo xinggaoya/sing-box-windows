@@ -4,7 +4,7 @@
     :mask-closable="false"
     class="update-modal"
     preset="card"
-    title="发现新版本"
+    :title="t('notification.updateAvailable')"
     size="small"
     :bordered="false"
     :segmented="true"
@@ -17,11 +17,11 @@
           <n-icon size="24" color="var(--primary-color)" class="update-icon">
             <download-outline />
           </n-icon>
-          <span>新版本 {{ latestVersion }} 已发布</span>
+          <span>{{ t('setting.update.newVersion') }} {{ latestVersion }}</span>
         </div>
         <div class="update-description">
-          <p>是否立即更新？</p>
-          <p class="current-version">当前版本：{{ currentVersion }}</p>
+          <p>{{ t('setting.update.confirmUpdate') }}</p>
+          <p class="current-version">{{ t('setting.update.current') }}: {{ currentVersion }}</p>
         </div>
       </div>
 
@@ -39,7 +39,7 @@
 
       <n-space justify="end" :size="16">
         <n-button size="medium" @click="onCancel" :disabled="isUpdating" class="update-button">
-          下次再说
+          {{ t('setting.update.later') }}
         </n-button>
         <n-button
           type="primary"
@@ -49,7 +49,7 @@
           @click="onUpdate"
           class="update-button"
         >
-          {{ isUpdating ? '正在下载更新' : '立即更新' }}
+          {{ isUpdating ? t('setting.update.downloading') : t('setting.update.updateNow') }}
         </n-button>
       </n-space>
     </n-space>
@@ -61,6 +61,7 @@ import { ref, defineProps, defineEmits, watch, onMounted, onBeforeUnmount } from
 import { useMessage } from 'naive-ui'
 import { DownloadOutline } from '@vicons/ionicons5'
 import { listen } from '@tauri-apps/api/event'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
   show: {
@@ -84,6 +85,7 @@ const props = defineProps({
 const emits = defineEmits(['update:show', 'update', 'cancel'])
 
 const message = useMessage()
+const { t } = useI18n()
 const isUpdating = ref(false)
 const updateProgress = ref(0)
 const localShow = ref(false)
@@ -115,7 +117,7 @@ const setupProgressListener = async () => {
           updateProgress.value = progress
         } else if (status === 'completed') {
           isUpdating.value = false
-          message.success('更新下载完成，即将安装...')
+          message.success(t('notification.updateDownloaded'))
           // 关闭对话框
           handleUpdateShow(false)
         }
@@ -132,7 +134,7 @@ const onUpdate = async () => {
     emits('update', props.downloadUrl)
   } catch (error) {
     isUpdating.value = false
-    message.error(`更新失败: ${error}`)
+    message.error(`${t('common.error')}: ${error}`)
   }
 }
 

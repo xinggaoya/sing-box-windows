@@ -26,6 +26,7 @@ type Events = {
   'window-restore': void
   'refresh-tray-menu': void
   'update-available': UpdateInfo
+  'language-changed': void
   error: string
 }
 

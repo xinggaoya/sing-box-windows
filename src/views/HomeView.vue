@@ -8,7 +8,9 @@
           <n-space align="center" :size="16">
             <div class="status-indicator">
               <div class="status-dot" :class="{ active: appState.isRunning }"></div>
-              <span class="status-text">{{ appState.isRunning ? '运行中' : '已停止' }}</span>
+              <span class="status-text">{{
+                appState.isRunning ? t('home.status.running') : t('home.status.stopped')
+              }}</span>
             </div>
             <n-tag
               :bordered="false"
@@ -22,7 +24,11 @@
                   <flash-outline v-else />
                 </n-icon>
               </template>
-              {{ appState.proxyMode === 'system' ? '系统代理' : 'TUN 模式' }}
+              {{
+                appState.proxyMode === 'system'
+                  ? t('home.proxyMode.system')
+                  : t('home.proxyMode.tun')
+              }}
             </n-tag>
           </n-space>
           <n-space :size="16">
@@ -37,7 +43,7 @@
               <template #icon>
                 <n-icon><repeat-outline /></n-icon>
               </template>
-              切换模式
+              {{ t('home.switchMode') }}
             </n-button>
             <n-button
               secondary
@@ -52,7 +58,7 @@
                   <power-outline />
                 </n-icon>
               </template>
-              {{ appState.isRunning ? '停止' : '启动' }}
+              {{ appState.isRunning ? t('home.stop') : t('home.start') }}
             </n-button>
           </n-space>
         </n-space>
@@ -64,7 +70,7 @@
               <n-icon size="22"><arrow-up-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">上传速度</span>
+              <span class="traffic-label">{{ t('home.traffic.uploadSpeed') }}</span>
               <span class="traffic-value">{{ trafficStr.up }}</span>
             </div>
           </div>
@@ -73,7 +79,7 @@
               <n-icon size="22"><arrow-down-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">下载速度</span>
+              <span class="traffic-label">{{ t('home.traffic.downloadSpeed') }}</span>
               <span class="traffic-value">{{ trafficStr.down }}</span>
             </div>
           </div>
@@ -82,7 +88,7 @@
               <n-icon size="22"><cloud-upload-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">上传总流量</span>
+              <span class="traffic-label">{{ t('home.traffic.uploadTotal') }}</span>
               <span class="traffic-value">{{ uploadTotalTraffic }}</span>
             </div>
           </div>
@@ -91,7 +97,7 @@
               <n-icon size="22"><cloud-download-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">下载总流量</span>
+              <span class="traffic-label">{{ t('home.traffic.downloadTotal') }}</span>
               <span class="traffic-value">{{ downloadTotalTraffic }}</span>
             </div>
           </div>
@@ -100,7 +106,7 @@
               <n-icon size="22"><hardware-chip-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">内存占用</span>
+              <span class="traffic-label">{{ t('home.traffic.memory') }}</span>
               <span class="traffic-value">{{ memoryStr }}</span>
             </div>
           </div>
@@ -109,7 +115,7 @@
               <n-icon size="22"><git-network-outline /></n-icon>
             </div>
             <div class="traffic-info">
-              <span class="traffic-label">活动连接</span>
+              <span class="traffic-label">{{ t('home.traffic.connections') }}</span>
               <span class="traffic-value">{{ activeConnectionsCount }}</span>
             </div>
           </div>
@@ -151,6 +157,7 @@ import { useAppStore } from '@/stores/AppStore'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useInfoStore } from '@/stores/infoStore'
 import { ProxyService } from '@/services/proxy-service'
+import { useI18n } from 'vue-i18n'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -159,6 +166,7 @@ const infoStore = useInfoStore()
 const proxyService = ProxyService.getInstance()
 const isStarting = ref(false)
 const isStopping = ref(false)
+const { t } = useI18n()
 
 // 监听路由可见性变化，简化为只用于计算属性的控制
 const route = useRoute()
@@ -213,7 +221,7 @@ const runKernel = async () => {
     isStarting.value = true
     await infoStore.startKernel()
     appState.setRunningState(true)
-    message.success('内核已启动')
+    message.success(t('notification.kernelStarted'))
   } catch (error) {
     message.error(error as string)
   } finally {
@@ -226,7 +234,7 @@ const stopKernel = async () => {
     isStopping.value = true
     await infoStore.stopKernel()
     appState.setRunningState(false)
-    message.success('内核已停止')
+    message.success(t('notification.kernelStopped'))
   } catch (error) {
     message.error(error as string)
   } finally {

@@ -8,22 +8,22 @@
             <n-icon size="24" class="card-icon">
               <document-text-outline />
             </n-icon>
-            日志查看
+            {{ t('log.title') }}
           </n-h3>
           <n-tag :bordered="false" type="info" size="medium" class="log-count-tag">
-            {{ displayedLogs.length }}/{{ totalLogs }} 条记录
+            {{ displayedLogs.length }}/{{ totalLogs }} {{ t('log.records') }}
           </n-tag>
         </div>
         <n-space :size="12">
           <n-switch v-model:value="autoScroll" size="medium" class="auto-scroll-switch">
-            <template #checked>自动滚动</template>
-            <template #unchecked>手动滚动</template>
+            <template #checked>{{ t('log.autoScroll') }}</template>
+            <template #unchecked>{{ t('log.manualScroll') }}</template>
           </n-switch>
 
           <n-select
             v-model:value="filterType"
             :options="logTypeOptions"
-            placeholder="筛选日志类型"
+            :placeholder="t('log.filterType')"
             size="medium"
             style="width: 120px"
             class="log-filter-select"
@@ -45,7 +45,7 @@
                   </template>
                 </n-button>
               </template>
-              清空日志
+              {{ t('log.clear') }}
             </n-tooltip>
 
             <n-tooltip trigger="hover" placement="top">
@@ -63,7 +63,7 @@
                   </template>
                 </n-button>
               </template>
-              复制日志
+              {{ t('log.copy') }}
             </n-tooltip>
 
             <n-tooltip trigger="hover" placement="top">
@@ -81,7 +81,7 @@
                   </template>
                 </n-button>
               </template>
-              导出日志
+              {{ t('log.export') }}
             </n-tooltip>
           </n-space>
         </n-space>
@@ -115,7 +115,7 @@
             </template>
           </n-virtual-list>
         </div>
-        <n-empty v-else description="暂无日志记录" class="log-empty" />
+        <n-empty v-else :description="t('log.noLogs')" class="log-empty" />
       </div>
     </n-card>
   </div>
@@ -127,6 +127,7 @@ import { onMounted, ref, computed, onUnmounted, watch, nextTick } from 'vue'
 import { useMessage } from 'naive-ui'
 import { TrashOutline, CopyOutline, DownloadOutline, DocumentTextOutline } from '@vicons/ionicons5'
 import type { VirtualListInst } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 
 interface Log {
   type: string
@@ -144,6 +145,7 @@ const virtualListRef = ref<VirtualListInst | null>(null)
 const autoScroll = ref(true)
 const filterType = ref<string | null>(null)
 const displayedLogs = ref<Log[]>([])
+const { t } = useI18n()
 
 // 格式化日志数据，添加key属性以适配虚拟列表
 const formattedLogs = computed<FormattedLog[]>(() => {

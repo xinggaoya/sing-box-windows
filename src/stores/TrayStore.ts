@@ -14,6 +14,7 @@ import { ProxyService } from '@/services/proxy-service'
 import mitt from '@/utils/mitt'
 import { Window } from '@tauri-apps/api/window'
 import { useRouter } from 'vue-router'
+import i18n from '@/locales'
 
 // 声明mitt事件类型
 declare module '@/utils/mitt' {
@@ -21,6 +22,7 @@ declare module '@/utils/mitt' {
     'refresh-tray-menu': void
     'process-status': void
     'proxy-mode-changed': void
+    'language-changed': void
   }
 }
 
@@ -62,13 +64,17 @@ export const useTrayStore = defineStore(
     // 只存储托盘ID，不存储实例
     const trayInstanceId = ref<string | null>(null)
 
+    // 获取翻译函数
+    const t = i18n.global.t
+
     /**
      * 更新托盘提示信息
      */
     const updateTrayTooltip = async () => {
       if (trayInstanceId.value) {
-        const status = appStore.isRunning ? '运行中' : '已停止'
-        const mode = appStore.proxyMode === 'system' ? '系统代理' : 'TUN模式'
+        const status = appStore.isRunning ? t('home.status.running') : t('home.status.stopped')
+        const mode =
+          appStore.proxyMode === 'system' ? t('home.proxyMode.system') : t('home.proxyMode.tun')
 
         // 获取当前使用的配置名称
         let configName = ''
@@ -77,11 +83,11 @@ export const useTrayStore = defineStore(
         }
 
         // 构建提示文本
-        let tooltipText = `sing-box-window - 内核${status}, ${mode}`
+        let tooltipText = `sing-box-window - ${t('tray.kernel')}${status}, ${mode}`
 
         // 如果有配置名称，则显示
         if (configName) {
-          tooltipText += `, 配置: ${configName}`
+          tooltipText += `, ${t('sub.title')}: ${configName}`
         }
         try {
           const tray = await TrayIcon.getById(trayInstanceId.value)
@@ -110,7 +116,7 @@ export const useTrayStore = defineStore(
         // 创建基本菜单项
         const showMenuItem = await MenuItem.new({
           id: 'show',
-          text: '显示界面',
+          text: t('tray.show'),
           enabled: true,
           action: async () => {
             await appStore.restoreFromBlank(router)
@@ -121,7 +127,7 @@ export const useTrayStore = defineStore(
         // 创建内核控制子菜单项
         const startMenuItem = await MenuItem.new({
           id: 'start',
-          text: '启动内核',
+          text: t('tray.start'),
           enabled: !appStore.isRunning,
           action: async () => {
             try {
@@ -136,7 +142,7 @@ export const useTrayStore = defineStore(
 
         const stopMenuItem = await MenuItem.new({
           id: 'stop',
-          text: '停止内核',
+          text: t('tray.stop'),
           enabled: appStore.isRunning,
           action: async () => {
             await infoStore.stopKernel()
@@ -147,7 +153,7 @@ export const useTrayStore = defineStore(
 
         const restartMenuItem = await MenuItem.new({
           id: 'restart',
-          text: '重启内核',
+          text: t('home.restart'),
           enabled: appStore.isRunning,
           action: async () => {
             await infoStore.restartKernel()
@@ -158,14 +164,14 @@ export const useTrayStore = defineStore(
         // 创建内核控制子菜单
         const kernelSubmenu = await Submenu.new({
           id: 'kernel_control',
-          text: '内核控制',
+          text: t('setting.kernel.title'),
           items: [startMenuItem, stopMenuItem, restartMenuItem],
         })
 
         // 创建代理模式子菜单项 - 使用普通MenuItem而不是CheckMenuItem
         const systemProxyMenuItem = await MenuItem.new({
           id: 'system_proxy',
-          text: '系统代理模式',
+          text: t('home.proxyMode.system'),
           // 当前为系统代理模式时禁用按钮
           enabled: currentProxyMode !== 'system',
           action: async () => {
@@ -183,7 +189,7 @@ export const useTrayStore = defineStore(
 
         const tunProxyMenuItem = await MenuItem.new({
           id: 'tun_mode',
-          text: 'TUN 模式',
+          text: t('home.proxyMode.tun'),
           // 当前为TUN模式时禁用按钮
           enabled: currentProxyMode !== 'tun',
           action: async () => {
@@ -206,14 +212,14 @@ export const useTrayStore = defineStore(
         // 当前模式指示器菜单项（仅作为标签，不可点击）
         const currentModeMenuItem = await MenuItem.new({
           id: 'current_mode',
-          text: `当前模式: ${currentProxyMode === 'system' ? '系统代理' : 'TUN模式'}`,
+          text: `${t('proxy.currentMode')} ${currentProxyMode === 'system' ? t('home.proxyMode.system') : t('home.proxyMode.tun')}`,
           enabled: false,
         })
 
         // 创建代理模式子菜单
         const proxyModeSubmenu = await Submenu.new({
           id: 'proxy_mode',
-          text: '代理模式',
+          text: t('home.switchMode'),
           items: [currentModeMenuItem, systemProxyMenuItem, tunProxyMenuItem],
         })
 
@@ -233,7 +239,7 @@ export const useTrayStore = defineStore(
         // 创建退出菜单项
         const quitMenuItem = await MenuItem.new({
           id: 'quit',
-          text: '退出',
+          text: t('tray.quit'),
           action: async () => {
             await infoStore.stopKernel()
             const appWindow = Window.getCurrent()
@@ -338,6 +344,16 @@ export const useTrayStore = defineStore(
           },
         )
 
+        // 监听语言变更
+        watch(
+          () => i18n.global.locale.value,
+          () => {
+            console.log('语言已变更，刷新托盘菜单')
+            refreshTrayMenu()
+            updateTrayTooltip()
+          },
+        )
+
         watch(() => [subStore.activeIndex, subStore.list.length], updateTrayTooltip)
 
         // 添加事件处理
@@ -356,6 +372,13 @@ export const useTrayStore = defineStore(
         mitt.on('refresh-tray-menu', () => {
           console.log('收到刷新托盘菜单事件')
           refreshTrayMenu()
+        })
+
+        // 监听语言变更事件
+        mitt.on('language-changed', () => {
+          console.log('收到语言变更事件，刷新托盘菜单')
+          refreshTrayMenu()
+          updateTrayTooltip()
         })
 
         return true
@@ -410,6 +433,7 @@ export const useTrayStore = defineStore(
       mitt.off('process-status')
       mitt.off('proxy-mode-changed')
       mitt.off('refresh-tray-menu')
+      mitt.off('language-changed')
     }
 
     return {

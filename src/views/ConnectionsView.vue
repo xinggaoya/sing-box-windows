@@ -3,13 +3,13 @@
     <n-card class="connections-card" :bordered="false">
       <template #header>
         <div class="card-header">
-          <h2>连接列表</h2>
+          <h2>{{ t('connections.title') }}</h2>
           <n-space>
             <n-button type="primary" @click="refreshConnections" :loading="loading">
               <template #icon>
                 <n-icon><refresh-outline /></n-icon>
               </template>
-              刷新
+              {{ t('common.refresh') }}
             </n-button>
           </n-space>
         </div>
@@ -18,14 +18,14 @@
       <n-spin :show="loading">
         <div class="stats-bar">
           <n-space justify="space-between" align="center">
-            <n-statistic label="活跃连接">
+            <n-statistic :label="t('connections.activeConnections')">
               {{ connections.length }}
             </n-statistic>
             <n-space>
-              <n-statistic label="上传总流量">
+              <n-statistic :label="t('connections.uploadTotal')">
                 {{ formatBytes(connectionsTotal.upload) }}
               </n-statistic>
-              <n-statistic label="下载总流量">
+              <n-statistic :label="t('connections.downloadTotal')">
                 {{ formatBytes(connectionsTotal.download) }}
               </n-statistic>
             </n-space>
@@ -42,7 +42,7 @@
             striped
           />
         </div>
-        <n-empty v-else description="暂无活跃连接" />
+        <n-empty v-else :description="t('connections.noConnections')" />
       </n-spin>
     </n-card>
   </div>
@@ -53,10 +53,12 @@ import { ref, onMounted, h, computed } from 'vue'
 import { useMessage, NTag, DataTableColumns, NSpace, NTooltip, NText } from 'naive-ui'
 import { RefreshOutline } from '@vicons/ionicons5'
 import { useInfoStore } from '@/stores/infoStore'
+import { useI18n } from 'vue-i18n'
 
 const message = useMessage()
 const loading = ref(false)
 const infoStore = useInfoStore()
+const { t } = useI18n()
 
 // 使用计算属性来获取连接信息
 const connections = computed(() => infoStore.connections)
@@ -116,7 +118,7 @@ const columns: DataTableColumns<Connection> = [
     },
   },
   {
-    title: '开始时间',
+    title: t('connections.startTime'),
     key: 'start',
     width: 160,
     render(row: Connection) {
@@ -124,7 +126,7 @@ const columns: DataTableColumns<Connection> = [
     },
   },
   {
-    title: '网络/类型',
+    title: t('connections.networkType'),
     key: 'network',
     width: 120,
     render(row: Connection) {
@@ -158,7 +160,7 @@ const columns: DataTableColumns<Connection> = [
     },
   },
   {
-    title: '源地址',
+    title: t('connections.source'),
     key: 'source',
     width: 200,
     render(row: Connection) {
@@ -169,13 +171,16 @@ const columns: DataTableColumns<Connection> = [
         {
           trigger: () => `${sourceIP}:${sourcePort}`,
           default: () =>
-            h('div', {}, [h('div', {}, `IP: ${sourceIP}`), h('div', {}, `端口: ${sourcePort}`)]),
+            h('div', {}, [
+              h('div', {}, `${t('connections.ip')}: ${sourceIP}`),
+              h('div', {}, `${t('connections.port')}: ${sourcePort}`),
+            ]),
         },
       )
     },
   },
   {
-    title: '目标地址',
+    title: t('connections.destination'),
     key: 'destination',
     width: 200,
     render(row: Connection) {
@@ -187,16 +192,16 @@ const columns: DataTableColumns<Connection> = [
           trigger: () => host || `${destinationIP}:${destinationPort}`,
           default: () =>
             h('div', {}, [
-              host ? h('div', {}, `主机: ${host}`) : null,
-              h('div', {}, `IP: ${destinationIP}`),
-              h('div', {}, `端口: ${destinationPort}`),
+              host ? h('div', {}, `${t('connections.host')}: ${host}`) : null,
+              h('div', {}, `${t('connections.ip')}: ${destinationIP}`),
+              h('div', {}, `${t('connections.port')}: ${destinationPort}`),
             ]),
         },
       )
     },
   },
   {
-    title: '规则',
+    title: t('connections.rule'),
     key: 'rule',
     width: 160,
     render(row: Connection) {

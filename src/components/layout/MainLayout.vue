@@ -127,6 +127,7 @@ import { useAppStore } from '@/stores/AppStore'
 import { listen } from '@tauri-apps/api/event'
 import logo from '@/assets/icon.png'
 import UpdateModal from '@/components/UpdateModal.vue'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const appWindow = Window.getCurrent()
@@ -138,6 +139,7 @@ const theme = ref(isDark.value ? darkTheme : null)
 const collapsed = ref(false)
 const currentMenu = ref(0)
 const isFullscreen = ref(false)
+const { t } = useI18n()
 
 // 更新对话框相关状态
 const showUpdateModal = ref(false)
@@ -166,7 +168,7 @@ const handleUpdate = async (downloadUrl: string) => {
     await appStore.downloadAndInstallUpdate()
   } catch (error) {
     notification.error({
-      title: '更新失败',
+      title: t('notification.updateFailed'),
       content: String(error),
       duration: 5000,
     })
@@ -189,40 +191,40 @@ const onToggleFullScreen = async () => {
 
 const menuOptions = computed(() => [
   {
-    label: '主页',
+    label: t('nav.home'),
     key: 0,
     icon: HomeOutline,
   },
   {
-    label: '代理',
+    label: t('nav.proxy'),
     key: 1,
     disabled: !appStore.isRunning,
     icon: SwapHorizontalOutline,
   },
   {
-    label: '订阅',
+    label: t('nav.sub'),
     key: 4,
     icon: AtCircleOutline,
   },
   {
-    label: '规则',
+    label: t('nav.rules'),
     key: 2,
     disabled: !appStore.isRunning,
     icon: FilterOutline,
   },
   {
-    label: '连接',
+    label: t('nav.connections'),
     key: 3,
     disabled: !appStore.isRunning,
     icon: LinkOutline,
   },
   {
-    label: '日志',
+    label: t('nav.log'),
     key: 5,
     icon: DocumentTextOutline,
   },
   {
-    label: '设置',
+    label: t('nav.setting'),
     key: 6,
     icon: SettingsOutline,
   },

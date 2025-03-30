@@ -4,11 +4,11 @@
     <div class="chart-labels">
       <div class="legend-item upload">
         <div class="legend-color"></div>
-        <span>上传速度</span>
+        <span>{{ t('home.traffic.uploadSpeed') }}</span>
       </div>
       <div class="legend-item download">
         <div class="legend-color"></div>
-        <span>下载速度</span>
+        <span>{{ t('home.traffic.downloadSpeed') }}</span>
       </div>
     </div>
   </div>
@@ -18,6 +18,7 @@
 import { ref, defineProps, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useThemeVars } from 'naive-ui'
 import { formatBandwidth } from '@/utils/index' // 导入formatBandwidth函数
+import { useI18n } from 'vue-i18n'
 
 defineOptions({
   name: 'TrafficChart',
@@ -37,6 +38,7 @@ const props = defineProps({
 const chartContainer = ref<HTMLDivElement | null>(null)
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
 const themeVars = useThemeVars()
+const { t } = useI18n()
 
 // 图表配置
 const MAX_DATA_POINTS = 60 // 最大数据点数量
@@ -236,7 +238,7 @@ const startUpdates = () => {
     clearInterval(updateTimer)
   }
 
-  console.log('启动图表更新定时器')
+  console.log(t('chart.startUpdateTimer'))
   updateTimer = setInterval(() => {
     updateData()
   }, 1000) as unknown as number
@@ -244,7 +246,7 @@ const startUpdates = () => {
 
 // 重置并刷新图表
 const resetAndRefresh = () => {
-  console.log('重置并刷新图表')
+  console.log(t('chart.resetRefresh'))
 
   // 清除所有数据
   uploadData.value = Array(MAX_DATA_POINTS).fill(0)
@@ -299,14 +301,14 @@ onUnmounted(() => {
 
 // 监听主题变化
 watch(themeVars, () => {
-  console.log('主题变化，重绘图表')
+  console.log(t('chart.themeChanged'))
   drawChart()
 })
 
 // 处理窗口大小变化
 const handleResize = () => {
   if (chartContainer.value && chartCanvas.value) {
-    console.log('窗口大小变化，重新绘制图表')
+    console.log(t('chart.windowResized'))
     initChart()
   }
 }
