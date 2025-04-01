@@ -1,7 +1,7 @@
 use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
 use crate::app::constants::{paths, messages, network};
 use crate::utils::config_util::ConfigUtil;
-use crate::utils::app_util::{get_work_dir, get_template_path};
+use crate::utils::app_util::{get_work_dir};
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -9,11 +9,15 @@ use std::path::Path;
 use tracing::{info, error};
 use base64;
 use serde_json::{json, Value};
+use tauri::path::BaseDirectory;
+use tauri::Manager;
 
 // 下载订阅
 #[tauri::command]
-pub async fn download_subscription(url: String) -> Result<(), String> {
-    download_and_process_subscription(url)
+pub async fn download_subscription(url: String, window: tauri::Window) -> Result<(), String> {
+    let app_handle = window.app_handle();
+    
+    download_and_process_subscription(url, app_handle.clone())
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
     let _ = crate::app::proxy_service::set_system_proxy();
@@ -22,8 +26,10 @@ pub async fn download_subscription(url: String) -> Result<(), String> {
 
 // 手动添加订阅内容
 #[tauri::command]
-pub async fn add_manual_subscription(content: String) -> Result<(), String> {
-    process_subscription_content(content)
+pub async fn add_manual_subscription(content: String, window: tauri::Window) -> Result<(), String> {
+    let app_handle = window.app_handle();
+    
+    process_subscription_content(content, app_handle.clone())
         .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
     let _ = crate::app::proxy_service::set_system_proxy();
     Ok(())
@@ -104,7 +110,7 @@ fn modify_default_mode(config_path: &Path, mode: String) -> Result<(), Box<dyn E
     Ok(())
 }
 
-async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Error>> {
+async fn download_and_process_subscription(url: String, app_handle: tauri::AppHandle) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir();
     let sing_box_dir = Path::new(&work_dir).join("sing-box");
@@ -119,7 +125,7 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     }
     
     // 检查模板文件是否存在
-    let template_path = get_template_path();
+    let template_path = app_handle.path().resolve("src/config/template.json", BaseDirectory::Resource)?;
     if !template_path.exists() {
         let err_msg = format!("找不到模板文件: {:?}", template_path);
         error!("{}", err_msg);
@@ -213,7 +219,6 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     }
 
     // 读取模板文件
-    let template_path = get_template_path();
     let mut template_file = File::open(&template_path)?;
     let mut template_content = String::new();
     template_file.read_to_string(&mut template_content)?;
@@ -281,33 +286,12 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
         }
     }
     
-    // 将配置转换为JSON字符串
-    let config_str = match serde_json::to_string_pretty(&config) {
-        Ok(s) => s,
-        Err(e) => {
-            let err_msg = format!("配置序列化失败: {}", e);
-            error!("{}", err_msg);
-            return Err(err_msg.into());
-        }
-    };
+    // 将配置转换为JSON字符串并写入文件
+    let config_str = serde_json::to_string_pretty(&config)?;
+    let mut file = File::create(&config_path)?;
+    file.write_all(config_str.as_bytes())?;
     
-    // 写入配置文件
-    match File::create(&config_path) {
-        Ok(mut file) => {
-            if let Err(e) = file.write_all(config_str.as_bytes()) {
-                let err_msg = format!("写入配置文件失败: {}", e);
-                error!("{}", err_msg);
-                return Err(err_msg.into());
-            }
-            info!("配置已成功保存到: {:?}", config_path);
-        },
-        Err(e) => {
-            let err_msg = format!("创建配置文件失败: {}", e);
-            error!("{}", err_msg);
-            return Err(err_msg.into());
-        }
-    }
-
+    info!("配置已成功保存到: {:?}", config_path);
     info!("订阅已更新并应用到模板，配置已保存");
     Ok(())
 }
@@ -820,7 +804,7 @@ fn update_selector_outbounds(outbounds_array: &mut Vec<Value>, nodes: &Vec<Value
 }
 
 // 处理订阅内容（手动添加）
-fn process_subscription_content(content: String) -> Result<(), Box<dyn Error>> {
+fn process_subscription_content(content: String, app_handle: tauri::AppHandle) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir();
     let sing_box_dir = Path::new(&work_dir).join("sing-box");
@@ -847,8 +831,8 @@ fn process_subscription_content(content: String) -> Result<(), Box<dyn Error>> {
     
     info!("成功提取到 {} 个节点，准备应用到配置", extracted_nodes.len());
     
-    // 检查模板文件是否存在
-    let template_path = get_template_path();
+    // 使用Tauri资源路径API获取模板文件路径
+    let template_path = app_handle.path().resolve("src/config/template.json", BaseDirectory::Resource)?;
     if !template_path.exists() {
         let err_msg = format!("找不到模板文件: {:?}", template_path);
         error!("{}", err_msg);
@@ -857,31 +841,12 @@ fn process_subscription_content(content: String) -> Result<(), Box<dyn Error>> {
     
     // 读取模板文件
     info!("从模板文件读取配置: {:?}", template_path);
-    let mut template_file = match File::open(&template_path) {
-        Ok(file) => file,
-        Err(e) => {
-            let err_msg = format!("打开模板文件失败: {}", e);
-            error!("{}", err_msg);
-            return Err(err_msg.into());
-        }
-    };
-    
+    let mut template_file = File::open(&template_path)?;
     let mut template_content = String::new();
-    if let Err(e) = template_file.read_to_string(&mut template_content) {
-        let err_msg = format!("读取模板文件内容失败: {}", e);
-        error!("{}", err_msg);
-        return Err(err_msg.into());
-    }
+    template_file.read_to_string(&mut template_content)?;
     
     // 将模板内容解析为JSON对象
-    let mut config: Value = match serde_json::from_str(&template_content) {
-        Ok(json) => json,
-        Err(e) => {
-            let err_msg = format!("解析模板JSON失败: {}", e);
-            error!("{}", err_msg);
-            return Err(err_msg.into());
-        }
-    };
+    let mut config: Value = serde_json::from_str(&template_content)?;
     
     // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {

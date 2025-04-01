@@ -214,6 +214,16 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
     match unzip_file(download_path.to_str().unwrap(), out_path.to_str().unwrap()).await {
         Ok(_) => {
             info!("内核已下载并解压到: {}", out_path.display());
+            
+            // 删除原始的zip压缩包
+            if let Err(e) = std::fs::remove_file(&download_path) {
+                error!("删除压缩包失败: {}", e);
+                info!("压缩包路径: {}", download_path.display());
+                // 仅发出警告，不中断流程
+            } else {
+                info!("成功删除原始压缩包: {}", download_path.display());
+            }
+            
             // 发送完成事件
             let _ = window.emit(
                 "download-progress",
