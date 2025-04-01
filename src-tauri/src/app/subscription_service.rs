@@ -105,13 +105,43 @@ fn modify_default_mode(config_path: &Path, mode: String) -> Result<(), Box<dyn E
 }
 
 async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Error>> {
+    // 确保工作目录结构存在
+    let work_dir = get_work_dir();
+    let sing_box_dir = Path::new(&work_dir).join("sing-box");
+    
+    if !sing_box_dir.exists() {
+        info!("正在创建Sing-Box目录: {:?}", sing_box_dir);
+        if let Err(e) = std::fs::create_dir_all(&sing_box_dir) {
+            let err_msg = format!("创建Sing-Box目录失败: {}", e);
+            error!("{}", err_msg);
+            return Err(err_msg.into());
+        }
+    }
+    
+    // 检查模板文件是否存在
+    let template_path = get_template_path();
+    if !template_path.exists() {
+        let err_msg = format!("找不到模板文件: {:?}", template_path);
+        error!("{}", err_msg);
+        return Err(err_msg.into());
+    }
+    
     let client = reqwest::Client::new();
     let mut headers = reqwest::header::HeaderMap::new();
     let user_agent = reqwest::header::HeaderValue::from_static("sing-box-windows/1.0 (sing-box; compatible; Windows NT 10.0)");
     headers.insert(reqwest::header::USER_AGENT, user_agent);
 
+    info!("开始下载订阅: {}", url);
     let response = client.get(url.trim()).headers(headers).send().await?;
+    
+    if !response.status().is_success() {
+        let err_msg = format!("订阅下载失败，HTTP状态码: {}", response.status());
+        error!("{}", err_msg);
+        return Err(err_msg.into());
+    }
+    
     let response_text = response.text().await?;
+    info!("订阅下载成功，内容长度: {} 字节", response_text.len());
     
     // 直接尝试从原始内容提取节点
     let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
@@ -176,7 +206,6 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     
     // 使用模板和提取的节点信息创建新的配置
     let work_dir = get_work_dir();
-    let config_path = Path::new(&work_dir).join("sing-box/config.json");
     let dir = Path::new(&work_dir).join("sing-box");
     // 确保目录存在
     if let Err(e) = std::fs::create_dir_all(&dir) {
@@ -237,9 +266,47 @@ async fn download_and_process_subscription(url: String) -> Result<(), Box<dyn Er
     }
     
     // 保存配置到文件
-    let mut config_file = File::create(config_path)?;
-    let config_str = serde_json::to_string_pretty(&config)?;
-    config_file.write_all(config_str.as_bytes())?;
+    let config_path = Path::new(&work_dir).join("sing-box/config.json");
+    info!("正在保存配置到: {:?}", config_path);
+    
+    // 确保目录存在
+    if let Some(parent) = config_path.parent() {
+        if !parent.exists() {
+            info!("创建配置目录: {:?}", parent);
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                let err_msg = format!("创建配置目录失败: {}", e);
+                error!("{}", err_msg);
+                return Err(err_msg.into());
+            }
+        }
+    }
+    
+    // 将配置转换为JSON字符串
+    let config_str = match serde_json::to_string_pretty(&config) {
+        Ok(s) => s,
+        Err(e) => {
+            let err_msg = format!("配置序列化失败: {}", e);
+            error!("{}", err_msg);
+            return Err(err_msg.into());
+        }
+    };
+    
+    // 写入配置文件
+    match File::create(&config_path) {
+        Ok(mut file) => {
+            if let Err(e) = file.write_all(config_str.as_bytes()) {
+                let err_msg = format!("写入配置文件失败: {}", e);
+                error!("{}", err_msg);
+                return Err(err_msg.into());
+            }
+            info!("配置已成功保存到: {:?}", config_path);
+        },
+        Err(e) => {
+            let err_msg = format!("创建配置文件失败: {}", e);
+            error!("{}", err_msg);
+            return Err(err_msg.into());
+        }
+    }
 
     info!("订阅已更新并应用到模板，配置已保存");
     Ok(())
@@ -754,19 +821,69 @@ fn update_selector_outbounds(outbounds_array: &mut Vec<Value>, nodes: &Vec<Value
 
 // 处理订阅内容（手动添加）
 fn process_subscription_content(content: String) -> Result<(), Box<dyn Error>> {
-    // 提取节点信息
+    // 确保工作目录结构存在
+    let work_dir = get_work_dir();
+    let sing_box_dir = Path::new(&work_dir).join("sing-box");
+    
+    if !sing_box_dir.exists() {
+        info!("正在创建Sing-Box目录: {:?}", sing_box_dir);
+        if let Err(e) = std::fs::create_dir_all(&sing_box_dir) {
+            let err_msg = format!("创建Sing-Box目录失败: {}", e);
+            error!("{}", err_msg);
+            return Err(err_msg.into());
+        }
+    }
+    
+    info!("处理订阅内容，长度: {} 字节", content.len());
+    
+    // 尝试从内容中提取节点
     let extracted_nodes = extract_nodes_from_subscription(&content)?;
     
-    // 读取模板文件
+    if extracted_nodes.is_empty() {
+        let err_msg = "无法从订阅内容提取节点信息";
+        error!("{}", err_msg);
+        return Err(err_msg.into());
+    }
+    
+    info!("成功提取到 {} 个节点，准备应用到配置", extracted_nodes.len());
+    
+    // 检查模板文件是否存在
     let template_path = get_template_path();
-    let mut template_file = File::open(&template_path)?;
+    if !template_path.exists() {
+        let err_msg = format!("找不到模板文件: {:?}", template_path);
+        error!("{}", err_msg);
+        return Err(err_msg.into());
+    }
+    
+    // 读取模板文件
+    info!("从模板文件读取配置: {:?}", template_path);
+    let mut template_file = match File::open(&template_path) {
+        Ok(file) => file,
+        Err(e) => {
+            let err_msg = format!("打开模板文件失败: {}", e);
+            error!("{}", err_msg);
+            return Err(err_msg.into());
+        }
+    };
+    
     let mut template_content = String::new();
-    template_file.read_to_string(&mut template_content)?;
+    if let Err(e) = template_file.read_to_string(&mut template_content) {
+        let err_msg = format!("读取模板文件内容失败: {}", e);
+        error!("{}", err_msg);
+        return Err(err_msg.into());
+    }
     
     // 将模板内容解析为JSON对象
-    let mut config: Value = serde_json::from_str(&template_content)?;
+    let mut config: Value = match serde_json::from_str(&template_content) {
+        Ok(json) => json,
+        Err(e) => {
+            let err_msg = format!("解析模板JSON失败: {}", e);
+            error!("{}", err_msg);
+            return Err(err_msg.into());
+        }
+    };
     
-    // 应用相同的节点合并逻辑
+    // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {
         if let Some(outbounds) = config_obj.get_mut("outbounds") {
             if let Some(outbounds_array) = outbounds.as_array_mut() {
@@ -806,13 +923,49 @@ fn process_subscription_content(content: String) -> Result<(), Box<dyn Error>> {
     }
     
     // 保存配置到文件
-    let work_dir = get_work_dir();
-    let path = Path::new(&work_dir).join("sing-box/config.json");
-    let mut file = File::create(path)?;
-    let config_str = serde_json::to_string_pretty(&config)?;
-    file.write_all(config_str.as_bytes())?;
+    let config_path = Path::new(&work_dir).join("sing-box/config.json");
+    info!("正在保存配置到: {:?}", config_path);
+    
+    // 确保目录存在
+    if let Some(parent) = config_path.parent() {
+        if !parent.exists() {
+            info!("创建配置目录: {:?}", parent);
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                let err_msg = format!("创建配置目录失败: {}", e);
+                error!("{}", err_msg);
+                return Err(err_msg.into());
+            }
+        }
+    }
+    
+    // 将配置转换为JSON字符串
+    let config_str = match serde_json::to_string_pretty(&config) {
+        Ok(s) => s,
+        Err(e) => {
+            let err_msg = format!("配置序列化失败: {}", e);
+            error!("{}", err_msg);
+            return Err(err_msg.into());
+        }
+    };
+    
+    // 写入配置文件
+    match File::create(&config_path) {
+        Ok(mut file) => {
+            if let Err(e) = file.write_all(config_str.as_bytes()) {
+                let err_msg = format!("写入配置文件失败: {}", e);
+                error!("{}", err_msg);
+                return Err(err_msg.into());
+            }
+            info!("配置已成功保存到: {:?}", config_path);
+        },
+        Err(e) => {
+            let err_msg = format!("创建配置文件失败: {}", e);
+            error!("{}", err_msg);
+            return Err(err_msg.into());
+        }
+    }
 
-    info!("订阅内容已处理并应用到模板");
+    info!("订阅已更新并应用到模板，配置已保存");
     Ok(())
 }
 
