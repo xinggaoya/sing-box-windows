@@ -14,10 +14,10 @@ use tauri::Manager;
 
 // 下载订阅
 #[tauri::command]
-pub async fn download_subscription(url: String, window: tauri::Window) -> Result<(), String> {
+pub async fn download_subscription(url: String, use_subscription_rules: bool, window: tauri::Window) -> Result<(), String> {
     let app_handle = window.app_handle();
     
-    download_and_process_subscription(url, app_handle.clone())
+    download_and_process_subscription(url, use_subscription_rules, app_handle.clone())
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
     let _ = crate::app::proxy_service::set_system_proxy();
@@ -26,10 +26,10 @@ pub async fn download_subscription(url: String, window: tauri::Window) -> Result
 
 // 手动添加订阅内容
 #[tauri::command]
-pub async fn add_manual_subscription(content: String, window: tauri::Window) -> Result<(), String> {
+pub async fn add_manual_subscription(content: String, use_subscription_rules: bool, window: tauri::Window) -> Result<(), String> {
     let app_handle = window.app_handle();
     
-    process_subscription_content(content, app_handle.clone())
+    process_subscription_content(content, use_subscription_rules, app_handle.clone())
         .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
     let _ = crate::app::proxy_service::set_system_proxy();
     Ok(())
@@ -110,7 +110,7 @@ fn modify_default_mode(config_path: &Path, mode: String) -> Result<(), Box<dyn E
     Ok(())
 }
 
-async fn download_and_process_subscription(url: String, app_handle: tauri::AppHandle) -> Result<(), Box<dyn Error>> {
+async fn download_and_process_subscription(url: String, use_subscription_rules: bool, app_handle: tauri::AppHandle) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir();
     let sing_box_dir = Path::new(&work_dir).join("sing-box");
@@ -148,6 +148,9 @@ async fn download_and_process_subscription(url: String, app_handle: tauri::AppHa
     
     let response_text = response.text().await?;
     info!("订阅下载成功，内容长度: {} 字节", response_text.len());
+    
+    // 检查是否使用订阅的规则集
+    info!("使用订阅规则集: {}", use_subscription_rules);
     
     // 直接尝试从原始内容提取节点
     let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
@@ -225,6 +228,28 @@ async fn download_and_process_subscription(url: String, app_handle: tauri::AppHa
     
     // 将模板内容解析为JSON对象
     let mut config: Value = serde_json::from_str(&template_content)?;
+    
+    // 如果使用订阅规则集，从订阅内容中提取规则
+    if use_subscription_rules {
+        info!("尝试从订阅中提取规则集...");
+        let subscription_rules = extract_rules_from_subscription(&response_text);
+        
+        if let Some(rules) = subscription_rules {
+            info!("成功从订阅中提取到规则集");
+            // 将订阅中的规则添加到配置中，替换模板中的规则
+            if let Some(config_obj) = config.as_object_mut() {
+                if let Some(route) = config_obj.get_mut("route") {
+                    if let Some(route_obj) = route.as_object_mut() {
+                        route_obj.insert("rules".to_string(), rules);
+                    }
+                }
+            }
+        } else {
+            info!("未能从订阅中提取到规则集，将使用模板中的默认规则");
+        }
+    } else {
+        info!("不使用订阅规则集，将使用模板中的默认规则");
+    }
     
     // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {
@@ -803,8 +828,28 @@ fn update_selector_outbounds(outbounds_array: &mut Vec<Value>, nodes: &Vec<Value
     }
 }
 
-// 处理订阅内容（手动添加）
-fn process_subscription_content(content: String, app_handle: tauri::AppHandle) -> Result<(), Box<dyn Error>> {
+// 添加一个从订阅中提取规则的函数
+fn extract_rules_from_subscription(content: &str) -> Option<Value> {
+    // 尝试将内容解析为JSON
+    if let Ok(json) = serde_json::from_str::<Value>(content) {
+        // 检查是否有规则字段
+        if let Some(route) = json.get("route") {
+            if let Some(rules) = route.get("rules") {
+                return Some(rules.clone());
+            }
+        }
+        
+        // 检查其他可能的规则位置
+        if let Some(rules) = json.get("rules") {
+            return Some(rules.clone());
+        }
+    }
+    
+    None
+}
+
+// 更新处理订阅内容的函数，添加use_subscription_rules参数
+fn process_subscription_content(content: String, use_subscription_rules: bool, app_handle: tauri::AppHandle) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir();
     let sing_box_dir = Path::new(&work_dir).join("sing-box");
@@ -819,6 +864,9 @@ fn process_subscription_content(content: String, app_handle: tauri::AppHandle) -
     }
     
     info!("处理订阅内容，长度: {} 字节", content.len());
+    
+    // 检查是否使用订阅的规则集
+    info!("使用订阅规则集: {}", use_subscription_rules);
     
     // 尝试从内容中提取节点
     let extracted_nodes = extract_nodes_from_subscription(&content)?;
@@ -848,15 +896,39 @@ fn process_subscription_content(content: String, app_handle: tauri::AppHandle) -
     // 将模板内容解析为JSON对象
     let mut config: Value = serde_json::from_str(&template_content)?;
     
+    // 如果使用订阅规则集，从内容中提取规则
+    if use_subscription_rules {
+        info!("尝试从内容中提取规则集...");
+        let subscription_rules = extract_rules_from_subscription(&content);
+        
+        if let Some(rules) = subscription_rules {
+            info!("成功从内容中提取到规则集");
+            // 将内容中的规则添加到配置中，替换模板中的规则
+            if let Some(config_obj) = config.as_object_mut() {
+                if let Some(route) = config_obj.get_mut("route") {
+                    if let Some(route_obj) = route.as_object_mut() {
+                        route_obj.insert("rules".to_string(), rules);
+                    }
+                }
+            }
+        } else {
+            info!("未能从内容中提取到规则集，将使用模板中的默认规则");
+        }
+    } else {
+        info!("不使用订阅规则集，将使用模板中的默认规则");
+    }
+    
     // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {
         if let Some(outbounds) = config_obj.get_mut("outbounds") {
             if let Some(outbounds_array) = outbounds.as_array_mut() {
-                // 更新自动选择和其他选择器
+                // 找到"自动选择"出站
                 if let Some(auto_select) = outbounds_array.iter_mut().find(|o| {
                     o.get("tag").and_then(|t| t.as_str()) == Some("自动选择")
                 }) {
+                    // 更新自动选择的outbounds列表
                     if let Some(outbound_tags) = auto_select.get_mut("outbounds") {
+                        // 设置所有节点的标签列表
                         let node_tags: Vec<Value> = extracted_nodes.iter()
                             .map(|node| json!(node.get("tag").unwrap().as_str().unwrap()))
                             .collect();
@@ -864,11 +936,14 @@ fn process_subscription_content(content: String, app_handle: tauri::AppHandle) -
                     }
                 }
                 
+                // 找到"手动切换"出站
                 if let Some(proxy_select) = outbounds_array.iter_mut().find(|o| {
                     o.get("tag").and_then(|t| t.as_str()) == Some("手动切换")
                 }) {
+                    // 更新手动切换的outbounds列表
                     if let Some(outbound_tags) = proxy_select.get_mut("outbounds") {
                         let mut tags = vec![json!("自动选择")];
+                        // 添加所有节点标签
                         for node in &extracted_nodes {
                             tags.push(json!(node.get("tag").unwrap().as_str().unwrap()));
                         }
@@ -876,10 +951,10 @@ fn process_subscription_content(content: String, app_handle: tauri::AppHandle) -
                     }
                 }
                 
-                // 更新其他选择器
+                // 更新其他选择器的outbounds列表
                 update_selector_outbounds(outbounds_array, &extracted_nodes);
                 
-                // 添加节点到outbounds
+                // 将节点添加到outbounds数组末尾
                 for node in extracted_nodes {
                     outbounds_array.push(node);
                 }

@@ -151,6 +151,9 @@ export default {
     readConfigFailed: '設定の読み込みに失敗しました: ',
     configSaved: '設定を保存して適用しました',
     saveConfigFailed: '設定の保存に失敗しました: ',
+    useRules: 'ルールセットの使用',
+    useSubRules: '購読ルールセットを使用',
+    useDefaultRules: 'デフォルトルールセットを使用',
   },
   log: {
     title: 'ログ',

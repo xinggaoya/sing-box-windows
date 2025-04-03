@@ -92,7 +92,8 @@ export const proxyApi = {
 // 订阅相关接口
 export const subscriptionApi = {
   // 下载订阅
-  downloadSubscription: (url: string) => invoke<void>('download_subscription', { url }),
+  downloadSubscription: (url: string, useSubscriptionRules: boolean = false) =>
+    invoke<void>('download_subscription', { url, useSubscriptionRules }),
 
   // 下载最新内核
   downloadLatestKernel: () => invoke<void>('download_latest_kernel'),
@@ -101,7 +102,8 @@ export const subscriptionApi = {
   getCurrentConfig: () => invoke<string>('get_current_config'),
 
   // 添加手动配置
-  addManualSubscription: (content: string) => invoke<void>('add_manual_subscription', { content }),
+  addManualSubscription: (content: string, useSubscriptionRules: boolean = false) =>
+    invoke<void>('add_manual_subscription', { content, useSubscriptionRules }),
 }
 
 // 统一导出所有 API

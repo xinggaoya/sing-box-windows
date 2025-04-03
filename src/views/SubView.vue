@@ -266,6 +266,16 @@
           </n-form-item>
         </n-tab-pane>
       </n-tabs>
+
+      <!-- 添加规则集开关 -->
+      <n-form-item :label="t('sub.useRules')" label-placement="left">
+        <n-space align="center">
+          <n-switch v-model:value="formValue.useSubscriptionRules" />
+          <n-text depth="3">{{
+            formValue.useSubscriptionRules ? t('sub.useSubRules') : t('sub.useDefaultRules')
+          }}</n-text>
+        </n-space>
+      </n-form-item>
     </n-form>
     <template #action>
       <n-space justify="end">
@@ -338,6 +348,7 @@ interface Subscription {
   isLoading: boolean
   isManual: boolean
   manualContent?: string
+  useSubscriptionRules: boolean
 }
 
 const message = useMessage()
@@ -368,6 +379,7 @@ const formValue = ref<Subscription>({
   isLoading: false,
   isManual: false,
   manualContent: '',
+  useSubscriptionRules: false,
 })
 
 const rules: FormRules = {
@@ -412,6 +424,7 @@ const resetForm = () => {
     isLoading: false,
     isManual: false,
     manualContent: '',
+    useSubscriptionRules: false,
   }
   editIndex.value = null
 }
@@ -424,6 +437,7 @@ const handleEdit = (index: number, item: Subscription) => {
     isLoading: item.isLoading,
     isManual: item.isManual,
     manualContent: item.manualContent,
+    useSubscriptionRules: item.useSubscriptionRules,
   }
   // 根据订阅类型设置activeTab
   activeTab.value = item.isManual ? 'manual' : 'url'
@@ -443,12 +457,18 @@ const handleConfirm = () => {
           // 如果是手动编辑模式且有内容，直接保存内容
           if (editIndex.value === null) {
             // 如果是新建订阅，同时使用这个内容
-            await tauriApi.subscription.addManualSubscription(formValue.value.manualContent)
+            await tauriApi.subscription.addManualSubscription(
+              formValue.value.manualContent,
+              formValue.value.useSubscriptionRules,
+            )
           }
         } else if (!isManual) {
           // 如果是URL模式且是新建订阅
           if (editIndex.value === null) {
-            await tauriApi.subscription.downloadSubscription(formValue.value.url)
+            await tauriApi.subscription.downloadSubscription(
+              formValue.value.url,
+              formValue.value.useSubscriptionRules,
+            )
           }
         }
 
@@ -461,6 +481,7 @@ const handleConfirm = () => {
             isLoading: false,
             isManual: isManual,
             manualContent: isManual ? formValue.value.manualContent : undefined,
+            useSubscriptionRules: formValue.value.useSubscriptionRules,
           })
 
           // 如果是新添加的手动配置，自动设为当前活跃订阅
@@ -477,6 +498,7 @@ const handleConfirm = () => {
             url: formValue.value.url,
             isManual: isManual,
             manualContent: isManual ? formValue.value.manualContent : undefined,
+            useSubscriptionRules: formValue.value.useSubscriptionRules,
           }
           message.success(t('sub.updateSuccess'))
         }
@@ -514,10 +536,13 @@ const useSubscription = async (url: string, index: number) => {
 
     if (item.isManual && item.manualContent) {
       // 如果是手动配置，直接使用保存的内容
-      await tauriApi.subscription.addManualSubscription(item.manualContent)
+      await tauriApi.subscription.addManualSubscription(
+        item.manualContent,
+        item.useSubscriptionRules,
+      )
     } else {
       // 否则从URL下载内容
-      await tauriApi.subscription.downloadSubscription(url)
+      await tauriApi.subscription.downloadSubscription(url, item.useSubscriptionRules)
     }
 
     // 更新订阅状态
