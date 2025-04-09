@@ -304,7 +304,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useMessage, useDialog } from 'naive-ui'
-import { enable, disable } from '@tauri-apps/plugin-autostart'
+import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import { useInfoStore } from '@/stores/infoStore'
 import { useAppStore } from '@/stores/AppStore'
 import {
@@ -445,6 +445,11 @@ const onAutoStartChange = async (value: boolean) => {
       // 如果没有管理员权限，请求以管理员权限重启
       await tauriApi.system.restartAsAdmin()
       return
+    }
+
+    // 移除旧版开机自启
+    if (await isEnabled()) {
+      await disable()
     }
 
     // 使用计划任务设置开机自启
