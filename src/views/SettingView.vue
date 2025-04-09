@@ -439,13 +439,19 @@ const downloadTheKernel = async () => {
 // 开机自启动设置
 const onAutoStartChange = async (value: boolean) => {
   try {
-    if (value) {
-      await enable()
-      message.success(t('setting.startup.enableSuccess'))
-    } else {
-      await disable()
-      message.success(t('setting.startup.disableSuccess'))
+    // 检查管理员权限
+    const isAdmin = await tauriApi.system.checkAdmin()
+    if (!isAdmin) {
+      // 如果没有管理员权限，请求以管理员权限重启
+      await tauriApi.system.restartAsAdmin()
+      return
     }
+
+    // 使用计划任务设置开机自启
+    await tauriApi.system.setAutostart(value)
+    message.success(
+      value ? t('setting.startup.enableSuccess') : t('setting.startup.disableSuccess'),
+    )
   } catch (error) {
     message.error(`${t('common.error')}: ${error}`)
     // 恢复原来的设置
@@ -537,6 +543,9 @@ onMounted(async () => {
   await getAppDataPath()
   // 获取内核版本信息
   await infoStore.updateVersion()
+  // 检查开机自启状态
+  const isAutostartEnabled = await tauriApi.system.isAutostartEnabled()
+  appStore.autoStartApp = isAutostartEnabled
 })
 </script>
 

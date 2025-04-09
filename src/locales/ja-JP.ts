@@ -198,8 +198,8 @@ export default {
     },
     autoStart: {
       title: '自動起動',
-      app: '起動時にアプリを開始',
-      kernel: 'アプリ起動時にカーネルを自動開始',
+      app: '起動時に開始',
+      kernel: 'カーネル起動',
     },
     advanced: {
       title: '詳細設定',
@@ -231,12 +231,12 @@ export default {
     },
     startup: {
       title: '起動設定',
-      bootTip: 'アプリケーションはシステム起動時に自動的に実行されます',
-      manualTip: 'アプリケーションは手動で起動する必要があります',
-      autoKernelTip: 'カーネルはアプリケーション起動時に自動的に開始されます',
-      manualKernelTip: 'カーネルは手動で起動する必要があります',
-      enableSuccess: '起動時の自動起動が有効になりました',
-      disableSuccess: '起動時の自動起動が無効になりました',
+      bootTip: 'システム起動時に自動的に開始',
+      manualTip: '手動で開始する必要があります',
+      autoKernelTip: 'プログラムと同時にカーネルを起動',
+      manualKernelTip: 'カーネルを手動で起動する必要があります',
+      enableSuccess: '自動起動を有効化',
+      disableSuccess: '自動起動を無効化',
     },
     network: {
       ipv6: 'IPv6優先',

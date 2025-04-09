@@ -33,7 +33,11 @@ export default {
     },
     proxyMode: {
       system: '系统代理',
-      tun: 'TUN模式',
+      tun: 'TUN 模式',
+    },
+    adminStatus: {
+      admin: '管理员',
+      normal: '普通用户',
     },
     switchMode: '切换模式',
     start: '启动',
@@ -154,7 +158,7 @@ export default {
   },
   setting: {
     title: '设置',
-    general: '常规',
+    general: '通用',
     theme: {
       title: '主题',
       light: '浅色',
@@ -181,9 +185,9 @@ export default {
       alreadyLatest: '当前已是最新版本',
     },
     autoStart: {
-      title: '自动启动',
-      app: '开机启动应用',
-      kernel: '启动应用时自动启动内核',
+      title: '自启动',
+      app: '开机自启',
+      kernel: '启动内核',
     },
     advanced: {
       title: '高级',
@@ -214,12 +218,12 @@ export default {
     },
     startup: {
       title: '启动设置',
-      bootTip: '应用将在系统启动时自动运行',
-      manualTip: '应用需要手动启动',
-      autoKernelTip: '应用启动时将自动启动内核',
+      bootTip: '程序将在系统启动时自动运行',
+      manualTip: '需要手动启动程序',
+      autoKernelTip: '程序启动时自动运行内核',
       manualKernelTip: '需要手动启动内核',
-      enableSuccess: '已设置开机启动',
-      disableSuccess: '已关闭开机启动',
+      enableSuccess: '已启用开机自启',
+      disableSuccess: '已禁用开机自启',
     },
     network: {
       ipv6: 'IPv6优先',

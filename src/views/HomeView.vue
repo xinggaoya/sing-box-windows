@@ -30,13 +30,27 @@
                   : t('home.proxyMode.tun')
               }}
             </n-tag>
+            <n-tag
+              :bordered="false"
+              :type="isAdmin ? 'success' : 'warning'"
+              size="medium"
+              class="admin-tag"
+            >
+              <template #icon>
+                <n-icon size="16">
+                  <shield-checkmark-outline v-if="isAdmin" />
+                  <shield-outline v-else />
+                </n-icon>
+              </template>
+              {{ isAdmin ? t('home.adminStatus.admin') : t('home.adminStatus.normal') }}
+            </n-tag>
           </n-space>
           <n-space :size="16">
             <n-button
               secondary
               type="info"
               size="medium"
-              :disabled="!appState.isRunning"
+              :disabled="isSwitching"
               @click="onModeChange(appState.proxyMode === 'system' ? 'tun' : 'system')"
               class="control-button"
             >
@@ -135,7 +149,7 @@
 
 <script setup lang="ts">
 import { useMessage, useDialog } from 'naive-ui'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
@@ -152,12 +166,15 @@ import {
   CloudDownloadOutline,
   TimeOutline,
   GitNetworkOutline,
+  ShieldCheckmarkOutline,
+  ShieldOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/AppStore'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useInfoStore } from '@/stores/infoStore'
 import { ProxyService } from '@/services/proxy-service'
 import { useI18n } from 'vue-i18n'
+import { tauriApi } from '@/services/tauri-api'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -166,7 +183,9 @@ const infoStore = useInfoStore()
 const proxyService = ProxyService.getInstance()
 const isStarting = ref(false)
 const isStopping = ref(false)
+const isSwitching = ref(false)
 const { t } = useI18n()
+const isAdmin = ref(false)
 
 // 监听路由可见性变化，简化为只用于计算属性的控制
 const route = useRoute()
@@ -257,12 +276,54 @@ const onModeChange = async (value: string) => {
     }
   }
 
-  const needClose = await proxyService.switchMode(value as 'system' | 'tun', showMessage)
-  if (needClose) {
-    const appWindow = Window.getCurrent()
-    await appWindow.close()
+  try {
+    isSwitching.value = true
+    // 如果内核正在运行，需要重启
+    if (appState.isRunning) {
+      // 先停止内核
+      await infoStore.stopKernel()
+      appState.setRunningState(false)
+
+      // 切换模式
+      const needClose = await proxyService.switchMode(value as 'system' | 'tun', showMessage)
+
+      // 重新启动内核
+      await infoStore.startKernel()
+      appState.setRunningState(true)
+      message.success(t('notification.kernelRestarted'))
+
+      if (needClose) {
+        const appWindow = Window.getCurrent()
+        await appWindow.close()
+      }
+    } else {
+      // 如果内核未运行，只需切换模式
+      const needClose = await proxyService.switchMode(value as 'system' | 'tun', showMessage)
+      if (needClose) {
+        const appWindow = Window.getCurrent()
+        await appWindow.close()
+      }
+    }
+  } catch (error) {
+    message.error(error as string)
+  } finally {
+    isSwitching.value = false
   }
 }
+
+// 检查管理员权限
+const checkAdminStatus = async () => {
+  try {
+    isAdmin.value = await tauriApi.system.checkAdmin()
+  } catch (error) {
+    console.error('检查管理员权限失败:', error)
+  }
+}
+
+onMounted(async () => {
+  // 检查管理员权限
+  await checkAdminStatus()
+})
 </script>
 
 <style scoped>
@@ -342,6 +403,16 @@ const onModeChange = async (value: string) => {
 }
 
 .mode-tag {
+  padding: 0 12px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.admin-tag {
   padding: 0 12px;
   height: 30px;
   display: flex;

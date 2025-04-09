@@ -10,7 +10,7 @@ use crate::app::subscription_service::{
     add_manual_subscription, download_subscription, get_current_config, get_current_proxy_mode,
     toggle_proxy_mode,
 };
-use crate::app::system_service::{check_admin, restart_as_admin};
+use crate::app::system_service::{check_admin, restart_as_admin, set_autostart, is_autostart_enabled};
 use crate::app::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
@@ -76,6 +76,8 @@ pub fn run() {
             get_version_info,
             get_rules,
             start_websocket_relay,
+            set_autostart,
+            is_autostart_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -35,6 +35,10 @@ export default {
       system: 'System Proxy',
       tun: 'TUN Mode',
     },
+    adminStatus: {
+      admin: 'Administrator',
+      normal: 'Normal User',
+    },
     switchMode: 'Switch Mode',
     start: 'Start',
     stop: 'Stop',
@@ -183,8 +187,8 @@ export default {
     },
     autoStart: {
       title: 'Auto Start',
-      app: 'Start app on boot',
-      kernel: 'Auto start kernel when app starts',
+      app: 'Start on Boot',
+      kernel: 'Start Kernel',
     },
     advanced: {
       title: 'Advanced',
@@ -216,12 +220,12 @@ export default {
     },
     startup: {
       title: 'Startup Settings',
-      bootTip: 'Application will run automatically at system startup',
-      manualTip: 'Application needs to be started manually',
-      autoKernelTip: 'Kernel will start automatically when the application starts',
+      bootTip: 'Program will start automatically on system boot',
+      manualTip: 'Program needs to be started manually',
+      autoKernelTip: 'Kernel will start automatically with program',
       manualKernelTip: 'Kernel needs to be started manually',
-      enableSuccess: 'Boot startup enabled',
-      disableSuccess: 'Boot startup disabled',
+      enableSuccess: 'Auto start enabled',
+      disableSuccess: 'Auto start disabled',
     },
     network: {
       ipv6: 'IPv6 Preferred',
