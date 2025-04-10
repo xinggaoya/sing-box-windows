@@ -1,6 +1,5 @@
 use crate::app::constants::{messages, process};
 use std::os::windows::process::CommandExt;
-use std::path::PathBuf;
 use tracing::{error, info};
 
 // 以管理员权限重启
@@ -18,7 +17,11 @@ pub fn restart_as_admin() -> Result<(), String> {
         .spawn();
 
     match result {
-        Ok(_) => Ok(()),
+        Ok(_) => {
+            // 启动管理员权限实例后，立即退出当前进程
+            info!("准备以管理员权限重启应用");
+            std::process::exit(0);
+        },
         Err(e) => Err(format!("{}: {}", messages::ERR_RESTART_FAILED, e)),
     }
 }

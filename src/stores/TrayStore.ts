@@ -223,19 +223,6 @@ export const useTrayStore = defineStore(
           items: [currentModeMenuItem, systemProxyMenuItem, tunProxyMenuItem],
         })
 
-        // 创建分隔符菜单项
-        const separator1 = await MenuItem.new({
-          id: 'separator1',
-          text: '-',
-          enabled: false,
-        })
-
-        const separator2 = await MenuItem.new({
-          id: 'separator2',
-          text: '-',
-          enabled: false,
-        })
-
         // 创建退出菜单项
         const quitMenuItem = await MenuItem.new({
           id: 'quit',
@@ -249,14 +236,7 @@ export const useTrayStore = defineStore(
 
         // 创建主菜单
         return await Menu.new({
-          items: [
-            showMenuItem,
-            separator1,
-            kernelSubmenu,
-            proxyModeSubmenu,
-            separator2,
-            quitMenuItem,
-          ],
+          items: [showMenuItem, kernelSubmenu, proxyModeSubmenu, quitMenuItem],
         })
       } catch (error) {
         console.error('创建菜单失败:', error)
