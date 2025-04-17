@@ -1,8 +1,8 @@
-use std::path::PathBuf;
-use tracing::error;
 use crate::app::constants::messages;
-use tauri::{AppHandle, Manager};
+use std::path::PathBuf;
 use tauri::path::BaseDirectory;
+use tauri::{AppHandle, Manager};
+use tracing::error;
 
 // 获取工作目录
 pub fn get_work_dir() -> String {
@@ -30,14 +30,16 @@ pub fn get_work_dir() -> String {
 /// 使用Tauri的资源API直接获取模板文件
 pub fn get_template_path(app_handle: &AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {
     // 直接从Tauri资源目录获取模板文件
-    let template_path = app_handle.path().resolve("src/config/template.json", BaseDirectory::Resource)?;
+    let template_path = app_handle
+        .path()
+        .resolve("src/config/template.json", BaseDirectory::Resource)?;
     tracing::info!("使用模板路径: {:?}", template_path);
-    
+
     if !template_path.exists() {
         let err_msg = format!("找不到模板文件: {:?}", template_path);
         tracing::error!("{}", err_msg);
         return Err(err_msg.into());
     }
-    
+
     Ok(template_path)
 }

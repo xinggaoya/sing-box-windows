@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { getVersion } from '@tauri-apps/api/app'
 import { darkTheme } from 'naive-ui'
 import { useOsTheme } from 'naive-ui'
 import { Window } from '@tauri-apps/api/window'
-import { listen } from '@tauri-apps/api/event'
+import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import mitt from '@/utils/mitt'
-import { useRouter, Router } from 'vue-router'
+import { Router } from 'vue-router'
 import { supportedLocales } from '@/locales'
 
 // 定义更新信息类型
@@ -56,6 +56,10 @@ export const useAppStore = defineStore(
 
     // 添加语言设置
     const locale = ref<Locale>('auto')
+
+    onMounted(async () => {
+      autoStartApp.value = await isEnabled()
+    })
 
     // 窗口状态
     const windowState = ref<WindowState>({

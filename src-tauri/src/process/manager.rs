@@ -1,13 +1,13 @@
 use super::{ProcessError, ProcessInfo, ProcessStatus, Result};
+use crate::app::constants::{messages, paths, process};
 use crate::utils::app_util::get_work_dir;
+use crate::utils::proxy_util::disable_system_proxy;
 use std::os::windows::process::CommandExt;
 use std::sync::Arc;
 use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
-use crate::utils::proxy_util::disable_system_proxy;
-use crate::app::constants::{paths, process, messages};
 
 pub struct ProcessManager {
     process_info: Arc<RwLock<ProcessInfo>>,
@@ -39,7 +39,7 @@ impl ProcessManager {
             let info = self.process_info.read().await;
             info.pid
         };
-        
+
         match std::process::Command::new("tasklist")
             .arg("/FI")
             .arg("IMAGENAME eq sing-box.exe")
@@ -54,7 +54,7 @@ impl ProcessManager {
                 if output_str.trim().is_empty() {
                     return None; // 没有sing-box进程
                 }
-                
+
                 // 解析所有sing-box进程的PID
                 for line in output_str.lines() {
                     let parts: Vec<&str> = line.split(',').collect();
@@ -99,7 +99,7 @@ impl ProcessManager {
         // 强制检查进程状态，确保状态与实际一致
         let force_check = true;
         let is_running = self._is_running(force_check).await;
-        
+
         // 如果当前实例的进程在运行，先尝试停止它
         if is_running {
             info!("检测到应用内核已运行，尝试强制停止");
@@ -110,7 +110,7 @@ impl ProcessManager {
                     // 即使当前无法停止，仍然继续尝试下一步
                 }
             }
-            
+
             // 重置状态，以确保干净的启动环境
             self.reset_process_state().await;
         }
@@ -121,10 +121,10 @@ impl ProcessManager {
             if let Err(e) = self.kill_process_by_name("sing-box.exe").await {
                 warn!("无法停止部分sing-box进程: {}", e);
             }
-            
+
             // 等待进程完全停止
             sleep(Duration::from_secs(1)).await;
-            
+
             // 再次检查进程是否已全部停止
             if self.is_process_running_by_name("sing-box.exe").await {
                 warn!("仍有sing-box进程在运行，将继续尝试启动");
@@ -140,7 +140,7 @@ impl ProcessManager {
     // 通过进程名称检查进程是否在运行
     async fn is_process_running_by_name(&self, process_name: &str) -> bool {
         let query = format!("IMAGENAME eq {}", process_name);
-        
+
         match std::process::Command::new("tasklist")
             .arg("/FI")
             .arg(query)
@@ -170,7 +170,7 @@ impl ProcessManager {
             .arg(process_name)
             .creation_flags(process::CREATE_NO_WINDOW)
             .output()?;
-        
+
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
             if error.contains("没有运行的任务") {
@@ -179,11 +179,11 @@ impl ProcessManager {
             }
             error!("终止进程失败: {}", error);
             return Err(std::io::Error::new(
-                std::io::ErrorKind::Other, 
-                format!("终止进程失败: {}", error)
+                std::io::ErrorKind::Other,
+                format!("终止进程失败: {}", error),
             ));
         }
-        
+
         info!("已终止所有 {} 进程", process_name);
         Ok(())
     }
@@ -191,21 +191,27 @@ impl ProcessManager {
     // 检查配置文件
     async fn check_config(&self) -> Result<()> {
         info!("当前工作目录: {}", get_work_dir());
-        
+
         // 检查配置文件是否存在
         let config_path = paths::get_config_path();
         if !config_path.exists() {
-            return Err(ProcessError::ConfigError(messages::ERR_CONFIG_READ_FAILED.to_string()));
+            return Err(ProcessError::ConfigError(
+                messages::ERR_CONFIG_READ_FAILED.to_string(),
+            ));
         }
 
         // 验证配置文件
-        let config_str = std::fs::read_to_string(&config_path)
-            .map_err(|e| ProcessError::ConfigError(format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e)))?;
+        let config_str = std::fs::read_to_string(&config_path).map_err(|e| {
+            ProcessError::ConfigError(format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))
+        })?;
 
         // 解析JSON
         let json_result: serde_json::Result<serde_json::Value> = serde_json::from_str(&config_str);
         if let Err(e) = json_result {
-            return Err(ProcessError::ConfigError(format!("配置文件JSON格式错误: {}", e)));
+            return Err(ProcessError::ConfigError(format!(
+                "配置文件JSON格式错误: {}",
+                e
+            )));
         }
 
         // 验证配置有效性 - 使用sing-box自带的验证功能
@@ -220,11 +226,14 @@ impl ProcessManager {
 
         if !output.status.success() {
             let error_output = String::from_utf8_lossy(&output.stderr);
-            return Err(ProcessError::ConfigError(format!("配置无效: {}", error_output)));
+            return Err(ProcessError::ConfigError(format!(
+                "配置无效: {}",
+                error_output
+            )));
         }
 
         info!("配置文件检查通过");
-        
+
         // 如果输出为空，则配置有效
         Ok(())
     }
@@ -297,13 +306,13 @@ impl ProcessManager {
 
         // 首先尝试优雅地停止进程
         // let stop_result = self.graceful_stop().await;
-        
+
         // 如果优雅停止失败，则强制终止
         // if stop_result.is_err() {
-            warn!("进程停止超时，尝试强制终止");
-            self.force_stop().await?;
+        warn!("进程停止超时，尝试强制终止");
+        self.force_stop().await?;
         // }
-        
+
         // 关闭系统代理
         if let Err(e) = disable_system_proxy() {
             warn!("关闭系统代理失败: {}", e);
@@ -404,10 +413,12 @@ impl ProcessManager {
 
         // 短暂等待确保进程已终止
         sleep(Duration::from_millis(500)).await;
-        
+
         // 检查进程是否仍存在
         if self.check_process_exists(Some(pid)).await {
-            return Err(ProcessError::StopFailed("强制停止失败，进程仍在运行".to_string()));
+            return Err(ProcessError::StopFailed(
+                "强制停止失败，进程仍在运行".to_string(),
+            ));
         }
 
         Ok(())
@@ -418,7 +429,7 @@ impl ProcessManager {
         if let Some(pid) = pid {
             // 使用具体的PID格式化查询，确保准确匹配
             let query = format!("PID eq {}", pid);
-            
+
             match std::process::Command::new("tasklist")
                 .arg("/FI")
                 .arg(query)
@@ -435,7 +446,7 @@ impl ProcessManager {
                     if output_str.is_empty() {
                         return false;
                     }
-                    
+
                     // 更严格地检查PID是否匹配
                     output_str.contains(&format!(",\"{}\"", pid))
                 }
@@ -477,12 +488,15 @@ impl ProcessManager {
         // 检查进程是否实际存在
         let pid = info.pid.unwrap(); // 安全，因为已经检查了is_none
         let exists = self.check_process_exists(Some(pid)).await;
-        
+
         if !exists && status_running {
             // 进程不存在但状态显示运行中，重置状态
             drop(info); // 释放读锁
             self.reset_process_state().await;
-            warn!("进程状态显示运行中 (PID: {})，但实际进程不存在，已重置状态", pid);
+            warn!(
+                "进程状态显示运行中 (PID: {})，但实际进程不存在，已重置状态",
+                pid
+            );
             return false;
         }
 
@@ -490,4 +504,3 @@ impl ProcessManager {
         exists
     }
 }
-

@@ -4,9 +4,8 @@ import { ref, watch } from 'vue'
 import { TrayIcon, TrayIconEvent } from '@tauri-apps/api/tray'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
-import { MenuItem, type MenuItemOptions } from '@tauri-apps/api/menu/menuItem'
-import { Submenu, type SubmenuOptions } from '@tauri-apps/api/menu/submenu'
-import { invoke } from '@tauri-apps/api/core'
+import { MenuItem } from '@tauri-apps/api/menu/menuItem'
+import { Submenu } from '@tauri-apps/api/menu/submenu'
 import { useAppStore } from './AppStore'
 import { useInfoStore } from './infoStore'
 import { useSubStore } from './SubStore'
@@ -223,19 +222,6 @@ export const useTrayStore = defineStore(
           items: [currentModeMenuItem, systemProxyMenuItem, tunProxyMenuItem],
         })
 
-        // 创建分隔符菜单项
-        const separator1 = await MenuItem.new({
-          id: 'separator1',
-          text: '-',
-          enabled: false,
-        })
-
-        const separator2 = await MenuItem.new({
-          id: 'separator2',
-          text: '-',
-          enabled: false,
-        })
-
         // 创建退出菜单项
         const quitMenuItem = await MenuItem.new({
           id: 'quit',
@@ -251,10 +237,8 @@ export const useTrayStore = defineStore(
         return await Menu.new({
           items: [
             showMenuItem,
-            separator1,
             kernelSubmenu,
             proxyModeSubmenu,
-            separator2,
             quitMenuItem,
           ],
         })

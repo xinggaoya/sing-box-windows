@@ -1,6 +1,6 @@
+use crate::app::constants::process as process_constants;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use crate::app::constants::process as process_constants;
 
 pub mod manager;
 

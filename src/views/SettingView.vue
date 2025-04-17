@@ -447,13 +447,12 @@ const onAutoStartChange = async (value: boolean) => {
       return
     }
 
-    // 移除旧版开机自启
-    if (await isEnabled()) {
+    if (value) {
+      await enable()
+    } else {
       await disable()
     }
 
-    // 使用计划任务设置开机自启
-    await tauriApi.system.setAutostart(value)
     message.success(
       value ? t('setting.startup.enableSuccess') : t('setting.startup.disableSuccess'),
     )
@@ -548,9 +547,6 @@ onMounted(async () => {
   await getAppDataPath()
   // 获取内核版本信息
   await infoStore.updateVersion()
-  // 检查开机自启状态
-  const isAutostartEnabled = await tauriApi.system.isAutostartEnabled()
-  appStore.autoStartApp = isAutostartEnabled
 })
 </script>
 

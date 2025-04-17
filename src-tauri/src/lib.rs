@@ -1,30 +1,31 @@
 use crate::app::kernel_service::{
-    check_kernel_version, download_latest_kernel, get_process_status,
-    restart_kernel, start_kernel, start_websocket_relay, stop_kernel,
+    check_kernel_version, download_latest_kernel, get_process_status, restart_kernel, start_kernel,
+    start_websocket_relay, stop_kernel,
 };
 use crate::app::proxy_service::{
-    change_proxy, get_proxies, get_rules, get_version_info, set_system_proxy,
-    set_tun_proxy, test_group_delay, toggle_ip_version,
+    change_proxy, get_proxies, get_rules, get_version_info, set_system_proxy, set_tun_proxy,
+    test_group_delay, toggle_ip_version,
 };
 use crate::app::subscription_service::{
     add_manual_subscription, download_subscription, get_current_config, get_current_proxy_mode,
     toggle_proxy_mode,
 };
-use crate::app::system_service::{check_admin, restart_as_admin, set_autostart, is_autostart_enabled};
+use crate::app::system_service::{check_admin, restart_as_admin};
 use crate::app::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
+use tracing_subscriber::{fmt, EnvFilter};
 
 pub mod app;
-pub mod config;
 pub mod entity;
 pub mod process;
 pub mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    fmt().with_env_filter(EnvFilter::from_default_env()).init();
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             let _ = show_window(app);
         }))
@@ -76,8 +77,6 @@ pub fn run() {
             get_version_info,
             get_rules,
             start_websocket_relay,
-            set_autostart,
-            is_autostart_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

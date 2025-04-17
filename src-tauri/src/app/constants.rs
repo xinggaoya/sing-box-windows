@@ -1,5 +1,5 @@
 //! 应用常量定义
-//! 
+//!
 //! 这个文件包含应用程序中使用的所有常量定义
 //! 集中管理常量便于统一修改和维护
 
@@ -7,7 +7,7 @@
 pub mod process {
     /// Windows 创建进程时隐藏控制台窗口的标志
     pub const CREATE_NO_WINDOW: u32 = 0x08000000;
-    
+
     /// 进程超时和延迟常量（秒）
     pub const GRACEFUL_TIMEOUT: u64 = 5;
     pub const HEALTH_CHECK_INTERVAL: u64 = 30;
@@ -17,13 +17,15 @@ pub mod process {
 
 /// 文件路径常量
 pub mod paths {
-    use std::path::PathBuf;
     use crate::utils::app_util::get_work_dir;
+    use std::path::PathBuf;
 
     /// 获取 Sing-Box 可执行文件路径
     pub fn get_kernel_path() -> PathBuf {
         let work_dir = get_work_dir();
-        PathBuf::from(&work_dir).join("sing-box").join("sing-box.exe")
+        PathBuf::from(&work_dir)
+            .join("sing-box")
+            .join("sing-box.exe")
     }
 
     /// 获取 Sing-Box 工作目录
@@ -35,7 +37,9 @@ pub mod paths {
     /// 获取配置文件路径
     pub fn get_config_path() -> PathBuf {
         let work_dir = get_work_dir();
-        PathBuf::from(&work_dir).join("sing-box").join("config.json")
+        PathBuf::from(&work_dir)
+            .join("sing-box")
+            .join("config.json")
     }
 }
 
@@ -43,19 +47,19 @@ pub mod paths {
 pub mod network {
     /// 默认监听地址
     pub const DEFAULT_LISTEN_ADDRESS: &str = "0.0.0.0";
-    
+
     /// 默认代理端口
     pub const DEFAULT_PROXY_PORT: u16 = 12080;
-    
+
     /// 默认 Clash API 地址
     pub const DEFAULT_CLASH_API_ADDRESS: &str = "127.0.0.1";
-    
+
     /// 默认 Clash API 端口
     pub const DEFAULT_CLASH_API_PORT: u16 = 12081;
-    
+
     /// 默认 API Token
     pub const DEFAULT_API_TOKEN: &str = "";
-    
+
     /// 网络请求超时时间（秒）
     pub const HTTP_TIMEOUT_SECONDS: u64 = 30;
 }
@@ -63,8 +67,9 @@ pub mod network {
 /// API 常量
 pub mod api {
     /// GitHub API URL
-    pub const GITHUB_API_URL: &str = "https://api.github.com/repos/xinggaoya/sing-box-windows/releases/latest";
-    
+    pub const GITHUB_API_URL: &str =
+        "https://api.github.com/repos/xinggaoya/sing-box-windows/releases/latest";
+
     /// 用户代理
     pub const USER_AGENT: &str = "sing-box-windows";
 }
@@ -99,7 +104,7 @@ pub mod messages {
     pub const ERR_WRITE_FILE_FAILED: &str = "写入文件失败";
     pub const ERR_READ_FILE_FAILED: &str = "读取文件失败";
     pub const ERR_KEY_NOT_FOUND: &str = "未找到键";
-    
+
     // 信息消息
     pub const INFO_PROCESS_STARTED: &str = "进程启动成功";
     pub const INFO_PROCESS_STOPPED: &str = "进程已停止";
@@ -115,7 +120,7 @@ pub mod messages {
 pub mod config {
     /// 默认的 Inbound 标签
     pub const DEFAULT_INBOUND_TAG: &str = "mixed-in";
-    
+
     /// 默认的 Inbound 类型
     pub const DEFAULT_INBOUND_TYPE: &str = "mixed";
 }
@@ -124,13 +129,13 @@ pub mod config {
 pub mod log {
     /// 日志级别
     pub const DEFAULT_LEVEL: &str = "debug";
-    
+
     /// 日志目录
     pub const DEFAULT_DIR: &str = "logs";
-    
+
     /// 日志文件名前缀
     pub const DEFAULT_FILE_PREFIX: &str = "app";
-    
+
     /// 日志轮转类型
     pub mod rotation {
         pub const HOURLY: &str = "hourly";
@@ -138,10 +143,10 @@ pub mod log {
         pub const NEVER: &str = "never";
         pub const DEFAULT: &str = "daily";
     }
-    
+
     /// 默认最大文件大小(MB)
     pub const DEFAULT_MAX_FILE_SIZE: u64 = 100;
-    
+
     /// 默认最大文件数量
     pub const DEFAULT_MAX_FILES: u32 = 30;
 }
@@ -149,11 +154,12 @@ pub mod log {
 /// 注册表常量
 pub mod registry {
     /// Windows Internet 设置注册表路径
-    pub const INTERNET_SETTINGS: &str = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
-    
+    pub const INTERNET_SETTINGS: &str =
+        r"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
+
     /// 代理开关键名
     pub const PROXY_ENABLE: &str = "ProxyEnable";
-    
+
     /// 代理服务器键名
     pub const PROXY_SERVER: &str = "ProxyServer";
 }
@@ -162,7 +168,7 @@ pub mod registry {
 pub mod server {
     /// 默认主机地址
     pub const DEFAULT_HOST: &str = "127.0.0.1";
-    
+
     /// 默认端口
     pub const DEFAULT_PORT: u16 = 8080;
 }
@@ -177,7 +183,7 @@ pub mod database {
 pub mod jwt {
     /// 默认密钥(注意：生产环境应使用安全的随机密钥)
     pub const DEFAULT_SECRET: &str = "your-secret-key";
-    
+
     /// 默认过期时间(秒)
     pub const DEFAULT_EXPIRATION: i64 = 86400; // 24小时
 }
@@ -186,7 +192,7 @@ pub mod jwt {
 pub mod rate_limit {
     /// 默认窗口时间(秒)
     pub const DEFAULT_WINDOW_SECS: u64 = 60;
-    
+
     /// 默认最大请求数
     pub const DEFAULT_MAX_REQUESTS: u64 = 100;
-} 
+}

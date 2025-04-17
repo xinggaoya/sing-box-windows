@@ -1,20 +1,20 @@
+use crate::app::constants::{config as config_constants, messages, network, paths};
 use crate::entity::config_model;
 use crate::utils::app_util::get_work_dir;
 use crate::utils::config_util::ConfigUtil;
+use reqwest::Client;
+use serde_json::{json, Value};
 use std::error::Error;
 use std::path::Path;
+use tauri::{Emitter, Runtime};
 use tracing::info;
-use crate::app::constants::{paths, network, config as config_constants, messages};
-use serde_json::{json, Value};
-use reqwest::Client;
-use tauri::{Runtime, Emitter};
 
 // 修改代理模式为系统代理
 #[tauri::command]
 pub fn set_system_proxy() -> Result<(), String> {
     let config_path = paths::get_config_path();
-    let json_util =
-        ConfigUtil::new(config_path.to_str().unwrap()).map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
+    let json_util = ConfigUtil::new(config_path.to_str().unwrap())
+        .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
 
     let mut json_util = json_util;
     let target_keys = vec!["inbounds"];
@@ -31,7 +31,10 @@ pub fn set_system_proxy() -> Result<(), String> {
         set_system_proxy: Some(true),
     }];
 
-    json_util.update_key(target_keys.clone(), serde_json::to_value(new_structs).unwrap());
+    json_util.update_key(
+        target_keys.clone(),
+        serde_json::to_value(new_structs).unwrap(),
+    );
     match json_util.save_to_file() {
         Ok(_) => {
             info!("{}", messages::INFO_PROXY_MODE_ENABLED);
@@ -108,44 +111,55 @@ pub fn toggle_ip_version(prefer_ipv6: bool) -> Result<(), String> {
 
     // 读取文件内容
     let content = std::fs::read_to_string(&path).map_err(|e| format!("读取配置文件失败: {}", e))?;
-    
+
     // 先尝试解析为JSON以验证是否有效
-    let json_config: Value = serde_json::from_str(&content)
-        .map_err(|e| format!("解析配置文件失败: {}", e))?;
-    
+    let json_config: Value =
+        serde_json::from_str(&content).map_err(|e| format!("解析配置文件失败: {}", e))?;
+
     // 检查DNS配置结构是否存在
-    if !json_config.get("dns").and_then(|dns| dns.get("servers")).is_some() {
+    if !json_config
+        .get("dns")
+        .and_then(|dns| dns.get("servers"))
+        .is_some()
+    {
         return Err("配置文件缺少DNS服务器配置".to_string());
     }
-    
+
     // 对服务器配置中的每个策略进行修改
     let mut modified_content = content;
-    
+
     // 识别现有策略和目标策略
-    let current_strategy = if prefer_ipv6 { "ipv4_only" } else { "prefer_ipv6" };
-    let target_strategy = if prefer_ipv6 { "prefer_ipv6" } else { "ipv4_only" };
-    
+    let current_strategy = if prefer_ipv6 {
+        "ipv4_only"
+    } else {
+        "prefer_ipv6"
+    };
+    let target_strategy = if prefer_ipv6 {
+        "prefer_ipv6"
+    } else {
+        "ipv4_only"
+    };
+
     // 替换策略字符串，但确保是在正确的上下文中
     // 通过查找 "strategy": "current_strategy" 模式来定位
     let pattern = format!("\"strategy\": \"{}\"", current_strategy);
     let replacement = format!("\"strategy\": \"{}\"", target_strategy);
-    
+
     // 执行替换
     modified_content = modified_content.replace(&pattern, &replacement);
-    
+
     // 验证修改后的内容仍然是有效的JSON
     let _: Value = serde_json::from_str(&modified_content)
         .map_err(|e| format!("修改后的配置不是有效的JSON: {}", e))?;
-    
+
     // 保存修改后的内容
-    std::fs::write(&path, modified_content)
-        .map_err(|e| format!("保存配置文件失败: {}", e))?;
-    
+    std::fs::write(&path, modified_content).map_err(|e| format!("保存配置文件失败: {}", e))?;
+
     info!(
         "IP版本模式已成功切换为: {}",
         if prefer_ipv6 { "IPv6优先" } else { "仅IPv4" }
     );
-    
+
     Ok(())
 }
 
@@ -159,30 +173,34 @@ pub fn get_api_token() -> String {
 #[tauri::command]
 pub async fn get_proxies() -> Result<Value, String> {
     let token = get_api_token();
-    let url = format!("http://{}:{}/proxies?token={}", 
-        network::DEFAULT_CLASH_API_ADDRESS, 
+    let url = format!(
+        "http://{}:{}/proxies?token={}",
+        network::DEFAULT_CLASH_API_ADDRESS,
         network::DEFAULT_CLASH_API_PORT,
-        token);
-    
+        token
+    );
+
     // 创建禁用代理的HTTP客户端
     let client = Client::builder()
         .no_proxy()
         .build()
         .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-    
+
     // 发送请求并获取响应
-    let response = client.get(&url)
+    let response = client
+        .get(&url)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .send()
         .await
         .map_err(|e| format!("获取代理列表失败: {}", e))?;
-    
+
     // 解析响应为JSON
-    let json = response.json::<Value>()
+    let json = response
+        .json::<Value>()
         .await
         .map_err(|e| format!("解析代理列表失败: {}", e))?;
-    
+
     Ok(json)
 }
 
@@ -190,37 +208,40 @@ pub async fn get_proxies() -> Result<Value, String> {
 #[tauri::command]
 pub async fn change_proxy(group: String, proxy: String) -> Result<(), String> {
     let token = get_api_token();
-    let url = format!("http://{}:{}/proxies/{}?token={}", 
-        network::DEFAULT_CLASH_API_ADDRESS, 
-        network::DEFAULT_CLASH_API_PORT, 
-        group, 
-        token);
-    
+    let url = format!(
+        "http://{}:{}/proxies/{}?token={}",
+        network::DEFAULT_CLASH_API_ADDRESS,
+        network::DEFAULT_CLASH_API_PORT,
+        group,
+        token
+    );
+
     // 创建禁用代理的HTTP客户端
     let client = Client::builder()
         .no_proxy()
         .build()
         .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-    
+
     // 请求体
     let payload = json!({
         "name": proxy
     });
-    
+
     // 发送请求并获取响应
-    let response = client.put(&url)
+    let response = client
+        .put(&url)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .json(&payload)
         .send()
         .await
         .map_err(|e| format!("切换代理失败: {}", e))?;
-    
+
     // 检查响应状态
     if !response.status().is_success() {
         return Err(format!("服务器返回错误: {}", response.status()));
     }
-    
+
     Ok(())
 }
 
@@ -229,61 +250,75 @@ pub async fn change_proxy(group: String, proxy: String) -> Result<(), String> {
 pub async fn test_group_delay<R: Runtime>(
     window: tauri::Window<R>,
     group: String,
-    server: Option<String>
+    server: Option<String>,
 ) -> Result<(), String> {
     // 使用默认测试URL或指定的URL
     let test_url = server.unwrap_or_else(|| "https://www.gstatic.com/generate_204".to_string());
     let token = get_api_token();
-    
+
     // 构建请求URL
-    let url = format!("http://{}:{}/group/{}/delay?url={}&timeout=2000&token={}", 
-        network::DEFAULT_CLASH_API_ADDRESS, 
+    let url = format!(
+        "http://{}:{}/group/{}/delay?url={}&timeout=2000&token={}",
+        network::DEFAULT_CLASH_API_ADDRESS,
         network::DEFAULT_CLASH_API_PORT,
         urlencoding::encode(&group),
         urlencoding::encode(&test_url),
-        token);
-    
+        token
+    );
+
     // 创建禁用代理的HTTP客户端
     let client = Client::builder()
         .no_proxy()
         .build()
         .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-    
+
     // 发送请求并获取结果
-    match client.get(&url)
+    match client
+        .get(&url)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
-        .send().await {
+        .send()
+        .await
+    {
         Ok(response) => {
             match response.json::<Value>().await {
                 Ok(data) => {
                     // 发送测试结果事件
-                    let _ = window.emit("test-group-result", json!({
-                        "group": group,
-                        "results": data,
-                        "success": true
-                    }));
-                },
+                    let _ = window.emit(
+                        "test-group-result",
+                        json!({
+                            "group": group,
+                            "results": data,
+                            "success": true
+                        }),
+                    );
+                }
                 Err(e) => {
                     // 发送测试失败事件
-                    let _ = window.emit("test-group-result", json!({
-                        "group": group,
-                        "success": false,
-                        "error": format!("解析结果失败: {}", e)
-                    }));
+                    let _ = window.emit(
+                        "test-group-result",
+                        json!({
+                            "group": group,
+                            "success": false,
+                            "error": format!("解析结果失败: {}", e)
+                        }),
+                    );
                 }
             }
-        },
+        }
         Err(e) => {
             // 发送测试失败事件
-            let _ = window.emit("test-group-result", json!({
-                "group": group,
-                "success": false,
-                "error": format!("请求失败: {}", e)
-            }));
+            let _ = window.emit(
+                "test-group-result",
+                json!({
+                    "group": group,
+                    "success": false,
+                    "error": format!("请求失败: {}", e)
+                }),
+            );
         }
     }
-    
+
     Ok(())
 }
 
@@ -291,30 +326,34 @@ pub async fn test_group_delay<R: Runtime>(
 #[tauri::command]
 pub async fn get_version_info() -> Result<Value, String> {
     let token = get_api_token();
-    let url = format!("http://{}:{}/version?token={}", 
-        network::DEFAULT_CLASH_API_ADDRESS, 
+    let url = format!(
+        "http://{}:{}/version?token={}",
+        network::DEFAULT_CLASH_API_ADDRESS,
         network::DEFAULT_CLASH_API_PORT,
-        token);
-    
+        token
+    );
+
     // 创建禁用代理的HTTP客户端
     let client = Client::builder()
         .no_proxy()
         .build()
         .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-    
+
     // 发送请求并获取响应
-    let response = client.get(&url)
+    let response = client
+        .get(&url)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .send()
         .await
         .map_err(|e| format!("获取版本信息失败: {}", e))?;
-    
+
     // 解析响应为JSON
-    let json = response.json::<Value>()
+    let json = response
+        .json::<Value>()
         .await
         .map_err(|e| format!("解析版本信息失败: {}", e))?;
-    
+
     Ok(json)
 }
 
@@ -322,11 +361,13 @@ pub async fn get_version_info() -> Result<Value, String> {
 #[tauri::command]
 pub async fn get_rules() -> Result<Value, String> {
     let token = get_api_token();
-    let url = format!("http://{}:{}/rules?token={}", 
-        network::DEFAULT_CLASH_API_ADDRESS, 
+    let url = format!(
+        "http://{}:{}/rules?token={}",
+        network::DEFAULT_CLASH_API_ADDRESS,
         network::DEFAULT_CLASH_API_PORT,
-        token);
-    
+        token
+    );
+
     // 创建禁用代理的HTTP客户端
     let client = Client::builder()
         .no_proxy()
@@ -335,17 +376,19 @@ pub async fn get_rules() -> Result<Value, String> {
 
     info!("获取规则列表{}", url);
     // 发送请求并获取响应
-    let response = client.get(&url)
+    let response = client
+        .get(&url)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .send()
         .await
         .map_err(|e| format!("获取规则列表失败: {}", e))?;
-    
+
     // 解析响应为JSON
-    let json = response.json::<Value>()
+    let json = response
+        .json::<Value>()
         .await
         .map_err(|e| format!("解析规则列表失败: {}", e))?;
-    
+
     Ok(json)
-} 
+}

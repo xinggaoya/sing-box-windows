@@ -118,10 +118,6 @@ export const tauriApi = {
     checkAdmin: () => invoke<boolean>('check_admin'),
     // 以管理员权限重启
     restartAsAdmin: () => invoke<void>('restart_as_admin'),
-    // 设置开机自启
-    setAutostart: (enabled: boolean) => invoke<void>('set_autostart', { enabled }),
-    // 检查开机自启是否已启用
-    isAutostartEnabled: () => invoke<boolean>('is_autostart_enabled'),
   },
 
   // 更新相关 API

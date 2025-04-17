@@ -1,9 +1,9 @@
+use crate::app::constants::{api, messages};
 use crate::utils::app_util::get_work_dir;
 use serde_json::json;
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use tauri::Emitter;
-use crate::app::constants::{api, messages};
 
 // 添加新的结构体用于版本信息
 #[derive(serde::Serialize)]
@@ -36,12 +36,11 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
         .as_str()
         .ok_or_else(|| format!("{}: 无法解析版本号", messages::ERR_GET_VERSION_FAILED))
         .map(|v| v.trim_start_matches('v').to_string())?;
-    
 
     // 获取下载链接
-    let assets = release["assets"].as_array().ok_or_else(|| {
-        format!("{}: 无法获取下载资源", messages::ERR_GET_VERSION_FAILED)
-    })?;
+    let assets = release["assets"]
+        .as_array()
+        .ok_or_else(|| format!("{}: 无法获取下载资源", messages::ERR_GET_VERSION_FAILED))?;
 
     // 查找Windows安装程序
     let mut download_url = String::new();
@@ -57,7 +56,10 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
     }
 
     if download_url.is_empty() {
-        return Err(format!("{}: 无法获取下载链接", messages::ERR_GET_VERSION_FAILED));
+        return Err(format!(
+            "{}: 无法获取下载链接",
+            messages::ERR_GET_VERSION_FAILED
+        ));
     }
 
     // 简单比较版本号
@@ -76,7 +78,6 @@ pub async fn download_and_install_update(
     window: tauri::Window,
     download_url: String,
 ) -> Result<(), String> {
-    
     let work_dir = get_work_dir();
     let download_path = Path::new(&work_dir).join("update.exe");
 
@@ -106,7 +107,9 @@ pub async fn download_and_install_update(
                 }),
             );
         },
-    ).await {
+    )
+    .await
+    {
         return Err(format!("下载更新失败: {}", e));
     }
 
@@ -127,4 +130,4 @@ pub async fn download_and_install_update(
         .map_err(|e| format!("启动安装程序失败: {}", e))?;
 
     Ok(())
-} 
+}
