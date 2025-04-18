@@ -43,13 +43,13 @@ const router = createRouter({
           path: '/connections',
           name: 'Connections',
           component: () => import('@/views/ConnectionsView.vue'),
-        },
-        {
-          path: '/blank',
-          name: 'Blank',
-          component: () => import('@/views/BlankView.vue'),
-        },
+        }
       ],
+    },
+    {
+      path: '/blank',
+      name: 'Blank',
+      component: () => import('@/views/BlankView.vue'),
     },
   ],
 })

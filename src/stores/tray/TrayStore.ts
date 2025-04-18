@@ -7,12 +7,13 @@ import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
 import { MenuItem } from '@tauri-apps/api/menu/menuItem'
 import { Submenu } from '@tauri-apps/api/menu/submenu'
-import { useAppStore } from '../app/AppStore'
-import { useSubStore } from '../subscription/SubStore'
-import { useKernelStore } from '../kernel/KernelStore'
+import { useAppStore } from '@/stores'
+import { useSubStore } from '@/stores'
+import { useKernelStore } from '@/stores'
 import { ProxyService } from '@/services/proxy-service'
 import mitt from '@/utils/mitt'
 import i18n from '@/locales'
+import { useRouter } from 'vue-router'
 
 // 自定义菜单项类型定义
 export interface TrayMenuOptions {
@@ -31,6 +32,7 @@ export const useTrayStore = defineStore(
     // 引用其他Store
     const appStore = useAppStore()
     const subStore = useSubStore()
+    const router = useRouter()
     const kernelStore = useKernelStore()
     const proxyService = ProxyService.getInstance()
 
@@ -158,7 +160,6 @@ export const useTrayStore = defineStore(
           enabled: currentProxyMode !== 'system',
           action: async () => {
             try {
-              console.log('切换到系统代理模式')
               await proxyService.switchMode('system')
               appStore.proxyMode = 'system'
               // 强制立即刷新菜单
@@ -176,7 +177,6 @@ export const useTrayStore = defineStore(
           enabled: currentProxyMode !== 'tun',
           action: async () => {
             try {
-              console.log('切换到TUN模式')
               const needClose = await proxyService.switchMode('tun')
               appStore.proxyMode = 'tun'
               // 强制立即刷新菜单
@@ -266,6 +266,7 @@ export const useTrayStore = defineStore(
                 // 如果点击的是左键，则显示界面
                 if (event.button === 'Left') {
                   const appWindow = Window.getCurrent()
+                  router.back()
                   await appWindow.show()
                   await appWindow.setFocus()
                 }
