@@ -2,28 +2,17 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { TrayIcon, TrayIconEvent } from '@tauri-apps/api/tray'
+import { Window } from '@tauri-apps/api/window'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
 import { MenuItem } from '@tauri-apps/api/menu/menuItem'
 import { Submenu } from '@tauri-apps/api/menu/submenu'
-import { useAppStore } from './AppStore'
-import { useInfoStore } from './infoStore'
-import { useSubStore } from './SubStore'
+import { useAppStore } from '../app/AppStore'
+import { useSubStore } from '../subscription/SubStore'
+import { useKernelStore } from '../kernel/KernelStore'
 import { ProxyService } from '@/services/proxy-service'
 import mitt from '@/utils/mitt'
-import { Window } from '@tauri-apps/api/window'
-import { useRouter } from 'vue-router'
 import i18n from '@/locales'
-
-// 声明mitt事件类型
-declare module '@/utils/mitt' {
-  interface Events {
-    'refresh-tray-menu': void
-    'process-status': void
-    'proxy-mode-changed': void
-    'language-changed': void
-  }
-}
 
 // 自定义菜单项类型定义
 export interface TrayMenuOptions {
@@ -36,25 +25,13 @@ export interface TrayMenuOptions {
   children?: TrayMenuOptions[]
 }
 
-// 定义Tauri菜单项类型
-interface TauriMenuItem {
-  id?: string
-  text?: string
-  type?: string
-  checked?: boolean
-  enabled?: boolean
-  action?: () => Promise<void>
-  submenu?: TauriMenuItem[]
-}
-
 export const useTrayStore = defineStore(
   'tray',
   () => {
     // 引用其他Store
     const appStore = useAppStore()
-    const infoStore = useInfoStore()
     const subStore = useSubStore()
-    const router = useRouter()
+    const kernelStore = useKernelStore()
     const proxyService = ProxyService.getInstance()
 
     // 添加一个内部状态，记录上次菜单刷新时的代理模式
@@ -71,30 +48,35 @@ export const useTrayStore = defineStore(
      */
     const updateTrayTooltip = async () => {
       if (trayInstanceId.value) {
-        const status = appStore.isRunning ? t('home.status.running') : t('home.status.stopped')
-        const mode =
-          appStore.proxyMode === 'system' ? t('home.proxyMode.system') : t('home.proxyMode.tun')
-
-        // 获取当前使用的配置名称
-        let configName = ''
-        if (subStore.activeIndex !== null && subStore.list.length > 0) {
-          configName = subStore.list[subStore.activeIndex].name
-        }
-
-        // 构建提示文本
-        let tooltipText = `sing-box-window - ${t('tray.kernel')}${status}, ${mode}`
-
-        // 如果有配置名称，则显示
-        if (configName) {
-          tooltipText += `, ${t('sub.title')}: ${configName}`
-        }
         try {
-          const tray = await TrayIcon.getById(trayInstanceId.value)
-          if (tray) {
-            await tray.setTooltip(tooltipText)
+          const status = appStore.isRunning ? t('home.status.running') : t('home.status.stopped')
+          const mode =
+            appStore.proxyMode === 'system' ? t('home.proxyMode.system') : t('home.proxyMode.tun')
+
+          // 获取当前使用的配置名称
+          let configName = ''
+          if (subStore.activeIndex !== null && subStore.list.length > 0) {
+            configName = subStore.list[subStore.activeIndex].name
+          }
+
+          // 构建提示文本
+          let tooltipText = `sing-box-window - ${t('tray.kernel')}${status}, ${mode}`
+
+          // 如果有配置名称，则显示
+          if (configName) {
+            tooltipText += `, ${t('sub.title')}: ${configName}`
+          }
+
+          // 获取托盘实例并更新提示
+          const trayIcon = await TrayIcon.getById(trayInstanceId.value)
+          if (trayIcon) {
+            await trayIcon.setTooltip(tooltipText)
+            console.log('更新托盘提示成功:', tooltipText)
+          } else {
+            console.warn('托盘实例不存在，无法更新提示')
           }
         } catch (e) {
-          console.error('备用方法更新托盘提示也失败:', e)
+          console.error('更新托盘提示失败:', e)
         }
       }
     }
@@ -118,8 +100,9 @@ export const useTrayStore = defineStore(
           text: t('tray.show'),
           enabled: true,
           action: async () => {
-            await appStore.restoreFromBlank(router)
-            await appStore.showWindow()
+            const appWindow = Window.getCurrent()
+            await appWindow.show()
+            await appWindow.setFocus()
           },
         })
 
@@ -130,7 +113,7 @@ export const useTrayStore = defineStore(
           enabled: !appStore.isRunning,
           action: async () => {
             try {
-              await infoStore.startKernel()
+              await kernelStore.startKernel()
               appStore.setRunningState(true)
               await refreshTrayMenu() // 刷新菜单以更新状态
             } catch (error) {
@@ -144,7 +127,7 @@ export const useTrayStore = defineStore(
           text: t('tray.stop'),
           enabled: appStore.isRunning,
           action: async () => {
-            await infoStore.stopKernel()
+            await kernelStore.stopKernel()
             appStore.setRunningState(false)
             await refreshTrayMenu() // 刷新菜单以更新状态
           },
@@ -155,7 +138,7 @@ export const useTrayStore = defineStore(
           text: t('home.restart'),
           enabled: appStore.isRunning,
           action: async () => {
-            await infoStore.restartKernel()
+            await kernelStore.restartKernel()
             await refreshTrayMenu() // 刷新菜单以更新状态
           },
         })
@@ -227,7 +210,7 @@ export const useTrayStore = defineStore(
           id: 'quit',
           text: t('tray.quit'),
           action: async () => {
-            await infoStore.stopKernel()
+            await kernelStore.stopKernel()
             const appWindow = Window.getCurrent()
             await appWindow.close()
           },
@@ -250,14 +233,14 @@ export const useTrayStore = defineStore(
     }
 
     /**
-     * 初始化托盘菜单
+     * 初始化托盘
      */
     const initTray = async () => {
       try {
         // 清理之前的托盘实例（如果存在）
         if (appStore.trayInstanceId) {
           try {
-            await TrayIcon.removeById(appStore.trayInstanceId)
+            await destroyTray()
           } catch (error) {
             // 忽略可能的错误
           }
@@ -282,8 +265,9 @@ export const useTrayStore = defineStore(
               case 'Click':
                 // 如果点击的是左键，则显示界面
                 if (event.button === 'Left') {
-                  await appStore.restoreFromBlank(router)
-                  await appStore.showWindow()
+                  const appWindow = Window.getCurrent()
+                  await appWindow.show()
+                  await appWindow.setFocus()
                 }
                 break
             }
@@ -399,7 +383,7 @@ export const useTrayStore = defineStore(
     }
 
     /**
-     * 清理托盘资源
+     * 销毁托盘
      */
     const destroyTray = async () => {
       if (trayInstanceId.value) {
@@ -423,12 +407,9 @@ export const useTrayStore = defineStore(
     return {
       trayInstanceId,
       initTray,
-      updateTrayTooltip,
-      refreshTrayMenu,
       destroyTray,
+      updateTrayTooltip,
+      refreshTrayMenu
     }
-  },
-  {
-    persist: true,
-  },
+  }
 )

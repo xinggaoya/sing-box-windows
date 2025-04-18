@@ -5,13 +5,13 @@
       <template #header-extra>
         <n-space align="center" :size="12">
           <n-tag
-            v-if="infoStore.version.version"
+            v-if="kernelStore.version.version"
             :bordered="false"
             type="default"
             size="medium"
             class="version-tag"
           >
-            {{ t('setting.kernel.currentVersion') }}{{ infoStore.version.version }}
+            {{ t('setting.kernel.currentVersion') }}{{ formatVersion(kernelStore.version.version) }}
           </n-tag>
           <n-tag v-else :bordered="false" type="error" size="medium" class="version-tag">
             {{ t('setting.kernel.notInstalled') }}
@@ -23,7 +23,7 @@
             size="medium"
             class="version-tag"
           >
-            {{ t('setting.kernel.newVersion') }}{{ infoStore.newVersion }}
+            {{ t('setting.kernel.newVersion') }}{{ formatVersion(kernelStore.newVersion) }}
           </n-tag>
         </n-space>
       </template>
@@ -50,7 +50,7 @@
         </n-alert>
 
         <n-alert
-          v-if="!infoStore.version.version"
+          v-if="!kernelStore.version.version"
           type="error"
           :show-icon="true"
           :title="t('setting.kernel.notInstalled')"
@@ -88,7 +88,7 @@
             {{
               hasNewVersion
                 ? t('setting.kernel.downloadNew')
-                : infoStore.version.version
+                : kernelStore.version.version
                   ? t('setting.kernel.redownload')
                   : t('setting.kernel.download')
             }}
@@ -175,14 +175,14 @@
               <div class="setting-title">{{ $t('setting.language.title') }}</div>
               <div class="setting-desc">
                 {{
-                  appStore.locale === 'auto'
+                  localeStore.locale === 'auto'
                     ? $t('setting.language.auto')
-                    : supportedLocales.find((loc) => loc.code === appStore.locale)?.name
+                    : supportedLocales.find((loc) => loc.code === localeStore.locale)?.name
                 }}
               </div>
             </div>
             <n-select
-              v-model:value="appStore.locale"
+              v-model:value="localeStore.locale"
               :options="languageOptions"
               size="small"
               style="min-width: 120px"
@@ -230,7 +230,7 @@
           <div class="about-item">
             <span class="about-label">{{ t('setting.about.appVersion') }}</span>
             <n-space align="center">
-              <span class="about-value">{{ appStore.appVersion }}</span>
+              <span class="about-value">{{ updateStore.appVersion }}</span>
               <n-button text size="tiny" @click="handleCheckUpdate" :loading="checkingUpdate">
                 <template #icon>
                   <n-icon><refresh-outline /></n-icon>
@@ -243,7 +243,7 @@
         <n-gi>
           <div class="about-item">
             <span class="about-label">{{ t('setting.about.kernelVersion') }}</span>
-            <span class="about-value">{{ infoStore.version.version }}</span>
+            <span class="about-value">{{ formatVersion(kernelStore.version.version) }}</span>
           </div>
         </n-gi>
         <n-gi>
@@ -294,7 +294,7 @@
   <update-modal
     v-model:show="showUpdateModal"
     :latest-version="latestVersion"
-    :current-version="appStore.appVersion"
+    :current-version="updateStore.appVersion"
     :download-url="downloadUrl"
     @update="handleUpdate"
     @cancel="skipUpdate"
@@ -305,8 +305,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useMessage, useDialog } from 'naive-ui'
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
-import { useInfoStore } from '@/stores/infoStore'
-import { useAppStore } from '@/stores/AppStore'
+import { useKernelStore } from '@/stores/kernel/KernelStore'
+import { useAppStore } from '@/stores/app/AppStore'
+import { useUpdateStore } from '@/stores/app/UpdateStore'
+import { useLocaleStore } from '@/stores/app/LocaleStore'
 import {
   DownloadOutline,
   SettingsOutline,
@@ -321,7 +323,7 @@ import { tauriApi } from '@/services/tauri-api'
 import { appDataDir } from '@tauri-apps/api/path'
 import UpdateModal from '@/components/UpdateModal.vue'
 import { supportedLocales } from '@/locales'
-import { Locale } from '@/stores/AppStore'
+import { Locale } from '@/stores/app/LocaleStore'
 import { useI18n } from 'vue-i18n'
 import mitt from '@/utils/mitt'
 import { getVersion } from '@tauri-apps/api/app'
@@ -330,7 +332,9 @@ import i18n from '@/locales'
 const message = useMessage()
 const dialog = useDialog()
 const appStore = useAppStore()
-const infoStore = useInfoStore()
+const kernelStore = useKernelStore()
+const updateStore = useUpdateStore()
+const localeStore = useLocaleStore()
 const loading = ref(false)
 const downloading = ref(false)
 const downloadProgress = ref(0)
@@ -364,7 +368,7 @@ const checkUpdate = async () => {
   try {
     if (skipUpdateFlag.value) return
 
-    const result = await tauriApi.update.checkUpdate(appStore.appVersion)
+    const result = await tauriApi.update.checkUpdate(updateStore.appVersion)
     if (result.has_update) {
       showUpdateModal.value = true
       latestVersion.value = result.latest_version
@@ -394,7 +398,7 @@ const skipUpdate = () => {
 const handleCheckUpdate = async () => {
   try {
     checkingUpdate.value = true
-    const result = await appStore.checkUpdate(false)
+    const result = await updateStore.checkUpdate(false)
     if (result?.has_update) {
       showUpdateModal.value = true
       latestVersion.value = result.latest_version
@@ -410,9 +414,36 @@ const handleCheckUpdate = async () => {
   }
 }
 
+// 格式化版本号，只显示纯版本号部分
+const formatVersion = (version: string) => {
+  if (!version) return ''
+
+  // 使用正则表达式提取版本号
+  // 匹配常见的版本号格式，如 1.2.3，1.2.3-beta 等
+  const versionRegex = /\d+\.\d+\.\d+(?:-[\w.]+)?/
+  const match = version.match(versionRegex)
+
+  if (match) {
+    return match[0]
+  }
+
+  // 如果没有匹配到版本号格式，则使用原始的处理方式
+  // 如果版本号以 'sing-box version ' 开头，只保留版本号部分
+  if (version.startsWith('sing-box version ')) {
+    return version.split(' ')[2]
+  }
+
+  // 如果包含空格，只取第一部分（通常是版本号）
+  if (version.includes(' ')) {
+    return version.split(' ')[0]
+  }
+
+  return version
+}
+
 const hasNewVersion = computed(() => {
-  if (!infoStore.newVersion || !infoStore.version.version) return false
-  return infoStore.newVersion != infoStore.version.version
+  if (!kernelStore.newVersion || !kernelStore.version.version) return false
+  return formatVersion(kernelStore.newVersion) != formatVersion(kernelStore.version.version)
 })
 
 const downloadTheKernel = async () => {
@@ -426,7 +457,7 @@ const downloadTheKernel = async () => {
     await tauriApi.subscription.downloadLatestKernel()
 
     // 下载成功后更新版本信息
-    await infoStore.updateVersion()
+    await kernelStore.updateVersion()
   } catch (error) {
     downloadError.value = error as string
     message.error(error as string)
@@ -490,7 +521,7 @@ const showManualDownloadModal = () => {
 const checkManualInstall = async () => {
   try {
     loading.value = true
-    const success = await infoStore.checkKernelVersion()
+    const success = await kernelStore.checkKernelVersion()
     if (success) {
       message.success(t('setting.kernel.installSuccess'))
     } else {
@@ -525,14 +556,14 @@ listen(
       downloadError.value = null
       message.success(t('setting.kernel.downloadComplete'))
       // 更新版本信息
-      infoStore.updateVersion()
+      kernelStore.updateVersion()
     }
   },
 )
 
 // 切换语言
 const handleChangeLanguage = async (value: string) => {
-  appStore.setLocale(value as Locale)
+  localeStore.setLocale(value as Locale)
   i18n.global.locale.value = value as 'zh-CN' | 'en-US' | 'ru-RU' | 'ja-JP'
   // 发送语言变更事件，通知托盘菜单刷新
   mitt.emit('language-changed')
@@ -540,13 +571,13 @@ const handleChangeLanguage = async (value: string) => {
 
 onMounted(async () => {
   // 获取当前版本号
-  await appStore.fetchAppVersion()
+  await updateStore.fetchAppVersion()
   // 检查更新
   await checkUpdate()
   // 获取应用数据目录
   await getAppDataPath()
   // 获取内核版本信息
-  await infoStore.updateVersion()
+  await kernelStore.updateVersion()
 })
 </script>
 

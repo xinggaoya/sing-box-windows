@@ -55,6 +55,11 @@ sing-box-windows/
 │   │   └── layout/    # 布局组件
 │   ├── router/        # 路由配置
 │   ├── stores/        # 状态管理
+│   │   ├── index.ts   # 主入口文件
+│   │   ├── app/       # 应用相关 store
+│   │   ├── kernel/    # 内核相关 store
+│   │   ├── subscription/ # 订阅相关 store
+│   │   └── tray/      # 托盘相关 store
 │   ├── utils/         # 工具函数
 │   │   ├── format.ts  # 格式化工具
 │   │   └── mitt.ts    # 事件总线
@@ -184,21 +189,124 @@ sing-box-windows/
 
 ### 状态管理
 
-项目使用 Pinia 进行状态管理，主要 Store 包括：
+项目使用 Pinia 进行状态管理，采用模块化的目录结构组织各个 Store：
 
-1. **appStore**：应用全局状态
+```
+src/stores/
+├── index.ts                # 主入口文件，导出所有 store
+├── app/                    # 应用相关 store
+│   ├── AppStore.ts         # 核心应用状态
+│   ├── ThemeStore.ts       # 主题管理
+│   ├── LocaleStore.ts      # 本地化/语言
+│   ├── WindowStore.ts      # 窗口管理
+│   └── UpdateStore.ts      # 应用更新
+├── kernel/                 # 内核相关 store
+│   ├── KernelStore.ts      # 内核状态和操作
+│   ├── ProxyStore.ts       # 代理设置
+│   ├── ConnectionStore.ts  # 连接管理
+│   ├── TrafficStore.ts     # 流量监控
+│   └── LogStore.ts         # 日志管理
+├── subscription/           # 订阅相关 store
+│   └── SubStore.ts         # 订阅管理
+└── tray/                   # 系统托盘相关 store
+    └── TrayStore.ts        # 系统托盘管理
+```
 
-   - 管理应用运行状态
-   - 管理窗口状态
-   - 处理应用配置
+各 Store 的职责如下：
 
-2. **infoStore**：内核信息状态
+1. **应用相关 Store**
 
-   - 管理内核版本信息
-   - 处理内核状态和事件监听
+   - **AppStore**：管理核心应用状态，如运行状态、自动启动设置等
+   - **ThemeStore**：管理应用主题（亮色/暗色）
+   - **LocaleStore**：管理应用语言设置
+   - **WindowStore**：管理窗口状态、操作和事件
+   - **UpdateStore**：管理应用更新检查和安装
 
-3. **trayStore**：系统托盘状态
-   - 管理系统托盘图标和菜单
+2. **内核相关 Store**
+
+   - **KernelStore**：管理内核版本、启动/停止操作
+   - **ProxyStore**：管理代理设置和节点
+   - **ConnectionStore**：管理连接信息和统计
+   - **TrafficStore**：管理流量监控和统计
+   - **LogStore**：管理日志记录和显示
+
+3. **订阅相关 Store**
+
+   - **SubStore**：管理代理订阅
+
+4. **系统托盘相关 Store**
+   - **TrayStore**：管理系统托盘图标和菜单
+
+### 使用 Store
+
+在组件中使用 Store 的示例：
+
+```typescript
+// 导入需要的 store
+import { useAppStore } from '@/stores/app/AppStore'
+import { useThemeStore } from '@/stores/app/ThemeStore'
+import { useKernelStore } from '@/stores/kernel/KernelStore'
+
+// 在组件中使用
+const appStore = useAppStore()
+const themeStore = useThemeStore()
+const kernelStore = useKernelStore()
+
+// 使用 store 中的状态
+const isRunning = appStore.isRunning
+const isDarkTheme = themeStore.isDark
+
+// 调用 store 中的方法
+themeStore.toggleTheme()
+await kernelStore.startKernel()
+```
+
+### Store 之间的交互
+
+各个 Store 可以通过以下方式进行交互：
+
+1. **直接引用**：一个 Store 可以导入并使用另一个 Store
+
+   ```typescript
+   // 在 KernelStore 中使用 AppStore
+   import { useAppStore } from '../app/AppStore'
+
+   export const useKernelStore = defineStore('kernel', () => {
+     const appStore = useAppStore()
+
+     const startKernel = async () => {
+       // ...
+       appStore.setRunningState(true)
+     }
+   })
+   ```
+
+2. **事件总线**：使用 mitt 进行松耦合的通信
+
+   ```typescript
+   // 在一个 Store 中发送事件
+   import mitt from '@/utils/mitt'
+
+   mitt.emit('kernel-started')
+
+   // 在另一个 Store 中监听事件
+   mitt.on('kernel-started', () => {
+     // 处理内核启动事件
+   })
+   ```
+
+3. **监听状态变化**：使用 Vue 的 watch 函数监听其他 Store 的状态变化
+
+   ```typescript
+   import { watch } from 'vue'
+
+   watch(
+     () => appStore.isRunning,
+     (newValue) => {
+       // 处理运行状态变化
+     }
+   )
+   ```
 
 ### 组件开发规范
 

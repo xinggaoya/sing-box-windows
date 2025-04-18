@@ -1,5 +1,5 @@
-import { MessageType } from '@/stores/infoStore'
-import { useInfoStore } from '@/stores/infoStore'
+import { MessageType } from '@/stores/kernel/LogStore'
+import { useLogStore } from '@/stores/kernel/LogStore'
 
 /**
  * 通知服务，提供统一的消息通知功能
@@ -7,7 +7,7 @@ import { useInfoStore } from '@/stores/infoStore'
 export class NotificationService {
   private static instance: NotificationService
   private messageHandler: ((type: MessageType, content: string) => void) | null = null
-  private infoStore = useInfoStore()
+  private logStore = useLogStore()
 
   private constructor() {
     // 私有构造函数，防止外部直接创建实例
@@ -29,7 +29,7 @@ export class NotificationService {
    */
   public setMessageHandler(handler: (type: MessageType, content: string) => void): void {
     this.messageHandler = handler
-    this.infoStore.setMessageCallback(handler)
+    this.logStore.setMessageCallback(handler)
   }
 
   /**
@@ -73,8 +73,8 @@ export class NotificationService {
     if (this.messageHandler) {
       this.messageHandler(type, content)
     } else {
-      // 如果没有设置处理函数，使用InfoStore提供的默认处理
-      this.infoStore.showMessage(type, content)
+      // 如果没有设置处理函数，使用LogStore提供的默认处理
+      this.logStore.showMessage(type, content)
     }
   }
 }

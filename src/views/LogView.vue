@@ -122,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { useInfoStore } from '@/stores/infoStore'
+import { useLogStore } from '@/stores/kernel/LogStore'
 import { onMounted, ref, computed, onUnmounted, watch, nextTick } from 'vue'
 import { useMessage } from 'naive-ui'
 import { TrashOutline, CopyOutline, DownloadOutline, DocumentTextOutline } from '@vicons/ionicons5'
@@ -140,7 +140,7 @@ interface FormattedLog extends Log {
 }
 
 const message = useMessage()
-const infoStore = useInfoStore()
+const logStore = useLogStore()
 const virtualListRef = ref<VirtualListInst | null>(null)
 const autoScroll = ref(true)
 const filterType = ref<string | null>(null)
@@ -170,7 +170,7 @@ const handleVirtualScroll = (e: Event) => {
 
 // 监听日志变化
 watch(
-  () => infoStore.logs,
+  () => logStore.logs,
   async (newLogs) => {
     updateDisplayedLogs()
     if (autoScroll.value) {
@@ -198,7 +198,10 @@ watch(autoScroll, (newValue) => {
   }
 })
 
-onMounted(() => {
+onMounted(async () => {
+  // 设置日志监听器
+  await logStore.setupLogListener()
+
   updateDisplayedLogs()
   nextTick(() => {
     if (autoScroll.value) {
@@ -207,11 +210,16 @@ onMounted(() => {
   })
 })
 
+// 组件卸载时清理日志监听器
+onUnmounted(() => {
+  logStore.cleanupListeners()
+})
+
 // 计算总日志数
 const totalLogs = computed(() => {
   return filterType.value
-    ? infoStore.logs.filter((log: Log) => log.type === filterType.value).length
-    : infoStore.logs.length
+    ? logStore.logs.filter((log: Log) => log.type === filterType.value).length
+    : logStore.logs.length
 })
 
 const logTypeOptions = [
@@ -225,8 +233,8 @@ const logTypeOptions = [
 // 更新显示的日志
 const updateDisplayedLogs = () => {
   displayedLogs.value = filterType.value
-    ? infoStore.logs.filter((log) => log.type === filterType.value)
-    : infoStore.logs
+    ? logStore.logs.filter((log) => log.type === filterType.value)
+    : logStore.logs
 }
 
 // 滚动到底部
@@ -241,7 +249,7 @@ const scrollToBottom = () => {
 
 const clearLogs = () => {
   // 使用store提供的方法清空日志
-  infoStore.clearLogs()
+  logStore.clearLogs()
   displayedLogs.value = []
   message.success('日志已清空')
 }

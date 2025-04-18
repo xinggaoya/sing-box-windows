@@ -49,20 +49,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h, computed } from 'vue'
+import { ref, onMounted, onUnmounted, h, computed } from 'vue'
 import { useMessage, NTag, DataTableColumns, NSpace, NTooltip, NText } from 'naive-ui'
 import { RefreshOutline } from '@vicons/ionicons5'
-import { useInfoStore } from '@/stores/infoStore'
+import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useI18n } from 'vue-i18n'
 
 const message = useMessage()
 const loading = ref(false)
-const infoStore = useInfoStore()
+const connectionStore = useConnectionStore()
 const { t } = useI18n()
 
 // 使用计算属性来获取连接信息
-const connections = computed(() => infoStore.connections)
-const connectionsTotal = computed(() => infoStore.connectionsTotal)
+const connections = computed(() => connectionStore.connections)
+const connectionsTotal = computed(() => connectionStore.connectionsTotal)
 
 // 定义连接数据接口
 interface ConnectionMetadata {
@@ -298,11 +298,19 @@ const refreshConnections = async () => {
   }
 }
 
-onMounted(() => {
-  // 当组件挂载时，确保infoStore中的连接数据已经初始化
-  if (!connections.value.length && infoStore.uptime > 0) {
+onMounted(async () => {
+  // 当组件挂载时，确保连接数据已经初始化
+  if (!connections.value.length) {
+    // 设置连接监听器
+    await connectionStore.setupConnectionsListener()
+    await connectionStore.setupMemoryListener()
     refreshConnections()
   }
+})
+
+// 组件卸载时清理连接监听器
+onUnmounted(() => {
+  connectionStore.cleanupListeners()
 })
 </script>
 

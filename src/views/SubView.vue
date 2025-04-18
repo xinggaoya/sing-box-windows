@@ -325,7 +325,7 @@
 <script setup lang="ts">
 import { useMessage } from 'naive-ui'
 import { ref, computed } from 'vue'
-import { useSubStore } from '@/stores/SubStore'
+import { useSubStore } from '@/stores/subscription/SubStore'
 import {
   AddOutline,
   LinkOutline,

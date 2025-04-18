@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme="appStore.theme" :theme-overrides="themeOverrides">
+  <n-config-provider :theme="themeStore.theme" :theme-overrides="themeOverrides">
     <n-dialog-provider>
       <n-modal-provider>
         <n-notification-provider>
@@ -15,9 +15,12 @@
 <script setup lang="ts">
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 import { onMounted, onUnmounted, watch } from 'vue'
-import { useAppStore } from '@/stores/AppStore'
-import { useInfoStore } from '@/stores/infoStore'
-import { useTrayStore } from '@/stores/TrayStore'
+import { useAppStore } from '@/stores/app/AppStore'
+import { useThemeStore } from '@/stores/app/ThemeStore'
+import { useLocaleStore } from '@/stores/app/LocaleStore'
+import { useWindowStore } from '@/stores/app/WindowStore'
+import { useKernelStore } from '@/stores/kernel/KernelStore'
+import { useTrayStore } from '@/stores/tray/TrayStore'
 import { useRouter } from 'vue-router'
 import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
@@ -25,14 +28,17 @@ import { useI18n } from 'vue-i18n'
 
 // 初始化 store
 const appStore = useAppStore()
-const infoStore = useInfoStore()
+const themeStore = useThemeStore()
+const localeStore = useLocaleStore()
+const windowStore = useWindowStore()
+const kernelStore = useKernelStore()
 const trayStore = useTrayStore()
 const router = useRouter()
 const { locale } = useI18n()
 
 // 监听语言变化
 watch(
-  () => appStore.currentLocale,
+  () => localeStore.currentLocale,
   (newLocale) => {
     locale.value = newLocale
   },
@@ -41,41 +47,41 @@ watch(
 
 onMounted(async () => {
   // 设置窗口事件处理器
-  // appStore.setupWindowEventHandlers(router)
+  // windowStore.setupWindowEventHandlers(router)
 
   // 自己实现窗口事件处理器
   // 窗口隐藏时切换到空白页
   mitt.on('window-hide', () => {
-    appStore.windowState.lastVisiblePath = router.currentRoute.value.path
-    if (appStore.windowState.lastVisiblePath !== '/blank') {
+    windowStore.windowState.lastVisiblePath = router.currentRoute.value.path
+    if (windowStore.windowState.lastVisiblePath !== '/blank') {
       router.push('/blank')
     }
   })
 
   // 窗口显示时恢复路由
   mitt.on('window-show', () => {
-    if (router.currentRoute.value.path === '/blank' && appStore.windowState.lastVisiblePath) {
-      router.push(appStore.windowState.lastVisiblePath)
+    if (router.currentRoute.value.path === '/blank' && windowStore.windowState.lastVisiblePath) {
+      router.push(windowStore.windowState.lastVisiblePath)
     }
   })
 
   // 窗口恢复时恢复路由
   mitt.on('window-restore', () => {
-    if (router.currentRoute.value.path === '/blank' && appStore.windowState.lastVisiblePath) {
-      router.push(appStore.windowState.lastVisiblePath)
+    if (router.currentRoute.value.path === '/blank' && windowStore.windowState.lastVisiblePath) {
+      router.push(windowStore.windowState.lastVisiblePath)
     }
   })
 
   // 检查当前窗口状态
   const appWindow = Window.getCurrent()
   appWindow.isVisible().then((visible) => {
-    appStore.windowState.isVisible = visible
+    windowStore.windowState.isVisible = visible
     if (
       visible &&
       router.currentRoute.value.path === '/blank' &&
-      appStore.windowState.lastVisiblePath
+      windowStore.windowState.lastVisiblePath
     ) {
-      router.push(appStore.windowState.lastVisiblePath)
+      router.push(windowStore.windowState.lastVisiblePath)
     }
   })
 
@@ -90,27 +96,27 @@ onMounted(async () => {
   // 如果开启了自动启动内核
   if (appStore.autoStartKernel) {
     try {
-      await infoStore.startKernel()
+      await kernelStore.startKernel()
       appStore.setRunningState(true)
 
       // 判断当前是否需要隐藏窗口
       const appWindow = Window.getCurrent()
       if (!(await appWindow.isVisible())) {
-        appStore.saveRouteAndGoBlank(router)
+        windowStore.saveRouteAndGoBlank(router)
       }
     } catch (error) {
       console.error('自动启动内核失败:', error)
     }
   }
-  // 如果内核正在运行，初始化 WebSocket 连接
+  // 如果内核正在运行，初始化事件监听器
   if (appStore.isRunning) {
-    infoStore.initEventListeners()
+    kernelStore.initEventListeners()
   }
 })
 
 onUnmounted(async () => {
   // 清理事件监听
-  // appStore.cleanupWindowEvents()
+  // windowStore.cleanupWindowEvents()
   mitt.off('window-minimize')
   mitt.off('window-hide')
   mitt.off('window-show')

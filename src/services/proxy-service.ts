@@ -1,6 +1,7 @@
 import { Window } from '@tauri-apps/api/window'
-import { useAppStore } from '@/stores/AppStore'
-import { useInfoStore } from '@/stores/infoStore'
+import { useAppStore } from '@/stores/app/AppStore'
+import { useKernelStore } from '@/stores/kernel/KernelStore'
+import { useProxyStore } from '@/stores/kernel/ProxyStore'
 import { tauriApi } from './tauri-api'
 import { NotificationService } from './notification-service'
 import i18n from '@/locales'
@@ -8,7 +9,8 @@ import i18n from '@/locales'
 export class ProxyService {
   private static instance: ProxyService
   private appStore = useAppStore()
-  private infoStore = useInfoStore()
+  private kernelStore = useKernelStore()
+  private proxyStore = useProxyStore()
   private notificationService = NotificationService.getInstance()
   private t = i18n.global.t
 
@@ -76,7 +78,7 @@ export class ProxyService {
           if (showMessage) showMessage('info', this.t('home.status.restarting'))
           else this.notificationService.info(this.t('home.status.restarting'))
 
-          await this.infoStore.restartKernel()
+          await this.kernelStore.restartKernel()
 
           if (showMessage) showMessage('success', this.t('notification.kernelRestarted'))
           else this.notificationService.success(this.t('notification.kernelRestarted'))

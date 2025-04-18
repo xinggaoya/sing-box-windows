@@ -16,10 +16,10 @@
           </n-h2>
         </n-space>
         <n-space :size="16">
-          <n-button quaternary size="medium" @click="appStore.toggleTheme" class="header-button">
+          <n-button quaternary size="medium" @click="themeStore.toggleTheme" class="header-button">
             <template #icon>
               <n-icon>
-                <moon-outline v-if="appStore.isDark" />
+                <moon-outline v-if="themeStore.isDark" />
                 <sunny-outline v-else />
               </n-icon>
             </template>
@@ -27,19 +27,19 @@
           <n-button quaternary size="medium" @click="onToggleFullScreen" class="header-button">
             <template #icon>
               <n-icon>
-                <expand-outline v-if="!appStore.windowState.isFullscreen" />
+                <expand-outline v-if="!windowStore.windowState.isFullscreen" />
                 <contract-outline v-else />
               </n-icon>
             </template>
           </n-button>
-          <n-button quaternary size="medium" @click="appStore.minimizeWindow" class="header-button">
+          <n-button quaternary size="medium" @click="windowStore.minimizeWindow" class="header-button">
             <template #icon>
               <n-icon>
                 <remove-outline />
               </n-icon>
             </template>
           </n-button>
-          <n-button quaternary size="medium" @click="appStore.hideWindow" class="header-button">
+          <n-button quaternary size="medium" @click="windowStore.hideWindow" class="header-button">
             <template #icon>
               <n-icon>
                 <close-outline />
@@ -94,7 +94,7 @@
   <update-modal
     v-model:show="showUpdateModal"
     :latest-version="updateInfo.latest_version"
-    :current-version="appStore.appVersion"
+    :current-version="updateStore.appVersion"
     :download-url="updateInfo.download_url"
     @update="handleUpdate"
     @cancel="handleCancelUpdate"
@@ -123,7 +123,10 @@ import {
   LinkOutline,
 } from '@vicons/ionicons5'
 import { Window } from '@tauri-apps/api/window'
-import { useAppStore } from '@/stores/AppStore'
+import { useAppStore } from '@/stores/app/AppStore'
+import { useThemeStore } from '@/stores/app/ThemeStore'
+import { useWindowStore } from '@/stores/app/WindowStore'
+import { useUpdateStore } from '@/stores/app/UpdateStore'
 import { listen } from '@tauri-apps/api/event'
 import logo from '@/assets/icon.png'
 import UpdateModal from '@/components/UpdateModal.vue'
@@ -132,10 +135,10 @@ import { useI18n } from 'vue-i18n'
 const router = useRouter()
 const appWindow = Window.getCurrent()
 const appStore = useAppStore()
+const themeStore = useThemeStore()
+const windowStore = useWindowStore()
+const updateStore = useUpdateStore()
 const notification = useNotification()
-const osThemeRef = useOsTheme()
-const isDark = ref(osThemeRef.value === 'dark')
-const theme = ref(isDark.value ? darkTheme : null)
 const collapsed = ref(false)
 const currentMenu = ref(0)
 const isFullscreen = ref(false)
@@ -152,7 +155,7 @@ const updateInfo = ref({
 // 检查更新
 const checkUpdateWithNotification = async () => {
   try {
-    const result = await appStore.checkUpdate()
+    const result = await updateStore.checkUpdate()
     if (result?.has_update) {
       updateInfo.value = result
       showUpdateModal.value = true
@@ -165,7 +168,7 @@ const checkUpdateWithNotification = async () => {
 // 处理更新
 const handleUpdate = async (downloadUrl: string) => {
   try {
-    await appStore.downloadAndInstallUpdate()
+    await updateStore.downloadAndInstallUpdate()
   } catch (error) {
     notification.error({
       title: t('notification.updateFailed'),
@@ -181,12 +184,11 @@ const handleCancelUpdate = () => {
 }
 
 const toggleTheme = () => {
-  isDark.value = !isDark.value
-  theme.value = isDark.value ? darkTheme : null
+  themeStore.toggleTheme()
 }
 
 const onToggleFullScreen = async () => {
-  await appStore.toggleFullScreen()
+  await windowStore.toggleFullScreen()
 }
 
 const menuOptions = computed(() => [
@@ -262,7 +264,7 @@ function onSelect(key: number) {
 // 监听窗口事件
 onMounted(async () => {
   // 获取当前版本号并检查更新
-  await appStore.fetchAppVersion()
+  await updateStore.fetchAppVersion()
   await checkUpdateWithNotification()
 
   // 监听窗口显示

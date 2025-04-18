@@ -27,6 +27,9 @@ type Events = {
   'refresh-tray-menu': void
   'update-available': UpdateInfo
   'language-changed': void
+  'kernel-started': void
+  'kernel-stopped': void
+  'tray-clicked': void
   error: string
 }
 

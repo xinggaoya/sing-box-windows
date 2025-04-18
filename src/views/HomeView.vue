@@ -138,8 +138,8 @@
         <!-- 流量图表 -->
         <div class="chart-wrapper">
           <TrafficChart
-            :upload-speed="infoStore.traffic.up"
-            :download-speed="infoStore.traffic.down"
+            :upload-speed="trafficStore.traffic.up"
+            :download-speed="trafficStore.traffic.down"
           />
         </div>
       </n-space>
@@ -149,7 +149,7 @@
 
 <script setup lang="ts">
 import { useMessage, useDialog } from 'naive-ui'
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
@@ -169,9 +169,11 @@ import {
   ShieldCheckmarkOutline,
   ShieldOutline,
 } from '@vicons/ionicons5'
-import { useAppStore } from '@/stores/AppStore'
+import { useAppStore } from '@/stores/app/AppStore'
+import { useKernelStore } from '@/stores/kernel/KernelStore'
+import { useTrafficStore } from '@/stores/kernel/TrafficStore'
+import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
-import { useInfoStore } from '@/stores/infoStore'
 import { ProxyService } from '@/services/proxy-service'
 import { useI18n } from 'vue-i18n'
 import { tauriApi } from '@/services/tauri-api'
@@ -179,7 +181,9 @@ import { tauriApi } from '@/services/tauri-api'
 const message = useMessage()
 const dialog = useDialog()
 const appState = useAppStore()
-const infoStore = useInfoStore()
+const kernelStore = useKernelStore()
+const trafficStore = useTrafficStore()
+const connectionStore = useConnectionStore()
 const proxyService = ProxyService.getInstance()
 const isStarting = ref(false)
 const isStopping = ref(false)
@@ -194,41 +198,41 @@ const isRouteActive = computed(() => route.path === '/')
 // 保留计算属性的可见性检查，但简化逻辑
 const useTotalTraffic = computed(() => {
   if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
-  return formatBandwidth(infoStore.traffic.total)
+  return formatBandwidth(trafficStore.traffic.total)
 })
 
 const memoryStr = computed(() => {
   if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
-  return formatBandwidth(infoStore.memory.inuse)
+  return formatBandwidth(connectionStore.memory?.inuse || 0)
 })
 
 const trafficStr = computed(() => {
   if (!isRouteActive.value) return { up: '0 B/s', down: '0 B/s' } // 不在当前路由时不计算
   return {
-    up: formatBandwidth(Number(infoStore.traffic.up) || 0),
-    down: formatBandwidth(Number(infoStore.traffic.down) || 0),
+    up: formatBandwidth(Number(trafficStore.traffic.up) || 0),
+    down: formatBandwidth(Number(trafficStore.traffic.down) || 0),
   }
 })
 
 const uploadTotalTraffic = computed(() => {
   if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
-  return formatBandwidth(Number(infoStore.connectionsTotal.upload) || 0)
+  return formatBandwidth(Number(trafficStore.traffic.totalUp) || 0)
 })
 
 const downloadTotalTraffic = computed(() => {
   if (!isRouteActive.value) return '0 B' // 不在当前路由时不计算
-  return formatBandwidth(Number(infoStore.connectionsTotal.download) || 0)
+  return formatBandwidth(Number(trafficStore.traffic.totalDown) || 0)
 })
 
 const activeConnectionsCount = computed(() => {
   if (!isRouteActive.value) return '0'
-  return infoStore.connections.length.toString()
+  return connectionStore.connections.length.toString()
 })
 
 const formattedUptime = computed(() => {
   if (!isRouteActive.value) return '00:00:00' // 不在当前路由时不计算
 
-  const uptime = Number(infoStore.uptime) || 0
+  const uptime = Number(kernelStore.uptime) || 0
   const hours = Math.floor(uptime / 3600)
   const minutes = Math.floor((uptime % 3600) / 60)
   const seconds = Math.floor(uptime % 60)
@@ -238,7 +242,7 @@ const formattedUptime = computed(() => {
 const runKernel = async () => {
   try {
     isStarting.value = true
-    await infoStore.startKernel()
+    await kernelStore.startKernel()
     appState.setRunningState(true)
     message.success(t('notification.kernelStarted'))
   } catch (error) {
@@ -251,7 +255,7 @@ const runKernel = async () => {
 const stopKernel = async () => {
   try {
     isStopping.value = true
-    await infoStore.stopKernel()
+    await kernelStore.stopKernel()
     appState.setRunningState(false)
     message.success(t('notification.kernelStopped'))
   } catch (error) {
@@ -281,14 +285,14 @@ const onModeChange = async (value: string) => {
     // 如果内核正在运行，需要重启
     if (appState.isRunning) {
       // 先停止内核
-      await infoStore.stopKernel()
+      await kernelStore.stopKernel()
       appState.setRunningState(false)
 
       // 切换模式
       const needClose = await proxyService.switchMode(value as 'system' | 'tun', showMessage)
 
       // 重新启动内核
-      await infoStore.startKernel()
+      await kernelStore.startKernel()
       appState.setRunningState(true)
       message.success(t('notification.kernelRestarted'))
 
@@ -321,8 +325,23 @@ const checkAdminStatus = async () => {
 }
 
 onMounted(async () => {
+  // 设置流量监听器
+  await trafficStore.setupTrafficListener()
+
+  // 设置内存监听器
+  await connectionStore.setupMemoryListener()
+
   // 检查管理员权限
   await checkAdminStatus()
+})
+
+// 组件卸载时清理
+onUnmounted(() => {
+  // 清理流量监听器
+  trafficStore.cleanupListeners()
+
+  // 清理内存监听器
+  connectionStore.cleanupListeners()
 })
 </script>
 
