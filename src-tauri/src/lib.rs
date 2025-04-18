@@ -1,17 +1,22 @@
-use crate::app::kernel_service::{
+// Core services imports
+use crate::app::core::kernel_service::{
     check_kernel_version, download_latest_kernel, get_process_status, restart_kernel, start_kernel,
     start_websocket_relay, stop_kernel,
 };
-use crate::app::proxy_service::{
+use crate::app::core::proxy_service::{
     change_proxy, get_proxies, get_rules, get_version_info, set_system_proxy, set_tun_proxy,
     test_group_delay, toggle_ip_version,
 };
-use crate::app::subscription_service::{
+
+// Network services imports
+use crate::app::network::subscription_service::{
     add_manual_subscription, download_subscription, get_current_config, get_current_proxy_mode,
     toggle_proxy_mode,
 };
-use crate::app::system_service::{check_admin, restart_as_admin};
-use crate::app::update_service::{check_update, download_and_install_update};
+
+// System services imports
+use crate::app::system::system_service::{check_admin, restart_as_admin};
+use crate::app::system::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tracing_subscriber::{fmt, EnvFilter};
@@ -53,30 +58,39 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Core - Kernel service commands
             start_kernel,
-            download_latest_kernel,
-            download_subscription,
-            add_manual_subscription,
-            get_current_config,
             stop_kernel,
-            set_system_proxy,
-            set_tun_proxy,
-            check_admin,
-            restart_as_admin,
             restart_kernel,
-            toggle_ip_version,
-            check_update,
-            download_and_install_update,
+            download_latest_kernel,
             get_process_status,
             check_kernel_version,
-            toggle_proxy_mode,
-            get_current_proxy_mode,
+            start_websocket_relay,
+
+            // Core - Proxy service commands
+            set_system_proxy,
+            set_tun_proxy,
+            toggle_ip_version,
             get_proxies,
             change_proxy,
             test_group_delay,
             get_version_info,
             get_rules,
-            start_websocket_relay,
+
+            // Network - Subscription service commands
+            download_subscription,
+            add_manual_subscription,
+            get_current_config,
+            toggle_proxy_mode,
+            get_current_proxy_mode,
+
+            // System service commands
+            check_admin,
+            restart_as_admin,
+
+            // Update service commands
+            check_update,
+            download_and_install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

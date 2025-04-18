@@ -1,4 +1,4 @@
-use crate::app::constants::{messages, network};
+use crate::app::constants::{messages, network_config};
 use futures_util::StreamExt;
 use std::fs::File;
 use std::io::Write;
@@ -21,7 +21,7 @@ where
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(
-            network::HTTP_TIMEOUT_SECONDS,
+            network_config::HTTP_TIMEOUT_SECONDS,
         ))
         .no_proxy() // 禁用代理
         .build()

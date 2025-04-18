@@ -47,6 +47,8 @@ Sing-Box Windows 是一个基于 [Sing-Box](https://github.com/SagerNet/sing-box
 
 ## 项目结构
 
+项目采用模块化的目录结构，按功能划分不同的模块：
+
 ```
 sing-box-windows/
 ├── src/                # 前端源代码
@@ -75,11 +77,20 @@ sing-box-windows/
 ├── src-tauri/         # Rust 后端代码
 │   ├── src/           # 源代码
 │   │   ├── app/       # 应用服务
-│   │   │   ├── kernel_service.rs    # 内核服务
-│   │   │   ├── proxy_service.rs     # 代理服务
-│   │   │   ├── subscription_service.rs # 订阅服务
-│   │   │   ├── system_service.rs    # 系统服务
-│   │   │   └── update_service.rs    # 更新服务
+│   │   │   ├── constants/          # 常量定义
+│   │   │   │   ├── mod.rs            # 常量模块入口
+│   │   │   │   ├── core.rs           # 核心相关常量(进程、路径、配置)
+│   │   │   │   ├── network.rs        # 网络相关常量(API、网络配置)
+│   │   │   │   ├── system.rs         # 系统相关常量(注册表、数据库、JWT)
+│   │   │   │   └── common.rs         # 通用常量(消息、日志)
+│   │   │   ├── core/               # 核心服务
+│   │   │   │   ├── kernel_service.rs  # 内核服务
+│   │   │   │   └── proxy_service.rs   # 代理服务
+│   │   │   ├── network/            # 网络服务
+│   │   │   │   └── subscription_service.rs # 订阅服务
+│   │   │   └── system/             # 系统服务
+│   │   │       ├── system_service.rs  # 系统功能
+│   │   │       └── update_service.rs  # 更新功能
 │   │   ├── entity/    # 数据实体
 │   │   ├── process/   # 进程管理
 │   │   ├── utils/     # 工具函数
@@ -89,6 +100,13 @@ sing-box-windows/
 │   └── Cargo.toml     # Rust 依赖配置
 └── package.json       # 项目配置
 ```
+
+这种模块化的结构有以下优点：
+
+1. **功能划分清晰**：按功能将代码划分为核心、网络、系统等模块
+2. **易于维护**：相关功能集中在一起，便于定位和修改
+3. **降低耦合度**：每个模块都有明确的职责和边界
+4. **方便扩展**：添加新功能时可以在相应模块中扩展，不影响其他模块
 
 ## 开发环境搭建
 
@@ -142,7 +160,31 @@ sing-box-windows/
 
 ## 核心功能模块
 
-### 内核管理 (kernel_service.rs)
+### 常量组织 (constants/)
+
+应用常量按功能模块分类组织，便于维护和扩展：
+
+- `constants/core.rs` - 核心相关常量
+  - `process` - 进程管理相关常量
+  - `paths` - 文件路径相关常量
+  - `config` - 配置相关常量
+
+- `constants/network.rs` - 网络相关常量
+  - `network_config` - 网络配置常量
+  - `api` - API相关常量
+  - `server` - 服务器相关常量
+  - `rate_limit` - 速率限制常量
+
+- `constants/system.rs` - 系统相关常量
+  - `registry` - 注册表相关常量
+  - `database` - 数据库相关常量
+  - `jwt` - JWT认证相关常量
+
+- `constants/common.rs` - 通用常量
+  - `messages` - 提示消息常量
+  - `log` - 日志相关常量
+
+### 内核管理 (core/kernel_service.rs)
 
 负责 Sing-Box 内核的下载、启动、停止和版本管理：
 
@@ -152,7 +194,7 @@ sing-box-windows/
 - `restart_kernel`：重启内核服务
 - `check_kernel_version`：检查内核版本
 
-### 代理服务 (proxy_service.rs)
+### 代理服务 (core/proxy_service.rs)
 
 管理代理设置和节点选择：
 
@@ -163,7 +205,7 @@ sing-box-windows/
 - `change_proxy`：切换使用的代理节点
 - `test_node_delay`：测试节点延迟
 
-### 订阅服务 (subscription_service.rs)
+### 订阅服务 (network/subscription_service.rs)
 
 处理代理订阅的添加、更新和管理：
 
@@ -171,14 +213,14 @@ sing-box-windows/
 - `add_manual_subscription`：手动添加订阅
 - `get_current_config`：获取当前配置
 
-### 系统服务 (system_service.rs)
+### 系统服务 (system/system_service.rs)
 
 处理与操作系统相关的功能：
 
 - `check_admin`：检查管理员权限
 - `restart_as_admin`：以管理员身份重启
 
-### 更新服务 (update_service.rs)
+### 更新服务 (system/update_service.rs)
 
 处理应用程序的更新：
 
@@ -452,33 +494,90 @@ await kernelStore.startKernel()
 
 ## 后端开发指南
 
+### 使用常量
+
+项目中的常量已经按功能模块分类组织，使用时需要注意导入正确的模块：
+
+```rust
+// 导入常量模块
+use crate::app::constants::{messages, network_config, paths, process};
+
+// 使用常量
+fn example() {
+    // 使用进程相关常量
+    let flags = process::CREATE_NO_WINDOW;
+
+    // 使用路径相关常量
+    let config_path = paths::get_config_path();
+
+    // 使用网络相关常量
+    let api_port = network_config::DEFAULT_CLASH_API_PORT;
+
+    // 使用消息常量
+    println!("{}", messages::INFO_PROCESS_STARTED);
+}
+```
+
+添加新常量时，应该将其添加到相应的模块中，而不是直接在代码中使用硬编码值。
+
 ### 命令注册
 
 所有前端可调用的后端命令在 `src-tauri/src/lib.rs` 的 `run()` 函数中通过 `invoke_handler` 注册：
 
 ```rust
 .invoke_handler(tauri::generate_handler![
+    // Core - Kernel service commands
     start_kernel,
+    stop_kernel,
+    restart_kernel,
     download_latest_kernel,
+
+    // Network - Subscription service commands
+    download_subscription,
+    add_manual_subscription,
+
     // 其他命令...
 ])
 ```
 
+### 模块组织
+
+项目采用模块化的组织结构，每个模块都有自己的 `mod.rs` 文件作为入口点：
+
+1. **模块入口文件**：
+   - `app/mod.rs` - 应用模块入口，定义子模块并重导出常用组件
+   - `app/core/mod.rs` - 核心服务模块入口
+   - `app/network/mod.rs` - 网络服务模块入口
+   - `app/system/mod.rs` - 系统服务模块入口
+   - `app/constants/mod.rs` - 常量模块入口
+
+2. **重导出机制**：
+   - 每个模块的 `mod.rs` 文件会重新导出其子模块中的重要组件
+   - 这样可以简化导入路径，例如使用 `crate::app::core::kernel_service` 而不是完整路径
+
+3. **向后兼容性**：
+   - `app/mod.rs` 中的重导出确保了代码重构不会破坏现有的导入路径
+   - 例如：`pub use core::kernel_service;` 允许使用 `crate::app::kernel_service` 而不是新路径
+
 ### 新增功能开发流程
 
 1. 在相应的服务模块中定义函数
-2. 在 `lib.rs` 中导入并注册该函数
-3. 在前端通过 `invoke` 调用该函数
+2. 在模块的 `mod.rs` 中重导出该函数（如果需要在其他模块中使用）
+3. 在 `lib.rs` 中导入并注册该函数
+4. 在前端通过 `invoke` 调用该函数
 
 示例：
 
 ```rust
-// 在 kernel_service.rs 中
+// 在 app/core/kernel_service.rs 中
 #[tauri::command]
 pub async fn my_new_function(param: String) -> Result<String, String> {
     // 实现逻辑
     Ok("成功".to_string())
 }
+
+// 在 app/core/mod.rs 中确保导出该函数
+pub use kernel_service::my_new_function;
 
 // 在 lib.rs 中注册
 .invoke_handler(tauri::generate_handler![
