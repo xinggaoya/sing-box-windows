@@ -37,7 +37,7 @@ export const useTrayStore = defineStore(
     const proxyService = ProxyService.getInstance()
 
     // 添加一个内部状态，记录上次菜单刷新时的代理模式
-    const lastProxyMode = ref<'system' | 'tun'>(appStore.proxyMode)
+    const lastProxyMode = ref<'system' | 'tun' | 'manual'>(appStore.proxyMode)
 
     // 只存储托盘ID，不存储实例
     const trayInstanceId = ref<string | null>(null)
@@ -53,7 +53,11 @@ export const useTrayStore = defineStore(
         try {
           const status = appStore.isRunning ? t('home.status.running') : t('home.status.stopped')
           const mode =
-            appStore.proxyMode === 'system' ? t('home.proxyMode.system') : t('home.proxyMode.tun')
+            appStore.proxyMode === 'system' 
+              ? t('home.proxyMode.system') 
+              : (appStore.proxyMode === 'manual'
+                ? t('home.proxyMode.manual')
+                : t('home.proxyMode.tun'))
 
           // 获取当前使用的配置名称
           let configName = ''
@@ -193,10 +197,34 @@ export const useTrayStore = defineStore(
           },
         })
 
+        // 手动模式菜单项
+        const manualProxyMenuItem = await MenuItem.new({
+          id: 'manual_mode',
+          text: t('home.proxyMode.manual'),
+          // 当前为手动模式时禁用按钮
+          enabled: currentProxyMode !== 'manual',
+          action: async () => {
+            try {
+              await proxyService.switchMode('manual')
+              appStore.proxyMode = 'manual'
+              // 强制立即刷新菜单
+              await refreshTrayMenu()
+            } catch (error) {
+              console.error('切换到手动模式失败:', error)
+            }
+          },
+        })
+
         // 当前模式指示器菜单项（仅作为标签，不可点击）
         const currentModeMenuItem = await MenuItem.new({
           id: 'current_mode',
-          text: `${t('proxy.currentMode')} ${currentProxyMode === 'system' ? t('home.proxyMode.system') : t('home.proxyMode.tun')}`,
+          text: `${t('proxy.currentMode')} ${
+            currentProxyMode === 'system' 
+              ? t('home.proxyMode.system') 
+              : (currentProxyMode === 'manual' 
+                ? t('home.proxyMode.manual') 
+                : t('home.proxyMode.tun'))
+          }`,
           enabled: false,
         })
 
@@ -204,7 +232,7 @@ export const useTrayStore = defineStore(
         const proxyModeSubmenu = await Submenu.new({
           id: 'proxy_mode',
           text: t('home.switchMode'),
-          items: [currentModeMenuItem, systemProxyMenuItem, tunProxyMenuItem],
+          items: [currentModeMenuItem, systemProxyMenuItem, tunProxyMenuItem, manualProxyMenuItem],
         })
 
         // 创建退出菜单项
