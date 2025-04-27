@@ -39,6 +39,10 @@ export default {
       admin: '管理员',
       normal: '普通用户',
     },
+    wsStatus: {
+      connected: '已连接',
+      disconnected: '未连接',
+    },
     switchMode: '切换模式',
     start: '启动',
     stop: '停止',

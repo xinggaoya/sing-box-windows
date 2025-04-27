@@ -212,7 +212,7 @@ export const useTrayStore = defineStore(
           id: 'quit',
           text: t('tray.quit'),
           action: async () => {
-            await kernelStore.stopKernel()
+            kernelStore.stopKernel()
             const appWindow = Window.getCurrent()
             await appWindow.close()
           },

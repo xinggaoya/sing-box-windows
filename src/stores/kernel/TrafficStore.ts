@@ -179,17 +179,33 @@ export const useTrafficStore = defineStore(
     // 更新流量统计数据
     const updateTrafficStats = (data: TrafficData) => {
       if (data && 'up' in data && 'down' in data) {
-        // 更新当前速率
-        traffic.value.up = data.up
-        traffic.value.down = data.down
-        
-        // 更新总流量
-        traffic.value.totalUp += data.up
-        traffic.value.totalDown += data.down
-        traffic.value.total = traffic.value.totalUp + traffic.value.totalDown
-        
-        // 更新最后更新时间
-        traffic.value.lastUpdated = Date.now()
+        try {
+          // 优化数据处理：确保是数值类型，避免格式错误
+          const upValue = Number(data.up) || 0;
+          const downValue = Number(data.down) || 0;
+          
+          // 更新当前速率
+          traffic.value.up = upValue;
+          traffic.value.down = downValue;
+          
+          // 更新总流量
+          traffic.value.totalUp += upValue;
+          traffic.value.totalDown += downValue;
+          traffic.value.total = traffic.value.totalUp + traffic.value.totalDown;
+          
+          // 更新最后更新时间
+          traffic.value.lastUpdated = Date.now();
+          
+          // 如果数据接收正常，但当前状态不是连接状态，更新状态
+          if (!connectionState.value.connected) {
+            connectionState.value.connected = true;
+            connectionState.value.connecting = false;
+            connectionState.value.error = null;
+          }
+          
+        } catch (error) {
+          console.error('处理流量数据时出错:', error, data);
+        }
       }
     }
 

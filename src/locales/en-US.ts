@@ -39,6 +39,10 @@ export default {
       admin: 'Administrator',
       normal: 'Normal User',
     },
+    wsStatus: {
+      connected: 'Connected',
+      disconnected: 'Disconnected',
+    },
     switchMode: 'Switch Mode',
     start: 'Start',
     stop: 'Stop',

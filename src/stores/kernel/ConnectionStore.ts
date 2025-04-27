@@ -318,10 +318,25 @@ export const useConnectionStore = defineStore(
     // 更新连接数据
     const updateConnections = (data: ConnectionsData) => {
       if (data && 'connections' in data) {
-        connections.value = data.connections || []
-        connectionsTotal.value = {
-          upload: data.uploadTotal || 0,
-          download: data.downloadTotal || 0,
+        try {
+          // 更新连接列表
+          connections.value = data.connections || [];
+          
+          // 更新统计数据，确保是数值
+          connectionsTotal.value = {
+            upload: Number(data.uploadTotal) || 0,
+            download: Number(data.downloadTotal) || 0,
+          };
+          
+          // 如果数据接收正常，但当前状态不是连接状态，更新状态
+          if (!connectionsState.value.connected) {
+            connectionsState.value.connected = true;
+            connectionsState.value.connecting = false;
+            connectionsState.value.error = null;
+          }
+          
+        } catch (error) {
+          console.error('处理连接数据时出错:', error, data);
         }
       }
     }
@@ -329,9 +344,26 @@ export const useConnectionStore = defineStore(
     // 更新内存数据
     const updateMemory = (data: { inuse: number; oslimit: number }) => {
       if ('inuse' in data && 'oslimit' in data) {
-        memory.value = {
-          ...data,
-          lastUpdated: Date.now() // 更新时间戳
+        try {
+          // 确保数据是数值类型
+          const inuse = Number(data.inuse) || 0;
+          const oslimit = Number(data.oslimit) || 0;
+          
+          memory.value = {
+            inuse,
+            oslimit,
+            lastUpdated: Date.now() // 更新时间戳
+          };
+          
+          // 如果数据接收正常，但当前状态不是连接状态，更新状态
+          if (!memoryState.value.connected) {
+            memoryState.value.connected = true;
+            memoryState.value.connecting = false;
+            memoryState.value.error = null;
+          }
+          
+        } catch (error) {
+          console.error('处理内存数据时出错:', error, data);
         }
       }
     }

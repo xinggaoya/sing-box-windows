@@ -35,6 +35,14 @@ export default {
       system: 'システムプロキシ',
       tun: 'TUNモード',
     },
+    adminStatus: {
+      admin: '管理者',
+      normal: '一般ユーザー',
+    },
+    wsStatus: {
+      connected: '接続済み',
+      disconnected: '未接続',
+    },
     switchMode: 'モード切替',
     start: '開始',
     stop: '停止',

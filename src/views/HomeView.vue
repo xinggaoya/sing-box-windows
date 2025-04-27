@@ -44,6 +44,20 @@
               </template>
               {{ isAdmin ? t('home.adminStatus.admin') : t('home.adminStatus.normal') }}
             </n-tag>
+            <n-tag
+              :bordered="false"
+              :type="appState.wsConnected ? 'success' : 'error'"
+              size="medium"
+              class="ws-tag"
+            >
+              <template #icon>
+                <n-icon size="16">
+                  <wifi-outline v-if="appState.wsConnected" />
+                  <close-circle-outline v-else />
+                </n-icon>
+              </template>
+              {{ appState.wsConnected ? t('home.wsStatus.connected') : t('home.wsStatus.disconnected') }}
+            </n-tag>
           </n-space>
           <n-space :size="16">
             <n-button
@@ -168,6 +182,8 @@ import {
   GitNetworkOutline,
   ShieldCheckmarkOutline,
   ShieldOutline,
+  WifiOutline,
+  CloseCircleOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -414,6 +430,7 @@ onUnmounted(() => {
   // 清理连接监听器
   connectionStore.cleanupListeners()
 })
+
 </script>
 
 <style scoped>
@@ -503,6 +520,16 @@ onUnmounted(() => {
 }
 
 .admin-tag {
+  padding: 0 12px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.ws-tag {
   padding: 0 12px;
   height: 30px;
   display: flex;

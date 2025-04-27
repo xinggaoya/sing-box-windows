@@ -41,6 +41,8 @@ export type Events = {
   'memory-connection-state': ConnectionState
   'connections-connection-state': ConnectionState
   'logs-connection-state': ConnectionState
+  'ws-connected': void  // 添加WebSocket连接成功事件
+  'ws-disconnected': void  // 添加WebSocket连接断开事件
   
   // WebSocket 数据事件
   'traffic-data': any
