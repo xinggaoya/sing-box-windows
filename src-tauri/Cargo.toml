@@ -42,3 +42,4 @@ serde = { version = "1.0.214", features = ["derive"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
+tauri-plugin-websocket = "2"

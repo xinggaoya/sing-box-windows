@@ -6,6 +6,7 @@ import { useAppStore } from '../app/AppStore'
 import { useConnectionStore } from './ConnectionStore'
 import { useTrafficStore } from './TrafficStore'
 import { useLogStore } from './LogStore'
+import { WebSocketService } from '@/services/websocket-service'
 
 // 定义版本信息接口
 export interface VersionInfo {
@@ -93,15 +94,22 @@ export const useKernelStore = defineStore(
         // 启动内核
         await tauriApi.kernel.startKernel()
 
+        // 设置 WebSocket 连接 token
+        const token = await tauriApi.proxy.getApiToken();
+        const wsService = WebSocketService.getInstance();
+        wsService.setToken(token);
+
+        // 短暂延迟，等待内核和API服务启动
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // 尝试建立所有 WebSocket 连接
+        const allConnected = await wsService.checkAllConnections();
+        if (!allConnected) {
+          console.warn('部分 WebSocket 连接失败，但仍会继续运行');
+        }
+
         // 设置运行状态
         appStore.setRunningState(true)
-
-        // 启动后端的WebSocket中继
-        try {
-          await tauriApi.kernel.startWebsocketRelay()
-        } catch (error) {
-          console.error('启动WebSocket中继失败:', error)
-        }
 
         // 通知内核状态变更
         mitt.emit('kernel-started')
@@ -120,17 +128,29 @@ export const useKernelStore = defineStore(
         clearTimers()
         cleanupEventListeners()
 
+        // 断开所有 WebSocket 连接
+        const wsService = WebSocketService.getInstance();
+        await wsService.disconnectAll();
+
         // 停止内核
         await tauriApi.kernel.stopKernel()
 
         // 设置运行状态
         appStore.setRunningState(false)
 
-        // 通知内核状态变更
-        mitt.emit('kernel-stopped')
-
+        // 重置所有相关数据
+        const connectionStore = useConnectionStore()
+        const trafficStore = useTrafficStore()
+        
         // 重置内存使用信息
         memory.value = { inuse: 0, oslimit: 0 }
+        
+        // 重置数据
+        connectionStore.resetData()
+        trafficStore.resetStats()
+        
+        // 通知内核状态变更
+        mitt.emit('kernel-stopped')
 
         return true
       } catch (error) {

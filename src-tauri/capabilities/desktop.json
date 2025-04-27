@@ -7,6 +7,7 @@
   ],
   "permissions": [
     "autostart:default",
-    "window-state:default"
+    "window-state:default",
+    "websocket:default"
   ]
 }

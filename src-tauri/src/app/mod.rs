@@ -26,11 +26,11 @@ pub use system::system_service;
 pub use system::update_service;
 
 // Re-export constants for backward compatibility
-pub use constants::core::process;
-pub use constants::core::paths;
-pub use constants::core::config;
-pub use constants::network::network_config;
-pub use constants::network::api;
-pub use constants::system::registry;
-pub use constants::common::messages;
 pub use constants::common::log;
+pub use constants::common::messages;
+pub use constants::core::config;
+pub use constants::core::paths;
+pub use constants::core::process;
+pub use constants::network::api;
+pub use constants::network::network_config;
+pub use constants::system::registry;

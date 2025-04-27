@@ -149,7 +149,7 @@
 
 <script setup lang="ts">
 import { useMessage, useDialog } from 'naive-ui'
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
@@ -194,6 +194,10 @@ const isAdmin = ref(false)
 // 监听路由可见性变化，简化为只用于计算属性的控制
 const route = useRoute()
 const isRouteActive = computed(() => route.path === '/')
+
+// 添加加载状态
+const isTrafficLoading = ref(false)
+const isConnectionLoading = ref(false)
 
 // 保留计算属性的可见性检查，但简化逻辑
 const useTotalTraffic = computed(() => {
@@ -324,15 +328,82 @@ const checkAdminStatus = async () => {
   }
 }
 
-onMounted(async () => {
-  // 设置流量监听器
-  await trafficStore.setupTrafficListener()
+// 在路由可见时重新设置监听
+const setupListeners = async () => {
+  try {
+    if (appState.isRunning) {
+      console.log("HomeView: 尝试设置监听器")
+      
+      // 清理之前的监听器，确保没有重复监听
+      trafficStore.cleanupListeners()
+      connectionStore.cleanupListeners()
+      
+      // 设置监听器，添加等待确保setup完成
+      isTrafficLoading.value = true
+      isConnectionLoading.value = true
+      
+      // 使用Promise.all同时设置两个监听器
+      await Promise.all([
+        trafficStore.setupTrafficListener(),
+        connectionStore.setupConnectionsListener(),
+        connectionStore.setupMemoryListener()
+      ]).catch(e => {
+        console.error("HomeView: 设置监听器失败", e)
+        // 尝试重试一次
+        return new Promise(resolve => {
+          setTimeout(async () => {
+            try {
+              await trafficStore.setupTrafficListener()
+              await connectionStore.setupConnectionsListener()
+              await connectionStore.setupMemoryListener()
+              resolve(true)
+            } catch (retryError) {
+              console.error("HomeView: 重试设置监听器失败", retryError)
+              resolve(false)
+            }
+          }, 1000)
+        })
+      })
+      
+      isTrafficLoading.value = false
+      isConnectionLoading.value = false
+      console.log("HomeView: 监听器设置完成")
+    }
+  } catch (error) {
+    console.error('HomeView: 设置监听器失败:', error)
+    isTrafficLoading.value = false
+    isConnectionLoading.value = false
+  }
+}
 
-  // 设置内存监听器
-  await connectionStore.setupMemoryListener()
+onMounted(async () => {
+  // 设置监听器
+  await setupListeners()
 
   // 检查管理员权限
   await checkAdminStatus()
+  
+  // 监听路由变化，当返回到主页时重新设置监听器
+  watch(isRouteActive, (isActive) => {
+    if (isActive && appState.isRunning) {
+      setupListeners()
+    } else if (!isActive) {
+      // 不在当前页面时清理监听器，减少资源占用
+      trafficStore.cleanupListeners()
+      connectionStore.cleanupListeners()
+    }
+  })
+  
+  // 监听内核状态变化
+  watch(() => appState.isRunning, (isRunning) => {
+    if (isRunning && isRouteActive.value) {
+      setupListeners()
+    } else if (!isRunning) {
+      // 内核停止时清理监听器
+      trafficStore.cleanupListeners()
+      connectionStore.cleanupListeners()
+    }
+  })
 })
 
 // 组件卸载时清理
@@ -340,7 +411,7 @@ onUnmounted(() => {
   // 清理流量监听器
   trafficStore.cleanupListeners()
 
-  // 清理内存监听器
+  // 清理连接监听器
   connectionStore.cleanupListeners()
 })
 </script>

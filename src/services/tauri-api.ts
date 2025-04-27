@@ -90,6 +90,9 @@ export const proxyApi = {
   // 获取规则列表
   getRules: () =>
     invoke<{ rules: Array<{ type: string; payload: string; proxy: string }> }>('get_rules'),
+
+  // 获取API令牌
+  getApiToken: () => invoke<string>('get_api_token'),
 }
 
 // 订阅相关接口

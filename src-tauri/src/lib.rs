@@ -31,6 +31,7 @@ pub fn run() {
     fmt().with_env_filter(EnvFilter::from_default_env()).init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             let _ = show_window(app);
         }))
@@ -66,7 +67,6 @@ pub fn run() {
             get_process_status,
             check_kernel_version,
             start_websocket_relay,
-
             // Core - Proxy service commands
             set_system_proxy,
             set_tun_proxy,
@@ -76,18 +76,15 @@ pub fn run() {
             test_group_delay,
             get_version_info,
             get_rules,
-
             // Network - Subscription service commands
             download_subscription,
             add_manual_subscription,
             get_current_config,
             toggle_proxy_mode,
             get_current_proxy_mode,
-
             // System service commands
             check_admin,
             restart_as_admin,
-
             // Update service commands
             check_update,
             download_and_install_update,

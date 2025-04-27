@@ -261,6 +261,7 @@ pub async fn start_websocket_relay<R: Runtime>(window: Window<R>) -> Result<(), 
 /// 启动流量数据中继
 async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
     let window_clone = window.clone();
+    let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
     let token = crate::app::proxy_service::get_api_token();
 
@@ -275,6 +276,11 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
 
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
+                // 连接成功，发送通知
+                let _ = window_for_error.emit("traffic-connection", json!({
+                    "status": "connected"
+                }));
+                
                 let (mut _write, mut read) = ws_stream.split();
 
                 // 持续读取WebSocket消息
@@ -285,9 +291,22 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
                                 let _ = tx.send(data).await;
                             }
                         }
-                        Ok(Message::Close(_)) => break,
+                        Ok(Message::Close(_)) => {
+                            error!("WebSocket流量连接关闭");
+                            // 发送连接关闭通知
+                            let _ = window_for_error.emit("traffic-connection", json!({
+                                "status": "closed",
+                                "error": "WebSocket连接已关闭"
+                            }));
+                            break;
+                        }
                         Err(e) => {
                             error!("WebSocket流量数据读取错误: {}", e);
+                            // 发送错误通知
+                            let _ = window_for_error.emit("traffic-connection", json!({
+                                "status": "error",
+                                "error": format!("数据读取错误: {}", e)
+                            }));
                             break;
                         }
                         _ => {}
@@ -296,6 +315,11 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
             }
             Err(e) => {
                 error!("WebSocket流量连接失败: {}", e);
+                // 发送连接失败通知
+                let _ = window_for_error.emit("traffic-connection", json!({
+                    "status": "failed",
+                    "error": format!("连接失败: {}", e)
+                }));
             }
         }
     });
@@ -313,6 +337,7 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
 /// 启动内存数据中继
 async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
     let window_clone = window.clone();
+    let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
     let token = crate::app::proxy_service::get_api_token();
 
@@ -327,6 +352,11 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
 
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
+                // 连接成功，发送通知
+                let _ = window_for_error.emit("memory-connection", json!({
+                    "status": "connected"
+                }));
+                
                 let (mut _write, mut read) = ws_stream.split();
 
                 // 持续读取WebSocket消息
@@ -337,9 +367,22 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
                                 let _ = tx.send(data).await;
                             }
                         }
-                        Ok(Message::Close(_)) => break,
+                        Ok(Message::Close(_)) => {
+                            error!("WebSocket内存连接关闭");
+                            // 发送连接关闭通知
+                            let _ = window_for_error.emit("memory-connection", json!({
+                                "status": "closed",
+                                "error": "WebSocket连接已关闭"
+                            }));
+                            break;
+                        }
                         Err(e) => {
                             error!("WebSocket内存数据读取错误: {}", e);
+                            // 发送错误通知
+                            let _ = window_for_error.emit("memory-connection", json!({
+                                "status": "error",
+                                "error": format!("数据读取错误: {}", e)
+                            }));
                             break;
                         }
                         _ => {}
@@ -348,6 +391,11 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
             }
             Err(e) => {
                 error!("WebSocket内存连接失败: {}", e);
+                // 发送连接失败通知
+                let _ = window_for_error.emit("memory-connection", json!({
+                    "status": "failed",
+                    "error": format!("连接失败: {}", e)
+                }));
             }
         }
     });
@@ -365,6 +413,7 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
 /// 启动日志数据中继
 async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
     let window_clone = window.clone();
+    let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
     let token = crate::app::proxy_service::get_api_token();
 
@@ -379,6 +428,11 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
 
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
+                // 连接成功，发送通知
+                let _ = window_for_error.emit("logs-connection", json!({
+                    "status": "connected"
+                }));
+                
                 let (mut _write, mut read) = ws_stream.split();
 
                 // 持续读取WebSocket消息
@@ -389,9 +443,22 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
                                 let _ = tx.send(data).await;
                             }
                         }
-                        Ok(Message::Close(_)) => break,
+                        Ok(Message::Close(_)) => {
+                            error!("WebSocket日志连接关闭");
+                            // 发送连接关闭通知
+                            let _ = window_for_error.emit("logs-connection", json!({
+                                "status": "closed",
+                                "error": "WebSocket连接已关闭"
+                            }));
+                            break;
+                        }
                         Err(e) => {
                             error!("WebSocket日志数据读取错误: {}", e);
+                            // 发送错误通知
+                            let _ = window_for_error.emit("logs-connection", json!({
+                                "status": "error",
+                                "error": format!("数据读取错误: {}", e)
+                            }));
                             break;
                         }
                         _ => {}
@@ -400,6 +467,11 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
             }
             Err(e) => {
                 error!("WebSocket日志连接失败: {}", e);
+                // 发送连接失败通知
+                let _ = window_for_error.emit("logs-connection", json!({
+                    "status": "failed",
+                    "error": format!("连接失败: {}", e)
+                }));
             }
         }
     });
@@ -417,6 +489,7 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
 /// 启动连接数据中继
 async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
     let window_clone = window.clone();
+    let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
     let token = crate::app::proxy_service::get_api_token();
 
@@ -431,6 +504,11 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
 
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
+                // 连接成功，发送通知
+                let _ = window_for_error.emit("connections-connection", json!({
+                    "status": "connected"
+                }));
+                
                 let (mut _write, mut read) = ws_stream.split();
 
                 // 持续读取WebSocket消息
@@ -441,9 +519,22 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
                                 let _ = tx.send(data).await;
                             }
                         }
-                        Ok(Message::Close(_)) => break,
+                        Ok(Message::Close(_)) => {
+                            error!("WebSocket连接数据连接关闭");
+                            // 发送连接关闭通知
+                            let _ = window_for_error.emit("connections-connection", json!({
+                                "status": "closed",
+                                "error": "WebSocket连接已关闭"
+                            }));
+                            break;
+                        }
                         Err(e) => {
                             error!("WebSocket连接数据读取错误: {}", e);
+                            // 发送错误通知
+                            let _ = window_for_error.emit("connections-connection", json!({
+                                "status": "error",
+                                "error": format!("数据读取错误: {}", e)
+                            }));
                             break;
                         }
                         _ => {}
@@ -452,6 +543,11 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
             }
             Err(e) => {
                 error!("WebSocket连接数据连接失败: {}", e);
+                // 发送连接失败通知
+                let _ = window_for_error.emit("connections-connection", json!({
+                    "status": "failed",
+                    "error": format!("连接失败: {}", e)
+                }));
             }
         }
     });

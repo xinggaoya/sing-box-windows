@@ -19,6 +19,7 @@
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
-    "core:window:allow-set-focus"
+    "core:window:allow-set-focus",
+    "websocket:default"
   ]
 }
