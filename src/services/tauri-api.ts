@@ -93,6 +93,9 @@ export const proxyApi = {
 
   // 获取API令牌
   getApiToken: () => invoke<string>('get_api_token'),
+
+  // 设置手动代理
+  setManualProxy: () => invoke<void>('set_manual_proxy'),
 }
 
 // 订阅相关接口

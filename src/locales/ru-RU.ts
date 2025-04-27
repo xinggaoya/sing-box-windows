@@ -34,6 +34,10 @@ export default {
     proxyMode: {
       system: 'Системный прокси',
       tun: 'TUN режим',
+      manual: 'Ручной режим',
+      systemTip: 'Автоматически настраивать системный прокси',
+      tunTip: 'Использовать TUN виртуальную сетевую карту для проксирования всего трафика, требуются права администратора',
+      manualTip: 'Требуется ручная настройка системного прокси'
     },
     adminStatus: {
       admin: 'Администратор',
@@ -47,6 +51,7 @@ export default {
     start: 'Старт',
     stop: 'Стоп',
     restart: 'Перезапуск',
+    restartAsAdmin: 'Перезапуск от администратора',
     traffic: {
       uploadSpeed: 'Скорость загрузки',
       downloadSpeed: 'Скорость скачивания',
@@ -309,8 +314,12 @@ export default {
     kernelStarted: 'Ядро запущено',
     kernelStopped: 'Ядро остановлено',
     kernelRestarted: 'Ядро перезапущено',
+    restartingAsAdmin: 'Перезапуск с правами администратора...',
     updateAvailable: 'Доступна новая версия',
     updateDownloaded: 'Обновление загружено, скоро будет установлено',
     updateFailed: 'Обновление не удалось',
+    systemProxyEnabled: 'Системный прокси включен',
+    manualProxyEnabled: 'Ручной режим прокси включен, требуется настроить системный прокси вручную',
+    tunProxyEnabled: 'TUN режим включен',
   },
 }

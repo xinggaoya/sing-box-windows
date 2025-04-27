@@ -44,6 +44,41 @@ pub fn set_system_proxy() -> Result<(), String> {
     }
 }
 
+// 设置手动代理模式（不自动设置系统代理）
+#[tauri::command]
+pub fn set_manual_proxy() -> Result<(), String> {
+    let config_path = paths::get_config_path();
+    let json_util = ConfigUtil::new(config_path.to_str().unwrap())
+        .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
+
+    let mut json_util = json_util;
+    let target_keys = vec!["inbounds"];
+    let new_structs = vec![config_model::Inbound {
+        r#type: config::DEFAULT_INBOUND_TYPE.to_string(),
+        tag: config::DEFAULT_INBOUND_TAG.to_string(),
+        listen: Some(network_config::DEFAULT_LISTEN_ADDRESS.to_string()),
+        listen_port: Some(network_config::DEFAULT_PROXY_PORT),
+        address: None,
+        auto_route: None,
+        strict_route: None,
+        stack: None,
+        sniff: None,
+        set_system_proxy: Some(false),
+    }];
+
+    json_util.update_key(
+        target_keys.clone(),
+        serde_json::to_value(new_structs).unwrap(),
+    );
+    match json_util.save_to_file() {
+        Ok(_) => {
+            info!("手动代理模式已启用，需要手动设置系统代理");
+            Ok(())
+        }
+        Err(e) => Err(format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e)),
+    }
+}
+
 // 修改TUN 模式为代理模式
 #[tauri::command]
 pub fn set_tun_proxy() -> Result<(), String> {

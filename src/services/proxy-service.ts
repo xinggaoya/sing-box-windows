@@ -26,74 +26,71 @@ export class ProxyService {
   /**
    * 切换代理模式
    * @param mode 代理模式
-   * @param showMessage 消息提示函数（可选）
-   * @returns 是否需要关闭窗口
+   * @param messageCallback 消息回调
+   * @returns 是否需要关闭应用（重启管理员）
    */
   public async switchMode(
-    mode: 'system' | 'tun',
-    showMessage?: (type: 'success' | 'info' | 'error', content: string) => void,
+    mode: 'system' | 'tun' | 'manual',
+    messageCallback?: (type: 'success' | 'info' | 'error', content: string) => void
   ): Promise<boolean> {
     try {
+      // 检查管理员权限
+      const isAdmin = await tauriApi.system.checkAdmin()
+
+      if (mode === 'tun' && !isAdmin) {
+        // TUN模式必须以管理员权限运行
+        if (messageCallback) {
+          messageCallback('info', '正在以管理员身份重启...')
+        }
+        await tauriApi.system.restartAsAdmin()
+        return true // 需要关闭当前应用
+      }
+
+      // 根据模式设置代理
       if (mode === 'system') {
         await tauriApi.proxy.setSystemProxy()
         this.appStore.proxyMode = 'system'
-        if (showMessage)
-          showMessage(
-            'success',
-            this.t('proxy.modeChangeSuccess', { mode: this.t('proxy.mode.global') }),
-          )
-        else
-          this.notificationService.success(
-            this.t('proxy.modeChangeSuccess', { mode: this.t('proxy.mode.global') }),
-          )
-      } else {
-        // TUN模式需要管理员权限
-        const isAdmin = await tauriApi.proxy.checkAdmin()
-        if (!isAdmin) {
-          try {
-            await tauriApi.proxy.restartAsAdmin()
-            return true // 需要关闭窗口
-          } catch (error) {
-            if (showMessage) showMessage('error', this.t('proxy.modeChangeError'))
-            else this.notificationService.error(this.t('proxy.modeChangeError'))
-            return false
-          }
+        if (messageCallback) {
+          messageCallback('success', '系统代理模式已启用')
         }
+      } else if (mode === 'manual') {
+        await tauriApi.proxy.setManualProxy()
+        this.appStore.proxyMode = 'manual'
+        if (messageCallback) {
+          messageCallback('info', '手动代理模式已启用，请手动设置系统代理')
+        }
+      } else {
+        // TUN模式
         await tauriApi.proxy.setTunProxy()
         this.appStore.proxyMode = 'tun'
-        if (showMessage)
-          showMessage(
-            'success',
-            this.t('proxy.modeChangeSuccess', { mode: this.t('proxy.mode.tun') }),
-          )
-        else
-          this.notificationService.success(
-            this.t('proxy.modeChangeSuccess', { mode: this.t('proxy.mode.tun') }),
-          )
+        if (messageCallback) {
+          messageCallback('success', 'TUN模式已启用')
+        }
       }
 
       // 如果内核正在运行，需要重启
       if (this.appStore.isRunning) {
         try {
-          if (showMessage) showMessage('info', this.t('home.status.restarting'))
+          if (messageCallback) messageCallback('info', this.t('home.status.restarting'))
           else this.notificationService.info(this.t('home.status.restarting'))
 
           await this.kernelStore.restartKernel()
 
-          if (showMessage) showMessage('success', this.t('notification.kernelRestarted'))
+          if (messageCallback) messageCallback('success', this.t('notification.kernelRestarted'))
           else this.notificationService.success(this.t('notification.kernelRestarted'))
         } catch (error) {
           const errorMsg = `${this.t('proxy.modeChangeFailed')}: ${error}`
-          if (showMessage) showMessage('error', errorMsg)
+          if (messageCallback) messageCallback('error', errorMsg)
           else this.notificationService.error(errorMsg)
         }
       }
 
-      return false // 不需要关闭窗口
+      return false // 不需要关闭应用
     } catch (error) {
-      const errorMsg = `${this.t('proxy.modeChangeFailed')}: ${error}`
-      if (showMessage) showMessage('error', errorMsg)
-      else this.notificationService.error(errorMsg)
+      if (messageCallback) {
+        messageCallback('error', `切换代理模式失败: ${error}`)
+      }
+      console.error('切换代理模式失败:', error)
       return false
     }
   }

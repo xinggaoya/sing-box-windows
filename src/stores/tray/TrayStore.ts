@@ -212,9 +212,13 @@ export const useTrayStore = defineStore(
           id: 'quit',
           text: t('tray.quit'),
           action: async () => {
-            kernelStore.stopKernel()
-            const appWindow = Window.getCurrent()
-            await appWindow.close()
+            try {
+              await kernelStore.stopKernel()
+              const appWindow = Window.getCurrent()
+              await appWindow.destroy()
+            } catch (e) {
+              console.error('退出应用失败:', e)
+            }
           },
         })
 
@@ -278,7 +282,7 @@ export const useTrayStore = defineStore(
             }
           },
           menu,
-          menuOnLeftClick: false,
+          menuOnLeftClick: true,
         }
 
         try {

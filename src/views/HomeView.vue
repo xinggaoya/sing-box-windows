@@ -4,52 +4,13 @@
     <n-card class="control-card" :bordered="false">
       <n-space vertical :size="16">
         <!-- 状态指示器和控制按钮 -->
-        <n-space justify="space-between" align="center">
-          <n-space align="center" :size="16">
-            <div class="status-indicator">
-              <div class="status-dot" :class="{ active: appState.isRunning }"></div>
-              <span class="status-text">{{
-                appState.isRunning ? t('home.status.running') : t('home.status.stopped')
-              }}</span>
-            </div>
-            <n-tag
-              :bordered="false"
-              :type="appState.proxyMode === 'system' ? 'info' : 'warning'"
-              size="medium"
-              class="mode-tag"
-            >
-              <template #icon>
-                <n-icon size="16">
-                  <globe-outline v-if="appState.proxyMode === 'system'" />
-                  <flash-outline v-else />
-                </n-icon>
-              </template>
-              {{
-                appState.proxyMode === 'system'
-                  ? t('home.proxyMode.system')
-                  : t('home.proxyMode.tun')
-              }}
-            </n-tag>
-            <n-tag
-              :bordered="false"
-              :type="isAdmin ? 'success' : 'warning'"
-              size="medium"
-              class="admin-tag"
-            >
-              <template #icon>
-                <n-icon size="16">
-                  <shield-checkmark-outline v-if="isAdmin" />
-                  <shield-outline v-else />
-                </n-icon>
-              </template>
-              {{ isAdmin ? t('home.adminStatus.admin') : t('home.adminStatus.normal') }}
-            </n-tag>
-            <n-tag
-              :bordered="false"
-              :type="appState.wsConnected ? 'success' : 'error'"
-              size="medium"
-              class="ws-tag"
-            >
+        <n-space justify="space-between" align="center" wrap-item>
+          <div class="status-indicator">
+            <div class="status-dot" :class="{ active: appState.isRunning }"></div>
+            <span class="status-text">{{
+              appState.isRunning ? t('home.status.running') : t('home.status.stopped')
+            }}</span>
+            <n-tag :bordered="false" :type="appState.wsConnected ? 'success' : 'error'" size="medium" class="ws-tag">
               <template #icon>
                 <n-icon size="16">
                   <wifi-outline v-if="appState.wsConnected" />
@@ -58,29 +19,31 @@
               </template>
               {{ appState.wsConnected ? t('home.wsStatus.connected') : t('home.wsStatus.disconnected') }}
             </n-tag>
-          </n-space>
-          <n-space :size="16">
-            <n-button
-              secondary
-              type="info"
-              size="medium"
-              :disabled="isSwitching"
-              @click="onModeChange(appState.proxyMode === 'system' ? 'tun' : 'system')"
-              class="control-button"
-            >
+            <n-tag :bordered="false" :type="isAdmin ? 'success' : 'warning'" size="medium" class="admin-tag">
               <template #icon>
-                <n-icon><repeat-outline /></n-icon>
+                <n-icon size="16">
+                  <shield-checkmark-outline v-if="isAdmin" />
+                  <shield-outline v-else />
+                </n-icon>
               </template>
-              {{ t('home.switchMode') }}
+              {{ isAdmin ? t('home.adminStatus.admin') : t('home.adminStatus.normal') }}
+            </n-tag>
+          </div>
+          <div class="controls-wrapper">
+
+            <!-- 管理员重启按钮 - 仅非管理员状态显示 -->
+            <n-button v-if="!isAdmin" type="warning" secondary size="medium" @click="restartAsAdmin"
+              class="control-button">
+              <template #icon>
+                <n-icon>
+                  <shield-checkmark-outline />
+                </n-icon>
+              </template>
+              {{ t('home.restartAsAdmin') }}
             </n-button>
-            <n-button
-              secondary
-              :type="appState.isRunning ? 'error' : 'primary'"
-              size="medium"
-              :loading="isStarting || isStopping"
-              @click="appState.isRunning ? stopKernel() : runKernel()"
-              class="control-button"
-            >
+            <!-- 启动/停止按钮 -->
+            <n-button :type="appState.isRunning ? 'error' : 'primary'" size="medium" :loading="isStarting || isStopping"
+              @click="appState.isRunning ? stopKernel() : runKernel()" class="control-button">
               <template #icon>
                 <n-icon>
                   <power-outline />
@@ -88,7 +51,31 @@
               </template>
               {{ appState.isRunning ? t('home.stop') : t('home.start') }}
             </n-button>
-          </n-space>
+          </div>
+        </n-space>
+
+        <!-- 状态标签 -->
+        <n-space :size="12" class="status-tags">
+          <div>
+            <!-- 代理模式选择器 -->
+            <n-radio-group v-model:value="currentProxyMode" name="proxy-mode"
+              :disabled="isSwitching || isStarting || isStopping" class="proxy-mode-selector">
+              <n-radio-button v-for="mode in proxyModes" :key="mode.value" :value="mode.value"
+                :disabled="mode.value === 'tun' && !isAdmin">
+                <n-tooltip placement="top" trigger="hover">
+                  <template #trigger>
+                    <n-space :size="4" align="center">
+                      <n-icon>
+                        <component :is="mode.icon" />
+                      </n-icon>
+                      <span>{{ t(mode.nameKey) }}</span>
+                    </n-space>
+                  </template>
+                  {{ t(mode.tipKey) }}
+                </n-tooltip>
+              </n-radio-button>
+            </n-radio-group>
+          </div>
         </n-space>
 
         <!-- 实时流量监控 -->
@@ -151,10 +138,7 @@
 
         <!-- 流量图表 -->
         <div class="chart-wrapper">
-          <TrafficChart
-            :upload-speed="trafficStore.traffic.up"
-            :download-speed="trafficStore.traffic.down"
-          />
+          <TrafficChart :upload-speed="trafficStore.traffic.up" :download-speed="trafficStore.traffic.down" />
         </div>
       </n-space>
     </n-card>
@@ -184,6 +168,7 @@ import {
   ShieldOutline,
   WifiOutline,
   CloseCircleOutline,
+  SettingsOutline
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -206,6 +191,38 @@ const isStopping = ref(false)
 const isSwitching = ref(false)
 const { t } = useI18n()
 const isAdmin = ref(false)
+
+// 代理模式选择
+const currentProxyMode = ref(appState.proxyMode || 'system')
+
+// 定义代理模式数据
+const proxyModes = [
+  {
+    value: 'system',
+    nameKey: 'home.proxyMode.system',
+    tipKey: 'home.proxyMode.systemTip',
+    icon: GlobeOutline
+  },
+  {
+    value: 'manual',
+    nameKey: 'home.proxyMode.manual',
+    tipKey: 'home.proxyMode.manualTip',
+    icon: SettingsOutline
+  },
+  {
+    value: 'tun',
+    nameKey: 'home.proxyMode.tun',
+    tipKey: 'home.proxyMode.tunTip',
+    icon: FlashOutline
+  }
+]
+
+// 监听代理模式变化
+watch(currentProxyMode, async (newMode) => {
+  if (newMode !== appState.proxyMode) {
+    await onModeChange(newMode)
+  }
+})
 
 // 监听路由可见性变化，简化为只用于计算属性的控制
 const route = useRoute()
@@ -278,8 +295,6 @@ const stopKernel = async () => {
     await kernelStore.stopKernel()
     appState.setRunningState(false)
     message.success(t('notification.kernelStopped'))
-  } catch (error) {
-    message.error(error as string)
   } finally {
     isStopping.value = false
   }
@@ -302,31 +317,39 @@ const onModeChange = async (value: string) => {
 
   try {
     isSwitching.value = true
+
     // 如果内核正在运行，需要重启
     if (appState.isRunning) {
       // 先停止内核
       await kernelStore.stopKernel()
       appState.setRunningState(false)
+    }
 
-      // 切换模式
-      const needClose = await proxyService.switchMode(value as 'system' | 'tun', showMessage)
+    // 切换模式
+    let needClose = false;
 
-      // 重新启动内核
+    if (value === 'system') {
+      await tauriApi.proxy.setSystemProxy();
+      appState.setProxyMode('system');
+      showMessage('success', t('notification.systemProxyEnabled'));
+    } else if (value === 'manual') {
+      await tauriApi.proxy.setManualProxy();
+      appState.setProxyMode('manual');
+      showMessage('info', t('notification.manualProxyEnabled'));
+    } else if (value === 'tun') {
+      needClose = await proxyService.switchMode('tun', showMessage);
+    }
+
+    // 如果内核之前在运行，重新启动
+    if (appState.isRunning) {
       await kernelStore.startKernel()
       appState.setRunningState(true)
       message.success(t('notification.kernelRestarted'))
+    }
 
-      if (needClose) {
-        const appWindow = Window.getCurrent()
-        await appWindow.close()
-      }
-    } else {
-      // 如果内核未运行，只需切换模式
-      const needClose = await proxyService.switchMode(value as 'system' | 'tun', showMessage)
-      if (needClose) {
-        const appWindow = Window.getCurrent()
-        await appWindow.close()
-      }
+    if (needClose) {
+      const appWindow = Window.getCurrent()
+      await appWindow.close()
     }
   } catch (error) {
     message.error(error as string)
@@ -349,15 +372,15 @@ const setupListeners = async () => {
   try {
     if (appState.isRunning) {
       console.log("HomeView: 尝试设置监听器")
-      
+
       // 清理之前的监听器，确保没有重复监听
       trafficStore.cleanupListeners()
       connectionStore.cleanupListeners()
-      
+
       // 设置监听器，添加等待确保setup完成
       isTrafficLoading.value = true
       isConnectionLoading.value = true
-      
+
       // 使用Promise.all同时设置两个监听器
       await Promise.all([
         trafficStore.setupTrafficListener(),
@@ -380,7 +403,7 @@ const setupListeners = async () => {
           }, 1000)
         })
       })
-      
+
       isTrafficLoading.value = false
       isConnectionLoading.value = false
       console.log("HomeView: 监听器设置完成")
@@ -392,13 +415,26 @@ const setupListeners = async () => {
   }
 }
 
+const restartAsAdmin = async () => {
+  try {
+    await tauriApi.system.restartAsAdmin()
+    message.info(t('notification.restartingAsAdmin') || '正在以管理员身份重启应用...')
+    // 重启后应用会关闭，所以不需要处理成功回调
+  } catch (error) {
+    message.error(error as string)
+  }
+}
+
 onMounted(async () => {
+  // 更新当前代理模式
+  currentProxyMode.value = appState.proxyMode;
+
   // 设置监听器
   await setupListeners()
 
   // 检查管理员权限
   await checkAdminStatus()
-  
+
   // 监听路由变化，当返回到主页时重新设置监听器
   watch(isRouteActive, (isActive) => {
     if (isActive && appState.isRunning) {
@@ -409,7 +445,7 @@ onMounted(async () => {
       connectionStore.cleanupListeners()
     }
   })
-  
+
   // 监听内核状态变化
   watch(() => appState.isRunning, (isRunning) => {
     if (isRunning && isRouteActive.value) {
@@ -493,10 +529,12 @@ onUnmounted(() => {
     transform: scale(0.95);
     opacity: 0.6;
   }
+
   70% {
     transform: scale(1.1);
     opacity: 0.2;
   }
+
   100% {
     transform: scale(0.95);
     opacity: 0.6;
@@ -509,26 +547,28 @@ onUnmounted(() => {
   color: var(--n-text-color-1);
 }
 
-.mode-tag {
-  padding: 0 12px;
-  height: 30px;
+.controls-wrapper {
   display: flex;
   align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  font-weight: 500;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.admin-tag {
-  padding: 0 12px;
-  height: 30px;
+.proxy-mode-selector {
+  margin-right: 4px;
+}
+
+.mode-radio {
   display: flex;
   align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  font-weight: 500;
 }
 
+.status-tags {
+  margin-top: -8px;
+}
+
+.mode-tag,
+.admin-tag,
 .ws-tag {
   padding: 0 12px;
   height: 30px;

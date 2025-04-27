@@ -7,7 +7,7 @@ import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 
 // 代理模式类型
-export type ProxyMode = 'system' | 'tun'
+export type ProxyMode = 'system' | 'tun' | 'manual'
 
 export const useAppStore = defineStore(
   'app',
@@ -162,6 +162,11 @@ export const useAppStore = defineStore(
       mitt.emit('proxy-mode-changed')
     }
 
+    // 设置代理模式
+    const setProxyMode = (mode: 'system' | 'tun' | 'manual') => {
+      proxyMode.value = mode
+    }
+
     return {
       isRunning,
       wsConnected,
@@ -173,7 +178,8 @@ export const useAppStore = defineStore(
       setRunningState,
       toggleAutoStart,
       switchProxyMode,
-      startWebSocketCheck
+      startWebSocketCheck,
+      setProxyMode
     }
   },
   {

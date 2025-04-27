@@ -33,7 +33,11 @@ export default {
     },
     proxyMode: {
       system: '系统代理',
-      tun: 'TUN 模式',
+      tun: 'TUN模式',
+      manual: '手动模式',
+      systemTip: '自动设置系统代理',
+      tunTip: '使用TUN虚拟网卡代理所有流量，需要管理员权限',
+      manualTip: '需要手动配置系统代理'
     },
     adminStatus: {
       admin: '管理员',
@@ -47,6 +51,7 @@ export default {
     start: '启动',
     stop: '停止',
     restart: '重启',
+    restartAsAdmin: '以管理员重启',
     traffic: {
       uploadSpeed: '上传速度',
       downloadSpeed: '下载速度',
@@ -292,8 +297,12 @@ export default {
     kernelStarted: '内核已启动',
     kernelStopped: '内核已停止',
     kernelRestarted: '内核已重启',
+    restartingAsAdmin: '正在以管理员身份重启应用...',
     updateAvailable: '发现新版本',
     updateDownloaded: '更新已下载，即将安装',
     updateFailed: '更新失败',
+    systemProxyEnabled: '系统代理已启用',
+    manualProxyEnabled: '手动代理模式已启用，请手动设置系统代理',
+    tunProxyEnabled: 'TUN模式已启用',
   },
 }

@@ -34,6 +34,10 @@ export default {
     proxyMode: {
       system: 'システムプロキシ',
       tun: 'TUNモード',
+      manual: '手動モード',
+      systemTip: '自動的にシステムプロキシを設定する',
+      tunTip: 'TUN仮想ネットワークカードですべてのトラフィックをプロキシ、管理者権限が必要',
+      manualTip: '手動でシステムプロキシを設定する必要があります'
     },
     adminStatus: {
       admin: '管理者',
@@ -47,6 +51,7 @@ export default {
     start: '開始',
     stop: '停止',
     restart: '再起動',
+    restartAsAdmin: '管理者として再起動',
     traffic: {
       uploadSpeed: 'アップロード速度',
       downloadSpeed: 'ダウンロード速度',
@@ -309,8 +314,12 @@ export default {
     kernelStarted: 'カーネルが開始されました',
     kernelStopped: 'カーネルが停止しました',
     kernelRestarted: 'カーネルが再起動されました',
+    restartingAsAdmin: '管理者として再起動しています...',
     updateAvailable: '新バージョンが利用可能です',
     updateDownloaded: 'アップデートがダウンロードされました、まもなくインストールされます',
     updateFailed: 'アップデートに失敗しました',
+    systemProxyEnabled: 'システムプロキシが有効になりました',
+    manualProxyEnabled: '手動プロキシモードが有効になりました、手動でシステムプロキシを設定してください',
+    tunProxyEnabled: 'TUNモードが有効になりました',
   },
 }

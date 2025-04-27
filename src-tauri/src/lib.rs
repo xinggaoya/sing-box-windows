@@ -4,7 +4,7 @@ use crate::app::core::kernel_service::{
     start_websocket_relay, stop_kernel,
 };
 use crate::app::core::proxy_service::{
-    change_proxy, get_proxies, get_rules, get_version_info, set_system_proxy, set_tun_proxy,
+    change_proxy, get_proxies, get_rules, get_version_info, set_manual_proxy, set_system_proxy, set_tun_proxy,
     test_group_delay, toggle_ip_version,
 };
 
@@ -70,6 +70,7 @@ pub fn run() {
             // Core - Proxy service commands
             set_system_proxy,
             set_tun_proxy,
+            set_manual_proxy,
             toggle_ip_version,
             get_proxies,
             change_proxy,

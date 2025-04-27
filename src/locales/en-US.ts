@@ -34,6 +34,10 @@ export default {
     proxyMode: {
       system: 'System Proxy',
       tun: 'TUN Mode',
+      manual: 'Manual Mode',
+      systemTip: 'Automatically set system proxy',
+      tunTip: 'Use TUN virtual network card to proxy all traffic, requires admin',
+      manualTip: 'Manually configure system proxy'
     },
     adminStatus: {
       admin: 'Administrator',
@@ -47,6 +51,7 @@ export default {
     start: 'Start',
     stop: 'Stop',
     restart: 'Restart',
+    restartAsAdmin: 'Restart as Admin',
     traffic: {
       uploadSpeed: 'Upload Speed',
       downloadSpeed: 'Download Speed',
@@ -294,8 +299,12 @@ export default {
     kernelStarted: 'Kernel started',
     kernelStopped: 'Kernel stopped',
     kernelRestarted: 'Kernel restarted',
+    restartingAsAdmin: 'Restarting as administrator...',
     updateAvailable: 'New version available',
     updateDownloaded: 'Update downloaded, will install soon',
     updateFailed: 'Update failed',
+    systemProxyEnabled: 'System proxy enabled',
+    manualProxyEnabled: 'Manual proxy mode enabled, please set system proxy manually',
+    tunProxyEnabled: 'TUN mode enabled',
   },
 }
