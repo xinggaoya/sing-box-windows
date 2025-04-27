@@ -104,7 +104,7 @@
 <script setup lang="ts">
 import { darkTheme, useOsTheme, NIcon, useNotification, NButton, NProgress } from 'naive-ui'
 import type { NotificationReactive } from 'naive-ui'
-import { h, ref, onMounted, computed } from 'vue'
+import { h, ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import mitt from '@/utils/mitt'
 import {
@@ -267,6 +267,9 @@ onMounted(async () => {
   await updateStore.fetchAppVersion()
   await checkUpdateWithNotification()
 
+  // 确保设置窗口事件处理器
+  windowStore.setupWindowEventHandlers(router)
+
   // 监听窗口显示
   await appWindow.listen('tauri://show', () => {
     mitt.emit('window-show')
@@ -276,6 +279,17 @@ onMounted(async () => {
   await appWindow.listen('tauri://restore', () => {
     mitt.emit('window-restore')
   })
+
+  // 监听窗口隐藏
+  await appWindow.listen('tauri://close-requested', async () => {
+    // 改为使用 hide 代替默认关闭行为
+    windowStore.hideWindow()
+  })
+})
+
+// 清理事件监听
+onBeforeUnmount(() => {
+  windowStore.cleanupWindowEvents()
 })
 </script>
 

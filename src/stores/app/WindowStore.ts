@@ -88,7 +88,10 @@ export const useWindowStore = defineStore(
     // 从空白页恢复到上次的路由
     const restoreFromBlank = (router: Router) => {
       if (router.currentRoute.value.path === '/blank' && windowState.value.lastVisiblePath) {
+        console.log(`从空白页恢复到之前路径: ${windowState.value.lastVisiblePath}`)
         router.push(windowState.value.lastVisiblePath)
+      } else {
+        console.log(`当前路径非空白页或没有保存的路径: ${router.currentRoute.value.path}`)
       }
     }
 
@@ -96,16 +99,19 @@ export const useWindowStore = defineStore(
     const setupWindowEventHandlers = (router: Router) => {
       // 窗口隐藏时切换到空白页
       mitt.on('window-hide', () => {
+        console.log(`保存当前路径并切换到空白页: ${router.currentRoute.value.path}`)
         saveRouteAndGoBlank(router)
       })
 
       // 窗口显示时恢复路由
       mitt.on('window-show', () => {
+        console.log('接收到窗口显示事件，准备恢复路由')
         restoreFromBlank(router)
       })
 
       // 窗口恢复时恢复路由
       mitt.on('window-restore', () => {
+        console.log('接收到窗口恢复事件，准备恢复路由')
         restoreFromBlank(router)
       })
 

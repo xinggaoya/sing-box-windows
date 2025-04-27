@@ -105,6 +105,8 @@ export const useTrayStore = defineStore(
             const appWindow = Window.getCurrent()
             await appWindow.show()
             await appWindow.setFocus()
+            // 添加触发窗口显示事件，确保路由能够正确恢复
+            mitt.emit('window-show')
           },
         })
 
@@ -266,9 +268,11 @@ export const useTrayStore = defineStore(
                 // 如果点击的是左键，则显示界面
                 if (event.button === 'Left') {
                   const appWindow = Window.getCurrent()
-                  router.back()
+                  // 移除router.back()调用，改用显示窗口的标准流程
                   await appWindow.show()
                   await appWindow.setFocus()
+                  // 触发窗口显示事件，让WindowStore处理路由恢复
+                  mitt.emit('window-show')
                 }
                 break
             }
