@@ -59,7 +59,6 @@ export const useAppStore = defineStore(
           connectionCheckTimeout = window.setTimeout(() => {
             // 再次检查，如果还是断开状态，则认为内核已停止
             if (!wsConnected.value) {
-              isRunning.value = false
               mitt.emit('process-status')
             }
           }, 5000) // 5秒后再检查
