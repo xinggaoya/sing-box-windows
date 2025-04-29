@@ -54,7 +54,7 @@
         bordered
         collapse-mode="width"
         :collapsed-width="64"
-        :width="200"
+        :width="180"
         :collapsed="collapsed"
         show-trigger
         @collapse="collapsed = true"

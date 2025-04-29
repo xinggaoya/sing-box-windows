@@ -310,7 +310,7 @@ export const useTrayStore = defineStore(
             }
           },
           menu,
-          menuOnLeftClick: true,
+          menuOnLeftClick: false,
         }
 
         try {

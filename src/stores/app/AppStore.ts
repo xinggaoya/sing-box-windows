@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, onMounted, watch } from 'vue'
-import { enable, isEnabled } from '@tauri-apps/plugin-autostart'
+import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import mitt from '@/utils/mitt'
 import { WebSocketService } from '@/services/websocket-service'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
@@ -35,7 +35,7 @@ export const useAppStore = defineStore(
 
     onMounted(async () => {
       autoStartApp.value = await isEnabled()
-      
+
       // 添加对WebSocket连接状态的监听
       mitt.on('ws-connected', () => {
         console.log('WebSocket连接成功事件接收到')
@@ -46,7 +46,7 @@ export const useAppStore = defineStore(
           mitt.emit('process-status')
         }
       })
-      
+
       mitt.on('ws-disconnected', () => {
         console.log('WebSocket连接断开事件接收到')
         wsConnected.value = false
@@ -70,7 +70,7 @@ export const useAppStore = defineStore(
     const setRunningState = (state: boolean) => {
       if (isRunning.value !== state) {
         isRunning.value = state
-        
+
         // 如果设置为运行中，启动WebSocket连接检查
         if (state) {
           startWebSocketCheck()
@@ -78,19 +78,19 @@ export const useAppStore = defineStore(
           // 如果设置为停止，清除WebSocket连接
           wsConnected.value = false
         }
-        
+
         // 发送进程状态变更事件
         mitt.emit('process-status')
       }
     }
-    
+
     // 启动WebSocket连接检查
     const startWebSocketCheck = () => {
       // 清除之前的超时处理
       if (connectionCheckTimeout) {
         clearTimeout(connectionCheckTimeout)
       }
-      
+
       // 启动连接检查
       connectionCheckTimeout = window.setTimeout(async () => {
         try {
@@ -99,7 +99,7 @@ export const useAppStore = defineStore(
           // 检查WebSocket连接状态
           const trafficStore = useTrafficStore()
           const connectionStore = useConnectionStore()
-          
+
           // 如果连接状态正常，则确认运行状态
           if (trafficStore.connectionState.connected || connectionStore.connectionsState.connected) {
             wsConnected.value = true
@@ -111,7 +111,7 @@ export const useAppStore = defineStore(
               connectionStore.setupConnectionsListener(),
               connectionStore.setupMemoryListener()
             ])
-            
+
             // 再次检查连接状态
             if (trafficStore.connectionState.connected || connectionStore.connectionsState.connected) {
               wsConnected.value = true
@@ -138,8 +138,6 @@ export const useAppStore = defineStore(
         if (enabled) {
           await enable()
         } else {
-          // 这里需要导入disable
-          const { disable } = await import('@tauri-apps/plugin-autostart')
           await disable()
         }
         autoStartApp.value = enabled

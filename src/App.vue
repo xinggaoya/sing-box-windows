@@ -95,6 +95,9 @@ onMounted(async () => {
 
   // 如果开启了自动启动内核
   if (appStore.autoStartKernel) {
+    if (appStore.proxyMode === 'tun') {
+      await appStore.switchProxyMode('system')
+    }
     try {
       await kernelStore.startKernel()
       appStore.setRunningState(true)

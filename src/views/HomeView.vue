@@ -497,6 +497,9 @@ const onModeChange = async (value: string) => {
       showMessage('info', t('notification.manualProxyEnabled'));
     } else if (value === 'tun') {
       needClose = await proxyService.switchMode('tun', showMessage);
+      // 添加缺失的状态更新
+      appState.setProxyMode('tun');
+      currentProxyMode.value = 'tun';
     }
 
     // 如果内核之前在运行，重新启动
