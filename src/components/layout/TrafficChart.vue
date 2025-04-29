@@ -1,7 +1,7 @@
 <template>
   <div class="traffic-chart-container" ref="chartContainer">
     <canvas ref="chartCanvas" class="chart-canvas"></canvas>
-    <div class="chart-labels">
+    <div class="chart-legend">
       <div class="legend-item upload">
         <div class="legend-color"></div>
         <span>{{ t('home.traffic.uploadSpeed') }}</span>
@@ -88,7 +88,14 @@ const drawChart = () => {
   const dpr = window.devicePixelRatio || 1
   const width = canvas.width
   const height = canvas.height
-  const padding = { top: 30 * dpr, right: 20 * dpr, bottom: 40 * dpr, left: 80 * dpr } // 增加左侧padding
+  
+  // 减小内边距使图表更紧凑，但增加左侧内边距确保文本不被截断
+  const padding = { 
+    top: 20 * dpr, 
+    right: 15 * dpr, 
+    bottom: 25 * dpr, 
+    left: 65 * dpr // 增加左侧内边距，从50增加到65
+  }
 
   // 清除画布
   ctx.clearRect(0, 0, width, height)
@@ -105,50 +112,58 @@ const drawChart = () => {
   const downloadColor = '#2080F0' // 蓝色
 
   // 设置字体
-  ctx.font = `${12 * dpr}px sans-serif`
+  ctx.font = `${10 * dpr}px sans-serif` // 减小字体大小从11px到10px
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = textColor
 
-  // 绘制Y轴标签和网格线
-  const yAxisSteps = 5
+  // 绘制Y轴标签和网格线 - 减少步数以减少视觉复杂度
+  const yAxisSteps = 4
   for (let i = 0; i <= yAxisSteps; i++) {
     const y = padding.top + chartHeight - (i / yAxisSteps) * chartHeight
     const value = (i / yAxisSteps) * maxValue.value
 
-    // 将值从B/s转换为适当单位的字符串（传入参数需要转换为KB）
-    const formattedValue = formatBandwidth(value * 1024 * 1024) // 转换为KB后传给formatBandwidth
-
-    // 添加"/s"表示速率单位
-    const speedLabel = `${formattedValue}/s`
+    // 将值从B/s转换为适当单位的字符串
+    const formattedValue = formatBandwidth(value * 1024 * 1024)
+    
+    // 使用更紧凑的标签格式
+    let speedLabel = `${formattedValue}/s`
+    
+    // 简化大单位的显示
+    speedLabel = speedLabel
+      .replace(' MB/s', 'MB/s')
+      .replace(' KB/s', 'KB/s')
+      .replace(' B/s', 'B/s')
+      .replace(' GB/s', 'GB/s')
 
     // 绘制网格线
     ctx.beginPath()
     ctx.strokeStyle = gridColor
-    ctx.lineWidth = 1
+    ctx.lineWidth = 0.5 * dpr
     ctx.moveTo(padding.left, y)
     ctx.lineTo(padding.left + chartWidth, y)
     ctx.stroke()
 
     // 绘制Y轴标签
-    ctx.fillText(speedLabel, padding.left - 10 * dpr, y)
+    ctx.fillText(speedLabel, padding.left - 8 * dpr, y)
   }
 
   // 绘制X轴
   ctx.beginPath()
   ctx.strokeStyle = gridColor
-  ctx.lineWidth = 1
+  ctx.lineWidth = 0.5 * dpr
   ctx.moveTo(padding.left, padding.top + chartHeight)
   ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight)
   ctx.stroke()
 
-  // 绘制X轴标签（只显示部分时间点以避免拥挤）
-  const labelInterval = Math.ceil(MAX_DATA_POINTS / 6) // 显示约6个标签
-  for (let i = 0; i < MAX_DATA_POINTS; i += labelInterval) {
+  // 只绘制较少的X轴标签以减少视觉复杂度
+  const labelInterval = Math.ceil(MAX_DATA_POINTS / 4)
+  ctx.font = `${10 * dpr}px sans-serif`
+  for (let i = MAX_DATA_POINTS - 1; i >= 0; i -= labelInterval) {
     if (timeLabels.value[i]) {
       const x = padding.left + (i / (MAX_DATA_POINTS - 1)) * chartWidth
       ctx.textAlign = 'center'
-      ctx.fillText(timeLabels.value[i], x, padding.top + chartHeight + 20 * dpr)
+      ctx.fillText(timeLabels.value[i], x, padding.top + chartHeight + 14 * dpr)
     }
   }
 
@@ -200,8 +215,8 @@ const drawCurve = (
   ctx.closePath()
 
   const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight)
-  gradient.addColorStop(0, `${color}40`) // 40 为透明度的十六进制
-  gradient.addColorStop(1, `${color}05`) // 05 为透明度的十六进制
+  gradient.addColorStop(0, `${color}30`) // 减轻填充不透明度
+  gradient.addColorStop(1, `${color}05`)
 
   ctx.fillStyle = gradient
   ctx.fill()
@@ -329,27 +344,31 @@ const handleResize = () => {
   height: 100%;
 }
 
-.chart-labels {
+.chart-legend {
   position: absolute;
-  top: 10px;
-  right: 20px;
+  top: 5px;
+  right: 15px;
   display: flex;
-  gap: 20px;
+  gap: 16px;
   z-index: 1;
+  background-color: rgba(var(--n-body-color-rgb), 0.4);
+  border-radius: 4px;
+  padding: 3px 6px;
+  backdrop-filter: blur(2px);
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 5px;
+  font-size: 11px;
   color: var(--n-text-color-1);
 }
 
 .legend-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
 }
 
 .upload .legend-color {
@@ -358,5 +377,18 @@ const handleResize = () => {
 
 .download .legend-color {
   background-color: #2080f0;
+}
+
+/* 适应深色/浅色模式 */
+:deep(.dark) .chart-legend {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+  .chart-legend {
+    top: auto;
+    bottom: 5px;
+    right: 5px;
+  }
 }
 </style>

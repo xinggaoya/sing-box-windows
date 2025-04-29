@@ -13,26 +13,6 @@
             </n-h3>
           </div>
           <div class="header-right">
-            <!-- 代理模式切换 -->
-            <n-dropdown :options="proxyModeOptions" @select="handleProxyModeChange" trigger="click">
-              <n-tooltip trigger="hover" placement="top">
-                <template #trigger>
-                  <n-tag class="mode-tag" :bordered="false" type="success" size="medium" hoverable>
-                    <n-icon size="18" class="mode-icon">
-                      <globe-outline v-if="currentProxyMode === 'global'" />
-                      <layers-outline v-if="currentProxyMode === 'rule'" />
-                      <hardware-chip-outline v-if="currentProxyMode === 'tun'" />
-                    </n-icon>
-                    {{ getProxyModeText(currentProxyMode) }}
-                    <n-icon size="16" class="dropdown-icon">
-                      <chevron-down-outline />
-                    </n-icon>
-                  </n-tag>
-                </template>
-                {{ t('proxy.modeSwitchTip') }}
-              </n-tooltip>
-            </n-dropdown>
-
             <!-- 刷新按钮 -->
             <n-tooltip trigger="hover" placement="top">
               <template #trigger>
@@ -55,36 +35,6 @@
         </div>
       </template>
     </n-card>
-
-    <!-- 代理模式切换对话框 -->
-    <n-modal
-      v-model:show="showModeChangeModal"
-      preset="dialog"
-      :title="`${t('proxy.switchTo')}${targetProxyMode ? getProxyModeText(targetProxyMode) : ''}`"
-    >
-      <template #header>
-        <div class="modal-header">
-          <n-icon size="22" class="modal-icon">
-            <information-circle-outline />
-          </n-icon>
-          <span
-            >{{ t('proxy.switchTo')
-            }}{{ targetProxyMode ? getProxyModeText(targetProxyMode) : '' }}</span
-          >
-        </div>
-      </template>
-      <div class="modal-content">{{ t('proxy.switchModeConfirm') }}</div>
-      <template #action>
-        <div class="modal-footer">
-          <n-space justify="end">
-            <n-button @click="showModeChangeModal = false">{{ t('common.cancel') }}</n-button>
-            <n-button type="primary" :loading="isChangingMode" @click="confirmProxyModeChange">
-              {{ t('proxy.confirmSwitch') }}
-            </n-button>
-          </n-space>
-        </div>
-      </template>
-    </n-modal>
 
     <!-- 代理列表卡片 -->
     <n-spin :show="isLoading">
@@ -136,36 +86,38 @@
                     :bordered="false"
                     hoverable
                   >
-                    <n-space vertical :size="14">
-                      <n-flex justify="space-between" align="center">
-                        <div class="proxy-name-container">
-                          <n-ellipsis style="max-width: 100%" :tooltip="{ width: 'trigger' }">
-                            {{ proxy }}
-                          </n-ellipsis>
-                        </div>
+                    <div class="proxy-card-content">
+                      <!-- 节点名称 - 单独占一行 -->
+                      <div class="proxy-name-wrapper">
+                        <n-ellipsis :tooltip="{ width: 'trigger' }">
+                          {{ proxy }}
+                        </n-ellipsis>
+                      </div>
+                      
+                      <!-- 底部操作区 -->
+                      <div class="proxy-card-footer">
+                        <!-- 延迟标签 -->
                         <n-tag
-                          :type="getNodeDelayType(getNodeDelay(proxy))"
+                          :type="getNodeStatusType(proxy)"
                           size="small"
                           :bordered="false"
                           round
                           class="delay-tag"
+                          @click="testSingleNode(proxy)"
+                          :loading="testingNodes[proxy]"
+                          hoverable
                         >
-                          {{
-                            getNodeDelay(proxy) === 0
-                              ? t('proxy.notTested')
-                              : getNodeDelay(proxy) + 'ms'
-                          }}
+                          {{ getNodeStatusText(proxy) }}
                         </n-tag>
-                      </n-flex>
-
-                      <n-flex justify="space-between" align="center">
+                        
+                        <!-- 切换按钮 -->
                         <n-button
                           @click="changeProxy(group.name, proxy)"
                           :type="group.now === proxy ? 'default' : 'primary'"
                           size="small"
                           :disabled="group.now === proxy"
                           :ghost="group.now !== proxy"
-                          class="proxy-button"
+                          class="proxy-button switch-button"
                         >
                           <template #icon>
                             <n-icon>
@@ -175,8 +127,8 @@
                           </template>
                           {{ group.now === proxy ? t('proxy.inUse') : t('proxy.switch') }}
                         </n-button>
-                      </n-flex>
-                    </n-space>
+                      </div>
+                    </div>
                   </n-card>
                 </n-grid-item>
               </n-grid>
@@ -235,6 +187,13 @@ interface TestGroupResult {
   error?: string
 }
 
+interface TestNodeResult {
+  proxy: string
+  delay?: number
+  success: boolean
+  error?: string
+}
+
 // 状态定义
 const message = useMessage()
 const isLoading = ref(false)
@@ -245,31 +204,17 @@ const { t } = useI18n()
 const rawProxies = ref<Record<string, ProxyData>>({})
 const proxyGroups = ref<ProxyData[]>([])
 const testingNodes = reactive<Record<string, boolean>>({})
-const currentProxyMode = ref('rule') // 默认为规则模式
-
-// 代理模式切换相关
-const isChangingMode = ref(false)
-const showModeChangeModal = ref(false)
-const targetProxyMode = ref('')
 
 // 注册事件监听器
 let unlistenTestProgress: (() => void) | null = null
 let unlistenTestResult: (() => void) | null = null
 let unlistenTestComplete: (() => void) | null = null
+let unlistenNodeResult: (() => void) | null = null
 
-// 代理模式选项
-const proxyModeOptions = [
-  {
-    label: t('proxy.mode.global'),
-    key: 'global',
-    icon: renderIcon(GlobeOutline),
-  },
-  {
-    label: t('proxy.mode.rule'),
-    key: 'rule',
-    icon: renderIcon(LayersOutline),
-  },
-]
+// 测试状态和结果
+const testingGroup = ref('')
+const testResults = reactive<Record<string, number>>({})
+const nodeErrors = reactive<Record<string, string>>({})
 
 // 动态渲染图标的辅助函数
 function renderIcon(icon: Component) {
@@ -287,15 +232,9 @@ const gridCols = computed(() => {
   return 4
 })
 
-// 在 script setup 部分添加新的状态和方法
-const testingGroup = ref('')
-const testResults = reactive<Record<string, number>>({})
-
 // 生命周期钩子
 onMounted(() => {
   init()
-  // 读取当前代理模式
-  getCurrentProxyMode()
   // 注册事件监听器
   setupEventListeners()
 })
@@ -305,6 +244,7 @@ onUnmounted(() => {
   if (unlistenTestProgress) unlistenTestProgress()
   if (unlistenTestResult) unlistenTestResult()
   if (unlistenTestComplete) unlistenTestComplete()
+  if (unlistenNodeResult) unlistenNodeResult()
 })
 
 // 设置事件监听器
@@ -328,6 +268,29 @@ const setupEventListeners = async () => {
 
   unlistenTestComplete = await listen('test-nodes-complete', () => {
     message.success(t('proxy.batchTestComplete'))
+  })
+  
+  // 添加节点测试结果监听
+  unlistenNodeResult = await listen('test-node-result', (event) => {
+    const data = event.payload as TestNodeResult
+    const { proxy, success, delay, error } = data
+    
+    // 取消该节点的加载状态
+    testingNodes[proxy] = false
+    
+    if (success) {
+      if (delay !== undefined) {
+        // 更新节点延迟
+        testResults[proxy] = delay
+        // 清除可能存在的错误
+        delete nodeErrors[proxy]
+        message.success(`${t('proxy.nodeTestComplete')}: ${proxy}`)
+      }
+    } else {
+      // 记录错误信息
+      nodeErrors[proxy] = error || t('proxy.unknownError')
+      message.error(`${t('proxy.nodeTestFailed')}: ${proxy}`)
+    }
   })
 }
 
@@ -378,20 +341,19 @@ const init = async () => {
 }
 
 /**
- * 获取节点的延迟
+ * 获取节点状态对应的颜色类型
  * @param name 节点名称
- * @returns 延迟值（毫秒）
- */
-const getNodeDelay = (name: string): number => {
-  return testResults[name] || 0
-}
-
-/**
- * 获取延迟对应的颜色类型
- * @param delay 延迟（毫秒）
  * @returns 颜色类型
  */
-const getNodeDelayType = (delay: number): string => {
+const getNodeStatusType = (name: string): string => {
+  // 如果节点有错误，返回错误状态
+  if (nodeErrors[name]) return 'error'
+  
+  // 如果节点正在测试中
+  if (testingNodes[name]) return 'info'
+  
+  // 否则根据延迟返回状态
+  const delay = testResults[name] || 0
   if (delay === 0) return 'default'
   if (delay < 100) return 'success'
   if (delay < 200) return 'info'
@@ -400,17 +362,21 @@ const getNodeDelayType = (delay: number): string => {
 }
 
 /**
- * 获取代理模式对应的文本
- * @param mode 代理模式
- * @returns 模式文本
+ * 获取节点状态文本
+ * @param name 节点名称
+ * @returns 状态文本
  */
-const getProxyModeText = (mode: string): string => {
-  const modeMap: Record<string, string> = {
-    global: t('proxy.mode.global'),
-    rule: t('proxy.mode.rule'),
-    tun: t('proxy.mode.tun'),
-  }
-  return modeMap[mode] || t('proxy.mode.unknown')
+const getNodeStatusText = (name: string): string => {
+  // 如果节点正在测试中
+  if (testingNodes[name]) return t('proxy.testing')
+  
+  // 如果节点有错误
+  if (nodeErrors[name]) return t('proxy.timeout')
+  
+  // 否则显示延迟
+  const delay = testResults[name] || 0
+  if (delay === 0) return t('proxy.notTested')
+  return `${delay}ms`
 }
 
 /**
@@ -421,6 +387,33 @@ const getProxyModeText = (mode: string): string => {
 const isRealNode = (name: string): boolean => {
   if (!rawProxies.value[name]) return false
   return !['Selector', 'URLTest', 'Fallback'].includes(rawProxies.value[name].type)
+}
+
+/**
+ * 测试单个节点延迟
+ * @param proxy 节点名称
+ */
+const testSingleNode = async (proxy: string) => {
+  if (testingNodes[proxy]) return
+  
+  // 设置测试中状态
+  testingNodes[proxy] = true
+  
+  try {
+    // 清除之前的错误信息
+    delete nodeErrors[proxy]
+    
+    // 调用后端API测试节点
+    await tauriApi.proxy.testNodeDelay(proxy)
+    
+    // 注意：此时不设置 testingNodes[proxy] = false
+    // 因为这将由事件监听器在收到结果时设置
+  } catch (error) {
+    console.error(t('proxy.testFailed'), error)
+    message.error(t('proxy.testErrorMessage'))
+    testingNodes[proxy] = false
+    nodeErrors[proxy] = String(error)
+  }
 }
 
 /**
@@ -456,55 +449,6 @@ const changeProxy = async (group: string, proxy: string) => {
   } catch (error) {
     console.error(t('proxy.switchFailed'), error)
     message.error(t('proxy.switchErrorMessage'))
-  }
-}
-
-/**
- * 获取当前代理模式
- */
-const getCurrentProxyMode = async () => {
-  try {
-    // 调用后端API获取当前代理模式
-    const mode = await tauriApi.proxy.getCurrentProxyMode()
-    currentProxyMode.value = mode
-    console.log(t('proxy.currentMode'), mode)
-  } catch (error) {
-    console.error(t('proxy.getModeError'), error)
-    // 出错时仍使用默认的规则模式
-    currentProxyMode.value = 'rule'
-  }
-}
-
-/**
- * 处理代理模式变更
- */
-const handleProxyModeChange = (key: string) => {
-  if (key === currentProxyMode.value) return
-
-  targetProxyMode.value = key
-  showModeChangeModal.value = true
-}
-
-/**
- * 确认切换代理模式
- */
-const confirmProxyModeChange = async () => {
-  if (!targetProxyMode.value) return
-
-  isChangingMode.value = true
-  try {
-    await tauriApi.proxy.toggleProxyMode(targetProxyMode.value)
-    await tauriApi.kernel.restartKernel()
-    currentProxyMode.value = targetProxyMode.value
-    message.success(t('proxy.modeChangeSuccess', { mode: getProxyModeText(targetProxyMode.value) }))
-    // 重新加载数据
-    await init()
-  } catch (error) {
-    console.error(t('proxy.modeChangeFailed'), error)
-    message.error(`${t('proxy.modeChangeError')}: ${error}`)
-  } finally {
-    isChangingMode.value = false
-    showModeChangeModal.value = false
   }
 }
 </script>
@@ -576,24 +520,6 @@ const confirmProxyModeChange = async () => {
   background-color: rgba(64, 128, 255, 0.1);
 }
 
-.mode-tag {
-  font-weight: 500;
-  padding: 0 12px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-}
-
-.mode-icon {
-  margin-right: 4px;
-}
-
-.dropdown-icon {
-  margin-left: 4px;
-}
-
 .dropdown-option-icon {
   display: flex;
   align-items: center;
@@ -601,26 +527,6 @@ const confirmProxyModeChange = async () => {
   width: 18px;
   height: 18px;
   margin-right: 8px;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.modal-icon {
-  color: var(--primary-color);
-}
-
-.modal-content {
-  margin: 16px 0;
-  line-height: 1.6;
-}
-
-.modal-footer {
-  margin-top: 8px;
 }
 
 .proxy-group {
@@ -642,33 +548,69 @@ const confirmProxyModeChange = async () => {
   transition: all 0.3s ease;
   border-radius: 12px;
   border-left: 3px solid transparent;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+  background: var(--card-color);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
 }
 
 .proxy-node-card:hover {
   transform: translateY(-3px);
-  box-shadow: var(--shadow-medium);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
 }
 
 .proxy-node-card-active {
   border-left: 3px solid var(--success-color);
+  background: linear-gradient(135deg, rgba(var(--success-color-rgb), 0.05), transparent);
 }
 
-.proxy-name-container {
-  font-weight: 500;
-  flex: 1;
-  overflow: hidden;
+.proxy-card-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.proxy-name-wrapper {
+  font-weight: 600;
+  font-size: 1.1em;
   color: var(--n-text-color-1);
+  margin-bottom: 12px;
+  padding: 2px 0;
+  line-height: 1.4;
+  border-bottom: 1px dashed rgba(128, 128, 128, 0.15);
+  padding-bottom: 10px;
+}
+
+.proxy-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
 }
 
 .delay-tag {
   font-weight: 500;
   transition: all 0.3s ease;
+  cursor: pointer;
+  min-width: 70px;
+  text-align: center;
+  padding: 0 8px;
+}
+
+.delay-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .proxy-button {
   border-radius: 8px;
   font-weight: 500;
   transition: all 0.25s ease;
+}
+
+.switch-button {
+  height: 32px;
+  font-size: 0.95em;
 }
 
 .proxy-button:hover:not(:disabled) {
@@ -690,6 +632,10 @@ const confirmProxyModeChange = async () => {
 
 :deep(.n-card.proxy-node-card:hover) {
   background-color: var(--card-color-hover);
+}
+
+:deep(.n-card.proxy-node-card-active) {
+  background: linear-gradient(135deg, rgba(var(--success-color-rgb), 0.08), transparent);
 }
 
 @keyframes slide-up {

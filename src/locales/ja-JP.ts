@@ -37,7 +37,14 @@ export default {
       manual: '手動モード',
       systemTip: '自動的にシステムプロキシを設定する',
       tunTip: 'TUN仮想ネットワークカードですべてのトラフィックをプロキシ、管理者権限が必要',
-      manualTip: '手動でシステムプロキシを設定する必要があります'
+      manualTip: '手動でシステムプロキシを設定する必要があります',
+      systemDescription: 'ウェブブラウザやアプリケーションのシステムプロキシ設定を自動的に構成します',
+      tunDescription: '仮想ネットワークカードを通じてすべてのシステムトラフィックをキャプチャしプロキシします、管理者権限が必要です',
+      manualDescription: 'アプリケーションやブラウザでプロキシ設定を手動で構成します'
+    },
+    proxyHeader: {
+      flowMode: 'トラフィックプロキシモード',
+      nodeMode: 'ノードプロキシモード'
     },
     adminStatus: {
       admin: '管理者',
@@ -59,6 +66,8 @@ export default {
       downloadTotal: '総ダウンロード',
       memory: 'メモリ',
       connections: 'アクティブ接続',
+      title: 'トラフィック統計',
+      connectionsLabel: '接続'
     },
   },
   chart: {
@@ -76,6 +85,7 @@ export default {
     currentNode: '現在のノード',
     nodeCount: 'ノード',
     speedTest: '遅延テスト',
+    testNode: 'テスト',
     notTested: 'テストなし',
     inUse: '使用中',
     switch: '切替',
@@ -87,8 +97,13 @@ export default {
     confirmSwitch: '切り替え確認',
     testProgress: 'テスト進捗:',
     groupTestComplete: 'グループ遅延テスト完了',
+    nodeTestComplete: 'ノード遅延テスト完了',
     testFailed: '遅延テスト失敗',
+    nodeTestFailed: 'ノード遅延テスト失敗',
     batchTestComplete: 'バッチ遅延テスト完了',
+    testing: 'テスト中...',
+    timeout: 'タイムアウト',
+    unknownError: '不明なエラー',
     loadSuccess: 'プロキシリスト読み込み成功',
     loadFailed: 'プロキシリスト取得失敗',
     loadFailedCheck: 'プロキシリスト取得失敗、Sing-Boxが起動しているか確認してください',
@@ -106,6 +121,8 @@ export default {
       rule: 'ルールモード',
       tun: 'TUNモード',
       unknown: '不明なモード',
+      globalDescription: '宛先に関係なく、すべてのトラフィックがプロキシを通して転送されます',
+      ruleDescription: 'トラフィックはルーティングルールと地理的位置に基づいて転送されます'
     },
   },
   sub: {

@@ -218,8 +218,5 @@ export const useTrafficStore = defineStore(
       updateTrafficStats,
       reconnectWebSocket
     }
-  },
-  {
-    persist: true,
   }
 )

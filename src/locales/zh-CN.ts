@@ -37,7 +37,14 @@ export default {
       manual: '手动模式',
       systemTip: '自动设置系统代理',
       tunTip: '使用TUN虚拟网卡代理所有流量，需要管理员权限',
-      manualTip: '需要手动配置系统代理'
+      manualTip: '需要手动配置系统代理',
+      systemDescription: '自动配置系统代理设置，为浏览器和应用程序提供代理服务',
+      tunDescription: '通过虚拟网卡捕获并代理所有系统流量，需要管理员权限',
+      manualDescription: '需要在应用程序和浏览器中手动配置代理设置'
+    },
+    proxyHeader: {
+      flowMode: '流量代理模式',
+      nodeMode: '节点代理模式'
     },
     adminStatus: {
       admin: '管理员',
@@ -59,6 +66,8 @@ export default {
       downloadTotal: '下载总流量',
       memory: '内存占用',
       connections: '活动连接',
+      title: '流量统计',
+      connectionsLabel: '个连接'
     },
   },
   chart: {
@@ -76,6 +85,7 @@ export default {
     currentNode: '当前节点',
     nodeCount: '个节点',
     speedTest: '测延迟',
+    testNode: '测试',
     notTested: '未测试',
     inUse: '使用中',
     switch: '切换',
@@ -86,8 +96,13 @@ export default {
     confirmSwitch: '确认切换',
     testProgress: '测试进度:',
     groupTestComplete: '组延迟测试完成',
+    nodeTestComplete: '节点延迟测试完成',
     testFailed: '延迟测试失败',
+    nodeTestFailed: '节点延迟测试失败',
     batchTestComplete: '批量延迟测试完成',
+    testing: '测试中...',
+    timeout: '超时',
+    unknownError: '未知错误',
     loadSuccess: '代理列表加载成功',
     loadFailed: '获取代理列表失败',
     loadFailedCheck: '获取代理列表失败，请检查Sing-Box是否已启动',
@@ -105,6 +120,8 @@ export default {
       rule: '规则模式',
       tun: 'TUN模式',
       unknown: '未知模式',
+      globalDescription: '所有流量将无视目标地址，全部通过代理转发',
+      ruleDescription: '流量将根据路由规则和地理位置信息进行转发'
     },
   },
   sub: {

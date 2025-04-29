@@ -1,16 +1,17 @@
 <template>
   <div class="home-container">
-    <!-- 状态控制卡片 -->
-    <n-card class="control-card" :bordered="false">
-      <n-space vertical :size="16">
-        <!-- 状态指示器和控制按钮 -->
-        <n-space justify="space-between" align="center" wrap-item>
+    <!-- 顶部状态卡片 -->
+    <n-card class="status-card" :bordered="false">
+      <div class="status-header">
+        <div class="status-left">
           <div class="status-indicator">
             <div class="status-dot" :class="{ active: appState.isRunning }"></div>
             <span class="status-text">{{
               appState.isRunning ? t('home.status.running') : t('home.status.stopped')
             }}</span>
-            <n-tag :bordered="false" :type="appState.wsConnected ? 'success' : 'error'" size="medium" class="ws-tag">
+          </div>
+          <div class="status-tags">
+            <n-tag :bordered="false" :type="appState.wsConnected ? 'success' : 'error'" class="status-tag">
               <template #icon>
                 <n-icon size="16">
                   <wifi-outline v-if="appState.wsConnected" />
@@ -19,7 +20,7 @@
               </template>
               {{ appState.wsConnected ? t('home.wsStatus.connected') : t('home.wsStatus.disconnected') }}
             </n-tag>
-            <n-tag :bordered="false" :type="isAdmin ? 'success' : 'warning'" size="medium" class="admin-tag">
+            <n-tag :bordered="false" :type="isAdmin ? 'success' : 'warning'" class="status-tag">
               <template #icon>
                 <n-icon size="16">
                   <shield-checkmark-outline v-if="isAdmin" />
@@ -29,128 +30,196 @@
               {{ isAdmin ? t('home.adminStatus.admin') : t('home.adminStatus.normal') }}
             </n-tag>
           </div>
-          <div class="controls-wrapper">
+        </div>
+        <div class="status-right">
+          <!-- 管理员重启按钮 - 仅非管理员状态显示 -->
+          <n-button v-if="!isAdmin" type="warning" secondary size="medium" @click="restartAsAdmin" class="control-button">
+            <template #icon>
+              <n-icon><shield-checkmark-outline /></n-icon>
+            </template>
+            {{ t('home.restartAsAdmin') }}
+          </n-button>
+          <!-- 启动/停止按钮 -->
+          <n-button :type="appState.isRunning ? 'error' : 'primary'" size="medium" :loading="isStarting || isStopping"
+            @click="appState.isRunning ? stopKernel() : runKernel()" class="control-button">
+            <template #icon>
+              <n-icon><power-outline /></n-icon>
+            </template>
+            {{ appState.isRunning ? t('home.stop') : t('home.start') }}
+          </n-button>
+        </div>
+      </div>
+    </n-card>
 
-            <!-- 管理员重启按钮 - 仅非管理员状态显示 -->
-            <n-button v-if="!isAdmin" type="warning" secondary size="medium" @click="restartAsAdmin"
-              class="control-button">
-              <template #icon>
-                <n-icon>
-                  <shield-checkmark-outline />
-                </n-icon>
-              </template>
-              {{ t('home.restartAsAdmin') }}
+    <!-- 代理模式设置卡片 -->
+    <div class="proxy-modes-container">
+      <!-- 流量代理模式卡片 -->
+      <n-card class="mode-card" :bordered="false">
+        <div class="mode-card-header">
+          <n-icon size="20" class="mode-card-icon"><layers-outline /></n-icon>
+          <h3 class="mode-card-title">{{ t('home.proxyHeader.flowMode') }}</h3>
+        </div>
+        <div class="mode-card-content">
+          <div class="mode-buttons">
+            <n-button-group size="medium">
+              <n-button
+                v-for="mode in proxyModes"
+                :key="mode.value"
+                :type="currentProxyMode === mode.value ? 'primary' : 'default'"
+                :ghost="currentProxyMode !== mode.value"
+                :disabled="(mode.value === 'tun' && !isAdmin) || isSwitching || isStarting || isStopping"
+                class="mode-button"
+                @click="onModeChange(mode.value)"
+              >
+                <template #icon><n-icon><component :is="mode.icon" /></n-icon></template>
+                {{ t(mode.nameKey) }}
+              </n-button>
+            </n-button-group>
+          </div>
+          <div class="mode-description">
+            {{ currentProxyMode ? t(`home.proxyMode.${currentProxyMode}Description`) : '' }}
+          </div>
+        </div>
+      </n-card>
+
+      <!-- 节点代理模式卡片 -->
+      <n-card class="mode-card" :bordered="false">
+        <div class="mode-card-header">
+          <n-icon size="20" class="mode-card-icon"><git-network-outline /></n-icon>
+          <h3 class="mode-card-title">{{ t('home.proxyHeader.nodeMode') }}</h3>
+        </div>
+        <div class="mode-card-content">
+          <div class="mode-buttons">
+            <n-button-group size="medium">
+              <n-button
+                v-for="mode in nodeProxyModes"
+                :key="mode.value"
+                :type="currentNodeProxyMode === mode.value ? 'primary' : 'default'"
+                :ghost="currentNodeProxyMode !== mode.value"
+                :disabled="!appState.isRunning || isSwitching || isStarting || isStopping"
+                class="mode-button"
+                @click="handleNodeProxyModeChange(mode.value)"
+              >
+                <template #icon><n-icon><component :is="mode.icon" /></n-icon></template>
+                {{ mode.label }}
+              </n-button>
+            </n-button-group>
+          </div>
+          <div class="mode-description">
+            {{ currentNodeProxyMode ? t(`proxy.mode.${currentNodeProxyMode}Description`) : '' }}
+          </div>
+        </div>
+      </n-card>
+    </div>
+
+    <!-- 节点模式切换确认对话框 -->
+    <n-modal
+      v-model:show="showNodeModeChangeModal"
+      preset="dialog"
+      :title="`${t('proxy.switchTo')}${targetNodeProxyMode ? getNodeProxyModeText(targetNodeProxyMode) : ''}`"
+    >
+      <template #header>
+        <div class="modal-header">
+          <n-icon size="22" class="modal-icon">
+            <information-circle-outline />
+          </n-icon>
+          <span>{{ t('proxy.switchTo') }}{{ targetNodeProxyMode ? getNodeProxyModeText(targetNodeProxyMode) : '' }}</span>
+        </div>
+      </template>
+      <div class="modal-content">{{ t('proxy.switchModeConfirm') }}</div>
+      <template #action>
+        <div class="modal-footer">
+          <n-space justify="end">
+            <n-button @click="showNodeModeChangeModal = false">{{ t('common.cancel') }}</n-button>
+            <n-button type="primary" :loading="isChangingNodeMode" @click="confirmNodeProxyModeChange">
+              {{ t('proxy.confirmSwitch') }}
             </n-button>
-            <!-- 启动/停止按钮 -->
-            <n-button :type="appState.isRunning ? 'error' : 'primary'" size="medium" :loading="isStarting || isStopping"
-              @click="appState.isRunning ? stopKernel() : runKernel()" class="control-button">
-              <template #icon>
-                <n-icon>
-                  <power-outline />
-                </n-icon>
-              </template>
-              {{ appState.isRunning ? t('home.stop') : t('home.start') }}
-            </n-button>
-          </div>
-        </n-space>
+          </n-space>
+        </div>
+      </template>
+    </n-modal>
 
-        <!-- 状态标签 -->
-        <n-space :size="12" class="status-tags">
-          <div>
-            <!-- 代理模式选择器 -->
-            <n-radio-group v-model:value="currentProxyMode" name="proxy-mode"
-              :disabled="isSwitching || isStarting || isStopping" class="proxy-mode-selector">
-              <n-radio-button v-for="mode in proxyModes" :key="mode.value" :value="mode.value"
-                :disabled="mode.value === 'tun' && !isAdmin">
-                <n-tooltip placement="top" trigger="hover">
-                  <template #trigger>
-                    <n-space :size="4" align="center">
-                      <n-icon>
-                        <component :is="mode.icon" />
-                      </n-icon>
-                      <span>{{ t(mode.nameKey) }}</span>
-                    </n-space>
-                  </template>
-                  {{ t(mode.tipKey) }}
-                </n-tooltip>
-              </n-radio-button>
-            </n-radio-group>
+    <!-- 流量数据卡片 -->
+    <n-card class="stats-card" :bordered="false">
+      <template #header>
+        <div class="stats-header">
+          <h3 class="stats-title">
+            <n-icon size="18" class="stats-icon"><analytics-outline /></n-icon>
+            {{ t('home.traffic.title') }}
+          </h3>
+          <div class="connections-indicator">
+            <n-icon size="16"><git-network-outline /></n-icon>
+            <span>{{ activeConnectionsCount }} {{ t('home.traffic.connectionsLabel') }}</span>
           </div>
-        </n-space>
+        </div>
+      </template>
 
-        <!-- 实时流量监控 -->
-        <div class="traffic-monitor">
-          <div class="traffic-card upload">
-            <div class="traffic-icon-container">
-              <n-icon size="22"><arrow-up-outline /></n-icon>
+      <div class="traffic-content">
+        <!-- 实时流量统计 -->
+        <div class="traffic-stats">
+          <div class="traffic-row">
+            <div class="traffic-item">
+              <div class="traffic-label">
+                <n-icon size="16" class="traffic-icon upload-icon"><arrow-up-outline /></n-icon>
+                <span>{{ t('home.traffic.uploadSpeed') }}</span>
+              </div>
+              <div class="traffic-value">{{ trafficStr.up }}</div>
             </div>
-            <div class="traffic-info">
-              <span class="traffic-label">{{ t('home.traffic.uploadSpeed') }}</span>
-              <span class="traffic-value">{{ trafficStr.up }}</span>
+            
+            <div class="traffic-item">
+              <div class="traffic-label">
+                <n-icon size="16" class="traffic-icon download-icon"><arrow-down-outline /></n-icon>
+                <span>{{ t('home.traffic.downloadSpeed') }}</span>
+              </div>
+              <div class="traffic-value">{{ trafficStr.down }}</div>
             </div>
-          </div>
-          <div class="traffic-card download">
-            <div class="traffic-icon-container">
-              <n-icon size="22"><arrow-down-outline /></n-icon>
+            
+            <div class="traffic-item">
+              <div class="traffic-label">
+                <n-icon size="16" class="traffic-icon cloud-up-icon"><cloud-upload-outline /></n-icon>
+                <span>{{ t('home.traffic.uploadTotal') }}</span>
+              </div>
+              <div class="traffic-value">{{ uploadTotalTraffic }}</div>
             </div>
-            <div class="traffic-info">
-              <span class="traffic-label">{{ t('home.traffic.downloadSpeed') }}</span>
-              <span class="traffic-value">{{ trafficStr.down }}</span>
+            
+            <div class="traffic-item">
+              <div class="traffic-label">
+                <n-icon size="16" class="traffic-icon cloud-down-icon"><cloud-download-outline /></n-icon>
+                <span>{{ t('home.traffic.downloadTotal') }}</span>
+              </div>
+              <div class="traffic-value">{{ downloadTotalTraffic }}</div>
             </div>
-          </div>
-          <div class="traffic-card upload-total">
-            <div class="traffic-icon-container">
-              <n-icon size="22"><cloud-upload-outline /></n-icon>
-            </div>
-            <div class="traffic-info">
-              <span class="traffic-label">{{ t('home.traffic.uploadTotal') }}</span>
-              <span class="traffic-value">{{ uploadTotalTraffic }}</span>
-            </div>
-          </div>
-          <div class="traffic-card download-total">
-            <div class="traffic-icon-container">
-              <n-icon size="22"><cloud-download-outline /></n-icon>
-            </div>
-            <div class="traffic-info">
-              <span class="traffic-label">{{ t('home.traffic.downloadTotal') }}</span>
-              <span class="traffic-value">{{ downloadTotalTraffic }}</span>
-            </div>
-          </div>
-          <div class="traffic-card memory">
-            <div class="traffic-icon-container">
-              <n-icon size="22"><hardware-chip-outline /></n-icon>
-            </div>
-            <div class="traffic-info">
-              <span class="traffic-label">{{ t('home.traffic.memory') }}</span>
-              <span class="traffic-value">{{ memoryStr }}</span>
-            </div>
-          </div>
-          <div class="traffic-card active-connections">
-            <div class="traffic-icon-container">
-              <n-icon size="22"><git-network-outline /></n-icon>
-            </div>
-            <div class="traffic-info">
-              <span class="traffic-label">{{ t('home.traffic.connections') }}</span>
-              <span class="traffic-value">{{ activeConnectionsCount }}</span>
+            
+            <div class="traffic-item">
+              <div class="traffic-label">
+                <n-icon size="16" class="traffic-icon memory-icon"><hardware-chip-outline /></n-icon>
+                <span>{{ t('home.traffic.memory') }}</span>
+              </div>
+              <div class="traffic-value">{{ memoryStr }}</div>
             </div>
           </div>
         </div>
-
+        
         <!-- 流量图表 -->
-        <div class="chart-wrapper">
-          <TrafficChart :upload-speed="trafficStore.traffic.up" :download-speed="trafficStore.traffic.down" />
+        <div class="chart-container">
+          <TrafficChart 
+            :upload-speed="trafficStore.traffic.up" 
+            :download-speed="trafficStore.traffic.down" 
+            class="traffic-chart"
+          />
         </div>
-      </n-space>
+      </div>
     </n-card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useMessage, useDialog } from 'naive-ui'
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch, h } from 'vue'
 import { useRoute } from 'vue-router'
 import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
+import type { Component as ComponentType } from 'vue'
 import {
   PowerOutline,
   RepeatOutline,
@@ -168,7 +237,10 @@ import {
   ShieldOutline,
   WifiOutline,
   CloseCircleOutline,
-  SettingsOutline
+  SettingsOutline,
+  InformationCircleOutline,
+  ChevronDownOutline,
+  LayersOutline
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -195,6 +267,17 @@ const isAdmin = ref(false)
 // 代理模式选择
 const currentProxyMode = ref(appState.proxyMode || 'system')
 
+// 节点代理模式选择
+const currentNodeProxyMode = ref('rule')
+const targetNodeProxyMode = ref('')
+const showNodeModeChangeModal = ref(false)
+const isChangingNodeMode = ref(false)
+
+// 动态渲染图标的辅助函数
+function renderIcon(icon: ComponentType) {
+  return () => h('div', { class: 'dropdown-option-icon' }, h(icon))
+}
+
 // 定义代理模式数据
 const proxyModes = [
   {
@@ -217,12 +300,84 @@ const proxyModes = [
   }
 ]
 
+// 定义节点代理模式选项 (更改为数组形式，与proxyModes一致)
+const nodeProxyModes = [
+  {
+    label: t('proxy.mode.global'),
+    value: 'global',
+    icon: GlobeOutline
+  },
+  {
+    label: t('proxy.mode.rule'),
+    value: 'rule',
+    icon: LayersOutline
+  }
+]
+
 // 监听代理模式变化
 watch(currentProxyMode, async (newMode) => {
   if (newMode !== appState.proxyMode) {
     await onModeChange(newMode)
   }
 })
+
+// 获取当前节点代理模式
+const getCurrentNodeProxyMode = async () => {
+  try {
+    // 调用后端API获取当前代理模式
+    const mode = await tauriApi.proxy.getCurrentProxyMode()
+    currentNodeProxyMode.value = mode
+    console.log(t('proxy.currentMode'), mode)
+  } catch (error) {
+    console.error(t('proxy.getModeError'), error)
+    // 出错时仍使用默认的规则模式
+    currentNodeProxyMode.value = 'rule'
+  }
+}
+
+/**
+ * 获取节点代理模式对应的文本
+ * @param mode 代理模式
+ * @returns 模式文本
+ */
+const getNodeProxyModeText = (mode: string): string => {
+  const modeMap: Record<string, string> = {
+    global: t('proxy.mode.global'),
+    rule: t('proxy.mode.rule'),
+  }
+  return modeMap[mode] || t('proxy.mode.unknown')
+}
+
+/**
+ * 处理节点代理模式变更
+ */
+const handleNodeProxyModeChange = (key: string) => {
+  if (key === currentNodeProxyMode.value) return
+  
+  targetNodeProxyMode.value = key
+  showNodeModeChangeModal.value = true
+}
+
+/**
+ * 确认切换节点代理模式
+ */
+const confirmNodeProxyModeChange = async () => {
+  if (!targetNodeProxyMode.value) return
+
+  isChangingNodeMode.value = true
+  try {
+    await tauriApi.proxy.toggleProxyMode(targetNodeProxyMode.value)
+    await kernelStore.restartKernel()
+    currentNodeProxyMode.value = targetNodeProxyMode.value
+    message.success(t('proxy.modeChangeSuccess', { mode: getNodeProxyModeText(targetNodeProxyMode.value) }))
+  } catch (error) {
+    console.error(t('proxy.modeChangeFailed'), error)
+    message.error(`${t('proxy.modeChangeError')}: ${error}`)
+  } finally {
+    isChangingNodeMode.value = false
+    showNodeModeChangeModal.value = false
+  }
+}
 
 // 监听路由可见性变化，简化为只用于计算属性的控制
 const route = useRoute()
@@ -301,6 +456,8 @@ const stopKernel = async () => {
 }
 
 const onModeChange = async (value: string) => {
+  if (value === currentProxyMode.value) return
+  
   const showMessage = (type: 'success' | 'info' | 'error', content: string) => {
     switch (type) {
       case 'success':
@@ -331,10 +488,12 @@ const onModeChange = async (value: string) => {
     if (value === 'system') {
       await tauriApi.proxy.setSystemProxy();
       appState.setProxyMode('system');
+      currentProxyMode.value = 'system';
       showMessage('success', t('notification.systemProxyEnabled'));
     } else if (value === 'manual') {
       await tauriApi.proxy.setManualProxy();
       appState.setProxyMode('manual');
+      currentProxyMode.value = 'manual';
       showMessage('info', t('notification.manualProxyEnabled'));
     } else if (value === 'tun') {
       needClose = await proxyService.switchMode('tun', showMessage);
@@ -428,6 +587,9 @@ const restartAsAdmin = async () => {
 onMounted(async () => {
   // 更新当前代理模式
   currentProxyMode.value = appState.proxyMode;
+  
+  // 获取节点代理模式
+  await getCurrentNodeProxyMode();
 
   // 设置监听器
   await setupListeners()
@@ -473,22 +635,40 @@ onUnmounted(() => {
 .home-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 12px 8px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.control-card {
-  border-radius: 16px;
+/* 状态卡片样式 */
+.status-card {
+  border-radius: 12px;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
 
-.control-card :deep(.n-card__content) {
-  padding: 16px;
+.status-card :deep(.n-card__content) {
+  padding: 8px 16px;
 }
 
-.control-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.status-right {
+  display: flex;
+  gap: 12px;
 }
 
 .status-indicator {
@@ -529,12 +709,10 @@ onUnmounted(() => {
     transform: scale(0.95);
     opacity: 0.6;
   }
-
   70% {
     transform: scale(1.1);
     opacity: 0.2;
   }
-
   100% {
     transform: scale(0.95);
     opacity: 0.6;
@@ -547,179 +725,297 @@ onUnmounted(() => {
   color: var(--n-text-color-1);
 }
 
-.controls-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.proxy-mode-selector {
-  margin-right: 4px;
-}
-
-.mode-radio {
-  display: flex;
-  align-items: center;
-}
-
 .status-tags {
-  margin-top: -8px;
+  display: flex;
+  gap: 8px;
 }
 
-.mode-tag,
-.admin-tag,
-.ws-tag {
-  padding: 0 12px;
-  height: 30px;
+.status-tag {
   display: flex;
   align-items: center;
   gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+}
+
+.control-button {
   border-radius: 8px;
   font-weight: 500;
 }
 
-.traffic-monitor {
+/* 代理模式卡片 */
+.proxy-modes-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
 }
 
-.traffic-card {
-  padding: 14px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  transition: all 0.3s ease;
-  border: 1px solid var(--n-border-color);
-}
-
-.traffic-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
-}
-
-:deep(.dark) .traffic-card:hover {
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-}
-
-.traffic-icon-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
+.mode-card {
   border-radius: 12px;
-  flex-shrink: 0;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  height: 100%;
 }
 
-.upload .traffic-icon-container {
-  background-color: rgba(24, 160, 88, 0.08);
-  color: var(--success-color);
+.mode-card :deep(.n-card__content) {
+  padding: 12px 16px;
 }
 
-.download .traffic-icon-container {
-  background-color: rgba(32, 128, 240, 0.08);
+.mode-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+}
+
+.mode-card-icon {
   color: var(--primary-color);
 }
 
-.memory .traffic-icon-container {
-  background-color: rgba(208, 48, 80, 0.08);
-  color: var(--error-color);
-}
-
-.total .traffic-icon-container {
-  background-color: rgba(240, 160, 32, 0.08);
-  color: var(--warning-color);
-}
-
-.upload-total .traffic-icon-container {
-  background-color: rgba(60, 180, 100, 0.08);
-  color: #2a9d8f;
-}
-
-.download-total .traffic-icon-container {
-  background-color: rgba(80, 140, 220, 0.08);
-  color: #4c6ef5;
-}
-
-.uptime .traffic-icon-container {
-  background-color: rgba(160, 100, 200, 0.08);
-  color: #9d4edd;
-}
-
-.active-connections .traffic-icon-container {
-  background-color: rgba(100, 160, 200, 0.08);
-  color: #3598db;
-}
-
-:deep(.dark) .upload .traffic-icon-container {
-  background-color: rgba(24, 160, 88, 0.15);
-}
-
-:deep(.dark) .download .traffic-icon-container {
-  background-color: rgba(32, 128, 240, 0.15);
-}
-
-:deep(.dark) .memory .traffic-icon-container {
-  background-color: rgba(208, 48, 80, 0.15);
-}
-
-:deep(.dark) .total .traffic-icon-container {
-  background-color: rgba(240, 160, 32, 0.15);
-}
-
-:deep(.dark) .upload-total .traffic-icon-container {
-  background-color: rgba(60, 180, 100, 0.15);
-}
-
-:deep(.dark) .download-total .traffic-icon-container {
-  background-color: rgba(80, 140, 220, 0.15);
-}
-
-:deep(.dark) .uptime .traffic-icon-container {
-  background-color: rgba(160, 100, 200, 0.15);
-}
-
-:deep(.dark) .active-connections .traffic-icon-container {
-  background-color: rgba(100, 160, 200, 0.15);
-}
-
-.traffic-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.traffic-label {
-  font-size: 13px;
-  color: var(--n-text-color-2);
-}
-
-.traffic-value {
-  font-size: 18px;
+.mode-card-title {
+  margin: 0;
+  font-size: 16px;
   font-weight: 600;
   color: var(--n-text-color-1);
 }
 
-.chart-wrapper {
-  margin-top: 6px;
-  height: 260px;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+.mode-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.control-button {
-  border-radius: 10px;
+.mode-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mode-button {
   font-weight: 500;
-  transition: all 0.25s ease;
+  flex: 1;
+  min-width: 100px;
+  padding: 4px 10px;
 }
 
-.control-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+.mode-description {
+  font-size: 12px;
+  color: var(--n-text-color-3);
+  line-height: 1.4;
+  padding: 2px 0;
+  max-height: 40px;
+  overflow: hidden;
+}
+
+/* 确认对话框 */
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.modal-icon {
+  color: var(--primary-color);
+}
+
+.modal-content {
+  margin: 16px 0;
+  line-height: 1.6;
+}
+
+.modal-footer {
+  margin-top: 8px;
+}
+
+/* 流量统计卡片 */
+.stats-card {
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.stats-card :deep(.n-card__content) {
+  padding: 10px 16px;
+}
+
+.stats-card :deep(.n-card__header) {
+  padding: 8px 16px;
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stats-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-icon {
+  color: var(--primary-color);
+}
+
+.connections-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--n-text-color-2);
+}
+
+.traffic-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.traffic-stats {
+  width: 100%;
+}
+
+.traffic-row {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px; /* 为滚动条预留空间 */
+}
+
+/* 隐藏滚动条但保留功能 */
+.traffic-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.traffic-row::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+:deep(.dark) .traffic-row::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.traffic-item {
+  flex: 1 0 auto;
+  min-width: 120px;
+  max-width: 180px;
+  background-color: rgba(0, 0, 0, 0.01);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.1);
+  white-space: nowrap;
+}
+
+:deep(.dark) .traffic-item {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.traffic-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--n-text-color-2);
+  margin-bottom: 2px;
+}
+
+.traffic-icon {
+  flex-shrink: 0;
+}
+
+.upload-icon {
+  color: var(--success-color);
+}
+
+.download-icon {
+  color: var(--primary-color);
+}
+
+.cloud-up-icon {
+  color: #2a9d8f;
+}
+
+.cloud-down-icon {
+  color: #4c6ef5;
+}
+
+.memory-icon {
+  color: var(--error-color);
+}
+
+.traffic-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--n-text-color-1);
+  padding-left: 4px;
+}
+
+.chart-container {
+  width: 100%;
+  height: 150px;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, 0.01);
+  margin-top: 4px;
+}
+
+:deep(.dark) .chart-container {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.traffic-chart {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 820px) {
+  .traffic-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  
+  .traffic-item {
+    min-width: 110px;
+  }
+}
+
+@media (max-width: 768px) {
+  .status-left, .status-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .status-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .traffic-content {
+    flex-direction: column;
+  }
+  
+  .traffic-row {
+    flex-direction: column;
+  }
+  
+  .traffic-item {
+    min-width: 105px;
+    padding: 5px 8px;
+  }
+  
+  .chart-container {
+    height: 130px;
+  }
 }
 </style>

@@ -427,3 +427,82 @@ pub async fn get_rules() -> Result<Value, String> {
 
     Ok(json)
 }
+
+/// 测试单个节点延迟
+#[tauri::command]
+pub async fn test_node_delay<R: Runtime>(
+    window: tauri::Window<R>,
+    proxy: String,
+    server: Option<String>,
+) -> Result<(), String> {
+    // 使用默认测试URL或指定的URL
+    let test_url = server.unwrap_or_else(|| "https://www.gstatic.com/generate_204".to_string());
+    let token = get_api_token();
+
+    // 构建请求URL
+    let url = format!(
+        "http://{}:{}/proxies/{}/delay?url={}&timeout=5000&token={}",
+        network_config::DEFAULT_CLASH_API_ADDRESS,
+        network_config::DEFAULT_CLASH_API_PORT,
+        urlencoding::encode(&proxy),
+        urlencoding::encode(&test_url),
+        token
+    );
+
+    // 创建禁用代理的HTTP客户端
+    let client = Client::builder()
+        .no_proxy()
+        .build()
+        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
+
+    // 发送请求并获取结果
+    match client
+        .get(&url)
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .send()
+        .await
+    {
+        Ok(response) => {
+            match response.json::<Value>().await {
+                Ok(data) => {
+                    let delay = data.get("delay").and_then(|d| d.as_u64()).unwrap_or(0);
+                    
+                    // 发送测试结果事件
+                    let _ = window.emit(
+                        "test-node-result",
+                        json!({
+                            "proxy": proxy,
+                            "delay": delay,
+                            "success": true
+                        }),
+                    );
+                }
+                Err(e) => {
+                    // 发送测试失败事件
+                    let _ = window.emit(
+                        "test-node-result",
+                        json!({
+                            "proxy": proxy,
+                            "success": false,
+                            "error": format!("解析结果失败: {}", e)
+                        }),
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            // 发送测试失败事件
+            let _ = window.emit(
+                "test-node-result",
+                json!({
+                    "proxy": proxy,
+                    "success": false,
+                    "error": format!("请求失败: {}", e)
+                }),
+            );
+        }
+    }
+
+    Ok(())
+}

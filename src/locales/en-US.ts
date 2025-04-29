@@ -37,7 +37,14 @@ export default {
       manual: 'Manual Mode',
       systemTip: 'Automatically set system proxy',
       tunTip: 'Use TUN virtual network card to proxy all traffic, requires admin',
-      manualTip: 'Manually configure system proxy'
+      manualTip: 'Manually configure system proxy',
+      systemDescription: 'Automatically configure system proxy settings for web browsers and applications',
+      tunDescription: 'Capture and proxy all system traffic via virtual network card, requires administrator privileges',
+      manualDescription: 'Configure proxy settings manually in your applications and browsers'
+    },
+    proxyHeader: {
+      flowMode: 'Traffic Proxy Mode',
+      nodeMode: 'Node Proxy Mode'
     },
     adminStatus: {
       admin: 'Administrator',
@@ -59,6 +66,8 @@ export default {
       downloadTotal: 'Total Download',
       memory: 'Memory',
       connections: 'Active Connections',
+      title: 'Traffic Statistics',
+      connectionsLabel: 'connections'
     },
   },
   chart: {
@@ -76,6 +85,7 @@ export default {
     currentNode: 'Current Node',
     nodeCount: 'nodes',
     speedTest: 'Test Latency',
+    testNode: 'Test',
     notTested: 'Not tested',
     inUse: 'In use',
     switch: 'Switch',
@@ -87,8 +97,13 @@ export default {
     confirmSwitch: 'Confirm Switch',
     testProgress: 'Test progress:',
     groupTestComplete: 'Group latency test completed',
+    nodeTestComplete: 'Node latency test completed',
     testFailed: 'Latency test failed',
+    nodeTestFailed: 'Node latency test failed',
     batchTestComplete: 'Batch latency test completed',
+    testing: 'Testing...',
+    timeout: 'Timeout',
+    unknownError: 'Unknown error',
     loadSuccess: 'Proxy list loaded successfully',
     loadFailed: 'Failed to get proxy list',
     loadFailedCheck: 'Failed to get proxy list, please check if Sing-Box is running',
@@ -106,6 +121,8 @@ export default {
       rule: 'Rule Mode',
       tun: 'TUN Mode',
       unknown: 'Unknown Mode',
+      globalDescription: 'All traffic will be forwarded through proxies regardless of destination',
+      ruleDescription: 'Traffic will be forwarded based on routing rules and geo-location'
     },
   },
   sub: {

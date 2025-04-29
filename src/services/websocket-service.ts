@@ -42,6 +42,14 @@ export class WebSocketService {
     memory: null
   };
 
+  // 记录监听器移除函数
+  private removeListenerFuncs: Record<string, (() => void) | null> = {
+    connections: null,
+    traffic: null,
+    logs: null,
+    memory: null
+  };
+
   private constructor() {}
 
   /**
@@ -223,6 +231,18 @@ export class WebSocketService {
   }
 
   /**
+   * 清除WebSocket的监听器
+   * @param type WebSocket类型
+   */
+  private cleanupListener(type: string) {
+    if (this.removeListenerFuncs[type]) {
+      console.log(`清除 ${type} WebSocket 监听器`);
+      this.removeListenerFuncs[type]!();
+      this.removeListenerFuncs[type] = null;
+    }
+  }
+
+  /**
    * 断开特定类型的WebSocket连接
    * @param type WebSocket类型: 'connections' | 'traffic' | 'logs' | 'memory'
    */
@@ -230,49 +250,88 @@ export class WebSocketService {
     // 清除重连计时器
     this.clearReconnectTimer(type);
     
+    // 获取相应的WebSocket引用
+    let ws: WebSocket | null = null;
+    let isClosing = false;
+    
+    switch (type) {
+      case 'connections':
+        ws = this.connectionWs;
+        isClosing = this.connectionIsClosing;
+        break;
+      case 'traffic':
+        ws = this.trafficWs;
+        isClosing = this.trafficIsClosing;
+        break;
+      case 'logs':
+        ws = this.logWs;
+        isClosing = this.logIsClosing;
+        break;
+      case 'memory':
+        ws = this.memoryWs;
+        isClosing = this.memoryIsClosing;
+        break;
+      default:
+        console.error(`未知的WebSocket类型: ${type}`);
+        return;
+    }
+    
+    // 如果连接不存在或已经在关闭中，直接返回
+    if (!ws || isClosing) {
+      console.log(`${type} WebSocket不存在或已经在关闭中，跳过断开操作`);
+      return;
+    }
+    
     try {
+      // 先清除监听器，避免disconnection期间仍接收消息
+      this.cleanupListener(type);
+      
+      // 设置关闭状态标志
+      this.setClosingState(type, true);
+      
+      try {
+        // 尝试断开连接
+        console.log(`正在断开 ${type} WebSocket连接...`);
+        await Promise.race([
+          ws.disconnect(),
+          // 添加超时，避免永久等待
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`断开${type}连接超时`)), 3000)
+          )
+        ]);
+        console.log(`${type} WebSocket连接已成功断开`);
+      } catch (disconnectError) {
+        // 断开连接出错，但继续执行清理
+        console.warn(`断开${type} WebSocket连接出错:`, disconnectError);
+      }
+      
+      // 无论断开是否成功，都清理引用
       switch (type) {
         case 'connections':
-          if (this.connectionWs) {
-            this.setClosingState('connections', true);
-            await this.connectionWs.disconnect();
-            this.connectionWs = null;
-            this.setClosingState('connections', false);
-          }
+          this.connectionWs = null;
           break;
         case 'traffic':
-          if (this.trafficWs) {
-            this.setClosingState('traffic', true);
-            await this.trafficWs.disconnect();
-            this.trafficWs = null;
-            this.setClosingState('traffic', false);
-          }
+          this.trafficWs = null;
           break;
         case 'logs':
-          if (this.logWs) {
-            this.setClosingState('logs', true);
-            await this.logWs.disconnect();
-            this.logWs = null;
-            this.setClosingState('logs', false);
-          }
+          this.logWs = null;
           break;
         case 'memory':
-          if (this.memoryWs) {
-            this.setClosingState('memory', true);
-            await this.memoryWs.disconnect();
-            this.memoryWs = null;
-            this.setClosingState('memory', false);
-          }
+          this.memoryWs = null;
           break;
-        default:
-          console.error(`未知的WebSocket类型: ${type}`);
       }
+      
+      // 重置关闭状态
+      this.setClosingState(type, false);
       
       // 断开后检查并更新连接状态
       this.checkConnectionStatus();
     } catch (error) {
-      console.error(`断开WebSocket连接失败 (${type}):`, error);
+      console.error(`处理WebSocket断开连接失败 (${type}):`, error);
+      
       // 即使发生错误，也重置状态和引用
+      this.cleanupListener(type);
+      
       switch (type) {
         case 'connections':
           this.connectionWs = null;
@@ -351,24 +410,49 @@ export class WebSocketService {
       this.clearReconnectTimer(key);
     });
     
-    // 标记所有连接为正在关闭
-    this.connectionIsClosing = true;
-    this.trafficIsClosing = true;
-    this.logIsClosing = true;
-    this.memoryIsClosing = true;
+    // 获取所有活跃连接的引用
+    const activeConnections = [];
+    
+    // 收集当前活跃的WebSocket连接
+    if (this.connectionWs && !this.connectionIsClosing) {
+      activeConnections.push({type: 'connections', ws: this.connectionWs});
+      this.connectionIsClosing = true;
+    }
+    
+    if (this.trafficWs && !this.trafficIsClosing) {
+      activeConnections.push({type: 'traffic', ws: this.trafficWs});
+      this.trafficIsClosing = true;
+    }
+    
+    if (this.logWs && !this.logIsClosing) {
+      activeConnections.push({type: 'logs', ws: this.logWs});
+      this.logIsClosing = true;
+    }
+    
+    if (this.memoryWs && !this.memoryIsClosing) {
+      activeConnections.push({type: 'memory', ws: this.memoryWs});
+      this.memoryIsClosing = true;
+    }
     
     try {
-      const disconnectPromises = [];
+      // 清除所有监听器
+      Object.keys(this.removeListenerFuncs).forEach(key => {
+        this.cleanupListener(key);
+      });
       
-      // 收集所有需要断开的连接
-      if (this.connectionWs) disconnectPromises.push(this.connectionWs.disconnect().catch(e => console.error('断开连接WebSocket失败:', e)));
-      if (this.trafficWs) disconnectPromises.push(this.trafficWs.disconnect().catch(e => console.error('断开流量WebSocket失败:', e)));
-      if (this.logWs) disconnectPromises.push(this.logWs.disconnect().catch(e => console.error('断开日志WebSocket失败:', e)));
-      if (this.memoryWs) disconnectPromises.push(this.memoryWs.disconnect().catch(e => console.error('断开内存WebSocket失败:', e)));
-
       // 并行断开所有连接
-      if (disconnectPromises.length > 0) {
-        await Promise.allSettled(disconnectPromises);
+      if (activeConnections.length > 0) {
+        console.log(`正在断开 ${activeConnections.length} 个WebSocket连接...`);
+        
+        await Promise.allSettled(
+          activeConnections.map(({type, ws}) => 
+            Promise.race([
+              ws.disconnect().catch(e => console.warn(`断开${type} WebSocket失败:`, e)),
+              // 添加超时
+              new Promise((resolve) => setTimeout(resolve, 3000))
+            ])
+          )
+        );
       }
 
       // 重置连接
@@ -396,6 +480,9 @@ export class WebSocketService {
    */
   private async setupConnectionsListener(connectionStore: ReturnType<typeof useConnectionStore>): Promise<boolean> {
     try {
+      // 清除可能存在的旧监听器
+      this.cleanupListener('connections');
+      
       // 断开旧连接
       if (this.connectionWs) {
         this.connectionIsClosing = true;
@@ -410,19 +497,40 @@ export class WebSocketService {
       }
 
       // 建立新连接
+      console.log(`尝试连接连接管理WebSocket: ws://127.0.0.1:12081/connections?token=${this.token.substring(0, 5)}...`);
       this.connectionWs = await WebSocket.connect(`ws://127.0.0.1:12081/connections?token=${this.token}`);
+      console.log('连接管理WebSocket连接成功');
       
       // 添加消息监听器
-      this.connectionWs.addListener(message => {
+      const removeListener = this.connectionWs.addListener(message => {
         try {
-          if (message.data) {
-            const data = JSON.parse(typeof message.data === 'string' ? message.data : JSON.stringify(message.data));
-            connectionStore.updateConnections(data);
+          // 在处理消息前检查WebSocket状态
+          if (!this.connectionWs || this.connectionIsClosing) {
+            console.log('连接WebSocket已关闭或正在关闭，忽略新收到的消息');
+            return;
           }
+          
+          if (!message.data) {
+            console.warn('收到空的连接消息');
+            return;
+          }
+          
+          let data;
+          if (typeof message.data === 'string') {
+            data = JSON.parse(message.data);
+          } else {
+            data = JSON.parse(JSON.stringify(message.data));
+          }
+          
+          // 更新连接数据
+          connectionStore.updateConnections(data);
         } catch (error) {
           console.error('解析连接数据失败:', error);
         }
       });
+      
+      // 保存移除监听器的函数
+      this.removeListenerFuncs['connections'] = removeListener;
       
       // 连接成功，更新状态
       this.updateConnectionStatus(true);
@@ -430,6 +538,7 @@ export class WebSocketService {
     } catch (error) {
       console.error('设置连接监听器失败:', error);
       this.connectionWs = null;
+      this.removeListenerFuncs['connections'] = null;
       return false;
     }
   }
@@ -439,6 +548,9 @@ export class WebSocketService {
    */
   private async setupTrafficListener(trafficStore: ReturnType<typeof useTrafficStore>): Promise<boolean> {
     try {
+      // 清除可能存在的旧监听器
+      this.cleanupListener('traffic');
+      
       // 断开旧连接
       if (this.trafficWs) {
         this.trafficIsClosing = true;
@@ -453,19 +565,40 @@ export class WebSocketService {
       }
 
       // 建立新连接
+      console.log(`尝试连接流量WebSocket: ws://127.0.0.1:12081/traffic?token=${this.token.substring(0, 5)}...`);
       this.trafficWs = await WebSocket.connect(`ws://127.0.0.1:12081/traffic?token=${this.token}`);
+      console.log('流量WebSocket连接成功');
       
       // 添加消息监听器
-      this.trafficWs.addListener(message => {
+      const removeListener = this.trafficWs.addListener(message => {
         try {
-          if (message.data && this.trafficWs && !this.trafficIsClosing) {
-            const data = JSON.parse(typeof message.data === 'string' ? message.data : JSON.stringify(message.data));
-            trafficStore.updateTrafficStats(data);
+          // 在处理消息前检查WebSocket状态
+          if (!this.trafficWs || this.trafficIsClosing) {
+            console.log('流量WebSocket已关闭或正在关闭，忽略新收到的消息');
+            return;
           }
+          
+          if (!message.data) {
+            console.warn('收到空的流量消息');
+            return;
+          }
+          
+          let data;
+          if (typeof message.data === 'string') {
+            data = JSON.parse(message.data);
+          } else {
+            data = JSON.parse(JSON.stringify(message.data));
+          }
+          
+          // 更新流量数据
+          trafficStore.updateTrafficStats(data);
         } catch (error) {
           console.error('解析流量数据失败:', error);
         }
       });
+      
+      // 保存移除监听器的函数
+      this.removeListenerFuncs['traffic'] = removeListener;
       
       // 连接成功，更新状态
       this.updateConnectionStatus(true);
@@ -473,6 +606,7 @@ export class WebSocketService {
     } catch (error) {
       console.error('设置流量监听器失败:', error);
       this.trafficWs = null;
+      this.removeListenerFuncs['traffic'] = null;
       return false;
     }
   }
@@ -482,6 +616,9 @@ export class WebSocketService {
    */
   private async setupLogListener(logStore: ReturnType<typeof useLogStore>): Promise<boolean> {
     try {
+      // 清除可能存在的旧监听器
+      this.cleanupListener('logs');
+      
       // 断开旧连接
       if (this.logWs) {
         this.logIsClosing = true;
@@ -496,21 +633,73 @@ export class WebSocketService {
       }
 
       // 建立新连接
+      console.log(`尝试连接日志WebSocket: ws://127.0.0.1:12081/logs?token=${this.token.substring(0, 5)}...`);
       this.logWs = await WebSocket.connect(`ws://127.0.0.1:12081/logs?token=${this.token}`);
+      console.log('日志WebSocket连接成功');
       
       // 添加消息监听器
-      this.logWs.addListener(message => {
+      const removeListener = this.logWs.addListener(message => {
         try {
-          if (message.data && this.logWs && !this.logIsClosing) {
-            const data = JSON.parse(typeof message.data === 'string' ? message.data : JSON.stringify(message.data));
-            if (data && typeof data.type === 'string' && typeof data.payload === 'string') {
-              logStore.addLog(data.type, data.payload);
-            }
+          console.log('收到日志消息:', message);
+          if (!message.data) {
+            console.warn('收到空的日志消息');
+            return;
           }
+          
+          if (!this.logWs || this.logIsClosing) {
+            console.warn('日志WebSocket已关闭或正在关闭，丢弃消息');
+            return;
+          }
+          
+          let data;
+          if (typeof message.data === 'string') {
+            data = JSON.parse(message.data);
+          } else {
+            data = JSON.parse(JSON.stringify(message.data));
+          }
+          
+          console.log('收到日志数据:', data);
+          
+          if (!data) {
+            console.warn('解析后的日志数据为空');
+            return;
+          }
+          
+          if (typeof data.type !== 'string') {
+            console.warn(`无效的日志类型: ${data.type}`);
+            return;
+          }
+          
+          if (typeof data.payload !== 'string') {
+            console.warn(`无效的日志内容: ${data.payload}`);
+            return;
+          }
+          
+          // 发送到日志存储
+          console.log(`添加日志: [${data.type}] ${data.payload}`);
+          logStore.addLog(data.type, data.payload);
+          
+          // 同时触发Tauri事件，确保LogStore中的监听器也能收到数据
+          const eventPayload = {
+            type: data.type,
+            payload: data.payload
+          };
+          
+          // 使用mitt发出日志事件，确保事件总线也能收到
+          mitt.emit('log-data', eventPayload);
+          
         } catch (error) {
-          console.error('解析日志数据失败:', error);
+          console.error('处理日志数据失败:', error, '原始消息:', message.data);
         }
       });
+      
+      // 保存移除监听器的函数
+      this.removeListenerFuncs['logs'] = removeListener;
+      
+      // 测试发送一条日志，确认监听器正常工作
+      setTimeout(() => {
+        logStore.addLog('info', '日志WebSocket连接已建立，等待内核数据...');
+      }, 500);
       
       // 连接成功，更新状态
       this.updateConnectionStatus(true);
@@ -518,6 +707,13 @@ export class WebSocketService {
     } catch (error) {
       console.error('设置日志监听器失败:', error);
       this.logWs = null;
+      this.removeListenerFuncs['logs'] = null;
+      
+      // 即使WebSocket连接失败，也添加一条本地日志
+      setTimeout(() => {
+        logStore.addLog('error', `日志连接失败: ${error}`);
+      }, 500);
+      
       return false;
     }
   }
@@ -527,6 +723,9 @@ export class WebSocketService {
    */
   private async setupMemoryListener(connectionStore: ReturnType<typeof useConnectionStore>): Promise<boolean> {
     try {
+      // 清除可能存在的旧监听器
+      this.cleanupListener('memory');
+      
       // 断开旧连接
       if (this.memoryWs) {
         this.memoryIsClosing = true;
@@ -541,19 +740,40 @@ export class WebSocketService {
       }
 
       // 建立新连接
+      console.log(`尝试连接内存WebSocket: ws://127.0.0.1:12081/memory?token=${this.token.substring(0, 5)}...`);
       this.memoryWs = await WebSocket.connect(`ws://127.0.0.1:12081/memory?token=${this.token}`);
+      console.log('内存WebSocket连接成功');
       
       // 添加消息监听器
-      this.memoryWs.addListener(message => {
+      const removeListener = this.memoryWs.addListener(message => {
         try {
-          if (message.data && this.memoryWs && !this.memoryIsClosing) {
-            const data = JSON.parse(typeof message.data === 'string' ? message.data : JSON.stringify(message.data));
-            connectionStore.updateMemory(data);
+          // 在处理消息前检查WebSocket状态
+          if (!this.memoryWs || this.memoryIsClosing) {
+            console.log('内存WebSocket已关闭或正在关闭，忽略新收到的消息');
+            return;
           }
+          
+          if (!message.data) {
+            console.warn('收到空的内存消息');
+            return;
+          }
+          
+          let data;
+          if (typeof message.data === 'string') {
+            data = JSON.parse(message.data);
+          } else {
+            data = JSON.parse(JSON.stringify(message.data));
+          }
+          
+          // 更新内存数据
+          connectionStore.updateMemory(data);
         } catch (error) {
           console.error('解析内存数据失败:', error);
         }
       });
+      
+      // 保存移除监听器的函数
+      this.removeListenerFuncs['memory'] = removeListener;
       
       // 连接成功，更新状态
       this.updateConnectionStatus(true);
@@ -561,6 +781,7 @@ export class WebSocketService {
     } catch (error) {
       console.error('设置内存监听器失败:', error);
       this.memoryWs = null;
+      this.removeListenerFuncs['memory'] = null;
       return false;
     }
   }

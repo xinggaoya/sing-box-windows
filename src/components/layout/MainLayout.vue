@@ -53,34 +53,21 @@
       <n-layout-sider
         bordered
         collapse-mode="width"
-        :collapsed-width="70"
-        :width="220"
+        :collapsed-width="64"
+        :width="200"
+        :collapsed="collapsed"
         show-trigger
-        style="background-color: var(--n-color-base)"
         @collapse="collapsed = true"
         @expand="collapsed = false"
-        class="custom-sider"
       >
-        <div class="custom-menu" :class="{ 'menu-collapsed': collapsed }">
-          <div
-            v-for="(item, index) in menuOptions"
-            :key="index"
-            class="menu-item"
-            :class="{
-              'menu-item-active': currentMenu === item.key,
-              'menu-item-disabled': item.disabled,
-            }"
-            @click="!item.disabled && onSelect(item.key)"
-          >
-            <div class="menu-indicator" :class="{ active: currentMenu === item.key }" />
-            <div class="menu-item-content">
-              <n-icon :size="24" class="menu-icon">
-                <component :is="item.icon" />
-              </n-icon>
-              <span v-show="!collapsed" class="menu-label">{{ item.label }}</span>
-            </div>
-          </div>
-        </div>
+        <n-menu
+          v-model:value="currentMenu"
+          :collapsed="collapsed"
+          :collapsed-width="64"
+          :collapsed-icon-size="22"
+          :options="menuOptions"
+          @update:value="onSelect"
+        />
       </n-layout-sider>
       <n-layout-content content-style="padding: 0;">
         <n-scrollbar style="max-height: calc(100vh - 64px)" class="main-scrollbar">
@@ -102,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { darkTheme, useOsTheme, NIcon, useNotification, NButton, NProgress } from 'naive-ui'
+import { darkTheme, useOsTheme, NIcon, useNotification, NButton, NProgress, type MenuOption } from 'naive-ui'
 import type { NotificationReactive } from 'naive-ui'
 import { h, ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
@@ -131,6 +118,7 @@ import { listen } from '@tauri-apps/api/event'
 import logo from '@/assets/icon.png'
 import UpdateModal from '@/components/UpdateModal.vue'
 import { useI18n } from 'vue-i18n'
+import type { Component } from 'vue'
 
 const router = useRouter()
 const appWindow = Window.getCurrent()
@@ -140,9 +128,14 @@ const windowStore = useWindowStore()
 const updateStore = useUpdateStore()
 const notification = useNotification()
 const collapsed = ref(false)
-const currentMenu = ref(0)
+const currentMenu = ref<string | null>('0')
 const isFullscreen = ref(false)
 const { t } = useI18n()
+
+// 渲染图标函数
+function renderIcon(icon: Component) {
+  return () => h(NIcon, null, { default: () => h(icon) })
+}
 
 // 更新对话框相关状态
 const showUpdateModal = ref(false)
@@ -191,49 +184,54 @@ const onToggleFullScreen = async () => {
   await windowStore.toggleFullScreen()
 }
 
-const menuOptions = computed(() => [
+const menuOptions = computed<MenuOption[]>(() => [
   {
     label: t('nav.home'),
-    key: 0,
-    icon: HomeOutline,
+    key: '0',
+    icon: renderIcon(HomeOutline),
+    disabled: false
   },
   {
     label: t('nav.proxy'),
-    key: 1,
+    key: '1',
     disabled: !appStore.isRunning,
-    icon: SwapHorizontalOutline,
+    icon: renderIcon(SwapHorizontalOutline),
   },
   {
     label: t('nav.sub'),
-    key: 4,
-    icon: AtCircleOutline,
+    key: '4',
+    icon: renderIcon(AtCircleOutline),
+    disabled: false
   },
   {
     label: t('nav.rules'),
-    key: 2,
+    key: '2',
     disabled: !appStore.isRunning,
-    icon: FilterOutline,
+    icon: renderIcon(FilterOutline),
   },
   {
     label: t('nav.connections'),
-    key: 3,
+    key: '3',
     disabled: !appStore.isRunning,
-    icon: LinkOutline,
+    icon: renderIcon(LinkOutline),
   },
   {
     label: t('nav.log'),
-    key: 5,
-    icon: DocumentTextOutline,
+    key: '5',
+    icon: renderIcon(DocumentTextOutline),
+    disabled: false
   },
   {
     label: t('nav.setting'),
-    key: 6,
-    icon: SettingsOutline,
+    key: '6',
+    icon: renderIcon(SettingsOutline),
+    disabled: false
   },
 ])
 
-function onSelect(key: number) {
-  switch (key) {
+function onSelect(key: string) {
+  const numKey = parseInt(key)
+  switch (numKey) {
     case 0:
       router.push('/')
       break
@@ -258,7 +256,6 @@ function onSelect(key: number) {
     default:
       break
   }
-  currentMenu.value = key
 }
 
 // 监听窗口事件
@@ -296,88 +293,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .custom-sider {
   transition: all 0.3s ease;
-  border-right: 1px solid var(--n-border-color);
-}
-
-.custom-menu {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.menu-collapsed {
-  padding: 12px 8px;
-  align-items: center;
-}
-
-.menu-item {
-  position: relative;
-  padding: 12px 16px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  user-select: none;
-  overflow: hidden;
-}
-
-.menu-item-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: relative;
-  z-index: 2;
-}
-
-.menu-label {
-  font-size: 15px;
-  font-weight: 500;
-  transition: all 0.25s ease;
-  color: var(--n-text-color-1);
-}
-
-.menu-icon {
-  transition: all 0.25s ease;
-  color: var(--n-text-color-2);
-}
-
-.menu-item:hover {
-  color: var(--primary-color);
-  background-color: rgba(64, 128, 255, 0.08);
-}
-
-.menu-item-active {
-  color: var(--primary-color);
-  background-color: rgba(64, 128, 255, 0.15);
-  box-shadow: 0 2px 8px rgba(64, 128, 255, 0.1);
-}
-
-.menu-item-active .menu-icon,
-.menu-item-active .menu-label {
-  color: var(--primary-color);
-  font-weight: 600;
-}
-
-.menu-indicator {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  height: 60%;
-  width: 4px;
-  border-radius: 4px;
-  transform: translateY(-50%);
-  background-color: transparent;
-  transition: all 0.3s ease;
-}
-
-.menu-indicator.active {
-  background-color: var(--primary-color);
-  box-shadow: 0 0 8px rgba(64, 128, 255, 0.5);
-}
-
-.menu-item-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .header-button {
@@ -386,48 +301,6 @@ onBeforeUnmount(() => {
 
 .header-button:hover {
   transform: translateY(-1px);
-}
-
-/* 增加选中特效 */
-.menu-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: transparent;
-  z-index: 1;
-  transition: all 0.3s ease;
-}
-
-.menu-item-active::before {
-  background-color: rgba(64, 128, 255, 0.05);
-}
-
-:deep(.dark) .custom-sider {
-  background-color: rgba(34, 34, 38, 0.95);
-}
-
-:deep(.dark) .menu-item:hover {
-  background-color: rgba(64, 128, 255, 0.15);
-}
-
-:deep(.dark) .menu-item-active {
-  background-color: rgba(64, 128, 255, 0.25);
-  box-shadow: 0 2px 10px rgba(64, 128, 255, 0.2);
-}
-
-:deep(.dark) .header-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(.dark) .menu-label {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-:deep(.dark) .menu-icon {
-  color: rgba(255, 255, 255, 0.75);
 }
 
 .main-scrollbar {

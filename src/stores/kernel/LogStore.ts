@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { listen } from '@tauri-apps/api/event'
+import mitt from '@/utils/mitt'
 
 // 定义消息类型
 export type MessageType = 'success' | 'info' | 'error' | 'warning'
@@ -16,7 +17,7 @@ export const useLogStore = defineStore(
   'log',
   () => {
     // 减少最大日志数量以减轻内存压力
-    const MAX_LOGS = 200
+    const MAX_LOGS = 500
 
     // 日志信息
     const logs = ref<LogEntry[]>([])
@@ -26,41 +27,33 @@ export const useLogStore = defineStore(
     
     // 存储事件监听器清理函数
     let unlistenLogsFn: (() => void) | null = null
+    
+    // 是否已经设置了mitt监听器
+    let mittListenerSet = false
 
     // 初始化日志监听
     const setupLogListener = async () => {
       try {
         // 先清理可能存在的旧监听器
-        if (unlistenLogsFn) {
-          unlistenLogsFn()
-          unlistenLogsFn = null
+        cleanupListeners()
+        
+        console.log('设置日志事件监听器...')
+        
+        // 监听Tauri日志事件
+        unlistenLogsFn = await listen('log-data', (event) => {
+          console.log('接收到Tauri日志事件:', event)
+          processLogData(event.payload)
+        })
+        
+        // 监听mitt事件总线的日志事件（从WebSocket服务中转发）
+        if (!mittListenerSet) {
+          console.log('设置mitt日志事件监听器')
+          mitt.on('log-data', handleMittLogData)
+          mittListenerSet = true
         }
         
-        // 监听日志数据
-        unlistenLogsFn = await listen('log-data', (event) => {
-          const data = event.payload as {
-            type: string
-            payload: string
-          }
-          if (
-            'type' in data &&
-            'payload' in data &&
-            typeof data.type === 'string' &&
-            typeof data.payload === 'string'
-          ) {
-            // 日志条目添加到数组前端，并限制最大数量
-            logs.value.unshift({
-              type: data.type,
-              payload: data.payload,
-              timestamp: Date.now(),
-            })
-
-            // 超过最大数量时，移除多余日志
-            if (logs.value.length > MAX_LOGS) {
-              logs.value = logs.value.slice(0, MAX_LOGS)
-            }
-          }
-        })
+        // 添加一条初始化日志
+        addLog('info', '日志系统已初始化')
         
         return true
       } catch (error) {
@@ -68,9 +61,42 @@ export const useLogStore = defineStore(
         return false
       }
     }
+    
+    // 处理mitt事件总线上的日志数据
+    const handleMittLogData = (data: any) => {
+      console.log('接收到mitt日志事件:', data)
+      processLogData(data)
+    }
+    
+    // 处理日志数据
+    const processLogData = (data: any) => {
+      try {
+        if (!data) {
+          console.warn('日志数据为空')
+          return
+        }
+        
+        // 确保数据有正确的格式
+        if (
+          'type' in data &&
+          'payload' in data &&
+          typeof data.type === 'string' &&
+          typeof data.payload === 'string'
+        ) {
+          // 添加日志
+          addLog(data.type, data.payload)
+        } else {
+          console.warn('无效的日志数据格式:', data)
+        }
+      } catch (e) {
+        console.error('处理日志数据失败:', e)
+      }
+    }
 
     // 添加日志
     const addLog = (type: string, payload: string) => {
+      console.log(`添加日志 [${type}]: ${payload}`)
+      
       // 添加新的日志条目
       logs.value.unshift({
         type,
@@ -87,6 +113,7 @@ export const useLogStore = defineStore(
     // 清空日志
     const clearLogs = () => {
       logs.value = []
+      addLog('info', '日志已清空')
     }
 
     // 设置消息回调
@@ -108,10 +135,37 @@ export const useLogStore = defineStore(
     // 清理监听器
     const cleanupListeners = () => {
       if (unlistenLogsFn) {
+        console.log('清理Tauri日志监听器')
         unlistenLogsFn()
         unlistenLogsFn = null
       }
+      
+      if (mittListenerSet) {
+        console.log('清理mitt日志监听器')
+        mitt.off('log-data', handleMittLogData)
+        mittListenerSet = false
+      }
     }
+    
+    // 添加内部日志测试功能，用于调试
+    const addTestLog = (count: number = 1) => {
+      for (let i = 0; i < count; i++) {
+        const types = ['info', 'success', 'warning', 'error']
+        const type = types[Math.floor(Math.random() * types.length)]
+        addLog(type, `测试日志 #${i+1}: ${new Date().toLocaleTimeString()}`)
+      }
+    }
+    
+    // 组件卸载时清理监听器
+    onUnmounted(() => {
+      cleanupListeners()
+    })
+    
+    // 组件挂载时设置监听器（如果需要）
+    onMounted(() => {
+      // 注释掉自动设置，由调用者决定是否调用setupLogListener
+      // setupLogListener()
+    })
 
     return {
       logs,
@@ -120,10 +174,8 @@ export const useLogStore = defineStore(
       setMessageCallback,
       showMessage,
       setupLogListener,
-      cleanupListeners
+      cleanupListeners,
+      addTestLog
     }
-  },
-  {
-    persist: true,
   }
 )

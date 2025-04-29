@@ -126,11 +126,13 @@ export const useProxyStore = defineStore(
     }
 
     // 测试节点延迟
-    const testNodeDelay = async (nodeName: string) => {
+    const testNodeDelay = async (nodeName: string): Promise<number> => {
       try {
         const delay = await tauriApi.proxy.testNodeDelay(nodeName)
-        nodeDelays.value[nodeName] = delay
-        return delay
+        // 确保delay是数字类型
+        const delayNum = typeof delay === 'number' ? delay : -1
+        nodeDelays.value[nodeName] = delayNum
+        return delayNum
       } catch (error) {
         console.error(`测试节点 ${nodeName} 延迟失败:`, error)
         nodeDelays.value[nodeName] = -1
@@ -145,6 +147,7 @@ export const useProxyStore = defineStore(
       for (const node of nodeList.value) {
         try {
           const delay = await testNodeDelay(node)
+          // delay已经在testNodeDelay中处理成数字
           results[node] = delay
         } catch {
           results[node] = -1

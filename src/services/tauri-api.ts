@@ -82,7 +82,7 @@ export const proxyApi = {
   testGroupDelay: (group: string) => invoke<void>('test_group_delay', { group }),
 
   // 测试节点延迟
-  testNodeDelay: (node: string) => invoke<number>('test_node_delay', { node }),
+  testNodeDelay: (proxy: string) => invoke<void>('test_node_delay', { proxy }),
 
   // 获取版本信息
   getVersionInfo: () => invoke<VersionInfo>('get_version_info'),

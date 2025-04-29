@@ -4,8 +4,8 @@ use crate::app::core::kernel_service::{
     start_websocket_relay, stop_kernel,
 };
 use crate::app::core::proxy_service::{
-    change_proxy, get_proxies, get_rules, get_version_info, set_manual_proxy, set_system_proxy, set_tun_proxy,
-    test_group_delay, toggle_ip_version,
+    change_proxy, get_api_token, get_proxies, get_rules, get_version_info, set_manual_proxy, set_system_proxy, set_tun_proxy,
+    test_group_delay, test_node_delay, toggle_ip_version,
 };
 
 // Network services imports
@@ -15,7 +15,7 @@ use crate::app::network::subscription_service::{
 };
 
 // System services imports
-use crate::app::system::system_service::{check_admin, restart_as_admin};
+use crate::app::system::system_service::{check_admin, exit_application, restart_as_admin};
 use crate::app::system::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
@@ -75,8 +75,10 @@ pub fn run() {
             get_proxies,
             change_proxy,
             test_group_delay,
+            test_node_delay,
             get_version_info,
             get_rules,
+            get_api_token,
             // Network - Subscription service commands
             download_subscription,
             add_manual_subscription,
@@ -86,6 +88,7 @@ pub fn run() {
             // System service commands
             check_admin,
             restart_as_admin,
+            exit_application,
             // Update service commands
             check_update,
             download_and_install_update,
