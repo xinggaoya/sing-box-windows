@@ -11,14 +11,22 @@
             }}</span>
           </div>
           <div class="status-tags">
-            <n-tag :bordered="false" :type="appState.wsConnected ? 'success' : 'error'" class="status-tag">
+            <n-tag
+              :bordered="false"
+              :type="appState.wsConnected ? 'success' : 'error'"
+              class="status-tag"
+            >
               <template #icon>
                 <n-icon size="16">
                   <wifi-outline v-if="appState.wsConnected" />
                   <close-circle-outline v-else />
                 </n-icon>
               </template>
-              {{ appState.wsConnected ? t('home.wsStatus.connected') : t('home.wsStatus.disconnected') }}
+              {{
+                appState.wsConnected
+                  ? t('home.wsStatus.connected')
+                  : t('home.wsStatus.disconnected')
+              }}
             </n-tag>
             <n-tag :bordered="false" :type="isAdmin ? 'success' : 'warning'" class="status-tag">
               <template #icon>
@@ -33,17 +41,33 @@
         </div>
         <div class="status-right">
           <!-- 管理员重启按钮 - 仅非管理员状态显示 -->
-          <n-button v-if="!isAdmin" type="warning" secondary size="medium" @click="restartAsAdmin" class="control-button">
+          <n-button
+            v-if="!isAdmin"
+            type="warning"
+            secondary
+            size="medium"
+            @click="restartAsAdmin"
+            class="control-button"
+          >
             <template #icon>
-              <n-icon><shield-checkmark-outline /></n-icon>
+              <n-icon>
+                <shield-checkmark-outline />
+              </n-icon>
             </template>
             {{ t('home.restartAsAdmin') }}
           </n-button>
           <!-- 启动/停止按钮 -->
-          <n-button :type="appState.isRunning ? 'error' : 'primary'" size="medium" :loading="isStarting || isStopping"
-            @click="appState.isRunning ? stopKernel() : runKernel()" class="control-button">
+          <n-button
+            :type="appState.isRunning ? 'error' : 'primary'"
+            size="medium"
+            :loading="isStarting || isStopping"
+            @click="appState.isRunning ? stopKernel() : runKernel()"
+            class="control-button"
+          >
             <template #icon>
-              <n-icon><power-outline /></n-icon>
+              <n-icon>
+                <power-outline />
+              </n-icon>
             </template>
             {{ appState.isRunning ? t('home.stop') : t('home.start') }}
           </n-button>
@@ -56,25 +80,28 @@
       <!-- 流量代理模式卡片 -->
       <n-card class="mode-card" :bordered="false">
         <div class="mode-card-header">
-          <n-icon size="20" class="mode-card-icon"><layers-outline /></n-icon>
+          <n-icon size="20" class="mode-card-icon">
+            <layers-outline />
+          </n-icon>
           <h3 class="mode-card-title">{{ t('home.proxyHeader.flowMode') }}</h3>
         </div>
         <div class="mode-card-content">
           <div class="mode-buttons">
-            <n-button-group size="medium">
-              <n-button
+            <n-radio-group v-model:value="currentProxyMode" size="medium">
+              <n-radio-button
                 v-for="mode in proxyModes"
                 :key="mode.value"
-                :type="currentProxyMode === mode.value ? 'primary' : 'default'"
-                :ghost="currentProxyMode !== mode.value"
+                :value="mode.value"
                 :disabled="isSwitching || isStarting || isStopping"
-                class="mode-button"
-                @click="onModeChange(mode.value)"
               >
-                <template #icon><n-icon><component :is="mode.icon" /></n-icon></template>
+                <template #icon>
+                  <n-icon>
+                    <component :is="mode.icon" />
+                  </n-icon>
+                </template>
                 {{ t(mode.nameKey) }}
-              </n-button>
-            </n-button-group>
+              </n-radio-button>
+            </n-radio-group>
           </div>
           <div class="mode-description">
             {{ currentProxyMode ? t(`home.proxyMode.${currentProxyMode}Description`) : '' }}
@@ -85,25 +112,28 @@
       <!-- 节点代理模式卡片 -->
       <n-card class="mode-card" :bordered="false">
         <div class="mode-card-header">
-          <n-icon size="20" class="mode-card-icon"><git-network-outline /></n-icon>
+          <n-icon size="20" class="mode-card-icon">
+            <git-network-outline />
+          </n-icon>
           <h3 class="mode-card-title">{{ t('home.proxyHeader.nodeMode') }}</h3>
         </div>
         <div class="mode-card-content">
           <div class="mode-buttons">
-            <n-button-group size="medium">
-              <n-button
+            <n-radio-group v-model:value="currentNodeProxyMode" size="medium">
+              <n-radio-button
                 v-for="mode in nodeProxyModes"
                 :key="mode.value"
-                :type="currentNodeProxyMode === mode.value ? 'primary' : 'default'"
-                :ghost="currentNodeProxyMode !== mode.value"
+                :value="mode.value"
                 :disabled="!appState.isRunning || isSwitching || isStarting || isStopping"
-                class="mode-button"
-                @click="handleNodeProxyModeChange(mode.value)"
               >
-                <template #icon><n-icon><component :is="mode.icon" /></n-icon></template>
+                <template #icon>
+                  <n-icon>
+                    <component :is="mode.icon" />
+                  </n-icon>
+                </template>
                 {{ mode.label }}
-              </n-button>
-            </n-button-group>
+              </n-radio-button>
+            </n-radio-group>
           </div>
           <div class="mode-description">
             {{ currentNodeProxyMode ? t(`proxy.mode.${currentNodeProxyMode}Description`) : '' }}
@@ -123,7 +153,10 @@
           <n-icon size="22" class="modal-icon">
             <information-circle-outline />
           </n-icon>
-          <span>{{ t('proxy.switchTo') }}{{ targetNodeProxyMode ? getNodeProxyModeText(targetNodeProxyMode) : '' }}</span>
+          <span
+            >{{ t('proxy.switchTo')
+            }}{{ targetNodeProxyMode ? getNodeProxyModeText(targetNodeProxyMode) : '' }}</span
+          >
         </div>
       </template>
       <div class="modal-content">{{ t('proxy.switchModeConfirm') }}</div>
@@ -131,7 +164,11 @@
         <div class="modal-footer">
           <n-space justify="end">
             <n-button @click="showNodeModeChangeModal = false">{{ t('common.cancel') }}</n-button>
-            <n-button type="primary" :loading="isChangingNodeMode" @click="confirmNodeProxyModeChange">
+            <n-button
+              type="primary"
+              :loading="isChangingNodeMode"
+              @click="confirmNodeProxyModeChange"
+            >
               {{ t('proxy.confirmSwitch') }}
             </n-button>
           </n-space>
@@ -144,11 +181,15 @@
       <template #header>
         <div class="stats-header">
           <h3 class="stats-title">
-            <n-icon size="18" class="stats-icon"><analytics-outline /></n-icon>
+            <n-icon size="18" class="stats-icon">
+              <analytics-outline />
+            </n-icon>
             {{ t('home.traffic.title') }}
           </h3>
           <div class="connections-indicator">
-            <n-icon size="16"><git-network-outline /></n-icon>
+            <n-icon size="16">
+              <git-network-outline />
+            </n-icon>
             <span>{{ activeConnectionsCount }} {{ t('home.traffic.connectionsLabel') }}</span>
           </div>
         </div>
@@ -160,51 +201,61 @@
           <div class="traffic-row">
             <div class="traffic-item">
               <div class="traffic-label">
-                <n-icon size="16" class="traffic-icon upload-icon"><arrow-up-outline /></n-icon>
+                <n-icon size="16" class="traffic-icon upload-icon">
+                  <arrow-up-outline />
+                </n-icon>
                 <span>{{ t('home.traffic.uploadSpeed') }}</span>
               </div>
               <div class="traffic-value">{{ trafficStr.up }}</div>
             </div>
-            
+
             <div class="traffic-item">
               <div class="traffic-label">
-                <n-icon size="16" class="traffic-icon download-icon"><arrow-down-outline /></n-icon>
+                <n-icon size="16" class="traffic-icon download-icon">
+                  <arrow-down-outline />
+                </n-icon>
                 <span>{{ t('home.traffic.downloadSpeed') }}</span>
               </div>
               <div class="traffic-value">{{ trafficStr.down }}</div>
             </div>
-            
+
             <div class="traffic-item">
               <div class="traffic-label">
-                <n-icon size="16" class="traffic-icon cloud-up-icon"><cloud-upload-outline /></n-icon>
+                <n-icon size="16" class="traffic-icon cloud-up-icon">
+                  <cloud-upload-outline />
+                </n-icon>
                 <span>{{ t('home.traffic.uploadTotal') }}</span>
               </div>
               <div class="traffic-value">{{ uploadTotalTraffic }}</div>
             </div>
-            
+
             <div class="traffic-item">
               <div class="traffic-label">
-                <n-icon size="16" class="traffic-icon cloud-down-icon"><cloud-download-outline /></n-icon>
+                <n-icon size="16" class="traffic-icon cloud-down-icon">
+                  <cloud-download-outline />
+                </n-icon>
                 <span>{{ t('home.traffic.downloadTotal') }}</span>
               </div>
               <div class="traffic-value">{{ downloadTotalTraffic }}</div>
             </div>
-            
+
             <div class="traffic-item">
               <div class="traffic-label">
-                <n-icon size="16" class="traffic-icon memory-icon"><hardware-chip-outline /></n-icon>
+                <n-icon size="16" class="traffic-icon memory-icon">
+                  <hardware-chip-outline />
+                </n-icon>
                 <span>{{ t('home.traffic.memory') }}</span>
               </div>
               <div class="traffic-value">{{ memoryStr }}</div>
             </div>
           </div>
         </div>
-        
+
         <!-- 流量图表 -->
         <div class="chart-container">
-          <TrafficChart 
-            :upload-speed="trafficStore.traffic.up" 
-            :download-speed="trafficStore.traffic.down" 
+          <TrafficChart
+            :upload-speed="trafficStore.traffic.up"
+            :download-speed="trafficStore.traffic.down"
             class="traffic-chart"
           />
         </div>
@@ -240,7 +291,7 @@ import {
   SettingsOutline,
   InformationCircleOutline,
   ChevronDownOutline,
-  LayersOutline
+  LayersOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -284,20 +335,20 @@ const proxyModes = [
     value: 'system',
     nameKey: 'home.proxyMode.system',
     tipKey: 'home.proxyMode.systemTip',
-    icon: GlobeOutline
+    icon: GlobeOutline,
   },
   {
     value: 'manual',
     nameKey: 'home.proxyMode.manual',
     tipKey: 'home.proxyMode.manualTip',
-    icon: SettingsOutline
+    icon: SettingsOutline,
   },
   {
     value: 'tun',
     nameKey: 'home.proxyMode.tun',
     tipKey: 'home.proxyMode.tunTip',
-    icon: FlashOutline
-  }
+    icon: FlashOutline,
+  },
 ]
 
 // 定义节点代理模式选项 (更改为数组形式，与proxyModes一致)
@@ -305,19 +356,36 @@ const nodeProxyModes = [
   {
     label: t('proxy.mode.global'),
     value: 'global',
-    icon: GlobeOutline
+    icon: GlobeOutline,
   },
   {
     label: t('proxy.mode.rule'),
     value: 'rule',
-    icon: LayersOutline
-  }
+    icon: LayersOutline,
+  },
 ]
 
 // 监听代理模式变化
-watch(currentProxyMode, async (newMode) => {
-  if (newMode !== appState.proxyMode) {
+watch(currentProxyMode, async (newMode, oldMode) => {
+  if (newMode !== oldMode) {
     await onModeChange(newMode)
+  }
+})
+
+// 监听appStore中代理模式变化，更新当前选中状态
+watch(
+  () => appState.proxyMode,
+  (newMode) => {
+    if (newMode !== currentProxyMode.value) {
+      currentProxyMode.value = newMode
+    }
+  }
+)
+
+// 为节点代理模式添加监听
+watch(currentNodeProxyMode, (newMode, oldMode) => {
+  if (newMode !== oldMode && oldMode) {
+    handleNodeProxyModeChange(newMode)
   }
 })
 
@@ -353,9 +421,21 @@ const getNodeProxyModeText = (mode: string): string => {
  */
 const handleNodeProxyModeChange = (key: string) => {
   if (key === currentNodeProxyMode.value) return
-  
+
+  // 保存当前选中项，以便用户取消时恢复
+  const prevMode = currentNodeProxyMode.value
   targetNodeProxyMode.value = key
+  
+  // 打开确认对话框
   showNodeModeChangeModal.value = true
+  
+  // 如果用户取消操作，恢复之前的选择
+  const unwatch = watch(showNodeModeChangeModal, (isVisible) => {
+    if (!isVisible && !isChangingNodeMode.value) {
+      currentNodeProxyMode.value = prevMode
+      unwatch() // 取消监听
+    }
+  })
 }
 
 /**
@@ -369,7 +449,9 @@ const confirmNodeProxyModeChange = async () => {
     await tauriApi.proxy.toggleProxyMode(targetNodeProxyMode.value)
     await kernelStore.restartKernel()
     currentNodeProxyMode.value = targetNodeProxyMode.value
-    message.success(t('proxy.modeChangeSuccess', { mode: getNodeProxyModeText(targetNodeProxyMode.value) }))
+    message.success(
+      t('proxy.modeChangeSuccess', { mode: getNodeProxyModeText(targetNodeProxyMode.value) }),
+    )
   } catch (error) {
     console.error(t('proxy.modeChangeFailed'), error)
     message.error(`${t('proxy.modeChangeError')}: ${error}`)
@@ -459,7 +541,7 @@ const stopKernel = async () => {
 
 const onModeChange = async (value: string) => {
   if (value === currentProxyMode.value) return
-  
+
   const showMessage = (type: 'success' | 'info' | 'error', content: string) => {
     switch (type) {
       case 'success':
@@ -476,39 +558,35 @@ const onModeChange = async (value: string) => {
 
   try {
     isSwitching.value = true
-
-    // 如果内核正在运行，需要重启
-    if (appState.isRunning) {
-      // 先停止内核
-      await kernelStore.stopKernel()
-      appState.setRunningState(false)
-    }
-
     // 切换模式
-    let needClose = false;
+    let needClose = false
+    let modeChanged = false
 
     if (value === 'system') {
-      await tauriApi.proxy.setSystemProxy();
-      appState.setProxyMode('system');
-      currentProxyMode.value = 'system';
-      showMessage('success', t('notification.systemProxyEnabled'));
+      await tauriApi.proxy.setSystemProxy()
+      appState.setProxyMode('system')
+      currentProxyMode.value = 'system'
+      modeChanged = true
+      showMessage('success', t('notification.systemProxyEnabled'))
     } else if (value === 'manual') {
-      await tauriApi.proxy.setManualProxy();
-      appState.setProxyMode('manual');
-      currentProxyMode.value = 'manual';
-      showMessage('info', t('notification.manualProxyEnabled'));
+      await tauriApi.proxy.setManualProxy()
+      appState.setProxyMode('manual')
+      currentProxyMode.value = 'manual'
+      modeChanged = true
+      showMessage('info', t('notification.manualProxyEnabled'))
     } else if (value === 'tun') {
-      needClose = await proxyService.switchMode('tun', showMessage);
+      needClose = await proxyService.switchMode('tun', showMessage)
       // 添加缺失的状态更新
-      appState.setProxyMode('tun');
-      currentProxyMode.value = 'tun';
+      appState.setProxyMode('tun')
+      currentProxyMode.value = 'tun'
+      modeChanged = true
     }
 
-    // 如果内核之前在运行，重新启动
-    if (appState.isRunning) {
-      await kernelStore.startKernel()
-      appState.setRunningState(true)
-      message.success(t('notification.kernelRestarted'))
+    // 如果内核正在运行且模式已改变，一定要重启内核
+    if (appState.isRunning && modeChanged) {
+      showMessage('info', t('notification.restartingKernel'))
+      await kernelStore.restartKernel()
+      showMessage('success', t('notification.kernelRestarted'))
     }
 
     if (needClose) {
@@ -535,7 +613,7 @@ const checkAdminStatus = async () => {
 const setupListeners = async () => {
   try {
     if (appState.isRunning) {
-      console.log("HomeView: 尝试设置监听器")
+      console.log('HomeView: 尝试设置监听器')
 
       // 清理之前的监听器，确保没有重复监听
       trafficStore.cleanupListeners()
@@ -549,11 +627,11 @@ const setupListeners = async () => {
       await Promise.all([
         trafficStore.setupTrafficListener(),
         connectionStore.setupConnectionsListener(),
-        connectionStore.setupMemoryListener()
-      ]).catch(e => {
-        console.error("HomeView: 设置监听器失败", e)
+        connectionStore.setupMemoryListener(),
+      ]).catch((e) => {
+        console.error('HomeView: 设置监听器失败', e)
         // 尝试重试一次
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
           setTimeout(async () => {
             try {
               await trafficStore.setupTrafficListener()
@@ -561,7 +639,7 @@ const setupListeners = async () => {
               await connectionStore.setupMemoryListener()
               resolve(true)
             } catch (retryError) {
-              console.error("HomeView: 重试设置监听器失败", retryError)
+              console.error('HomeView: 重试设置监听器失败', retryError)
               resolve(false)
             }
           }, 1000)
@@ -570,7 +648,7 @@ const setupListeners = async () => {
 
       isTrafficLoading.value = false
       isConnectionLoading.value = false
-      console.log("HomeView: 监听器设置完成")
+      console.log('HomeView: 监听器设置完成')
     }
   } catch (error) {
     console.error('HomeView: 设置监听器失败:', error)
@@ -591,10 +669,10 @@ const restartAsAdmin = async () => {
 
 onMounted(async () => {
   // 更新当前代理模式
-  currentProxyMode.value = appState.proxyMode;
-  
+  currentProxyMode.value = appState.proxyMode
+
   // 获取节点代理模式
-  await getCurrentNodeProxyMode();
+  await getCurrentNodeProxyMode()
 
   // 设置监听器
   await setupListeners()
@@ -614,15 +692,18 @@ onMounted(async () => {
   })
 
   // 监听内核状态变化
-  watch(() => appState.isRunning, (isRunning) => {
-    if (isRunning && isRouteActive.value) {
-      setupListeners()
-    } else if (!isRunning) {
-      // 内核停止时清理监听器
-      trafficStore.cleanupListeners()
-      connectionStore.cleanupListeners()
-    }
-  })
+  watch(
+    () => appState.isRunning,
+    (isRunning) => {
+      if (isRunning && isRouteActive.value) {
+        setupListeners()
+      } else if (!isRunning) {
+        // 内核停止时清理监听器
+        trafficStore.cleanupListeners()
+        connectionStore.cleanupListeners()
+      }
+    },
+  )
 })
 
 // 组件卸载时清理
@@ -633,7 +714,6 @@ onUnmounted(() => {
   // 清理连接监听器
   connectionStore.cleanupListeners()
 })
-
 </script>
 
 <style scoped>
@@ -799,6 +879,7 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+/* 移除单选框特定样式，恢复原始样式 */
 .mode-button {
   font-weight: 500;
   flex: 1;
@@ -989,36 +1070,37 @@ onUnmounted(() => {
     flex-wrap: nowrap;
     overflow-x: auto;
   }
-  
+
   .traffic-item {
     min-width: 110px;
   }
 }
 
 @media (max-width: 768px) {
-  .status-left, .status-right {
+  .status-left,
+  .status-right {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .status-header {
     flex-direction: column;
     gap: 16px;
   }
-  
+
   .traffic-content {
     flex-direction: column;
   }
-  
+
   .traffic-row {
     flex-direction: column;
   }
-  
+
   .traffic-item {
     min-width: 105px;
     padding: 5px 8px;
   }
-  
+
   .chart-container {
     height: 130px;
   }
