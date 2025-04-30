@@ -1,5 +1,10 @@
 use crate::app::constants::{messages, process};
 use std::os::windows::process::CommandExt;
+use serde_json::json;
+use std::path::PathBuf;
+use std::process::Command;
+use tracing::info;
+use crate::utils::app_util::{get_service_path, get_work_dir};
 
 // 以管理员权限重启
 #[tauri::command]
@@ -66,7 +71,7 @@ pub fn restart_as_admin(app_handle: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
-// 检查是否有管理员权限
+// 检查是否有管理员权限 - 使用Windows API的方式
 #[tauri::command]
 pub fn check_admin() -> bool {
     // 尝试执行一个需要管理员权限的操作，例如查询系统会话
@@ -85,4 +90,87 @@ pub fn check_admin() -> bool {
 #[tauri::command]
 pub fn exit_application(app_handle: tauri::AppHandle) {
     app_handle.exit(0);
+}
+
+/// 获取用户缓存目录
+fn get_user_cache_dir() -> PathBuf {
+    let work_dir = get_work_dir();
+    PathBuf::from(&work_dir)
+}
+
+/// 安装服务
+#[tauri::command]
+pub async fn install_service() -> Result<serde_json::Value, String> {
+    info!("安装服务");
+    
+    // 检查是否有管理员权限
+    if !check_admin() {
+        return Err("安装服务需要管理员权限".to_string());
+    }
+    
+    let cache_dir = get_user_cache_dir();
+    info!("用户缓存目录: {:?}", cache_dir);
+    
+    // 确保缓存目录存在
+    if let Err(e) = std::fs::create_dir_all(&cache_dir) {
+        return Err(format!("创建缓存目录失败: {}", e));
+    }
+    
+    // 执行服务安装命令
+    let output = Command::new(get_service_path())
+        .arg("install")
+        .arg(cache_dir.to_string_lossy().to_string())
+        .creation_flags(process::CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| format!("执行服务安装命令失败: {}", e))?;
+    
+    let exit_code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    
+    info!("服务安装结果: 退出码={}, stdout={}, stderr={}", exit_code, stdout, stderr);
+    
+    if exit_code == 0 {
+        Ok(json!({
+            "success": true,
+            "message": "服务安装成功",
+            "output": stdout
+        }))
+    } else {
+        Err(format!("服务安装失败: {}", stderr))
+    }
+}
+
+/// 卸载服务
+#[tauri::command]
+pub async fn uninstall_service() -> Result<serde_json::Value, String> {
+    info!("卸载服务");
+    
+    // 检查是否有管理员权限
+    if !check_admin() {
+        return Err("卸载服务需要管理员权限".to_string());
+    }
+    
+    // 执行服务卸载命令
+    let output = Command::new(get_service_path())
+        .arg("uninstall")
+        .creation_flags(process::CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| format!("执行服务卸载命令失败: {}", e))?;
+    
+    let exit_code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    
+    info!("服务卸载结果: 退出码={}, stdout={}, stderr={}", exit_code, stdout, stderr);
+    
+    if exit_code == 0 {
+        Ok(json!({
+            "success": true,
+            "message": "服务卸载成功",
+            "output": stdout
+        }))
+    } else {
+        Err(format!("服务卸载失败: {}", stderr))
+    }
 }

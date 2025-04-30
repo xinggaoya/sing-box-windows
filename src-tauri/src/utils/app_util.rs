@@ -37,9 +37,21 @@ pub fn get_template_path(app_handle: &AppHandle) -> Result<PathBuf, Box<dyn std:
 
     if !template_path.exists() {
         let err_msg = format!("找不到模板文件: {:?}", template_path);
-        tracing::error!("{}", err_msg);
+        error!("{}", err_msg);
         return Err(err_msg.into());
     }
 
     Ok(template_path)
+}
+
+/// 获取服务路径
+pub fn get_service_path() -> PathBuf {
+    // 获取可执行程序路径
+    let exe_path = std::env::current_exe().expect("无法获取可执行程序路径");
+    let work_dir = exe_path
+        .parent()
+        .expect("无法获取可执行程序父目录")
+        .to_str()
+        .expect("无法将父目录路径转换为字符串");
+    PathBuf::from(&work_dir).join("src").join("config").join("sing-box-service.exe")
 }

@@ -5,6 +5,7 @@ import mitt from '@/utils/mitt'
 import { WebSocketService } from '@/services/websocket-service'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
+import { useMessage } from 'naive-ui'
 
 // 代理模式类型
 export type ProxyMode = 'system' | 'tun' | 'manual'
@@ -12,6 +13,42 @@ export type ProxyMode = 'system' | 'tun' | 'manual'
 export const useAppStore = defineStore(
   'app',
   () => {
+    // 消息服务实例
+    let messageInstance: ReturnType<typeof useMessage> | null = null
+
+    // 设置消息服务实例
+    const setMessageInstance = (instance: ReturnType<typeof useMessage>) => {
+      messageInstance = instance
+    }
+
+    // 显示成功消息
+    const showSuccessMessage = (content: string) => {
+      if (messageInstance) {
+        messageInstance.success(content)
+      }
+    }
+
+    // 显示错误消息
+    const showErrorMessage = (content: string) => {
+      if (messageInstance) {
+        messageInstance.error(content)
+      }
+    }
+
+    // 显示警告消息
+    const showWarningMessage = (content: string) => {
+      if (messageInstance) {
+        messageInstance.warning(content)
+      }
+    }
+
+    // 显示信息消息
+    const showInfoMessage = (content: string) => {
+      if (messageInstance) {
+        messageInstance.info(content)
+      }
+    }
+
     // 应用运行状态
     const isRunning = ref(false)
     // WebSocket连接状态
@@ -176,7 +213,12 @@ export const useAppStore = defineStore(
       toggleAutoStart,
       switchProxyMode,
       startWebSocketCheck,
-      setProxyMode
+      setProxyMode,
+      setMessageInstance,
+      showSuccessMessage,
+      showErrorMessage,
+      showWarningMessage,
+      showInfoMessage
     }
   },
   {

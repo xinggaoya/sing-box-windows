@@ -4,6 +4,7 @@
       <n-modal-provider>
         <n-notification-provider>
           <n-message-provider>
+            <message-consumer />
             <router-view />
           </n-message-provider>
         </n-notification-provider>
@@ -14,7 +15,7 @@
 
 <script setup lang="ts">
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
-import { onMounted, onUnmounted, watch } from 'vue'
+import { onMounted, onUnmounted, watch, defineComponent } from 'vue'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useThemeStore } from '@/stores/app/ThemeStore'
 import { useLocaleStore } from '@/stores/app/LocaleStore'
@@ -25,6 +26,23 @@ import { useRouter } from 'vue-router'
 import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
 import { useI18n } from 'vue-i18n'
+import { useMessage } from 'naive-ui'
+
+// 消息消费组件
+const MessageConsumer = defineComponent({
+  name: 'MessageConsumer',
+  setup() {
+    const message = useMessage()
+    const appStore = useAppStore()
+    
+    // 注册消息实例
+    onMounted(() => {
+      appStore.setMessageInstance(message)
+    })
+    
+    return () => null
+  }
+})
 
 // 初始化 store
 const appStore = useAppStore()

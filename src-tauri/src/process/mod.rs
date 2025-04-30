@@ -27,6 +27,7 @@ pub enum ProcessError {
     PermissionError(String),
     NetworkError(String),
     Unknown(String),
+    Other(String),
 }
 
 impl From<std::io::Error> for ProcessError {
@@ -48,6 +49,7 @@ impl fmt::Display for ProcessError {
             ProcessError::PermissionError(msg) => write!(f, "权限错误: {}", msg),
             ProcessError::NetworkError(msg) => write!(f, "网络错误: {}", msg),
             ProcessError::Unknown(msg) => write!(f, "未知错误: {}", msg),
+            ProcessError::Other(msg) => write!(f, "其他错误: {}", msg),
         }
     }
 }

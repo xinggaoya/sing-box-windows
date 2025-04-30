@@ -13,6 +13,9 @@ pub mod registry {
 
     /// 代理服务器键名
     pub const PROXY_SERVER: &str = "ProxyServer";
+    
+    /// 代理例外地址键名
+    pub const PROXY_OVERRIDE: &str = "ProxyOverride";
 }
 
 /// 数据库默认配置

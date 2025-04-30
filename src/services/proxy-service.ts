@@ -34,18 +34,6 @@ export class ProxyService {
     messageCallback?: (type: 'success' | 'info' | 'error', content: string) => void
   ): Promise<boolean> {
     try {
-      // 检查管理员权限
-      const isAdmin = await tauriApi.system.checkAdmin()
-
-      if (mode === 'tun' && !isAdmin) {
-        // TUN模式必须以管理员权限运行
-        if (messageCallback) {
-          messageCallback('info', '正在以管理员身份重启...')
-        }
-        await tauriApi.system.restartAsAdmin()
-        return true // 需要关闭当前应用
-      }
-
       // 根据模式设置代理
       if (mode === 'system') {
         await tauriApi.proxy.setSystemProxy()

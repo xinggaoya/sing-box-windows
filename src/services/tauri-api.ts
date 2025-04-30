@@ -31,7 +31,7 @@ interface VersionInfo {
 // 内核管理相关接口
 export const kernelApi = {
   // 启动内核
-  startKernel: () => invoke<void>('start_kernel'),
+  startKernel: (proxyMode?: string) => invoke<void>('start_kernel', { proxyMode }),
 
   // 停止内核
   stopKernel: () => invoke<void>('stop_kernel'),
@@ -127,6 +127,10 @@ export const tauriApi = {
     checkAdmin: () => invoke<boolean>('check_admin'),
     // 以管理员权限重启
     restartAsAdmin: () => invoke<void>('restart_as_admin'),
+    // 安装服务
+    installService: () => invoke('install_service'),
+    // 卸载服务
+    uninstallService: () => invoke('uninstall_service'),
   },
 
   // 更新相关 API

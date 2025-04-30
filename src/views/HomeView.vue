@@ -67,7 +67,7 @@
                 :key="mode.value"
                 :type="currentProxyMode === mode.value ? 'primary' : 'default'"
                 :ghost="currentProxyMode !== mode.value"
-                :disabled="(mode.value === 'tun' && !isAdmin) || isSwitching || isStarting || isStopping"
+                :disabled="isSwitching || isStarting || isStopping"
                 class="mode-button"
                 @click="onModeChange(mode.value)"
               >
@@ -434,6 +434,8 @@ const formattedUptime = computed(() => {
 const runKernel = async () => {
   try {
     isStarting.value = true
+    // 确保当前模式已设置到appStore
+    appState.setProxyMode(currentProxyMode.value)
     await kernelStore.startKernel()
     appState.setRunningState(true)
     message.success(t('notification.kernelStarted'))

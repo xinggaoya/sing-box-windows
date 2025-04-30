@@ -91,8 +91,11 @@ export const useKernelStore = defineStore(
           uptime.value += 1
         }, 1000)
 
+        // 获取当前代理模式
+        const proxyMode = appStore.proxyMode || 'manual'
+
         // 启动内核
-        await tauriApi.kernel.startKernel()
+        await tauriApi.kernel.startKernel(proxyMode)
 
         // 设置 WebSocket 连接 token
         const token = await tauriApi.proxy.getApiToken();

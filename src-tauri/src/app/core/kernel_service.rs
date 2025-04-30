@@ -13,7 +13,7 @@ use tauri::{Runtime, Window};
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use url::Url;
 
 // 全局进程管理器
@@ -47,13 +47,40 @@ pub async fn check_kernel_version() -> Result<String, String> {
 
 // 运行内核
 #[tauri::command]
-pub async fn start_kernel() -> Result<(), String> {
-    PROCESS_MANAGER.start().await.map_err(|e| e.to_string())
+pub async fn start_kernel(proxy_mode: Option<String>) -> Result<(), String> {
+    let result = PROCESS_MANAGER.start().await.map_err(|e| e.to_string())?;
+    
+    info!(proxy_mode);
+    // 如果指定了代理模式为system，则设置系统代理
+    if let Some(mode) = proxy_mode {
+        if mode == "system" {
+            // 短暂延迟，确保内核已启动
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            
+            // 设置系统代理
+            crate::utils::proxy_util::enable_system_proxy(
+                "127.0.0.1", 
+                network_config::DEFAULT_PROXY_PORT
+            ).map_err(|e| format!("设置系统代理失败: {}", e))?;
+            
+            info!("系统代理已启用");
+        }
+    }
+    
+    Ok(result)
 }
 
 // 停止内核
 #[tauri::command]
 pub async fn stop_kernel() -> Result<(), String> {
+    // 先尝试关闭系统代理，无论如何都继续执行后续操作
+    if let Err(e) = crate::utils::proxy_util::disable_system_proxy() {
+        warn!("关闭系统代理失败: {}", e);
+    } else {
+        info!("{}", messages::INFO_SYSTEM_PROXY_DISABLED);
+    }
+    
+    // 停止内核
     PROCESS_MANAGER.stop().await.map_err(|e| e.to_string())
 }
 
