@@ -40,22 +40,6 @@
           </div>
         </div>
         <div class="status-right">
-          <!-- 管理员重启按钮 - 仅非管理员状态显示 -->
-          <n-button
-            v-if="!isAdmin"
-            type="warning"
-            secondary
-            size="medium"
-            @click="restartAsAdmin"
-            class="control-button"
-          >
-            <template #icon>
-              <n-icon>
-                <shield-checkmark-outline />
-              </n-icon>
-            </template>
-            {{ t('home.restartAsAdmin') }}
-          </n-button>
           <!-- 启动/停止按钮 -->
           <n-button
             :type="appState.isRunning ? 'error' : 'primary'"
@@ -654,16 +638,6 @@ const setupListeners = async () => {
     console.error('HomeView: 设置监听器失败:', error)
     isTrafficLoading.value = false
     isConnectionLoading.value = false
-  }
-}
-
-const restartAsAdmin = async () => {
-  try {
-    await tauriApi.system.restartAsAdmin()
-    message.info(t('notification.restartingAsAdmin') || '正在以管理员身份重启应用...')
-    // 重启后应用会关闭，所以不需要处理成功回调
-  } catch (error) {
-    message.error(error as string)
   }
 }
 

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from '../app/AppStore'
+import { tauriApi } from '@/services/tauri-api'
 
 export const useServiceStore = defineStore('service', () => {
   // 服务状态
@@ -11,31 +12,15 @@ export const useServiceStore = defineStore('service', () => {
   const isUninstalling = ref(false)
   const installError = ref('')
   
-  // 检查服务是否已安装 - 通过服务安装命令的返回结果判断
+  // 检查服务是否已安装 - 通过服务状态检查命令
   async function checkServiceStatus() {
     try {
-      // 直接通过安装服务来判断状态
-      // 如果安装服务成功，说明服务不存在
-      // 如果返回"服务已存在"的错误，说明服务已安装
-      await invoke('install_service')
-      // 如果执行到这里，说明安装成功了，但实际上是首次安装
-      isServiceInstalled.value = true
-      isServiceRunning.value = true
-      return { installed: true, running: true }
+      const result = await tauriApi.system.checkServiceStatus()
+      isServiceInstalled.value = result.installed
+      isServiceRunning.value = result.running
+      return { installed: result.installed, running: result.running }
     } catch (error) {
       console.error('检查服务状态失败:', error)
-      
-      // 判断错误信息是否包含"服务已存在"
-      const errorStr = String(error).toLowerCase()
-      if (errorStr.includes('已安装') || 
-          errorStr.includes('already installed') || 
-          errorStr.includes('已存在') || 
-          errorStr.includes('already exists')) {
-        isServiceInstalled.value = true
-        isServiceRunning.value = true
-        return { installed: true, running: true }
-      }
-      
       isServiceInstalled.value = false
       isServiceRunning.value = false
       return { installed: false, running: false }

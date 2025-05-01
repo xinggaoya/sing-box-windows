@@ -131,6 +131,8 @@ export const tauriApi = {
     installService: () => invoke('install_service'),
     // 卸载服务
     uninstallService: () => invoke('uninstall_service'),
+    // 检查服务状态
+    checkServiceStatus: () => invoke<{installed: boolean, running: boolean}>('check_service_status'),
   },
 
   // 更新相关 API

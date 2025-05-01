@@ -117,6 +117,89 @@
       </n-space>
     </n-card>
 
+    <!-- 服务管理卡片 -->
+    <n-card class="setting-card" :bordered="false">
+      <template #header>
+        <div class="card-header">
+          <n-h3 class="card-title">
+            <n-icon size="20" class="card-icon">
+              <server-outline />
+            </n-icon>
+            服务管理
+          </n-h3>
+        </div>
+      </template>
+
+      <n-space vertical :size="16">
+        <n-alert
+          v-if="!serviceStore.isServiceInstalled"
+          type="warning"
+          :show-icon="true"
+          title="服务未安装"
+          class="version-alert"
+        >
+          必须安装系统服务才能使用TUN模式和更多高级功能
+        </n-alert>
+
+        <n-space justify="space-between" align="center">
+          <div>
+            <n-space align="center" :size="12">
+              <n-tag
+                :type="serviceStore.isServiceInstalled ? 'success' : 'error'"
+                :bordered="false"
+                size="medium"
+              >
+                {{ serviceStore.isServiceInstalled ? '已安装' : '未安装' }}
+              </n-tag>
+              <span class="service-status">系统服务状态</span>
+              <n-button
+                text
+                size="small"
+                @click="refreshServiceStatus"
+                :loading="checkingService"
+              >
+                <template #icon>
+                  <n-icon><refresh-outline /></n-icon>
+                </template>
+                刷新
+              </n-button>
+            </n-space>
+
+            <div class="service-desc" v-if="serviceStore.isServiceInstalled">
+              <n-space align="center" :size="12">
+                <n-tag
+                  :type="serviceStore.isServiceRunning ? 'success' : 'warning'"
+                  :bordered="false"
+                  size="small"
+                >
+                  {{ serviceStore.isServiceRunning ? '运行中' : '已停止' }}
+                </n-tag>
+                <span>服务运行状态</span>
+              </n-space>
+            </div>
+          </div>
+
+          <n-space>
+            <n-button
+              type="error"
+              @click="handleUninstallService"
+              :loading="serviceStore.isUninstalling"
+              :disabled="!serviceStore.isServiceInstalled || !isAdmin"
+            >
+              卸载服务
+            </n-button>
+            <n-button
+              type="primary"
+              @click="navigateToServiceInstall"
+              :disabled="serviceStore.isServiceInstalled"
+            >
+              {{ serviceStore.isServiceInstalled ? '已安装' : '安装服务' }}
+            </n-button>
+          </n-space>
+        </n-space>
+      </n-space>
+    </n-card>
+
     <!-- 启动设置卡片 -->
     <n-card class="setting-card" :bordered="false">
       <template #header>
@@ -309,6 +392,8 @@ import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useUpdateStore } from '@/stores/app/UpdateStore'
 import { useLocaleStore } from '@/stores/app/LocaleStore'
+import { useServiceStore } from '@/stores/system/ServiceStore'
+import { useRouter } from 'vue-router'
 import {
   DownloadOutline,
   SettingsOutline,
@@ -317,6 +402,7 @@ import {
   LogoGithub,
   GlobeOutline,
   RefreshOutline,
+  ServerOutline,
 } from '@vicons/ionicons5'
 import { listen } from '@tauri-apps/api/event'
 import { tauriApi } from '@/services/tauri-api'
@@ -335,6 +421,8 @@ const appStore = useAppStore()
 const kernelStore = useKernelStore()
 const updateStore = useUpdateStore()
 const localeStore = useLocaleStore()
+const serviceStore = useServiceStore()
+const router = useRouter()
 const loading = ref(false)
 const downloading = ref(false)
 const downloadProgress = ref(0)
@@ -569,6 +657,67 @@ const handleChangeLanguage = async (value: string) => {
   mitt.emit('language-changed')
 }
 
+const isAdmin = ref(false)
+const checkingService = ref(false)
+
+// 检查管理员权限
+async function checkAdminPermission() {
+  try {
+    isAdmin.value = await tauriApi.system.checkAdmin()
+  } catch (error) {
+    console.error('检查管理员权限失败:', error)
+    isAdmin.value = false
+  }
+}
+
+// 刷新服务状态
+async function refreshServiceStatus() {
+  try {
+    checkingService.value = true
+    await serviceStore.checkServiceStatus()
+    message.success('服务状态刷新成功')
+  } catch (error) {
+    message.error(`服务状态刷新失败: ${error}`)
+  } finally {
+    checkingService.value = false
+  }
+}
+
+// 卸载服务
+async function handleUninstallService() {
+  if (!isAdmin.value) {
+    try {
+      await tauriApi.system.restartAsAdmin()
+      return
+    } catch (error) {
+      message.error(`以管理员身份重启失败: ${error}`)
+      return
+    }
+  }
+
+  try {
+    dialog.warning({
+      title: '卸载服务',
+      content: '确定要卸载系统服务吗？卸载后将无法使用TUN模式等高级功能。',
+      positiveText: '确定卸载',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        const success = await serviceStore.uninstallService()
+        if (success) {
+          message.success('服务卸载成功')
+        }
+      }
+    })
+  } catch (error) {
+    message.error(`服务卸载失败: ${error}`)
+  }
+}
+
+// 跳转到服务安装页面
+function navigateToServiceInstall() {
+  router.push('/service-install')
+}
+
 onMounted(async () => {
   // 获取当前版本号
   await updateStore.fetchAppVersion()
@@ -578,6 +727,10 @@ onMounted(async () => {
   await getAppDataPath()
   // 获取内核版本信息
   await kernelStore.updateVersion()
+  // 检查管理员权限
+  await checkAdminPermission()
+  // 检查服务状态
+  await serviceStore.checkServiceStatus()
 })
 </script>
 
@@ -736,5 +889,16 @@ onMounted(async () => {
   margin-top: 4px;
   border-radius: 4px;
   word-break: break-all;
+}
+
+.service-status {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.service-desc {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-color-3);
 }
 </style>

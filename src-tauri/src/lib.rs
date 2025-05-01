@@ -15,7 +15,7 @@ use crate::app::network::subscription_service::{
 };
 
 // System services imports
-use crate::app::system::system_service::{check_admin, exit_application, install_service, restart_as_admin, uninstall_service};
+use crate::app::system::system_service::{check_admin, check_service_status, exit_application, install_service, restart_as_admin, uninstall_service};
 use crate::app::system::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
@@ -91,6 +91,7 @@ pub fn run() {
             exit_application,
             install_service,
             uninstall_service,
+            check_service_status,
             // Update service commands
             check_update,
             download_and_install_update,
