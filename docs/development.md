@@ -9,6 +9,7 @@
 - [核心功能模块](#核心功能模块)
 - [前端开发指南](#前端开发指南)
 - [后端开发指南](#后端开发指南)
+- [系统服务管理](#系统服务管理)
 - [多语言开发指南](#多语言开发指南)
 - [构建与发布](#构建与发布)
 - [常见问题](#常见问题)
@@ -219,6 +220,9 @@ sing-box-windows/
 
 - `check_admin`：检查管理员权限
 - `restart_as_admin`：以管理员身份重启
+- `install_service`：安装系统服务
+- `uninstall_service`：卸载系统服务
+- `check_service_status`：检查服务状态
 
 ### 更新服务 (system/update_service.rs)
 
@@ -607,6 +611,136 @@ async function callMyFunction() {
 - 确保进程正确启动和终止
 - 处理好权限问题
 - 管理好进程的生命周期
+
+## 系统服务管理
+
+Sing-Box Windows 使用 Windows 服务机制来提供更高权限的功能，特别是 TUN 模式。服务管理是应用程序的重要组成部分。
+
+### 服务架构
+
+1. **服务组件**：
+   - `sing-box-service.exe`：核心服务可执行文件
+   - 安装在系统服务中，名称为 "SingBoxService"
+   - 以 SYSTEM 权限运行，提供 TUN 模式所需的网络接口管理能力
+
+2. **服务流程**：
+   - 服务首次安装需要管理员权限
+   - 安装时将服务可执行文件复制到缓存目录，确保即使原始文件被锁定也能安装
+   - 服务安装后会自动启动，并可以跟随系统启动
+
+3. **权限管理**：
+   - 服务安装/卸载需要管理员权限
+   - 应用程序自动检测管理员状态，并提供相应的提示和操作
+
+### 服务管理页面
+
+`ServiceInstallView.vue` 是一个专门用于服务安装和管理的页面，提供以下功能：
+
+1. **状态显示**：
+   - 显示服务安装状态（已安装/未安装）
+   - 显示服务运行状态（运行中/已停止）
+   - 显示当前应用程序的管理员权限状态
+
+2. **操作功能**：
+   - 安装服务：以管理员权限将服务安装到系统
+   - 卸载服务：移除已安装的系统服务
+   - 管理员重启：当缺少管理员权限时，提供以管理员身份重启的选项
+
+3. **导航控制**：
+   - 服务安装完成后提供"继续使用"按钮返回主页
+   - 确保用户能够清楚了解服务的状态和必要性
+
+### 后端服务管理接口
+
+系统服务管理的后端实现在 `system_service.rs` 中：
+
+```rust
+// 检查服务状态
+#[tauri::command]
+pub async fn check_service_status() -> Result<serde_json::Value, String> {
+    // 使用 Windows SC 命令检查服务状态
+    // 返回服务的安装和运行状态
+}
+
+// 安装服务
+#[tauri::command]
+pub async fn install_service() -> Result<serde_json::Value, String> {
+    // 复制服务文件到缓存目录
+    // 执行服务安装命令
+}
+
+// 卸载服务
+#[tauri::command]
+pub async fn uninstall_service() -> Result<serde_json::Value, String> {
+    // 执行服务卸载命令
+}
+```
+
+### 前端服务管理 Store
+
+`ServiceStore.ts` 提供了与后端通信和管理服务状态的功能：
+
+```typescript
+// 检查服务状态
+async function checkServiceStatus() {
+  try {
+    const result = await tauriApi.system.checkServiceStatus()
+    isServiceInstalled.value = result.installed
+    isServiceRunning.value = result.running
+    return { installed: result.installed, running: result.running }
+  } catch (error) {
+    // 错误处理...
+  }
+}
+
+// 安装服务
+async function installService() {
+  // 调用后端安装服务并处理结果...
+}
+
+// 卸载服务
+async function uninstallService() {
+  // 调用后端卸载服务并处理结果...
+}
+```
+
+### 设置页面的服务管理
+
+`SettingView.vue` 集成了服务管理功能：
+
+1. **状态展示**：
+   - 显示服务的安装和运行状态
+   - 提供服务状态刷新功能
+
+2. **操作功能**：
+   - 卸载服务按钮：允许用户直接从设置页面卸载服务
+   - 安装服务跳转：提供跳转到专门的服务安装页面
+
+3. **权限控制**：
+   - 根据管理员权限状态动态控制按钮的可用性
+   - 提供适当的提示和引导
+
+### 服务管理开发最佳实践
+
+1. **错误处理**：
+   - 全面捕获和处理服务操作中可能出现的异常
+   - 为用户提供清晰的错误提示和解决建议
+
+2. **权限检查**：
+   - 在执行需要管理员权限的操作前，始终检查权限状态
+   - 提供明确的管理员权限获取路径
+
+3. **服务文件管理**：
+   - 使用缓存目录存放服务文件副本，避免文件锁定问题
+   - 确保服务文件路径解析正确，特别是在不同的安装环境中
+
+4. **用户体验**：
+   - 提供明确的服务状态反馈和操作结果通知
+   - 设计清晰的服务管理流程和界面导航
+
+5. **扩展服务功能**：
+   - 添加新的服务功能时，需要同时更新服务可执行文件和管理接口
+   - 确保新功能在不同权限环境下的兼容性
 
 ## 构建与发布
 

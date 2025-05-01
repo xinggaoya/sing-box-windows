@@ -25,11 +25,19 @@
           </n-alert>
           
           <n-space vertical class="status-items">
-            <n-space align="center">
-              <n-tag :type="serviceStore.isServiceInstalled ? 'success' : 'error'" size="medium">
-                {{ serviceStore.isServiceInstalled ? '已安装' : '未安装' }}
-              </n-tag>
-              <span>服务安装状态</span>
+            <n-space align="center" justify="space-between">
+              <n-space align="center">
+                <n-tag :type="serviceStore.isServiceInstalled ? 'success' : 'error'" size="medium">
+                  {{ serviceStore.isServiceInstalled ? '已安装' : '未安装' }}
+                </n-tag>
+                <span>服务安装状态</span>
+              </n-space>
+              <n-button text size="small" @click="refreshServiceStatus" :loading="isRefreshing">
+                <template #icon>
+                  <n-icon><refresh-outline /></n-icon>
+                </template>
+                刷新状态
+              </n-button>
             </n-space>
             
             <n-space align="center" v-if="serviceStore.isServiceInstalled">
@@ -46,15 +54,40 @@
               <span>管理员权限</span>
             </n-space>
           </n-space>
+          
+          <!-- 服务信息展示 -->
+          <n-collapse v-if="serviceStore.isServiceInstalled" class="service-details">
+            <n-collapse-item title="服务详细信息" name="service-info">
+              <n-descriptions bordered size="small">
+                <n-descriptions-item label="服务名称">
+                  SingBoxService
+                </n-descriptions-item>
+                <n-descriptions-item label="启动类型">
+                  自动
+                </n-descriptions-item>
+                <n-descriptions-item label="服务路径">
+                  {{ servicePath }}
+                </n-descriptions-item>
+                <n-descriptions-item label="服务说明">
+                  提供Sing-Box代理内核的高权限运行环境，支持TUN模式和系统代理设置
+                </n-descriptions-item>
+              </n-descriptions>
+            </n-collapse-item>
+          </n-collapse>
         </div>
         
         <div class="action-area">
           <n-alert type="warning" v-if="!serviceStore.isServiceInstalled">
-            您必须安装服务才能使用 Sing-Box
+            您必须安装服务才能使用 Sing-Box 的全部功能，特别是TUN模式
           </n-alert>
           
           <n-alert type="error" v-if="serviceStore.installError">
             {{ serviceStore.installError }}
+          </n-alert>
+          
+          <!-- 操作结果提示 -->
+          <n-alert v-if="operationResult.show" :type="operationResult.type" class="operation-result">
+            {{ operationResult.message }}
           </n-alert>
           
           <n-space justify="center" class="action-buttons">
@@ -93,10 +126,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { NCard, NButton, NSpace, NTag, NAlert, NIcon } from 'naive-ui'
+import { NCard, NButton, NSpace, NTag, NAlert, NIcon, NCollapse, NCollapseItem, NDescriptions, NDescriptionsItem } from 'naive-ui'
 import { SettingOutlined } from '@vicons/antd'
+import { RefreshOutline } from '@vicons/ionicons5'
 import { useServiceStore } from '@/stores/system/ServiceStore'
 import { tauriApi } from '@/services/tauri-api'
+import { appDataDir } from '@tauri-apps/api/path'
 
 const router = useRouter()
 const serviceStore = useServiceStore()
@@ -104,6 +139,31 @@ const serviceStore = useServiceStore()
 // 管理员权限状态
 const isAdmin = ref(false)
 const isRestarting = ref(false)
+const isRefreshing = ref(false)
+
+// 服务路径
+const servicePath = ref('正在获取...')
+
+// 操作结果提示
+const operationResult = ref({
+  show: false,
+  type: 'info' as 'info' | 'success' | 'error' | 'warning',
+  message: ''
+})
+
+// 显示操作结果提示
+function showOperationResult(type: 'info' | 'success' | 'error' | 'warning', message: string, duration = 5000) {
+  operationResult.value = {
+    show: true,
+    type,
+    message
+  }
+  
+  // 自动隐藏提示
+  setTimeout(() => {
+    operationResult.value.show = false
+  }, duration)
+}
 
 // 检查管理员权限
 async function checkAdminPermission() {
@@ -115,6 +175,31 @@ async function checkAdminPermission() {
   }
 }
 
+// 获取服务路径
+async function getServicePath() {
+  try {
+    const dataDir = await appDataDir()
+    servicePath.value = `${dataDir}sing-box-service.exe`
+  } catch (error) {
+    console.error('获取服务路径失败:', error)
+    servicePath.value = '获取失败'
+  }
+}
+
+// 刷新服务状态
+async function refreshServiceStatus() {
+  try {
+    isRefreshing.value = true
+    await serviceStore.checkServiceStatus()
+    showOperationResult('success', '服务状态刷新成功')
+  } catch (error) {
+    console.error('刷新服务状态失败:', error)
+    showOperationResult('error', `刷新服务状态失败: ${error}`)
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
 // 以管理员身份重启
 async function restartAsAdmin() {
   try {
@@ -122,6 +207,7 @@ async function restartAsAdmin() {
     await tauriApi.system.restartAsAdmin()
   } catch (error) {
     console.error('以管理员身份重启失败:', error)
+    showOperationResult('error', `以管理员身份重启失败: ${error}`)
   } finally {
     isRestarting.value = false
   }
@@ -132,12 +218,20 @@ async function handleInstall() {
   if (!isAdmin.value) {
     return restartAsAdmin()
   }
-  const success = await serviceStore.installService()
-  if (success) {
-    // 延迟一点时间，让用户看到安装成功的消息
-    setTimeout(() => {
-      navigateToHome()
-    }, 1500)
+  
+  try {
+    const success = await serviceStore.installService()
+    if (success) {
+      showOperationResult('success', '服务安装成功！现在您可以使用TUN模式和更多高级功能')
+      // 获取更新后的服务路径
+      await getServicePath()
+      // 延迟一点时间，让用户看到安装成功的消息
+      setTimeout(() => {
+        navigateToHome()
+      }, 3000)
+    }
+  } catch (error) {
+    showOperationResult('error', `服务安装失败: ${error}`)
   }
 }
 
@@ -146,7 +240,15 @@ async function handleUninstall() {
   if (!isAdmin.value) {
     return restartAsAdmin()
   }
-  await serviceStore.uninstallService()
+  
+  try {
+    const success = await serviceStore.uninstallService()
+    if (success) {
+      showOperationResult('success', '服务卸载成功')
+    }
+  } catch (error) {
+    showOperationResult('error', `服务卸载失败: ${error}`)
+  }
 }
 
 // 继续使用
@@ -158,6 +260,10 @@ function navigateToHome() {
 onMounted(async () => {
   await checkAdminPermission()
   await serviceStore.checkServiceStatus()
+  
+  if (serviceStore.isServiceInstalled) {
+    await getServicePath()
+  }
 })
 </script>
 
@@ -218,10 +324,18 @@ onMounted(async () => {
   margin-top: 12px;
 }
 
+.service-details {
+  margin-top: 12px;
+}
+
 .action-area {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.operation-result {
+  margin-top: 8px;
 }
 
 .action-buttons {
@@ -230,5 +344,31 @@ onMounted(async () => {
 
 .continue-button {
   margin-top: 12px;
+}
+
+@media (max-width: 600px) {
+  .service-install-container {
+    padding: 12px;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+  
+  .admin-alert {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .admin-alert button {
+    width: 100%;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .action-buttons button {
+    width: 100%;
+  }
 }
 </style> 
