@@ -316,6 +316,8 @@ export default {
       updateBefore: '更新服务前，请确保应用程序已是最新版本',
       updateNeeded: '服务需要更新',
       updateDescription: '检测到服务文件已更新，建议点击"更新服务"按钮进行更新',
+      updateNeededAdmin: '服务需要更新 (需要管理员权限)',
+      updateDescriptionAdmin: '检测到服务文件已更新，请先以管理员身份重启应用程序，然后再点击"更新服务"按钮',
       needAdmin: '需要管理员',
       available: '有更新',
     }

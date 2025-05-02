@@ -111,6 +111,11 @@
           {{ $t('service.update.updateDescription') }}
         </n-alert>
 
+        <n-alert v-if="serviceStore.needsUpdate && !isAdmin" type="info" :show-icon="true"
+          :title="$t('service.update.updateNeededAdmin')" class="version-alert">
+          {{ $t('service.update.updateDescriptionAdmin') }}
+        </n-alert>
+
         <n-space justify="space-between" align="center">
           <div>
             <n-space align="center" :size="12">

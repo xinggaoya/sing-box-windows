@@ -318,6 +318,8 @@ export default {
       updateBefore: 'Before updating the service, please make sure the application is up to date',
       updateNeeded: 'Service Update Required',
       updateDescription: 'Service file update detected. It is recommended to click the "Update Service" button to update.',
+      updateNeededAdmin: 'Service Update Required (Administrator Required)',
+      updateDescriptionAdmin: 'Service file update detected. Please restart the application as administrator first, then click the "Update Service" button.',
       needAdmin: 'Admin Required',
       available: 'Update Available',
     }

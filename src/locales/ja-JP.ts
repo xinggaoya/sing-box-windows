@@ -318,6 +318,8 @@ export default {
       updateBefore: 'サービスを更新する前に、アプリケーションが最新であることを確認してください',
       updateNeeded: 'サービス更新が必要',
       updateDescription: 'サービスファイルの更新が検出されました。「サービス更新」ボタンをクリックして更新することをお勧めします。',
+      updateNeededAdmin: 'サービス更新が必要（管理者権限が必要）',
+      updateDescriptionAdmin: 'サービスファイルの更新が検出されました。まず管理者として再起動してから、「サービス更新」ボタンをクリックしてください。',
       needAdmin: '管理者権限が必要',
       available: '更新可能',
     }
