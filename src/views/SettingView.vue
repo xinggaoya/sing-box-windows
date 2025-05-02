@@ -125,7 +125,7 @@
             <n-icon size="20" class="card-icon">
               <server-outline />
             </n-icon>
-            服务管理
+            {{ $t('service.install.title') }}
           </n-h3>
         </div>
       </template>
@@ -135,10 +135,10 @@
           v-if="!serviceStore.isServiceInstalled"
           type="warning"
           :show-icon="true"
-          title="服务未安装"
+          :title="$t('service.install.notInstalled')"
           class="version-alert"
         >
-          必须安装系统服务才能使用TUN模式和更多高级功能
+          {{ $t('service.install.requiredWarning') }}
         </n-alert>
 
         <n-space justify="space-between" align="center">
@@ -149,9 +149,9 @@
                 :bordered="false"
                 size="medium"
               >
-                {{ serviceStore.isServiceInstalled ? '已安装' : '未安装' }}
+                {{ serviceStore.isServiceInstalled ? $t('service.install.installed') : $t('service.install.notInstalled') }}
               </n-tag>
-              <span class="service-status">系统服务状态</span>
+              <span class="service-status">{{ $t('service.install.serviceStatus') }}</span>
               <n-button
                 text
                 size="small"
@@ -161,7 +161,7 @@
                 <template #icon>
                   <n-icon><refresh-outline /></n-icon>
                 </template>
-                刷新
+                {{ $t('common.refresh') }}
               </n-button>
             </n-space>
 
@@ -172,9 +172,9 @@
                   :bordered="false"
                   size="small"
                 >
-                  {{ serviceStore.isServiceRunning ? '运行中' : '已停止' }}
+                  {{ serviceStore.isServiceRunning ? $t('service.install.running') : $t('service.install.notRunning') }}
                 </n-tag>
-                <span>服务运行状态</span>
+                <span>{{ $t('service.install.runningStatus') }}</span>
               </n-space>
             </div>
           </div>
@@ -186,14 +186,14 @@
               :loading="serviceStore.isUninstalling"
               :disabled="!serviceStore.isServiceInstalled || !isAdmin"
             >
-              卸载服务
+              {{ $t('service.install.uninstallButton') }}
             </n-button>
             <n-button
               type="primary"
               @click="navigateToServiceInstall"
               :disabled="serviceStore.isServiceInstalled"
             >
-              {{ serviceStore.isServiceInstalled ? '已安装' : '安装服务' }}
+              {{ serviceStore.isServiceInstalled ? $t('service.install.installed') : $t('service.install.installButton') }}
             </n-button>
           </n-space>
         </n-space>
@@ -675,9 +675,9 @@ async function refreshServiceStatus() {
   try {
     checkingService.value = true
     await serviceStore.checkServiceStatus()
-    message.success('服务状态刷新成功')
+    message.success(t('service.install.refreshSuccess'))
   } catch (error) {
-    message.error(`服务状态刷新失败: ${error}`)
+    message.error(t('service.install.refreshError', { error }))
   } finally {
     checkingService.value = false
   }
@@ -690,26 +690,26 @@ async function handleUninstallService() {
       await tauriApi.system.restartAsAdmin()
       return
     } catch (error) {
-      message.error(`以管理员身份重启失败: ${error}`)
+      message.error(t('service.install.restartError', { error }))
       return
     }
   }
 
   try {
     dialog.warning({
-      title: '卸载服务',
-      content: '确定要卸载系统服务吗？卸载后将无法使用TUN模式等高级功能。',
-      positiveText: '确定卸载',
-      negativeText: '取消',
+      title: t('service.install.uninstallConfirmTitle'),
+      content: t('service.install.uninstallConfirmContent'),
+      positiveText: t('service.install.uninstallConfirmButton'),
+      negativeText: t('service.install.cancelButton'),
       onPositiveClick: async () => {
         const success = await serviceStore.uninstallService()
         if (success) {
-          message.success('服务卸载成功')
+          message.success(t('service.install.uninstallSuccess'))
         }
       }
     })
   } catch (error) {
-    message.error(`服务卸载失败: ${error}`)
+    message.error(t('service.install.uninstallError', { error }))
   }
 }
 

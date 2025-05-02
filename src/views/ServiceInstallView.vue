@@ -6,20 +6,20 @@
           <n-icon size="48" :depth="3">
             <setting-outlined />
           </n-icon>
-          <h1>服务安装</h1>
+          <h1>{{ $t('service.install.title') }}</h1>
         </div>
       </template>
       
       <div class="service-install-content">
         <div class="status-info">
-          <p class="description">Sing-Box 需要安装必要的系统服务才能继续使用。此操作需要管理员权限。</p>
+          <p class="description">{{ $t('service.install.description') }}</p>
           
           <!-- 管理员权限状态显示 -->
           <n-alert type="warning" v-if="!isAdmin">
             <div class="admin-alert">
-              <span>当前应用未以管理员身份运行，无法安装服务</span>
+              <span>{{ $t('service.install.notAdmin') }}</span>
               <n-button type="primary" @click="restartAsAdmin" :loading="isRestarting">
-                以管理员身份重启
+                {{ $t('service.install.restartAsAdmin') }}
               </n-button>
             </div>
           </n-alert>
@@ -28,48 +28,48 @@
             <n-space align="center" justify="space-between">
               <n-space align="center">
                 <n-tag :type="serviceStore.isServiceInstalled ? 'success' : 'error'" size="medium">
-                  {{ serviceStore.isServiceInstalled ? '已安装' : '未安装' }}
+                  {{ serviceStore.isServiceInstalled ? $t('service.install.installed') : $t('service.install.notInstalled') }}
                 </n-tag>
-                <span>服务安装状态</span>
+                <span>{{ $t('service.install.serviceStatus') }}</span>
               </n-space>
               <n-button text size="small" @click="refreshServiceStatus" :loading="isRefreshing">
                 <template #icon>
                   <n-icon><refresh-outline /></n-icon>
                 </template>
-                刷新状态
+                {{ $t('service.install.refresh') }}
               </n-button>
             </n-space>
             
             <n-space align="center" v-if="serviceStore.isServiceInstalled">
               <n-tag :type="serviceStore.isServiceRunning ? 'success' : 'warning'" size="medium">
-                {{ serviceStore.isServiceRunning ? '运行中' : '未运行' }}
+                {{ serviceStore.isServiceRunning ? $t('service.install.running') : $t('service.install.notRunning') }}
               </n-tag>
-              <span>服务运行状态</span>
+              <span>{{ $t('service.install.runningStatus') }}</span>
             </n-space>
             
             <n-space align="center">
               <n-tag :type="isAdmin ? 'success' : 'error'" size="medium">
-                {{ isAdmin ? '是' : '否' }}
+                {{ isAdmin ? $t('service.install.isAdmin') : $t('service.install.isNotAdmin') }}
               </n-tag>
-              <span>管理员权限</span>
+              <span>{{ $t('service.install.adminStatus') }}</span>
             </n-space>
           </n-space>
           
           <!-- 服务信息展示 -->
           <n-collapse v-if="serviceStore.isServiceInstalled" class="service-details">
-            <n-collapse-item title="服务详细信息" name="service-info">
+            <n-collapse-item :title="$t('service.install.serviceDetails')" name="service-info">
               <n-descriptions bordered size="small">
-                <n-descriptions-item label="服务名称">
+                <n-descriptions-item :label="$t('service.install.serviceName')">
                   SingBoxService
                 </n-descriptions-item>
-                <n-descriptions-item label="启动类型">
-                  自动
+                <n-descriptions-item :label="$t('service.install.startupType')">
+                  {{ $t('common.auto') }}
                 </n-descriptions-item>
-                <n-descriptions-item label="服务路径">
+                <n-descriptions-item :label="$t('service.install.servicePath')">
                   {{ servicePath }}
                 </n-descriptions-item>
-                <n-descriptions-item label="服务说明">
-                  提供Sing-Box代理内核的高权限运行环境，支持TUN模式和系统代理设置
+                <n-descriptions-item :label="$t('common.description')">
+                  {{ $t('service.install.serviceDescription') }}
                 </n-descriptions-item>
               </n-descriptions>
             </n-collapse-item>
@@ -78,7 +78,7 @@
         
         <div class="action-area">
           <n-alert type="warning" v-if="!serviceStore.isServiceInstalled">
-            您必须安装服务才能使用 Sing-Box 的全部功能，特别是TUN模式
+            {{ $t('service.install.requiredWarning') }}
           </n-alert>
           
           <n-alert type="error" v-if="serviceStore.installError">
@@ -98,7 +98,7 @@
               :loading="serviceStore.isInstalling"
               :disabled="serviceStore.isServiceInstalled || !isAdmin"
             >
-              {{ serviceStore.isServiceInstalled ? '已安装' : '安装服务' }}
+              {{ serviceStore.isServiceInstalled ? $t('service.install.installed') : $t('service.install.installButton') }}
             </n-button>
             
             <n-button
@@ -108,13 +108,13 @@
               :loading="serviceStore.isUninstalling"
               :disabled="!serviceStore.isServiceInstalled || serviceStore.isInstalling || !isAdmin"
             >
-              卸载服务
+              {{ $t('service.install.uninstallButton') }}
             </n-button>
           </n-space>
           
           <n-space justify="center" class="continue-button" v-if="serviceStore.isServiceInstalled">
             <n-button type="success" size="large" @click="navigateToHome">
-              继续使用
+              {{ $t('service.install.continueButton') }}
             </n-button>
           </n-space>
         </div>
@@ -132,9 +132,11 @@ import { RefreshOutline } from '@vicons/ionicons5'
 import { useServiceStore } from '@/stores/system/ServiceStore'
 import { tauriApi } from '@/services/tauri-api'
 import { appDataDir } from '@tauri-apps/api/path'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const serviceStore = useServiceStore()
+const { t } = useI18n()
 
 // 管理员权限状态
 const isAdmin = ref(false)
@@ -142,7 +144,7 @@ const isRestarting = ref(false)
 const isRefreshing = ref(false)
 
 // 服务路径
-const servicePath = ref('正在获取...')
+const servicePath = ref(t('common.loading'))
 
 // 操作结果提示
 const operationResult = ref({
@@ -182,7 +184,7 @@ async function getServicePath() {
     servicePath.value = `${dataDir}sing-box-service.exe`
   } catch (error) {
     console.error('获取服务路径失败:', error)
-    servicePath.value = '获取失败'
+    servicePath.value = t('common.unknown')
   }
 }
 
@@ -191,10 +193,10 @@ async function refreshServiceStatus() {
   try {
     isRefreshing.value = true
     await serviceStore.checkServiceStatus()
-    showOperationResult('success', '服务状态刷新成功')
+    showOperationResult('success', t('service.install.refreshSuccess'))
   } catch (error) {
     console.error('刷新服务状态失败:', error)
-    showOperationResult('error', `刷新服务状态失败: ${error}`)
+    showOperationResult('error', t('service.install.refreshError', { error }))
   } finally {
     isRefreshing.value = false
   }
@@ -207,7 +209,7 @@ async function restartAsAdmin() {
     await tauriApi.system.restartAsAdmin()
   } catch (error) {
     console.error('以管理员身份重启失败:', error)
-    showOperationResult('error', `以管理员身份重启失败: ${error}`)
+    showOperationResult('error', t('service.install.restartError', { error }))
   } finally {
     isRestarting.value = false
   }
@@ -222,7 +224,7 @@ async function handleInstall() {
   try {
     const success = await serviceStore.installService()
     if (success) {
-      showOperationResult('success', '服务安装成功！现在您可以使用TUN模式和更多高级功能')
+      showOperationResult('success', t('service.install.installSuccess'))
       // 获取更新后的服务路径
       await getServicePath()
       // 延迟一点时间，让用户看到安装成功的消息
@@ -231,7 +233,7 @@ async function handleInstall() {
       }, 3000)
     }
   } catch (error) {
-    showOperationResult('error', `服务安装失败: ${error}`)
+    showOperationResult('error', t('service.install.installError', { error }))
   }
 }
 
@@ -244,10 +246,10 @@ async function handleUninstall() {
   try {
     const success = await serviceStore.uninstallService()
     if (success) {
-      showOperationResult('success', '服务卸载成功')
+      showOperationResult('success', t('service.install.uninstallSuccess'))
     }
   } catch (error) {
-    showOperationResult('error', `服务卸载失败: ${error}`)
+    showOperationResult('error', t('service.install.uninstallError', { error }))
   }
 }
 
