@@ -53,5 +53,8 @@ pub fn get_service_path() -> PathBuf {
         .expect("无法获取可执行程序父目录")
         .to_str()
         .expect("无法将父目录路径转换为字符串");
-    PathBuf::from(&work_dir).join("src").join("config").join("sing-box-service.exe")
+    PathBuf::from(&work_dir)
+        .join("src")
+        .join("config")
+        .join("sing-box-service.exe")
 }

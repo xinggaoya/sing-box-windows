@@ -21,7 +21,7 @@ pub mod network_config {
 
     /// 网络请求超时时间（秒）
     pub const HTTP_TIMEOUT_SECONDS: u64 = 30;
-    
+
     /// 默认服务插件 API 端口
     pub const DEFAULT_API_PORT: u16 = 28955;
 }

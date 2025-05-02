@@ -467,7 +467,7 @@ pub async fn test_node_delay<R: Runtime>(
             match response.json::<Value>().await {
                 Ok(data) => {
                     let delay = data.get("delay").and_then(|d| d.as_u64()).unwrap_or(0);
-                    
+
                     // 发送测试结果事件
                     let _ = window.emit(
                         "test-node-result",

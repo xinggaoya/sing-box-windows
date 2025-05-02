@@ -401,7 +401,8 @@ fn extract_nodes_from_subscription(content: &str) -> Result<Vec<Value>, Box<dyn 
 
                     match outbound_type {
                         Some("vless") | Some("vmess") | Some("trojan") | Some("shadowsocks")
-                        | Some("shadowsocksr") | Some("socks") | Some("http") | Some("hysteria2") => {
+                        | Some("shadowsocksr") | Some("socks") | Some("http")
+                        | Some("hysteria2") => {
                             nodes.push(node_with_tag);
                         }
                         _ => {} // 忽略其他类型的出站
@@ -895,7 +896,7 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
         }
         "hysteria2" => {
             let password = clash_node.get("password").and_then(|p| p.as_str())?;
-            
+
             let mut node = json!({
                 "tag": name,
                 "type": "hysteria2",
@@ -907,23 +908,27 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
                     "alpn": ["h3"]
                 }
             });
-            
+
             // 处理 insecure 设置
-            if let Some(insecure) = clash_node.get("tls").and_then(|t| t.get("insecure")).and_then(|i| i.as_bool()) {
+            if let Some(insecure) = clash_node
+                .get("tls")
+                .and_then(|t| t.get("insecure"))
+                .and_then(|i| i.as_bool())
+            {
                 if let Some(tls) = node.get_mut("tls") {
                     if let Some(tls_obj) = tls.as_object_mut() {
                         tls_obj.insert("insecure".to_string(), json!(insecure));
                     }
                 }
             }
-            
+
             // 处理网络设置
             if let Some(network) = clash_node.get("network").and_then(|n| n.as_str()) {
                 if let Some(obj) = node.as_object_mut() {
                     obj.insert("network".to_string(), json!(network));
                 }
             }
-            
+
             Some(node)
         }
         // 其他类型可以类似处理

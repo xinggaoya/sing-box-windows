@@ -4,8 +4,8 @@ use crate::app::core::kernel_service::{
     start_websocket_relay, stop_kernel,
 };
 use crate::app::core::proxy_service::{
-    change_proxy, get_api_token, get_proxies, get_rules, get_version_info, set_manual_proxy, set_system_proxy, set_tun_proxy,
-    test_group_delay, test_node_delay, toggle_ip_version,
+    change_proxy, get_api_token, get_proxies, get_rules, get_version_info, set_manual_proxy,
+    set_system_proxy, set_tun_proxy, test_group_delay, test_node_delay, toggle_ip_version,
 };
 
 // Network services imports
@@ -15,7 +15,10 @@ use crate::app::network::subscription_service::{
 };
 
 // System services imports
-use crate::app::system::system_service::{check_admin, check_service_status, exit_application, install_service, restart_as_admin, uninstall_service};
+use crate::app::system::system_service::{
+    check_admin, check_service_status, exit_application, install_service, restart_as_admin,
+    uninstall_service,
+};
 use crate::app::system::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
@@ -31,6 +34,7 @@ pub fn run() {
     fmt().with_env_filter(EnvFilter::from_default_env()).init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             let _ = show_window(app);

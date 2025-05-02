@@ -37,6 +37,7 @@ lazy_static = "1.4.0"
 winreg = "0.52.0"
 winapi = { version = "0.3", features = ["wininet"] }
 serde = { version = "1.0.214", features = ["derive"] }
+tauri-plugin-store = "2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"

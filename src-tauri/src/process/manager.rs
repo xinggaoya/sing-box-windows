@@ -39,38 +39,40 @@ impl ProcessManager {
     // 获取进程状态
     pub async fn get_status(&self) -> ProcessInfo {
         match self.query_status().await {
-            Ok((running, pid)) => {
-                ProcessInfo {
-                    pid,
-                    status: if running { ProcessStatus::Running } else { ProcessStatus::Stopped },
-                    last_error: None,
-                }
+            Ok((running, pid)) => ProcessInfo {
+                pid,
+                status: if running {
+                    ProcessStatus::Running
+                } else {
+                    ProcessStatus::Stopped
+                },
+                last_error: None,
             },
-            Err(e) => {
-                ProcessInfo {
-                    pid: None,
-                    status: ProcessStatus::Failed(e.to_string()),
-                    last_error: Some(e.to_string()),
-                }
-            }
+            Err(e) => ProcessInfo {
+                pid: None,
+                status: ProcessStatus::Failed(e.to_string()),
+                last_error: Some(e.to_string()),
+            },
         }
     }
 
     // 查询API获取状态
     async fn query_status(&self) -> Result<(bool, Option<u32>)> {
         let url = format!("{}/status", self.api_base_url);
-        
+
         match self.client.get(&url).send().await {
             Ok(response) => {
                 // 先保存状态码
                 let status_code = response.status();
                 let is_success = status_code.is_success();
-                
+
                 if is_success {
                     match response.json::<ApiResponse>().await {
                         Ok(api_resp) => {
                             if api_resp.success && api_resp.data.is_some() {
-                                if let Ok(status_data) = serde_json::from_value::<StatusResponse>(api_resp.data.unwrap()) {
+                                if let Ok(status_data) =
+                                    serde_json::from_value::<StatusResponse>(api_resp.data.unwrap())
+                                {
                                     return Ok((status_data.running, status_data.pid));
                                 }
                             }
@@ -100,7 +102,7 @@ impl ProcessManager {
     pub async fn is_running(&self) -> bool {
         match self.query_status().await {
             Ok((running, _)) => running,
-            Err(_) => false
+            Err(_) => false,
         }
     }
 
@@ -111,13 +113,13 @@ impl ProcessManager {
 
         // 调用API启动服务
         let url = format!("{}/start", self.api_base_url);
-        
+
         match self.client.post(&url).send().await {
             Ok(response) => {
                 // 先保存状态码
                 let status_code = response.status();
                 let is_success = status_code.is_success();
-                
+
                 if is_success {
                     match response.json::<ApiResponse>().await {
                         Ok(api_resp) => {
@@ -127,7 +129,10 @@ impl ProcessManager {
                                 info!("{}", messages::INFO_PROCESS_STARTED);
                                 return Ok(());
                             } else {
-                                return Err(ProcessError::StartFailed(format!("启动失败: {}", api_resp.message)));
+                                return Err(ProcessError::StartFailed(format!(
+                                    "启动失败: {}",
+                                    api_resp.message
+                                )));
                             }
                         }
                         Err(e) => {
@@ -139,12 +144,18 @@ impl ProcessManager {
                                 info!("内核启动成功（响应格式不标准但状态码正常）");
                                 return Ok(());
                             }
-                            
-                            return Err(ProcessError::StartFailed(format!("解析启动响应失败: {}", e)));
+
+                            return Err(ProcessError::StartFailed(format!(
+                                "解析启动响应失败: {}",
+                                e
+                            )));
                         }
                     }
                 } else {
-                    return Err(ProcessError::StartFailed(format!("启动响应错误: HTTP {}", status_code)));
+                    return Err(ProcessError::StartFailed(format!(
+                        "启动响应错误: HTTP {}",
+                        status_code
+                    )));
                 }
             }
             Err(e) => {
@@ -157,31 +168,34 @@ impl ProcessManager {
     pub async fn stop(&self) -> Result<()> {
         // 调用API停止服务
         let url = format!("{}/stop", self.api_base_url);
-        
+
         match self.client.post(&url).send().await {
             Ok(response) => {
                 // 先保存状态码
                 let status_code = response.status();
                 let is_success = status_code.is_success();
-                
+
                 if is_success {
                     match response.json::<ApiResponse>().await {
                         Ok(api_resp) => {
                             if api_resp.success {
                                 // 停止成功，等待一段时间确保服务已停止
                                 sleep(Duration::from_secs(1)).await;
-                                
+
                                 // 关闭系统代理
                                 if let Err(e) = disable_system_proxy() {
                                     warn!("关闭系统代理失败: {}", e);
                                 } else {
                                     info!("{}", messages::INFO_SYSTEM_PROXY_DISABLED);
                                 }
-                                
+
                                 info!("{}", messages::INFO_PROCESS_STOPPED);
                                 return Ok(());
                             } else {
-                                return Err(ProcessError::StopFailed(format!("停止失败: {}", api_resp.message)));
+                                return Err(ProcessError::StopFailed(format!(
+                                    "停止失败: {}",
+                                    api_resp.message
+                                )));
                             }
                         }
                         Err(e) => {
@@ -190,23 +204,29 @@ impl ProcessManager {
                                 // 虽然解析失败，但HTTP状态是成功的，可能API返回非标准格式
                                 // 假设操作成功
                                 sleep(Duration::from_secs(1)).await;
-                                
+
                                 // 关闭系统代理
                                 if let Err(e) = disable_system_proxy() {
                                     warn!("关闭系统代理失败: {}", e);
                                 } else {
                                     info!("{}", messages::INFO_SYSTEM_PROXY_DISABLED);
                                 }
-                                
+
                                 info!("内核停止成功（响应格式不标准但状态码正常）");
                                 return Ok(());
                             }
-                            
-                            return Err(ProcessError::StopFailed(format!("解析停止响应失败: {}", e)));
+
+                            return Err(ProcessError::StopFailed(format!(
+                                "解析停止响应失败: {}",
+                                e
+                            )));
                         }
                     }
                 } else {
-                    return Err(ProcessError::StopFailed(format!("停止响应错误: HTTP {}", status_code)));
+                    return Err(ProcessError::StopFailed(format!(
+                        "停止响应错误: HTTP {}",
+                        status_code
+                    )));
                 }
             }
             Err(e) => {
@@ -219,13 +239,13 @@ impl ProcessManager {
     pub async fn restart(&self) -> Result<()> {
         // 调用API重启服务
         let url = format!("{}/restart", self.api_base_url);
-        
+
         match self.client.post(&url).send().await {
             Ok(response) => {
                 // 先保存状态码
                 let status_code = response.status();
                 let is_success = status_code.is_success();
-                
+
                 if is_success {
                     match response.json::<ApiResponse>().await {
                         Ok(api_resp) => {
@@ -235,7 +255,10 @@ impl ProcessManager {
                                 info!("内核已重启");
                                 return Ok(());
                             } else {
-                                return Err(ProcessError::Other(format!("重启失败: {}", api_resp.message)));
+                                return Err(ProcessError::Other(format!(
+                                    "重启失败: {}",
+                                    api_resp.message
+                                )));
                             }
                         }
                         Err(e) => {
@@ -247,12 +270,15 @@ impl ProcessManager {
                                 info!("内核重启成功（响应格式不标准但状态码正常）");
                                 return Ok(());
                             }
-                            
+
                             return Err(ProcessError::Other(format!("解析重启响应失败: {}", e)));
                         }
                     }
                 } else {
-                    return Err(ProcessError::Other(format!("重启响应错误: HTTP {}", status_code)));
+                    return Err(ProcessError::Other(format!(
+                        "重启响应错误: HTTP {}",
+                        status_code
+                    )));
                 }
             }
             Err(e) => {

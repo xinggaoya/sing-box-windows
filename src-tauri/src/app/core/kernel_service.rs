@@ -49,24 +49,25 @@ pub async fn check_kernel_version() -> Result<String, String> {
 #[tauri::command]
 pub async fn start_kernel(proxy_mode: Option<String>) -> Result<(), String> {
     let result = PROCESS_MANAGER.start().await.map_err(|e| e.to_string())?;
-    
+
     info!(proxy_mode);
     // 如果指定了代理模式为system，则设置系统代理
     if let Some(mode) = proxy_mode {
         if mode == "system" {
             // 短暂延迟，确保内核已启动
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            
+
             // 设置系统代理
             crate::utils::proxy_util::enable_system_proxy(
-                "127.0.0.1", 
-                network_config::DEFAULT_PROXY_PORT
-            ).map_err(|e| format!("设置系统代理失败: {}", e))?;
-            
+                "127.0.0.1",
+                network_config::DEFAULT_PROXY_PORT,
+            )
+            .map_err(|e| format!("设置系统代理失败: {}", e))?;
+
             info!("系统代理已启用");
         }
     }
-    
+
     Ok(result)
 }
 
@@ -79,7 +80,7 @@ pub async fn stop_kernel() -> Result<(), String> {
     } else {
         info!("{}", messages::INFO_SYSTEM_PROXY_DISABLED);
     }
-    
+
     // 停止内核
     PROCESS_MANAGER.stop().await.map_err(|e| e.to_string())
 }
@@ -304,10 +305,13 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
                 // 连接成功，发送通知
-                let _ = window_for_error.emit("traffic-connection", json!({
-                    "status": "connected"
-                }));
-                
+                let _ = window_for_error.emit(
+                    "traffic-connection",
+                    json!({
+                        "status": "connected"
+                    }),
+                );
+
                 let (mut _write, mut read) = ws_stream.split();
 
                 // 持续读取WebSocket消息
@@ -321,19 +325,25 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
                         Ok(Message::Close(_)) => {
                             error!("WebSocket流量连接关闭");
                             // 发送连接关闭通知
-                            let _ = window_for_error.emit("traffic-connection", json!({
-                                "status": "closed",
-                                "error": "WebSocket连接已关闭"
-                            }));
+                            let _ = window_for_error.emit(
+                                "traffic-connection",
+                                json!({
+                                    "status": "closed",
+                                    "error": "WebSocket连接已关闭"
+                                }),
+                            );
                             break;
                         }
                         Err(e) => {
                             error!("WebSocket流量数据读取错误: {}", e);
                             // 发送错误通知
-                            let _ = window_for_error.emit("traffic-connection", json!({
-                                "status": "error",
-                                "error": format!("数据读取错误: {}", e)
-                            }));
+                            let _ = window_for_error.emit(
+                                "traffic-connection",
+                                json!({
+                                    "status": "error",
+                                    "error": format!("数据读取错误: {}", e)
+                                }),
+                            );
                             break;
                         }
                         _ => {}
@@ -343,10 +353,13 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
             Err(e) => {
                 error!("WebSocket流量连接失败: {}", e);
                 // 发送连接失败通知
-                let _ = window_for_error.emit("traffic-connection", json!({
-                    "status": "failed",
-                    "error": format!("连接失败: {}", e)
-                }));
+                let _ = window_for_error.emit(
+                    "traffic-connection",
+                    json!({
+                        "status": "failed",
+                        "error": format!("连接失败: {}", e)
+                    }),
+                );
             }
         }
     });
@@ -380,10 +393,13 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
                 // 连接成功，发送通知
-                let _ = window_for_error.emit("memory-connection", json!({
-                    "status": "connected"
-                }));
-                
+                let _ = window_for_error.emit(
+                    "memory-connection",
+                    json!({
+                        "status": "connected"
+                    }),
+                );
+
                 let (mut _write, mut read) = ws_stream.split();
 
                 // 持续读取WebSocket消息
@@ -397,19 +413,25 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
                         Ok(Message::Close(_)) => {
                             error!("WebSocket内存连接关闭");
                             // 发送连接关闭通知
-                            let _ = window_for_error.emit("memory-connection", json!({
-                                "status": "closed",
-                                "error": "WebSocket连接已关闭"
-                            }));
+                            let _ = window_for_error.emit(
+                                "memory-connection",
+                                json!({
+                                    "status": "closed",
+                                    "error": "WebSocket连接已关闭"
+                                }),
+                            );
                             break;
                         }
                         Err(e) => {
                             error!("WebSocket内存数据读取错误: {}", e);
                             // 发送错误通知
-                            let _ = window_for_error.emit("memory-connection", json!({
-                                "status": "error",
-                                "error": format!("数据读取错误: {}", e)
-                            }));
+                            let _ = window_for_error.emit(
+                                "memory-connection",
+                                json!({
+                                    "status": "error",
+                                    "error": format!("数据读取错误: {}", e)
+                                }),
+                            );
                             break;
                         }
                         _ => {}
@@ -419,10 +441,13 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
             Err(e) => {
                 error!("WebSocket内存连接失败: {}", e);
                 // 发送连接失败通知
-                let _ = window_for_error.emit("memory-connection", json!({
-                    "status": "failed",
-                    "error": format!("连接失败: {}", e)
-                }));
+                let _ = window_for_error.emit(
+                    "memory-connection",
+                    json!({
+                        "status": "failed",
+                        "error": format!("连接失败: {}", e)
+                    }),
+                );
             }
         }
     });
@@ -456,10 +481,13 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
                 // 连接成功，发送通知
-                let _ = window_for_error.emit("logs-connection", json!({
-                    "status": "connected"
-                }));
-                
+                let _ = window_for_error.emit(
+                    "logs-connection",
+                    json!({
+                        "status": "connected"
+                    }),
+                );
+
                 let (mut _write, mut read) = ws_stream.split();
 
                 // 持续读取WebSocket消息
@@ -473,19 +501,25 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
                         Ok(Message::Close(_)) => {
                             error!("WebSocket日志连接关闭");
                             // 发送连接关闭通知
-                            let _ = window_for_error.emit("logs-connection", json!({
-                                "status": "closed",
-                                "error": "WebSocket连接已关闭"
-                            }));
+                            let _ = window_for_error.emit(
+                                "logs-connection",
+                                json!({
+                                    "status": "closed",
+                                    "error": "WebSocket连接已关闭"
+                                }),
+                            );
                             break;
                         }
                         Err(e) => {
                             error!("WebSocket日志数据读取错误: {}", e);
                             // 发送错误通知
-                            let _ = window_for_error.emit("logs-connection", json!({
-                                "status": "error",
-                                "error": format!("数据读取错误: {}", e)
-                            }));
+                            let _ = window_for_error.emit(
+                                "logs-connection",
+                                json!({
+                                    "status": "error",
+                                    "error": format!("数据读取错误: {}", e)
+                                }),
+                            );
                             break;
                         }
                         _ => {}
@@ -495,10 +529,13 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
             Err(e) => {
                 error!("WebSocket日志连接失败: {}", e);
                 // 发送连接失败通知
-                let _ = window_for_error.emit("logs-connection", json!({
-                    "status": "failed",
-                    "error": format!("连接失败: {}", e)
-                }));
+                let _ = window_for_error.emit(
+                    "logs-connection",
+                    json!({
+                        "status": "failed",
+                        "error": format!("连接失败: {}", e)
+                    }),
+                );
             }
         }
     });
@@ -532,10 +569,13 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
                 // 连接成功，发送通知
-                let _ = window_for_error.emit("connections-connection", json!({
-                    "status": "connected"
-                }));
-                
+                let _ = window_for_error.emit(
+                    "connections-connection",
+                    json!({
+                        "status": "connected"
+                    }),
+                );
+
                 let (mut _write, mut read) = ws_stream.split();
 
                 // 持续读取WebSocket消息
@@ -549,19 +589,25 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
                         Ok(Message::Close(_)) => {
                             error!("WebSocket连接数据连接关闭");
                             // 发送连接关闭通知
-                            let _ = window_for_error.emit("connections-connection", json!({
-                                "status": "closed",
-                                "error": "WebSocket连接已关闭"
-                            }));
+                            let _ = window_for_error.emit(
+                                "connections-connection",
+                                json!({
+                                    "status": "closed",
+                                    "error": "WebSocket连接已关闭"
+                                }),
+                            );
                             break;
                         }
                         Err(e) => {
                             error!("WebSocket连接数据读取错误: {}", e);
                             // 发送错误通知
-                            let _ = window_for_error.emit("connections-connection", json!({
-                                "status": "error",
-                                "error": format!("数据读取错误: {}", e)
-                            }));
+                            let _ = window_for_error.emit(
+                                "connections-connection",
+                                json!({
+                                    "status": "error",
+                                    "error": format!("数据读取错误: {}", e)
+                                }),
+                            );
                             break;
                         }
                         _ => {}
@@ -571,10 +617,13 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
             Err(e) => {
                 error!("WebSocket连接数据连接失败: {}", e);
                 // 发送连接失败通知
-                let _ = window_for_error.emit("connections-connection", json!({
-                    "status": "failed",
-                    "error": format!("连接失败: {}", e)
-                }));
+                let _ = window_for_error.emit(
+                    "connections-connection",
+                    json!({
+                        "status": "failed",
+                        "error": format!("连接失败: {}", e)
+                    }),
+                );
             }
         }
     });
