@@ -17,7 +17,7 @@ use crate::app::network::subscription_service::{
 // System services imports
 use crate::app::system::system_service::{
     check_admin, check_service_status, exit_application, install_service, restart_as_admin,
-    uninstall_service,
+    uninstall_service, update_service, check_service_update_needed,
 };
 use crate::app::system::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
@@ -96,6 +96,8 @@ pub fn run() {
             install_service,
             uninstall_service,
             check_service_status,
+            update_service,
+            check_service_update_needed,
             // Update service commands
             check_update,
             download_and_install_update,

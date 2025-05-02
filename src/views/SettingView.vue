@@ -4,25 +4,13 @@
     <n-card class="setting-card" :bordered="false">
       <template #header-extra>
         <n-space align="center" :size="12">
-          <n-tag
-            v-if="kernelStore.version.version"
-            :bordered="false"
-            type="default"
-            size="medium"
-            class="version-tag"
-          >
+          <n-tag v-if="kernelStore.version.version" :bordered="false" type="default" size="medium" class="version-tag">
             {{ t('setting.kernel.currentVersion') }}{{ formatVersion(kernelStore.version.version) }}
           </n-tag>
           <n-tag v-else :bordered="false" type="error" size="medium" class="version-tag">
             {{ t('setting.kernel.notInstalled') }}
           </n-tag>
-          <n-tag
-            v-if="hasNewVersion"
-            :bordered="false"
-            type="warning"
-            size="medium"
-            class="version-tag"
-          >
+          <n-tag v-if="hasNewVersion" :bordered="false" type="warning" size="medium" class="version-tag">
             {{ t('setting.kernel.newVersion') }}{{ formatVersion(kernelStore.newVersion) }}
           </n-tag>
         </n-space>
@@ -39,47 +27,25 @@
       </template>
 
       <n-space vertical :size="20">
-        <n-alert
-          v-if="hasNewVersion"
-          type="warning"
-          :show-icon="true"
-          :title="t('setting.kernel.newVersionFound')"
-          class="version-alert"
-        >
+        <n-alert v-if="hasNewVersion" type="warning" :show-icon="true" :title="t('setting.kernel.newVersionFound')"
+          class="version-alert">
           {{ t('setting.kernel.updateTip') }}
         </n-alert>
 
-        <n-alert
-          v-if="!kernelStore.version.version"
-          type="error"
-          :show-icon="true"
-          :title="t('setting.kernel.notInstalled')"
-          class="version-alert"
-        >
+        <n-alert v-if="!kernelStore.version.version" type="error" :show-icon="true"
+          :title="t('setting.kernel.notInstalled')" class="version-alert">
           {{ t('setting.kernel.installPrompt') }}
         </n-alert>
 
-        <n-progress
-          v-if="downloading"
-          type="line"
-          :percentage="downloadProgress"
-          :processing="downloadProgress < 100"
-          :indicator-placement="'inside'"
-          :rail-style="{ background: 'var(--n-color-disabled)' }"
-          class="download-progress"
-        >
+        <n-progress v-if="downloading" type="line" :percentage="downloadProgress" :processing="downloadProgress < 100"
+          :indicator-placement="'inside'" :rail-style="{ background: 'var(--n-color-disabled)' }"
+          class="download-progress">
           {{ downloadMessage }}
         </n-progress>
 
         <n-space align="center" justify="space-between">
-          <n-button
-            type="primary"
-            @click="downloadTheKernel"
-            :loading="loading"
-            :disabled="downloading"
-            size="medium"
-            class="download-button"
-          >
+          <n-button type="primary" @click="downloadTheKernel" :loading="loading" :disabled="downloading" size="medium"
+            class="download-button">
             <template #icon>
               <n-icon>
                 <download-outline />
@@ -95,13 +61,7 @@
           </n-button>
 
           <n-space :size="16">
-            <n-button
-              text
-              size="medium"
-              @click="showManualDownloadModal"
-              :disabled="downloading"
-              class="action-button"
-            >
+            <n-button text size="medium" @click="showManualDownloadModal" :disabled="downloading" class="action-button">
               {{ t('setting.kernel.manualDownload') }}
             </n-button>
             <n-button text size="medium" @click="checkManualInstall" :disabled="downloading">
@@ -131,33 +91,35 @@
       </template>
 
       <n-space vertical :size="16">
-        <n-alert
-          v-if="!serviceStore.isServiceInstalled"
-          type="warning"
-          :show-icon="true"
-          :title="$t('service.install.notInstalled')"
-          class="version-alert"
-        >
+        <n-alert v-if="!serviceStore.isServiceInstalled" type="warning" :show-icon="true"
+          :title="$t('service.install.notInstalled')" class="version-alert">
           {{ $t('service.install.requiredWarning') }}
+        </n-alert>
+
+        <n-alert v-if="!isAdmin" type="warning" :show-icon="true" :title="$t('service.install.adminRequired')"
+          class="version-alert">
+          <div class="admin-alert-content">
+            <span>{{ $t('service.install.notAdmin') }}</span>
+            <n-button type="primary" @click="restartAsAdmin" :loading="isRestarting">
+              {{ $t('service.install.restartAsAdmin') }}
+            </n-button>
+          </div>
+        </n-alert>
+
+        <n-alert v-if="serviceStore.needsUpdate && isAdmin" type="info" :show-icon="true"
+          :title="$t('service.update.updateNeeded')" class="version-alert">
+          {{ $t('service.update.updateDescription') }}
         </n-alert>
 
         <n-space justify="space-between" align="center">
           <div>
             <n-space align="center" :size="12">
-              <n-tag
-                :type="serviceStore.isServiceInstalled ? 'success' : 'error'"
-                :bordered="false"
-                size="medium"
-              >
-                {{ serviceStore.isServiceInstalled ? $t('service.install.installed') : $t('service.install.notInstalled') }}
+              <n-tag :type="serviceStore.isServiceInstalled ? 'success' : 'error'" :bordered="false" size="medium">
+                {{ serviceStore.isServiceInstalled ? $t('service.install.installed') :
+                  $t('service.install.notInstalled') }}
               </n-tag>
               <span class="service-status">{{ $t('service.install.serviceStatus') }}</span>
-              <n-button
-                text
-                size="small"
-                @click="refreshServiceStatus"
-                :loading="checkingService"
-              >
+              <n-button text size="small" @click="refreshServiceStatus" :loading="checkingService">
                 <template #icon>
                   <n-icon><refresh-outline /></n-icon>
                 </template>
@@ -167,11 +129,7 @@
 
             <div class="service-desc" v-if="serviceStore.isServiceInstalled">
               <n-space align="center" :size="12">
-                <n-tag
-                  :type="serviceStore.isServiceRunning ? 'success' : 'warning'"
-                  :bordered="false"
-                  size="small"
-                >
+                <n-tag :type="serviceStore.isServiceRunning ? 'success' : 'warning'" :bordered="false" size="small">
                   {{ serviceStore.isServiceRunning ? $t('service.install.running') : $t('service.install.notRunning') }}
                 </n-tag>
                 <span>{{ $t('service.install.runningStatus') }}</span>
@@ -180,20 +138,25 @@
           </div>
 
           <n-space>
-            <n-button
-              type="error"
-              @click="handleUninstallService"
-              :loading="serviceStore.isUninstalling"
-              :disabled="!serviceStore.isServiceInstalled || !isAdmin"
-            >
+            <n-button type="warning" @click="handleUpdateService" :loading="serviceStore.isUpdating"
+              :disabled="!serviceStore.isServiceInstalled || !isAdmin">
+              <div class="button-content">
+                {{ $t('service.update.buttonText') }}
+                <n-tag v-if="serviceStore.needsUpdate && !isAdmin" size="small" round type="error" class="badge">
+                  {{ $t('service.update.needAdmin') }}
+                </n-tag>
+                <n-tag v-else-if="serviceStore.needsUpdate" size="small" round type="warning" class="badge">
+                  {{ $t('service.update.available') }}
+                </n-tag>
+              </div>
+            </n-button>
+            <n-button type="error" @click="handleUninstallService" :loading="serviceStore.isUninstalling"
+              :disabled="!serviceStore.isServiceInstalled || !isAdmin">
               {{ $t('service.install.uninstallButton') }}
             </n-button>
-            <n-button
-              type="primary"
-              @click="navigateToServiceInstall"
-              :disabled="serviceStore.isServiceInstalled"
-            >
-              {{ serviceStore.isServiceInstalled ? $t('service.install.installed') : $t('service.install.installButton') }}
+            <n-button type="primary" @click="navigateToServiceInstall" :disabled="serviceStore.isServiceInstalled">
+              {{ serviceStore.isServiceInstalled ? $t('service.install.installed') : $t('service.install.installButton')
+              }}
             </n-button>
           </n-space>
         </n-space>
@@ -264,13 +227,8 @@
                 }}
               </div>
             </div>
-            <n-select
-              v-model:value="localeStore.locale"
-              :options="languageOptions"
-              size="small"
-              style="min-width: 120px"
-              @update:value="handleChangeLanguage"
-            />
+            <n-select v-model:value="localeStore.locale" :options="languageOptions" size="small"
+              style="min-width: 120px" @update:value="handleChangeLanguage" />
           </n-space>
         </n-list-item>
 
@@ -345,24 +303,14 @@
 
       <div class="about-footer">
         <n-space justify="center" align="center">
-          <n-button
-            text
-            tag="a"
-            href="https://github.com/xinggaoya/sing-box-windows"
-            target="_blank"
-          >
+          <n-button text tag="a" href="https://github.com/xinggaoya/sing-box-windows" target="_blank">
             <template #icon>
               <n-icon><logo-github /></n-icon>
             </template>
             GitHub
           </n-button>
           <n-divider vertical />
-          <n-button
-            text
-            tag="a"
-            href="https://github.com/xinggaoya/sing-box-windows"
-            target="_blank"
-          >
+          <n-button text tag="a" href="https://github.com/xinggaoya/sing-box-windows" target="_blank">
             <template #icon>
               <n-icon><globe-outline /></n-icon>
             </template>
@@ -374,14 +322,8 @@
   </div>
 
   <!-- 应用更新对话框 -->
-  <update-modal
-    v-model:show="showUpdateModal"
-    :latest-version="latestVersion"
-    :current-version="updateStore.appVersion"
-    :download-url="downloadUrl"
-    @update="handleUpdate"
-    @cancel="skipUpdate"
-  />
+  <update-modal v-model:show="showUpdateModal" :latest-version="latestVersion" :current-version="updateStore.appVersion"
+    :download-url="downloadUrl" @update="handleUpdate" @cancel="skipUpdate" />
 </template>
 
 <script setup lang="ts">
@@ -659,6 +601,7 @@ const handleChangeLanguage = async (value: string) => {
 
 const isAdmin = ref(false)
 const checkingService = ref(false)
+const isRestarting = ref(false)
 
 // 检查管理员权限
 async function checkAdminPermission() {
@@ -713,9 +656,43 @@ async function handleUninstallService() {
   }
 }
 
+// 更新服务
+async function handleUpdateService() {
+  if (!isAdmin.value) {
+    try {
+      await tauriApi.system.restartAsAdmin()
+      return
+    } catch (error) {
+      message.error(t('service.install.restartError', { error }))
+      return
+    }
+  }
+
+  try {
+    const updated = await serviceStore.updateService()
+    if (updated) {
+      message.success(t('service.update.successMessage'))
+    }
+  } catch (error) {
+    message.error(t('service.update.errorMessage', { error }))
+  }
+}
+
 // 跳转到服务安装页面
 function navigateToServiceInstall() {
   router.push('/service-install')
+}
+
+// 重启为管理员
+async function restartAsAdmin() {
+  try {
+    isRestarting.value = true
+    await tauriApi.system.restartAsAdmin()
+  } catch (error) {
+    message.error(t('service.install.restartError', { error }))
+  } finally {
+    isRestarting.value = false
+  }
 }
 
 onMounted(async () => {
@@ -731,6 +708,10 @@ onMounted(async () => {
   await checkAdminPermission()
   // 检查服务状态
   await serviceStore.checkServiceStatus()
+  // 检查服务是否需要更新
+  if (serviceStore.isServiceInstalled) {
+    await serviceStore.checkServiceUpdateNeeded()
+  }
 })
 </script>
 
@@ -900,5 +881,29 @@ onMounted(async () => {
   margin-top: 8px;
   font-size: 12px;
   color: var(--text-color-3);
+}
+
+.admin-alert-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.button-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge {
+  margin-left: 4px;
+  border-radius: 12px;
+  font-size: 11px;
+  padding: 0 8px;
+  height: 18px;
+  line-height: 18px;
 }
 </style>

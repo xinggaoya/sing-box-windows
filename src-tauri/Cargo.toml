@@ -23,6 +23,7 @@ serde_json = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "local-time"] }
 base64 = "0.13.0"
+sha2 = "0.10"
 
 tauri = { version = "2", features = ["tray-icon", "unstable"] }
 reqwest = { version = "0", features = ["json", "stream", "rustls-tls"] }

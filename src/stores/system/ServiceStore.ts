@@ -10,7 +10,9 @@ export const useServiceStore = defineStore('service', () => {
   const isServiceRunning = ref(false)
   const isInstalling = ref(false)
   const isUninstalling = ref(false)
+  const isUpdating = ref(false)
   const installError = ref('')
+  const needsUpdate = ref(false)
   
   // 检查服务是否已安装 - 通过服务状态检查命令
   async function checkServiceStatus() {
@@ -24,6 +26,30 @@ export const useServiceStore = defineStore('service', () => {
       isServiceInstalled.value = false
       isServiceRunning.value = false
       return { installed: false, running: false }
+    }
+  }
+  
+  // 检查服务是否需要更新
+  async function checkServiceUpdateNeeded() {
+    if (!isServiceInstalled.value) {
+      needsUpdate.value = false
+      return false
+    }
+    
+    try {
+      const result = await tauriApi.system.checkServiceUpdateNeeded()
+      
+      if (result.success) {
+        needsUpdate.value = result.need_update
+        return result.need_update
+      } else {
+        needsUpdate.value = false
+        return false
+      }
+    } catch (error) {
+      console.error('检查服务更新状态失败:', error)
+      needsUpdate.value = false
+      return false
     }
   }
   
@@ -88,15 +114,50 @@ export const useServiceStore = defineStore('service', () => {
     }
   }
   
+  // 更新服务
+  async function updateService() {
+    const appStore = useAppStore()
+    
+    if (isUpdating.value) return false
+    
+    isUpdating.value = true
+    
+    try {
+      const result = await tauriApi.system.updateService()
+      
+      if (result.success) {
+        if (result.updated) {
+          appStore.showSuccessMessage('服务已更新')
+        } else {
+          appStore.showInfoMessage(result.message)
+        }
+        return result.updated
+      } else {
+        appStore.showErrorMessage(`服务更新失败: ${result.message}`)
+        return false
+      }
+    } catch (error) {
+      console.error('更新服务失败:', error)
+      appStore.showErrorMessage(`服务更新失败: ${error}`)
+      return false
+    } finally {
+      isUpdating.value = false
+    }
+  }
+  
   return {
     isServiceInstalled,
     isServiceRunning,
     isInstalling,
     isUninstalling,
+    isUpdating,
     installError,
+    needsUpdate,
     checkServiceStatus,
+    checkServiceUpdateNeeded,
     installService,
-    uninstallService
+    uninstallService,
+    updateService
   }
 }, {
   persist: true, // 添加持久化存储

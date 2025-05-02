@@ -133,6 +133,10 @@ export const tauriApi = {
     uninstallService: () => invoke('uninstall_service'),
     // 检查服务状态
     checkServiceStatus: () => invoke<{installed: boolean, running: boolean}>('check_service_status'),
+    // 更新服务
+    updateService: () => invoke<{success: boolean, updated: boolean, message: string}>('update_service'),
+    // 检查服务是否需要更新
+    checkServiceUpdateNeeded: () => invoke<{success: boolean, need_update: boolean, message: string}>('check_service_update_needed'),
   },
 
   // 更新相关 API
