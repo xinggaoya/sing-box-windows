@@ -71,12 +71,13 @@
         </div>
         <div class="mode-card-content">
           <div class="mode-buttons">
-            <n-radio-group v-model:value="currentProxyMode" size="medium">
-              <n-radio-button
+            <n-button-group size="medium">
+              <n-button 
                 v-for="mode in proxyModes"
                 :key="mode.value"
-                :value="mode.value"
+                :type="currentProxyMode === mode.value ? 'primary' : 'default'"
                 :disabled="isSwitching || isStarting || isStopping"
+                @click="onModeChange(mode.value)"
               >
                 <template #icon>
                   <n-icon>
@@ -84,8 +85,8 @@
                   </n-icon>
                 </template>
                 {{ t(mode.nameKey) }}
-              </n-radio-button>
-            </n-radio-group>
+              </n-button>
+            </n-button-group>
           </div>
           <div class="mode-description">
             {{ currentProxyMode ? t(`home.proxyMode.${currentProxyMode}Description`) : '' }}
@@ -103,12 +104,13 @@
         </div>
         <div class="mode-card-content">
           <div class="mode-buttons">
-            <n-radio-group v-model:value="currentNodeProxyMode" size="medium">
-              <n-radio-button
+            <n-button-group size="medium">
+              <n-button
                 v-for="mode in nodeProxyModes"
                 :key="mode.value"
-                :value="mode.value"
+                :type="currentNodeProxyMode === mode.value ? 'primary' : 'default'"
                 :disabled="!appState.isRunning || isSwitching || isStarting || isStopping"
+                @click="handleNodeProxyModeChange(mode.value)"
               >
                 <template #icon>
                   <n-icon>
@@ -116,8 +118,8 @@
                   </n-icon>
                 </template>
                 {{ mode.label }}
-              </n-radio-button>
-            </n-radio-group>
+              </n-button>
+            </n-button-group>
           </div>
           <div class="mode-description">
             {{ currentNodeProxyMode ? t(`proxy.mode.${currentNodeProxyMode}Description`) : '' }}
@@ -349,13 +351,6 @@ const nodeProxyModes = [
   },
 ]
 
-// 监听代理模式变化
-watch(currentProxyMode, async (newMode, oldMode) => {
-  if (newMode !== oldMode) {
-    await onModeChange(newMode)
-  }
-})
-
 // 监听appStore中代理模式变化，更新当前选中状态
 watch(
   () => appState.proxyMode,
@@ -379,9 +374,7 @@ const getCurrentNodeProxyMode = async () => {
     // 调用后端API获取当前代理模式
     const mode = await tauriApi.proxy.getCurrentProxyMode()
     currentNodeProxyMode.value = mode
-    console.log(t('proxy.currentMode'), mode)
   } catch (error) {
-    console.error(t('proxy.getModeError'), error)
     // 出错时仍使用默认的规则模式
     currentNodeProxyMode.value = 'rule'
   }
@@ -437,7 +430,6 @@ const confirmNodeProxyModeChange = async () => {
       t('proxy.modeChangeSuccess', { mode: getNodeProxyModeText(targetNodeProxyMode.value) }),
     )
   } catch (error) {
-    console.error(t('proxy.modeChangeFailed'), error)
     message.error(`${t('proxy.modeChangeError')}: ${error}`)
   } finally {
     isChangingNodeMode.value = false
@@ -546,24 +538,18 @@ const onModeChange = async (value: string) => {
     let needClose = false
     let modeChanged = false
 
-    if (value === 'system') {
-      await tauriApi.proxy.setSystemProxy()
-      appState.setProxyMode('system')
-      currentProxyMode.value = 'system'
+    // 统一使用 proxyService.switchMode 方法切换所有模式
+    if (value === 'system' || value === 'manual' || value === 'tun') {
+      needClose = await proxyService.switchMode(value, showMessage)
+      currentProxyMode.value = value
       modeChanged = true
-      showMessage('success', t('notification.systemProxyEnabled'))
-    } else if (value === 'manual') {
-      await tauriApi.proxy.setManualProxy()
-      appState.setProxyMode('manual')
-      currentProxyMode.value = 'manual'
-      modeChanged = true
-      showMessage('info', t('notification.manualProxyEnabled'))
-    } else if (value === 'tun') {
-      needClose = await proxyService.switchMode('tun', showMessage)
-      // 添加缺失的状态更新
-      appState.setProxyMode('tun')
-      currentProxyMode.value = 'tun'
-      modeChanged = true
+
+      // 根据不同模式显示不同的提示信息
+      if (value === 'system') {
+        showMessage('success', t('notification.systemProxyEnabled'))
+      } else if (value === 'manual') {
+        showMessage('info', t('notification.manualProxyEnabled'))
+      }
     }
 
     // 如果内核正在运行且模式已改变，一定要重启内核
@@ -597,8 +583,6 @@ const checkAdminStatus = async () => {
 const setupListeners = async () => {
   try {
     if (appState.isRunning) {
-      console.log('HomeView: 尝试设置监听器')
-
       // 清理之前的监听器，确保没有重复监听
       trafficStore.cleanupListeners()
       connectionStore.cleanupListeners()
@@ -613,7 +597,6 @@ const setupListeners = async () => {
         connectionStore.setupConnectionsListener(),
         connectionStore.setupMemoryListener(),
       ]).catch((e) => {
-        console.error('HomeView: 设置监听器失败', e)
         // 尝试重试一次
         return new Promise((resolve) => {
           setTimeout(async () => {
@@ -632,7 +615,6 @@ const setupListeners = async () => {
 
       isTrafficLoading.value = false
       isConnectionLoading.value = false
-      console.log('HomeView: 监听器设置完成')
     }
   } catch (error) {
     console.error('HomeView: 设置监听器失败:', error)

@@ -370,6 +370,7 @@ export default {
     kernelStarted: 'Kernel started',
     kernelStopped: 'Kernel stopped',
     kernelRestarted: 'Kernel restarted',
+    restartingKernel: 'Restarting kernel...',
     restartingAsAdmin: 'Restarting as administrator...',
     updateAvailable: 'New version available',
     updateDownloaded: 'Update downloaded, will install soon',

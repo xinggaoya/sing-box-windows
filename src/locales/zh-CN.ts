@@ -368,6 +368,7 @@ export default {
     kernelStarted: '内核已启动',
     kernelStopped: '内核已停止',
     kernelRestarted: '内核已重启',
+    restartingKernel: '正在重启内核...',
     restartingAsAdmin: '正在以管理员身份重启应用...',
     updateAvailable: '发现新版本',
     updateDownloaded: '更新已下载，即将安装',

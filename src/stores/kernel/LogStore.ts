@@ -37,23 +37,18 @@ export const useLogStore = defineStore(
         // 先清理可能存在的旧监听器
         cleanupListeners()
         
-        console.log('设置日志事件监听器...')
         
         // 监听Tauri日志事件
         unlistenLogsFn = await listen('log-data', (event) => {
-          console.log('接收到Tauri日志事件:', event)
           processLogData(event.payload)
         })
         
         // 监听mitt事件总线的日志事件（从WebSocket服务中转发）
         if (!mittListenerSet) {
-          console.log('设置mitt日志事件监听器')
           mitt.on('log-data', handleMittLogData)
           mittListenerSet = true
         }
         
-        // 添加一条初始化日志
-        addLog('info', '日志系统已初始化')
         
         return true
       } catch (error) {
@@ -64,7 +59,6 @@ export const useLogStore = defineStore(
     
     // 处理mitt事件总线上的日志数据
     const handleMittLogData = (data: any) => {
-      console.log('接收到mitt日志事件:', data)
       processLogData(data)
     }
     
@@ -95,7 +89,6 @@ export const useLogStore = defineStore(
 
     // 添加日志
     const addLog = (type: string, payload: string) => {
-      console.log(`添加日志 [${type}]: ${payload}`)
       
       // 添加新的日志条目
       logs.value.unshift({

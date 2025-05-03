@@ -370,6 +370,7 @@ export default {
     kernelStarted: 'カーネルが開始されました',
     kernelStopped: 'カーネルが停止しました',
     kernelRestarted: 'カーネルが再起動されました',
+    restartingKernel: 'カーネルを再起動中...',
     restartingAsAdmin: '管理者として再起動しています...',
     updateAvailable: '新バージョンが利用可能です',
     updateDownloaded: 'アップデートがダウンロードされました、まもなくインストールされます',

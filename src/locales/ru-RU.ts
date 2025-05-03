@@ -370,6 +370,7 @@ export default {
     kernelStarted: 'Ядро запущено',
     kernelStopped: 'Ядро остановлено',
     kernelRestarted: 'Ядро перезапущено',
+    restartingKernel: 'Перезапуск ядра...',
     restartingAsAdmin: 'Перезапуск с правами администратора...',
     updateAvailable: 'Доступна новая версия',
     updateDownloaded: 'Обновление загружено, скоро будет установлено',

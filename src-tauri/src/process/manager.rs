@@ -20,7 +20,6 @@ struct ApiResponse {
 struct StatusResponse {
     running: bool,
     pid: Option<u32>,
-    // 可以根据实际返回添加更多字段
 }
 
 pub struct ProcessManager {
@@ -95,14 +94,6 @@ impl ProcessManager {
                 // 服务可能未启动
                 return Err(ProcessError::Other(format!("获取状态请求失败: {}", e)));
             }
-        }
-    }
-
-    // 检查进程是否在运行
-    pub async fn is_running(&self) -> bool {
-        match self.query_status().await {
-            Ok((running, _)) => running,
-            Err(_) => false,
         }
     }
 

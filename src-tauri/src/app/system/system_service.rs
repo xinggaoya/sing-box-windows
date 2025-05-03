@@ -2,7 +2,7 @@ use crate::app::constants::{messages, process};
 use crate::utils::app_util::{get_service_path, get_work_dir};
 use serde_json::json;
 use std::fs;
-use std::io::{self, Read};
+use std::io::{Read};
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
