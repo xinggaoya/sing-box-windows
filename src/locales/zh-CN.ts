@@ -178,15 +178,29 @@ export default {
     copy: '复制日志',
     export: '导出日志',
     search: '搜索',
+    searchLogs: '搜索日志...',
     noLogs: '暂无日志记录',
     records: '条记录',
     autoScroll: '自动滚动',
     manualScroll: '手动滚动',
     filterType: '筛选日志类型',
+    clearedSuccess: '日志已清空',
+    copiedSuccess: '日志已复制到剪贴板',
+    exportedSuccess: '日志已导出',
+    noSearchResults: '没有匹配的日志记录',
+    types: {
+      all: '全部',
+      info: '信息',
+      warning: '警告',
+      error: '错误',
+      success: '成功'
+    }
   },
   setting: {
     title: '设置',
-    general: '通用',
+    general: {
+      title: '常规设置'
+    },
     theme: {
       title: '主题',
       light: '浅色',
@@ -196,6 +210,8 @@ export default {
     language: {
       title: '语言',
       auto: '自动',
+      changed: '语言已更改',
+      changeSuccess: '语言已成功更改',
     },
     update: {
       title: '更新',
@@ -337,6 +353,9 @@ export default {
     fetchSuccess: '成功获取 {count} 条规则',
     fetchError: '获取规则失败',
     fetchErrorFormat: '获取规则失败：返回数据格式错误',
+    totalRules: '总规则数',
+    matchingRules: '匹配规则数',
+    noMatchingRules: '没有匹配的规则',
   },
   connections: {
     title: '连接管理',
@@ -355,6 +374,14 @@ export default {
     ip: 'IP',
     port: '端口',
     host: '主机',
+    process: '进程',
+    traffic: '流量',
+    unknown: '未知',
+    refreshSuccess: '连接列表已刷新',
+    refreshError: '刷新连接列表失败',
+    totalConnections: '总连接数',
+    matchingConnections: '匹配连接数',
+    noMatchingConnections: '没有匹配的连接',
   },
   tray: {
     show: '显示窗口',

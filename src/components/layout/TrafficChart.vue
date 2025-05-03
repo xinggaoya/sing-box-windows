@@ -91,10 +91,10 @@ const drawChart = () => {
   
   // 减小内边距使图表更紧凑，但增加左侧内边距确保文本不被截断
   const padding = { 
-    top: 20 * dpr, 
+    top: 24 * dpr, 
     right: 15 * dpr, 
-    bottom: 25 * dpr, 
-    left: 65 * dpr // 增加左侧内边距，从50增加到65
+    bottom: 28 * dpr, 
+    left: 65 * dpr
   }
 
   // 清除画布
@@ -112,12 +112,12 @@ const drawChart = () => {
   const downloadColor = '#2080F0' // 蓝色
 
   // 设置字体
-  ctx.font = `${10 * dpr}px sans-serif` // 减小字体大小从11px到10px
+  ctx.font = `${11 * dpr}px sans-serif`
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = textColor
 
-  // 绘制Y轴标签和网格线 - 减少步数以减少视觉复杂度
+  // 绘制Y轴标签和网格线 - 精简网格线数量提高可读性
   const yAxisSteps = 4
   for (let i = 0; i <= yAxisSteps; i++) {
     const y = padding.top + chartHeight - (i / yAxisSteps) * chartHeight
@@ -136,34 +136,37 @@ const drawChart = () => {
       .replace(' B/s', 'B/s')
       .replace(' GB/s', 'GB/s')
 
-    // 绘制网格线
+    // 绘制网格线 - 使用虚线样式并降低不透明度提高视觉效果
     ctx.beginPath()
-    ctx.strokeStyle = gridColor
+    ctx.strokeStyle = `${gridColor}40` // 增加透明度
     ctx.lineWidth = 0.5 * dpr
+    ctx.setLineDash([4 * dpr, 4 * dpr]) // 设置虚线样式
     ctx.moveTo(padding.left, y)
     ctx.lineTo(padding.left + chartWidth, y)
     ctx.stroke()
+    ctx.setLineDash([]) // 重置虚线样式
 
     // 绘制Y轴标签
-    ctx.fillText(speedLabel, padding.left - 8 * dpr, y)
+    ctx.fillText(speedLabel, padding.left - 10 * dpr, y)
   }
 
-  // 绘制X轴
+  // 绘制X轴 - 使用实线样式，稍微加粗提高可读性
   ctx.beginPath()
   ctx.strokeStyle = gridColor
-  ctx.lineWidth = 0.5 * dpr
+  ctx.lineWidth = 1 * dpr
   ctx.moveTo(padding.left, padding.top + chartHeight)
   ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight)
   ctx.stroke()
 
   // 只绘制较少的X轴标签以减少视觉复杂度
-  const labelInterval = Math.ceil(MAX_DATA_POINTS / 4)
+  const labelInterval = Math.ceil(MAX_DATA_POINTS / 5) // 减少标签数量
   ctx.font = `${10 * dpr}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
   for (let i = MAX_DATA_POINTS - 1; i >= 0; i -= labelInterval) {
     if (timeLabels.value[i]) {
       const x = padding.left + (i / (MAX_DATA_POINTS - 1)) * chartWidth
-      ctx.textAlign = 'center'
-      ctx.fillText(timeLabels.value[i], x, padding.top + chartHeight + 14 * dpr)
+      ctx.fillText(timeLabels.value[i], x, padding.top + chartHeight + 10 * dpr)
     }
   }
 
@@ -190,11 +193,12 @@ const drawCurve = (
 ) => {
   const max = maxValue.value || 0.1 // 避免除以零
 
-  // 绘制曲线
+  // 绘制曲线 - 使用圆角连接和更粗的线条
   ctx.beginPath()
   ctx.strokeStyle = color
-  ctx.lineWidth = 2 * dpr
+  ctx.lineWidth = 2.5 * dpr
   ctx.lineJoin = 'round'
+  ctx.lineCap = 'round' // 设置线段端点为圆形
 
   data.forEach((value, index) => {
     const x = padding.left + (index / (MAX_DATA_POINTS - 1)) * chartWidth
@@ -203,7 +207,14 @@ const drawCurve = (
     if (index === 0) {
       ctx.moveTo(x, y)
     } else {
-      ctx.lineTo(x, y)
+      // 使用贝塞尔曲线平滑绘制
+      const prevX = padding.left + ((index - 1) / (MAX_DATA_POINTS - 1)) * chartWidth
+      const prevY = padding.top + chartHeight - (data[index - 1] / max) * chartHeight
+      
+      const cpX1 = prevX + (x - prevX) / 3
+      const cpX2 = prevX + (x - prevX) * 2 / 3
+      
+      ctx.bezierCurveTo(cpX1, prevY, cpX2, y, x, y)
     }
   })
 
@@ -215,11 +226,30 @@ const drawCurve = (
   ctx.closePath()
 
   const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight)
-  gradient.addColorStop(0, `${color}30`) // 减轻填充不透明度
-  gradient.addColorStop(1, `${color}05`)
+  gradient.addColorStop(0, `${color}35`) // 顶部稍微透明
+  gradient.addColorStop(1, `${color}05`) // 底部更透明
 
   ctx.fillStyle = gradient
   ctx.fill()
+  
+  // 绘制高亮点 - 在最后一个数据点上显示圆点
+  if (data.length > 0) {
+    const lastIndex = data.length - 1
+    const lastX = padding.left + (lastIndex / (MAX_DATA_POINTS - 1)) * chartWidth
+    const lastY = padding.top + chartHeight - (data[lastIndex] / max) * chartHeight
+    
+    // 绘制内外两层圆点
+    ctx.beginPath()
+    ctx.fillStyle = themeVars.value.bodyColor // 内圆使用背景色
+    ctx.arc(lastX, lastY, 4 * dpr, 0, Math.PI * 2)
+    ctx.fill()
+    
+    ctx.beginPath()
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2 * dpr
+    ctx.arc(lastX, lastY, 4 * dpr, 0, Math.PI * 2)
+    ctx.stroke()
+  }
 }
 
 // 更新数据
@@ -346,29 +376,39 @@ const handleResize = () => {
 
 .chart-legend {
   position: absolute;
-  top: 5px;
-  right: 15px;
+  top: 8px;
+  right: 16px;
   display: flex;
   gap: 16px;
   z-index: 1;
-  background-color: rgba(var(--n-body-color-rgb), 0.4);
-  border-radius: 4px;
-  padding: 3px 6px;
-  backdrop-filter: blur(2px);
+  background-color: rgba(var(--n-body-color-rgb), 0.5);
+  border-radius: 8px;
+  padding: 6px 12px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(128, 128, 128, 0.1);
+  transition: all 0.2s ease;
+}
+
+.chart-legend:hover {
+  background-color: rgba(var(--n-body-color-rgb), 0.7);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--n-text-color-1);
 }
 
 .legend-color {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .upload .legend-color {
@@ -381,14 +421,20 @@ const handleResize = () => {
 
 /* 适应深色/浅色模式 */
 :deep(.dark) .chart-legend {
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: rgba(30, 30, 30, 0.6);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.dark) .legend-color {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 @media (max-width: 768px) {
   .chart-legend {
     top: auto;
-    bottom: 5px;
-    right: 5px;
+    bottom: 10px;
+    right: 10px;
+    padding: 4px 10px;
   }
 }
 </style>

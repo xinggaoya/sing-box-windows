@@ -56,14 +56,6 @@ impl fmt::Display for ProcessError {
 
 impl std::error::Error for ProcessError {}
 
-// 进程信息结构体
-#[derive(Debug, Clone, Serialize)]
-pub struct ProcessInfo {
-    pub pid: Option<u32>,
-    pub status: ProcessStatus,
-    pub last_error: Option<String>,
-}
-
 pub type Result<T> = std::result::Result<T, ProcessError>;
 
 // 进程配置结构体

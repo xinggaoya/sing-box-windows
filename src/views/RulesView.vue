@@ -16,26 +16,60 @@
       </template>
 
       <n-spin :show="loading">
-        <div v-if="rules.length > 0" class="rules-list">
+        <div class="search-filter-bar">
+          <n-input
+            v-model:value="searchQuery"
+            placeholder="搜索规则..."
+            clearable
+            :style="{ width: '300px' }"
+          >
+            <template #prefix>
+              <n-icon><search-outline /></n-icon>
+            </template>
+          </n-input>
+          <n-select
+            v-model:value="typeFilter"
+            :options="typeOptions"
+            placeholder="按类型筛选"
+            clearable
+            :style="{ width: '180px' }"
+          />
+          <n-select
+            v-model:value="proxyFilter"
+            :options="proxyOptions"
+            placeholder="按代理筛选"
+            clearable
+            :style="{ width: '180px' }"
+          />
+        </div>
+
+        <div v-if="filteredRules.length > 0" class="rules-list">
           <n-data-table
             :columns="columns"
-            :data="rules"
+            :data="filteredRules"
             :pagination="pagination"
             :bordered="false"
             :max-height="600"
             striped
           />
         </div>
-        <n-empty v-else :description="t('rules.noRules')" />
+        <n-empty v-else :description="searchQuery || typeFilter || proxyFilter ? t('rules.noMatchingRules') : t('rules.noRules')" />
+        
+        <div class="stats-bar">
+          <n-tag type="info" size="small">{{ t('rules.totalRules') }}: {{ rules.length }}</n-tag>
+          <n-tag v-if="searchQuery || typeFilter || proxyFilter" type="success" size="small">
+            {{ t('rules.matchingRules') }}: {{ filteredRules.length }}
+          </n-tag>
+        </div>
       </n-spin>
     </n-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h } from 'vue'
-import { useMessage, NTag, DataTableColumns } from 'naive-ui'
-import { RefreshOutline } from '@vicons/ionicons5'
+import { ref, onMounted, h, computed } from 'vue'
+import { useMessage, NTag, DataTableColumns, SelectOption } from 'naive-ui'
+import { RefreshOutline, SearchOutline } from '@vicons/ionicons5'
 import { tauriApi } from '@/services/tauri-api'
 import { useI18n } from 'vue-i18n'
 
@@ -50,6 +84,63 @@ interface Rule {
 }
 
 const rules = ref<Rule[]>([])
+const searchQuery = ref('')
+const typeFilter = ref(null)
+const proxyFilter = ref(null)
+
+// 计算筛选后的规则
+const filteredRules = computed(() => {
+  return rules.value.filter(rule => {
+    const matchesSearch = !searchQuery.value || 
+      rule.payload.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      rule.proxy.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      rule.type.toLowerCase().includes(searchQuery.value.toLowerCase())
+    
+    const matchesType = !typeFilter.value || rule.type === typeFilter.value
+    
+    const matchesProxy = !proxyFilter.value || 
+      (proxyFilter.value === 'direct' && rule.proxy === t('rules.directConnect')) ||
+      (proxyFilter.value === 'reject' && rule.proxy === 'reject') ||
+      (proxyFilter.value !== 'direct' && proxyFilter.value !== 'reject' && rule.proxy.includes(proxyFilter.value))
+    
+    return matchesSearch && matchesType && matchesProxy
+  })
+})
+
+// 类型过滤选项
+const typeOptions = computed(() => {
+  const types = [...new Set(rules.value.map(rule => rule.type))]
+  return types.map(type => ({ label: type, value: type }))
+})
+
+// 代理过滤选项
+const proxyOptions = computed(() => {
+  const proxies = new Set<string>()
+  
+  // 添加常见特殊代理
+  proxies.add('direct')
+  proxies.add('reject')
+  
+  // 添加其他代理
+  rules.value.forEach(rule => {
+    let proxyName = rule.proxy
+    if (proxyName.startsWith('route(') && proxyName.endsWith(')')) {
+      proxyName = proxyName.substring(6, proxyName.length - 1)
+    }
+    
+    if (proxyName !== t('rules.directConnect') && proxyName !== 'reject') {
+      proxies.add(proxyName)
+    }
+  })
+  
+  return [
+    { label: t('rules.directConnect'), value: 'direct' },
+    { label: '拦截', value: 'reject' },
+    ...Array.from(proxies)
+      .filter(proxy => proxy !== 'direct' && proxy !== 'reject')
+      .map(proxy => ({ label: proxy, value: proxy }))
+  ]
+})
 
 // 定义表格列
 const columns: DataTableColumns<Rule> = [
@@ -105,6 +196,21 @@ const columns: DataTableColumns<Rule> = [
           }),
         ])
       }
+      
+      // 高亮搜索关键字
+      if (searchQuery.value && row.payload.toLowerCase().includes(searchQuery.value.toLowerCase())) {
+        const index = row.payload.toLowerCase().indexOf(searchQuery.value.toLowerCase())
+        const beforeMatch = row.payload.substring(0, index)
+        const match = row.payload.substring(index, index + searchQuery.value.length)
+        const afterMatch = row.payload.substring(index + searchQuery.value.length)
+        
+        return h('div', {}, [
+          beforeMatch,
+          h('span', { style: { backgroundColor: 'rgba(var(--primary-color), 0.1)', fontWeight: 'bold' } }, match),
+          afterMatch
+        ])
+      }
+      
       return row.payload
     },
   },
@@ -152,7 +258,7 @@ const columns: DataTableColumns<Rule> = [
 
 // 分页设置
 const pagination = {
-  pageSize: 10,
+  pageSize: 15,
 }
 
 // 获取规则列表
@@ -209,7 +315,21 @@ onMounted(() => {
   font-weight: 500;
 }
 
+.search-filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
 .rules-list {
   margin-top: 12px;
+}
+
+.stats-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 0;
 }
 </style>

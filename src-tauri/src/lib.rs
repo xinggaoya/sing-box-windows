@@ -1,6 +1,6 @@
 // Core services imports
 use crate::app::core::kernel_service::{
-    check_kernel_version, download_latest_kernel, get_process_status, restart_kernel, start_kernel,
+    check_kernel_version, download_latest_kernel, restart_kernel, start_kernel,
     start_websocket_relay, stop_kernel,
 };
 use crate::app::core::proxy_service::{
@@ -16,8 +16,8 @@ use crate::app::network::subscription_service::{
 
 // System services imports
 use crate::app::system::system_service::{
-    check_admin, check_service_status, exit_application, install_service, restart_as_admin,
-    uninstall_service, update_service, check_service_update_needed,
+    check_admin, check_service_status, check_service_update_needed, exit_application,
+    install_service, restart_as_admin, uninstall_service, update_service,
 };
 use crate::app::system::update_service::{check_update, download_and_install_update};
 use tauri::{AppHandle, Manager};
@@ -68,7 +68,6 @@ pub fn run() {
             stop_kernel,
             restart_kernel,
             download_latest_kernel,
-            get_process_status,
             check_kernel_version,
             start_websocket_relay,
             // Core - Proxy service commands

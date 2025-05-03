@@ -91,17 +91,6 @@ pub async fn restart_kernel() -> Result<(), String> {
     PROCESS_MANAGER.restart().await.map_err(|e| e.to_string())
 }
 
-// 获取进程状态
-#[tauri::command]
-pub async fn get_process_status() -> serde_json::Value {
-    let info = PROCESS_MANAGER.get_status().await;
-    json!({
-        "status": info.status,
-        "pid": info.pid,
-        "last_error": info.last_error
-    })
-}
-
 // 下载内核
 #[tauri::command]
 pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String> {

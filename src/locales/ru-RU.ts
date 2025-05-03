@@ -179,15 +179,29 @@ export default {
     copy: 'Копировать журналы',
     export: 'Экспорт журналов',
     search: 'Поиск',
+    searchLogs: 'Поиск в журналах...',
     noLogs: 'Нет доступных журналов',
     records: 'записей',
     autoScroll: 'Автопрокрутка',
     manualScroll: 'Ручная прокрутка',
     filterType: 'Фильтр типов журнала',
+    clearedSuccess: 'Журналы очищены',
+    copiedSuccess: 'Журналы скопированы в буфер обмена',
+    exportedSuccess: 'Журналы экспортированы',
+    noSearchResults: 'Нет совпадающих записей',
+    types: {
+      all: 'Все',
+      info: 'Информация',
+      warning: 'Предупреждение',
+      error: 'Ошибка',
+      success: 'Успех'
+    }
   },
   setting: {
     title: 'Настройки',
-    general: 'Общие',
+    general: {
+      title: 'Общие настройки'
+    },
     theme: {
       title: 'Тема',
       light: 'Светлая',
@@ -197,6 +211,8 @@ export default {
     language: {
       title: 'Язык',
       auto: 'Авто',
+      changed: 'Язык изменен',
+      changeSuccess: 'Язык успешно изменен',
     },
     update: {
       title: 'Обновление',
@@ -339,6 +355,9 @@ export default {
     fetchSuccess: 'Успешно получено {count} правил',
     fetchError: 'Не удалось получить правила',
     fetchErrorFormat: 'Не удалось получить правила: неверный формат данных',
+    totalRules: 'Всего правил',
+    matchingRules: 'Совпадающих правил',
+    noMatchingRules: 'Нет совпадающих правил',
   },
   connections: {
     title: 'Соединения',
@@ -357,6 +376,14 @@ export default {
     ip: 'IP',
     port: 'Порт',
     host: 'Хост',
+    process: 'Процесс',
+    traffic: 'Трафик',
+    unknown: 'Неизвестно',
+    refreshSuccess: 'Список соединений обновлен',
+    refreshError: 'Не удалось обновить список соединений',
+    totalConnections: 'Всего соединений',
+    matchingConnections: 'Совпадающих соединений',
+    noMatchingConnections: 'Нет совпадающих соединений',
   },
   tray: {
     show: 'Показать окно',

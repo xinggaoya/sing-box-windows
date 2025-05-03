@@ -179,15 +179,29 @@ export default {
     copy: 'Copy Logs',
     export: 'Export Logs',
     search: 'Search',
+    searchLogs: 'Search logs...',
     noLogs: 'No logs available',
     records: 'records',
     autoScroll: 'Auto Scroll',
     manualScroll: 'Manual Scroll',
     filterType: 'Filter Log Type',
+    clearedSuccess: 'Logs cleared',
+    copiedSuccess: 'Logs copied to clipboard',
+    exportedSuccess: 'Logs exported',
+    noSearchResults: 'No matching logs found',
+    types: {
+      all: 'All',
+      info: 'Info',
+      warning: 'Warning',
+      error: 'Error',
+      success: 'Success'
+    }
   },
   setting: {
     title: 'Settings',
-    general: 'General',
+    general: {
+      title: 'General Settings'
+    },
     theme: {
       title: 'Theme',
       light: 'Light',
@@ -197,6 +211,8 @@ export default {
     language: {
       title: 'Language',
       auto: 'Auto',
+      changed: 'Language Changed',
+      changeSuccess: 'Language changed successfully',
     },
     update: {
       title: 'Update',
@@ -339,6 +355,9 @@ export default {
     fetchSuccess: 'Successfully fetched {count} rules',
     fetchError: 'Failed to fetch rules',
     fetchErrorFormat: 'Failed to fetch rules: Invalid data format',
+    totalRules: 'Total Rules',
+    matchingRules: 'Matching Rules',
+    noMatchingRules: 'No matching rules',
   },
   connections: {
     title: 'Connections',
@@ -357,6 +376,14 @@ export default {
     ip: 'IP',
     port: 'Port',
     host: 'Host',
+    process: 'Process',
+    traffic: 'Traffic',
+    unknown: 'Unknown',
+    refreshSuccess: 'Connection list refreshed',
+    refreshError: 'Failed to refresh connection list',
+    totalConnections: 'Total Connections',
+    matchingConnections: 'Matching Connections',
+    noMatchingConnections: 'No matching connections',
   },
   tray: {
     show: 'Show Window',

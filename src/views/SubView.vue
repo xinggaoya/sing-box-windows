@@ -2,44 +2,36 @@
   <div class="sub-container">
     <!-- 订阅管理卡片 -->
     <n-card class="sub-card" :bordered="false">
-      <template #header>
-        <div class="card-header">
-          <div class="header-left">
-            <n-h3 class="card-title">
-              <n-icon size="20" class="card-icon">
-                <link-outline />
-              </n-icon>
-              {{ t('sub.title') }}
-            </n-h3>
-            <n-tag :bordered="false" type="info" size="small" class="sub-count-tag">
-              {{ subStore.list.length }} {{ t('sub.count') }}
-            </n-tag>
-          </div>
-          <n-button
-            quaternary
-            circle
-            size="small"
-            @click="showAddModal = true"
-            :disabled="isLoading"
-            class="add-button"
-          >
-            <template #icon>
-              <n-icon>
-                <add-outline />
-              </n-icon>
-            </template>
-          </n-button>
+      <div class="card-header">
+        <div class="header-left">
+          <n-h3 class="card-title">
+            <n-icon size="20" class="card-icon">
+              <link-outline />
+            </n-icon>
+            {{ t('sub.title') }}
+          </n-h3>
+          <n-tag :bordered="false" type="info" size="small" class="sub-count-tag">
+            {{ subStore.list.length }} {{ t('sub.count') }}
+          </n-tag>
         </div>
-      </template>
+        <n-button
+          quaternary
+          circle
+          size="small"
+          @click="showAddModal = true"
+          :disabled="isLoading"
+          class="add-button"
+        >
+          <template #icon>
+            <n-icon>
+              <add-outline />
+            </n-icon>
+          </template>
+        </n-button>
+      </div>
 
-      <n-grid
-        :x-gap="12"
-        :y-gap="12"
-        :cols="gridCols"
-        responsive="screen"
-        item-responsive
-      >
-        <n-grid-item v-for="(item, index) in subStore.list" :key="index">
+      <div class="sub-grid">
+        <div v-for="(item, index) in subStore.list" :key="index" class="sub-grid-item">
           <n-card
             :class="{
               'sub-node-card': true,
@@ -49,7 +41,7 @@
             size="small"
             hoverable
           >
-            <n-space vertical :size="8">
+            <n-space vertical :size="6">
               <n-flex justify="space-between" align="center">
                 <div class="name-container">
                   <n-icon size="16" :color="subStore.activeIndex === index ? '#18a058' : '#4080ff'">
@@ -78,43 +70,57 @@
                   </div>
                 </div>
                 <n-space :size="4">
-                  <n-button
-                    quaternary
-                    circle
-                    size="tiny"
-                    @click="copyUrl(item.url)"
-                    class="action-button"
-                  >
-                    <template #icon>
-                      <n-icon><copy-outline /></n-icon>
+                  <n-tooltip trigger="hover" :delay="500" placement="top">
+                    <template #trigger>
+                      <n-button
+                        quaternary
+                        circle
+                        size="tiny"
+                        @click="copyUrl(item.url)"
+                        class="action-button"
+                      >
+                        <template #icon>
+                          <n-icon><copy-outline /></n-icon>
+                        </template>
+                      </n-button>
                     </template>
-                  </n-button>
+                    {{ t('sub.copyUrl') }}
+                  </n-tooltip>
 
-                  <n-button
-                    quaternary
-                    circle
-                    size="tiny"
-                    @click="handleEdit(index, item)"
-                    class="action-button"
-                  >
-                    <template #icon>
-                      <n-icon><create-outline /></n-icon>
+                  <n-tooltip trigger="hover" :delay="500" placement="top">
+                    <template #trigger>
+                      <n-button
+                        quaternary
+                        circle
+                        size="tiny"
+                        @click="handleEdit(index, item)"
+                        class="action-button"
+                      >
+                        <template #icon>
+                          <n-icon><create-outline /></n-icon>
+                        </template>
+                      </n-button>
                     </template>
-                  </n-button>
+                    {{ t('sub.edit') }}
+                  </n-tooltip>
 
-                  <n-button
-                    v-if="subStore.activeIndex === index"
-                    quaternary
-                    circle
-                    size="tiny"
-                    type="info"
-                    @click="editCurrentConfig()"
-                    class="action-button"
-                  >
-                    <template #icon>
-                      <n-icon><code-outline /></n-icon>
+                  <n-tooltip v-if="subStore.activeIndex === index" trigger="hover" :delay="500" placement="top">
+                    <template #trigger>
+                      <n-button
+                        quaternary
+                        circle
+                        size="tiny"
+                        type="info"
+                        @click="editCurrentConfig()"
+                        class="action-button"
+                      >
+                        <template #icon>
+                          <n-icon><code-outline /></n-icon>
+                        </template>
+                      </n-button>
                     </template>
-                  </n-button>
+                    {{ t('sub.editCurrentConfig') }}
+                  </n-tooltip>
 
                   <n-popconfirm
                     @positive-click="deleteSubscription(index)"
@@ -135,13 +141,16 @@
                         </template>
                       </n-button>
                     </template>
+                    {{ t('sub.confirmDelete') }}
                   </n-popconfirm>
                 </n-space>
               </n-flex>
 
-              <n-ellipsis style="max-width: 100%" :tooltip="{ width: 'trigger' }" class="url-container">
-                {{ item.url }}
-              </n-ellipsis>
+              <div class="url-container">
+                <n-ellipsis style="max-width: 100%" :tooltip="{ width: 'trigger' }">
+                  {{ item.url }}
+                </n-ellipsis>
+              </div>
 
               <n-flex justify="space-between" align="center">
                 <n-text depth="3" class="update-time">
@@ -167,8 +176,8 @@
               </n-flex>
             </n-space>
           </n-card>
-        </n-grid-item>
-      </n-grid>
+        </div>
+      </div>
 
       <n-empty v-if="!subStore.list.length" :description="t('sub.noSubs')" class="empty-container">
         <template #extra>
@@ -190,7 +199,7 @@
     preset="dialog"
     :title="editIndex === null ? t('sub.add') : t('sub.edit')"
     :bordered="false"
-    style="width: 550px"
+    style="width: 500px"
     class="sub-modal"
   >
     <n-form
@@ -454,12 +463,9 @@ const handleConfirm = () => {
             useSubscriptionRules: formValue.value.useSubscriptionRules,
           })
 
-          // 如果是新添加的手动配置，自动设为当前活跃订阅
-          if (isManual) {
-            subStore.activeIndex = subStore.list.length - 1
-          }
-
-          message.success(t('sub.addSuccess'))
+          // 自动设置为当前活跃订阅（无论是手动还是URL订阅）
+          subStore.activeIndex = subStore.list.length - 1
+          message.success(t('sub.addAndUseSuccess'))
         } else {
           // 更新订阅
           subStore.list[editIndex.value] = {
@@ -589,19 +595,21 @@ const saveCurrentConfig = async () => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 12px 8px;
-  animation: slide-up 0.4s ease;
+  animation: slide-up 0.3s ease;
 }
 
 .sub-card {
-  border-radius: 12px;
+  border-radius: 16px;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 4px;
+  padding: 0;
+  margin-bottom: 12px;
 }
 
 .header-left {
@@ -627,6 +635,13 @@ const saveCurrentConfig = async () => {
   font-size: 12px;
   padding: 0 8px;
   height: 22px;
+  border-radius: 11px;
+}
+
+.sub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
 }
 
 .name-container {
@@ -638,20 +653,30 @@ const saveCurrentConfig = async () => {
 }
 
 .sub-node-card {
-  border-radius: 10px;
+  border-radius: 12px;
   transition: all 0.3s ease;
   border-left: 2px solid transparent;
   height: 100%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.sub-node-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.sub-node-card :deep(.n-card__content) {
+  padding: 12px 14px;
 }
 
 .sub-node-card-active {
   border-left: 2px solid var(--success-color);
-  background-color: rgba(0, 180, 42, 0.05);
+  background: linear-gradient(135deg, rgba(var(--success-color-rgb), 0.05), transparent);
 }
 
 .sub-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   max-width: 120px;
   white-space: nowrap;
   overflow: hidden;
@@ -686,6 +711,7 @@ const saveCurrentConfig = async () => {
   word-break: break-all;
   border: 1px solid var(--n-border-color);
   background-color: rgba(0, 0, 0, 0.02);
+  margin: 4px 0;
 }
 
 :deep(.dark) .url-container {
@@ -697,14 +723,23 @@ const saveCurrentConfig = async () => {
 }
 
 .use-button {
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 12px;
   padding: 0 8px;
+  height: 24px;
 }
 
 .action-button {
   height: 22px;
   width: 22px;
+}
+
+.action-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+:deep(.dark) .action-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .empty-container {
@@ -713,7 +748,7 @@ const saveCurrentConfig = async () => {
 }
 
 .add-sub-button {
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 0 12px;
 }
 
@@ -742,5 +777,26 @@ const saveCurrentConfig = async () => {
 .modal-button {
   min-width: 70px;
   border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+  .sub-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .sub-name {
+    max-width: 160px;
+  }
+}
+
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

@@ -179,15 +179,29 @@ export default {
     copy: 'ログコピー',
     export: 'ログエクスポート',
     search: '検索',
+    searchLogs: 'ログを検索...',
     noLogs: 'ログがありません',
     records: '記録',
     autoScroll: '自動スクロール',
     manualScroll: '手動スクロール',
     filterType: 'ログタイプフィルター',
+    clearedSuccess: 'ログがクリアされました',
+    copiedSuccess: 'ログがクリップボードにコピーされました',
+    exportedSuccess: 'ログがエクスポートされました',
+    noSearchResults: '一致するログが見つかりません',
+    types: {
+      all: 'すべて',
+      info: '情報',
+      warning: '警告',
+      error: 'エラー',
+      success: '成功'
+    }
   },
   setting: {
     title: '設定',
-    general: '一般',
+    general: {
+      title: '一般設定'
+    },
     theme: {
       title: 'テーマ',
       light: 'ライト',
@@ -197,6 +211,8 @@ export default {
     language: {
       title: '言語',
       auto: '自動',
+      changed: '言語が変更されました',
+      changeSuccess: '言語が正常に変更されました',
     },
     update: {
       title: '更新',
@@ -339,6 +355,9 @@ export default {
     fetchSuccess: '{count}個のルールを取得しました',
     fetchError: 'ルールの取得に失敗しました',
     fetchErrorFormat: 'ルールの取得に失敗しました: 無効なデータ形式',
+    totalRules: '総ルール数',
+    matchingRules: '一致するルール数',
+    noMatchingRules: '一致するルールがありません',
   },
   connections: {
     title: '接続',
@@ -357,6 +376,14 @@ export default {
     ip: 'IP',
     port: 'ポート',
     host: 'ホスト',
+    process: 'プロセス',
+    traffic: 'トラフィック',
+    unknown: '不明',
+    refreshSuccess: '接続リストが更新されました',
+    refreshError: '接続リストの更新に失敗しました',
+    totalConnections: '総接続数',
+    matchingConnections: '一致する接続数',
+    noMatchingConnections: '一致する接続がありません',
   },
   tray: {
     show: 'ウィンドウを表示',

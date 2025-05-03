@@ -1,4 +1,4 @@
-use super::{ProcessError, ProcessInfo, ProcessStatus, Result};
+use super::{ProcessError, Result};
 use crate::app::constants::{messages, network_config, paths};
 use crate::utils::proxy_util::disable_system_proxy;
 use reqwest::Client;
@@ -11,15 +11,6 @@ use tracing::{error, info, warn};
 struct ApiResponse {
     success: bool,
     message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<serde_json::Value>,
-}
-
-// 定义状态响应的数据结构
-#[derive(Debug, Serialize, Deserialize)]
-struct StatusResponse {
-    running: bool,
-    pid: Option<u32>,
 }
 
 pub struct ProcessManager {
@@ -29,29 +20,17 @@ pub struct ProcessManager {
 
 impl ProcessManager {
     pub fn new() -> Self {
+        let client = Client::builder()
+            .no_proxy()
+            .build()
+            .unwrap_or_else(|_| {
+                warn!("创建无代理客户端失败，使用默认客户端");
+                Client::new()
+            });
+            
         Self {
-            client: Client::new(),
+            client,
             api_base_url: format!("http://127.0.0.1:{}/api", network_config::DEFAULT_API_PORT),
-        }
-    }
-
-    // 获取进程状态
-    pub async fn get_status(&self) -> ProcessInfo {
-        match self.query_status().await {
-            Ok((running, pid)) => ProcessInfo {
-                pid,
-                status: if running {
-                    ProcessStatus::Running
-                } else {
-                    ProcessStatus::Stopped
-                },
-                last_error: None,
-            },
-            Err(e) => ProcessInfo {
-                pid: None,
-                status: ProcessStatus::Failed(e.to_string()),
-                last_error: Some(e.to_string()),
-            },
         }
     }
 
@@ -68,31 +47,27 @@ impl ProcessManager {
                 if is_success {
                     match response.json::<ApiResponse>().await {
                         Ok(api_resp) => {
-                            if api_resp.success && api_resp.data.is_some() {
-                                if let Ok(status_data) =
-                                    serde_json::from_value::<StatusResponse>(api_resp.data.unwrap())
-                                {
-                                    return Ok((status_data.running, status_data.pid));
-                                }
+                            if api_resp.success {
+                                return Ok((true, api_resp.message.parse::<u32>().ok()));
                             }
                             // API返回成功但无数据，可能是服务未运行
                             warn!("获取状态信息: {}", api_resp.message);
-                            return Ok((false, None));
+                            Ok((false, None))
                         }
                         Err(e) => {
                             error!("解析状态响应失败: {}", e);
-                            return Err(ProcessError::Other(format!("解析状态响应失败: {}", e)));
+                            Err(ProcessError::Other(format!("解析状态响应失败: {}", e)))
                         }
                     }
                 } else {
                     let err_msg = format!("获取状态响应错误: HTTP {}", status_code);
                     error!("{}", err_msg);
-                    return Err(ProcessError::Other(err_msg));
+                    Err(ProcessError::Other(err_msg))
                 }
             }
             Err(e) => {
                 // 服务可能未启动
-                return Err(ProcessError::Other(format!("获取状态请求失败: {}", e)));
+                Err(ProcessError::Other(format!("获取状态请求失败: {}", e)))
             }
         }
     }
@@ -118,12 +93,12 @@ impl ProcessManager {
                                 // 启动成功，等待一段时间确保服务已启动
                                 sleep(Duration::from_secs(1)).await;
                                 info!("{}", messages::INFO_PROCESS_STARTED);
-                                return Ok(());
+                                Ok(())
                             } else {
-                                return Err(ProcessError::StartFailed(format!(
+                                Err(ProcessError::StartFailed(format!(
                                     "启动失败: {}",
                                     api_resp.message
-                                )));
+                                )))
                             }
                         }
                         Err(e) => {
@@ -136,22 +111,20 @@ impl ProcessManager {
                                 return Ok(());
                             }
 
-                            return Err(ProcessError::StartFailed(format!(
+                            Err(ProcessError::StartFailed(format!(
                                 "解析启动响应失败: {}",
                                 e
-                            )));
+                            )))
                         }
                     }
                 } else {
-                    return Err(ProcessError::StartFailed(format!(
+                    Err(ProcessError::StartFailed(format!(
                         "启动响应错误: HTTP {}",
                         status_code
-                    )));
+                    )))
                 }
             }
-            Err(e) => {
-                return Err(ProcessError::StartFailed(format!("启动请求失败: {}", e)));
-            }
+            Err(e) => Err(ProcessError::StartFailed(format!("启动请求失败: {}", e))),
         }
     }
 
