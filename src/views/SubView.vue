@@ -533,7 +533,7 @@ const useSubscription = async (url: string, index: number) => {
   } finally {
     // 确保一定会重置加载状态
     if (index >= 0 && index < subStore.list.length) {
-      subStore.list[index].isLoading = false
+    subStore.list[index].isLoading = false
     }
   }
 }
