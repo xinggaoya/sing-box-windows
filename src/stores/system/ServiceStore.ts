@@ -17,7 +17,7 @@ export const useServiceStore = defineStore('service', () => {
   // 检查服务是否已安装 - 通过服务状态检查命令
   async function checkServiceStatus() {
     try {
-      const result = await tauriApi.system.checkServiceStatus()
+      const result = await invoke<{ installed: boolean; running: boolean }>('check_service_status')
       isServiceInstalled.value = result.installed
       isServiceRunning.value = result.running
       return { installed: result.installed, running: result.running }
@@ -37,7 +37,7 @@ export const useServiceStore = defineStore('service', () => {
     }
     
     try {
-      const result = await tauriApi.system.checkServiceUpdateNeeded()
+      const result = await invoke<{ success: boolean; need_update: boolean; message: string }>('check_service_update_needed')
       
       if (result.success) {
         needsUpdate.value = result.need_update
@@ -123,7 +123,7 @@ export const useServiceStore = defineStore('service', () => {
     isUpdating.value = true
     
     try {
-      const result = await tauriApi.system.updateService()
+      const result = await invoke<{ success: boolean; updated: boolean; message: string }>('update_service')
       
       if (result.success) {
         if (result.updated) {

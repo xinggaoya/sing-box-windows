@@ -8,6 +8,7 @@
       :is-starting="isStarting"
       :is-stopping="isStopping"
       :is-restarting="isRestarting"
+      :is-connecting="appState.isConnecting"
       @start="runKernel"
       @stop="stopKernel"
       @restart-as-admin="restartAsAdmin"
@@ -89,6 +90,7 @@ import { useRoute } from 'vue-router'
 import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
 import type { Component as ComponentType } from 'vue'
+import mitt from '@/utils/mitt'
 import {
   PowerOutline,
   RepeatOutline,
@@ -321,13 +323,55 @@ const runKernel = async () => {
       return
     }
     
+    // 显示启动中提示
+    message.info(t('notification.startingKernel'))
+    
+    // 监听启动失败事件
+    const onStartFailed = (event: { error: string }) => {
+      message.error(event.error)
+      mitt.off('kernel-start-failed', onStartFailed)
+    }
+    mitt.on('kernel-start-failed', onStartFailed)
+    
+    // 监听连接状态变化
+    const onConnectionChange = (isConnecting: boolean) => {
+      if (isConnecting) {
+        message.info(t('notification.connectingToKernel'))
+      }
+    }
+    mitt.on('connecting-status-changed', onConnectionChange)
+    
+    // 尝试启动内核
     await kernelStore.startKernel()
-    appState.setRunningState(true)
-    message.success(t('notification.kernelStarted'))
+    
+    // 启动成功，显示提示
+    if (appState.isRunning && appState.wsConnected) {
+      message.success(t('notification.kernelStarted'))
+    }
   } catch (error) {
-    message.error(error as string)
+    // 处理已知错误
+    let errorMessage = typeof error === 'string' ? error : 
+                       error instanceof Error ? error.message : 
+                       t('notification.unknownError')
+    
+    // 如果错误信息太长，截取一部分
+    if (errorMessage.length > 150) {
+      errorMessage = errorMessage.substring(0, 150) + '...'
+    }
+    
+    // 显示错误并带有详细说明
+    dialog.error({
+      title: t('notification.startFailed'),
+      content: `${errorMessage}\n\n${t('notification.checkTheFollowing')}:\n1. ${t('notification.checkConfig')}\n2. ${t('notification.checkNetwork')}\n3. ${t('notification.checkPermissions')}`,
+      positiveText: t('common.ok')
+    })
+    
+    appState.setRunningState(false)
   } finally {
     isStarting.value = false
+    // 清理事件监听
+    mitt.off('kernel-start-failed')
+    mitt.off('connecting-status-changed')
   }
 }
 

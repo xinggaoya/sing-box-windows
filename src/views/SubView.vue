@@ -303,7 +303,7 @@
 
 <script setup lang="ts">
 import { useMessage } from 'naive-ui'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useSubStore } from '@/stores/subscription/SubStore'
 import {
   AddOutline,
@@ -531,7 +531,10 @@ const useSubscription = async (url: string, index: number) => {
   } catch (error) {
     message.error(t('sub.useFailed') + error)
   } finally {
-    subStore.list[index].isLoading = false
+    // 确保一定会重置加载状态
+    if (index >= 0 && index < subStore.list.length) {
+      subStore.list[index].isLoading = false
+    }
   }
 }
 
@@ -594,6 +597,12 @@ const saveCurrentConfig = async () => {
     isConfigLoading.value = false
   }
 }
+
+// 在组件挂载时重置所有订阅的加载状态
+onMounted(() => {
+  // 使用SubStore提供的方法重置所有加载状态
+  subStore.resetLoadingState();
+});
 </script>
 
 <style scoped>

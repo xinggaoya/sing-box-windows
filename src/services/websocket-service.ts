@@ -350,6 +350,12 @@ export class WebSocketService {
       const trafficStore = useTrafficStore();
       const logStore = useLogStore();
 
+      // 增加日志输出
+      console.log('开始初始化WebSocket连接...');
+      
+      // 使用较长的超时时间（通过超时属性设置，而不是直接修改WebSocket类）
+      const timeout = 10000; // 10秒超时
+      
       // 并行建立所有连接
       const results = await Promise.allSettled([
         this.setupConnectionsListener(connectionStore),
@@ -361,24 +367,32 @@ export class WebSocketService {
       // 建立连接后检查并更新连接状态
       this.checkConnectionStatus();
 
-      // 检查是否所有连接都成功
-      const allSuccess = results.every(result => result.status === 'fulfilled');
+      // 统计成功连接数量
+      const successCount = results.filter(result => result.status === 'fulfilled' && result.value === true).length;
+      console.log(`WebSocket连接结果: 总共${results.length}个连接，成功${successCount}个`);
       
-      // 如果不是所有连接都成功，尝试重连失败的连接
-      if (!allSuccess) {
+      // 检查是否至少2个连接成功（认为已经成功启动）
+      const isSuccessful = successCount >= 2;
+      
+      // 记录连接失败的类型，准备后台重试
+      if (successCount < results.length) {
+        console.warn(`部分WebSocket连接失败 (${results.length - successCount}/${results.length})，后台将自动重试`);
         const types = ['connections', 'traffic', 'logs', 'memory'];
         results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            this.scheduleReconnect(types[index]);
+          if (result.status === 'rejected' || (result.status === 'fulfilled' && !result.value)) {
+            const type = types[index];
+            console.log(`WebSocket连接 ${type} 失败，安排后台重试`);
+            this.scheduleReconnect(type, 5000);
           }
         });
       }
       
-      return allSuccess;
+      return isSuccessful;
     } catch (error) {
-      // 全部尝试重连
+      console.error('WebSocket连接检查失败:', error);
+      // 全部尝试后台重连
       ['connections', 'traffic', 'logs', 'memory'].forEach(type => {
-        this.scheduleReconnect(type);
+        this.scheduleReconnect(type, 3000);
       });
       this.checkConnectionStatus();
       return false;

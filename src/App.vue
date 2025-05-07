@@ -22,6 +22,7 @@ import { useLocaleStore } from '@/stores/app/LocaleStore'
 import { useWindowStore } from '@/stores/app/WindowStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useTrayStore } from '@/stores/tray/TrayStore'
+import { useSubStore } from '@/stores/subscription/SubStore'
 import { useRouter } from 'vue-router'
 import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
@@ -51,6 +52,7 @@ const localeStore = useLocaleStore()
 const windowStore = useWindowStore()
 const kernelStore = useKernelStore()
 const trayStore = useTrayStore()
+const subStore = useSubStore()
 const router = useRouter()
 const { locale } = useI18n()
 
@@ -64,6 +66,9 @@ watch(
 )
 
 onMounted(async () => {
+  // 重置所有订阅的加载状态，确保没有订阅处于加载状态
+  subStore.resetLoadingState()
+  
   // 设置窗口事件处理器
   // windowStore.setupWindowEventHandlers(router)
 

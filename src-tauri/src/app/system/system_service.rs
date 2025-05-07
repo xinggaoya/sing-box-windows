@@ -1,6 +1,5 @@
 use crate::app::constants::{messages, process};
 use std::os::windows::process::CommandExt;
-use tracing::{info, error, warn};
 
 // 以管理员权限重启
 #[tauri::command]

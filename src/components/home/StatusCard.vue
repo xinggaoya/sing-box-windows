@@ -3,10 +3,8 @@
     <div class="status-header">
       <div class="status-left">
         <div class="status-indicator">
-          <div class="status-dot" :class="{ active: isRunning }"></div>
-          <span class="status-text">{{
-            isRunning ? t('home.status.running') : t('home.status.stopped')
-          }}</span>
+          <div class="status-dot" :class="statusClass"></div>
+          <span class="status-text">{{ statusText }}</span>
         </div>
         <div class="status-tags">
           <n-tag
@@ -74,6 +72,7 @@
 <script setup lang="ts">
 import { PowerOutline, WifiOutline, CloseCircleOutline, ShieldCheckmarkOutline, ShieldOutline, RefreshOutline } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
+import { computed } from 'vue'
 
 defineOptions({
   name: 'StatusCard'
@@ -103,6 +102,10 @@ const props = defineProps({
   isRestarting: {
     type: Boolean,
     default: false
+  },
+  isConnecting: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -116,6 +119,35 @@ const handleToggle = () => {
     emit('start')
   }
 }
+
+const statusClass = computed(() => {
+  if (props.isStarting || props.isStopping || props.isRestarting || props.isConnecting) {
+    return 'status-pending'
+  }
+  return props.isRunning && props.wsConnected
+    ? 'status-active'
+    : props.isRunning && !props.wsConnected
+    ? 'status-warning'
+    : 'status-inactive'
+})
+
+const statusText = computed(() => {
+  if (props.isStarting) {
+    return t('status.starting')
+  } else if (props.isStopping) {
+    return t('status.stopping')
+  } else if (props.isRestarting) {
+    return t('status.restarting')
+  } else if (props.isConnecting) {
+    return t('status.connecting')
+  } else if (props.isRunning && props.wsConnected) {
+    return t('status.running')
+  } else if (props.isRunning && !props.wsConnected) {
+    return t('status.disconnected')
+  } else {
+    return t('status.stopped')
+  }
+})
 </script>
 
 <style scoped>
@@ -159,44 +191,40 @@ const handleToggle = () => {
 }
 
 .status-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background-color: var(--n-text-color-disabled);
-  transition: all 0.3s ease;
+  background-color: currentColor;
+  display: inline-block;
+  margin-right: 8px;
   position: relative;
 }
 
-.status-dot.active {
-  background-color: var(--success-color);
-  box-shadow: 0 0 10px var(--success-color);
-}
-
-.status-dot.active::after {
+.status-pending .status-dot::after {
   content: '';
   position: absolute;
-  top: -5px;
-  left: -5px;
-  right: -5px;
-  bottom: -5px;
+  top: -4px;
+  left: -4px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 1px solid var(--success-color);
-  opacity: 0.4;
-  animation: pulse 1.8s infinite;
+  background-color: currentColor;
+  opacity: 0.3;
+  animation: pulse 1.5s infinite ease-in-out;
 }
 
 @keyframes pulse {
   0% {
-    transform: scale(0.95);
-    opacity: 0.6;
+    transform: scale(0.6);
+    opacity: 0.5;
   }
-  70% {
-    transform: scale(1.2);
-    opacity: 0.3;
+  50% {
+    transform: scale(1);
+    opacity: 0.2;
   }
   100% {
-    transform: scale(0.95);
-    opacity: 0.6;
+    transform: scale(0.6);
+    opacity: 0.5;
   }
 }
 
@@ -243,6 +271,23 @@ const handleToggle = () => {
 .admin-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(250, 173, 20, 0.25);
+}
+
+/* 添加状态颜色 */
+.status-active {
+  color: var(--success-color, #18a058);
+}
+
+.status-inactive {
+  color: var(--error-color, #d03050);
+}
+
+.status-warning {
+  color: var(--warning-color, #f0a020);
+}
+
+.status-pending {
+  color: var(--info-color, #2080f0);
 }
 
 @media (max-width: 768px) {

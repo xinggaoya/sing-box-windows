@@ -963,26 +963,6 @@ fn update_selector_outbounds(outbounds_array: &mut Vec<Value>, nodes: &Vec<Value
     }
 }
 
-// 添加一个从订阅中提取规则的函数
-fn extract_rules_from_subscription(content: &str) -> Option<Value> {
-    // 尝试将内容解析为JSON
-    if let Ok(json) = serde_json::from_str::<Value>(content) {
-        // 检查是否有规则字段
-        if let Some(route) = json.get("route") {
-            if let Some(rules) = route.get("rules") {
-                return Some(rules.clone());
-            }
-        }
-
-        // 检查其他可能的规则位置
-        if let Some(rules) = json.get("rules") {
-            return Some(rules.clone());
-        }
-    }
-
-    None
-}
-
 // 更新处理订阅内容的函数，添加use_subscription_rules参数
 fn process_subscription_content(
     content: String,

@@ -102,26 +102,96 @@ export const useKernelStore = defineStore(
         const wsService = WebSocketService.getInstance();
         wsService.setToken(token);
 
-        // 短暂延迟，等待内核和API服务启动
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        // 尝试建立所有 WebSocket 连接
-        const allConnected = await wsService.checkAllConnections();
-        if (!allConnected) {
-          console.warn('部分 WebSocket 连接失败，但仍会继续运行');
-        }
+        // 启动时将状态设为连接中
+        appStore.setConnectingState(true);
 
-        // 设置运行状态
-        appStore.setRunningState(true)
-
-        // 通知内核状态变更
-        mitt.emit('kernel-started')
-
-        return true
+        // 设置WebSocket连接检查
+        return await checkWebSocketConnections(wsService);
       } catch (error) {
-        console.error('启动内核失败:', error)
-        return false
+        // 停止计时器
+        clearTimers();
+        
+        // 重置连接状态
+        appStore.setConnectingState(false);
+        appStore.setRunningState(false);
+        
+        // 格式化错误消息
+        let errorMessage = '启动内核失败';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+        
+        console.error('启动内核失败:', errorMessage);
+        
+        // 通知启动失败
+        mitt.emit('kernel-start-failed', { error: errorMessage });
+        
+        throw new Error(errorMessage);
       }
+    }
+
+    // 定时检查WebSocket连接状态
+    const checkWebSocketConnections = async (wsService: WebSocketService) => {
+      // 连接检查配置
+      const maxCheckTime = 30000; // 最大检查时间（毫秒）
+      const checkInterval = 1000; // 检查间隔（毫秒）
+      const maxChecks = Math.floor(maxCheckTime / checkInterval);
+      
+      // 每次检查前清理可能存在的连接
+      await wsService.disconnectAll().catch(() => {});
+      
+      // 开始定时检查
+      let isConnected = false;
+      for (let i = 0; i < maxChecks; i++) {
+        console.log(`检查WebSocket连接状态 (第${i + 1}/${maxChecks}次)...`);
+        
+        try {
+          // 尝试建立连接
+          isConnected = await wsService.checkAllConnections();
+          
+          if (isConnected) {
+            console.log(`WebSocket连接成功 (第${i + 1}次检查)`);
+            break;
+          } else {
+            console.log(`WebSocket连接尚未就绪，${checkInterval}毫秒后重试...`);
+            
+            // 等待指定时间后重试
+            await new Promise(resolve => setTimeout(resolve, checkInterval));
+          }
+        } catch (error) {
+          console.error(`WebSocket连接检查出错 (第${i + 1}次): ${error}`);
+          
+          // 等待后重试
+          await new Promise(resolve => setTimeout(resolve, checkInterval));
+        }
+      }
+      
+      if (!isConnected) {
+        // 所有检查都失败，尝试停止内核并报错
+        console.error(`WebSocket连接在${maxCheckTime/1000}秒内检查失败，内核可能未正常启动`);
+        
+        // 清理资源
+        clearTimers();
+        await wsService.disconnectAll().catch(() => {});
+        await tauriApi.kernel.stopKernel().catch(() => {});
+        
+        // 重置连接状态
+        appStore.setConnectingState(false);
+        
+        // 抛出错误
+        throw new Error(`启动失败: 内核服务在${maxCheckTime/1000}秒内未就绪，请检查配置或网络问题`);
+      }
+
+      // 成功建立WebSocket连接，设置运行状态
+      appStore.setRunningState(true);
+      appStore.setConnectingState(false);
+
+      // 通知内核状态变更
+      mitt.emit('kernel-started');
+
+      return true;
     }
 
     // 停止内核

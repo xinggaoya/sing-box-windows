@@ -94,28 +94,71 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
 
 // 运行内核
 #[tauri::command]
-pub async fn start_kernel(proxy_mode: Option<String>) -> Result<(), String> {
-    let result = PROCESS_MANAGER.start().await.map_err(|e| e.to_string())?;
+pub async fn start_kernel(_proxy_mode: Option<String>) -> Result<(), String> {
+    // 启动内核进程
+    match PROCESS_MANAGER.start().await {
+        Ok(_) => {
+            info!("内核进程启动成功，现在配置代理模式");
 
-    info!(proxy_mode);
-    // 如果指定了代理模式为system，则设置系统代理
-    if let Some(mode) = proxy_mode {
-        if mode == "system" {
-            // 短暂延迟，确保内核已启动
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-            // 设置系统代理
-            crate::utils::proxy_util::enable_system_proxy(
-                "127.0.0.1",
-                network_config::DEFAULT_PROXY_PORT,
-            )
-            .map_err(|e| format!("设置系统代理失败: {}", e))?;
-
-            info!("系统代理已启用");
+            // 创建HTTP客户端用于检查内核状态
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(2))
+                .no_proxy()
+                .build()
+                .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
+            
+            let url = format!("http://127.0.0.1:{}/version?token=", network_config::DEFAULT_CLASH_API_PORT);
+            
+            // 内核启动检查的最大时间（秒）
+            let max_check_time_secs = 20;
+            // 每次检查的间隔（毫秒）
+            let check_interval_ms = 1000;
+            // 最大检查次数
+            let max_checks = max_check_time_secs * 1000 / check_interval_ms;
+            
+            // 进行定时检查
+            let mut api_ready = false;
+            for i in 0..max_checks {
+                info!("检查内核API是否就绪 (第{}次检查)...", i + 1);
+                
+                match client.get(&url).send().await {
+                    Ok(_) => {
+                        info!("内核API服务连接成功，内核已就绪");
+                        api_ready = true;
+                        break;
+                    },
+                    Err(e) => {
+                        if i < max_checks - 1 {
+                            info!("内核API服务暂未就绪，将在{}ms后重试: {}", check_interval_ms, e);
+                            tokio::time::sleep(tokio::time::Duration::from_millis(check_interval_ms)).await;
+                        } else {
+                            info!("内核API服务在最大等待时间内无响应，将由前端确认启动状态");
+                        }
+                    }
+                }
+            }
+            
+            if !api_ready {
+                info!("内核API服务在设定时间内未就绪，但进程已启动，将通过WebSocket确认状态");
+                // 即使API未就绪也返回成功，交由前端通过WebSocket确认最终状态
+            }
+            
+            Ok(())
+        },
+        Err(e) => {
+            // 从错误中提取关键信息
+            let error_string = e.to_string();
+            let shortened_error = if error_string.len() > 300 {
+                // 提取前300个字符
+                format!("{}...(错误信息过长)", &error_string[..300])
+            } else {
+                error_string
+            };
+            
+            error!("内核启动失败: {}", shortened_error);
+            Err(shortened_error)
         }
     }
-
-    Ok(result)
 }
 
 // 停止内核
@@ -679,3 +722,4 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
 
     Ok(())
 }
+

@@ -35,10 +35,21 @@ export const useSubStore = defineStore(
       })
     }
 
+    // 重置所有订阅的加载状态
+    const resetLoadingState = () => {
+      if (list.value.length > 0) {
+        list.value = list.value.map(item => ({
+          ...item,
+          isLoading: false
+        }))
+      }
+    }
+
     return {
       list,
       activeIndex,
       add,
+      resetLoadingState,
     }
   },
   {

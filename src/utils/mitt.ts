@@ -33,6 +33,8 @@ export type Events = {
   'language-changed': void
   'kernel-started': void
   'kernel-stopped': void
+  'kernel-start-failed': { error: string }
+  'connecting-status-changed': boolean
   'tray-clicked': void
   'error': string
   
@@ -48,7 +50,7 @@ export type Events = {
   'traffic-data': any
   'memory-data': any
   'connections-data': any
-  'log-data': any
+  'log-data': { type: string; payload: string }
 }
 
 // 创建 mitt 实例

@@ -53,6 +53,8 @@ export const useAppStore = defineStore(
     const isRunning = ref(false)
     // WebSocket连接状态
     const wsConnected = ref(false)
+    // 连接中状态（正在启动内核但尚未完成连接）
+    const isConnecting = ref(false)
 
     // 托盘实例ID - 由TrayStore使用
     const trayInstanceId = ref<string | null>(null)
@@ -114,11 +116,20 @@ export const useAppStore = defineStore(
         } else {
           // 如果设置为停止，清除WebSocket连接
           wsConnected.value = false
+          // 同时确保连接中状态也被清除
+          isConnecting.value = false
         }
 
         // 发送进程状态变更事件
         mitt.emit('process-status')
       }
+    }
+
+    // 设置连接中状态
+    const setConnectingState = (state: boolean) => {
+      isConnecting.value = state
+      // 发送状态变更事件
+      mitt.emit('connecting-status-changed', state)
     }
 
     // 启动WebSocket连接检查
@@ -204,12 +215,14 @@ export const useAppStore = defineStore(
     return {
       isRunning,
       wsConnected,
+      isConnecting,
       trayInstanceId,
       proxyMode,
       autoStartApp,
       autoStartKernel,
       preferIpv6,
       setRunningState,
+      setConnectingState,
       toggleAutoStart,
       switchProxyMode,
       startWebSocketCheck,

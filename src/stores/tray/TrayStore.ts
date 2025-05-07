@@ -14,6 +14,7 @@ import { ProxyService } from '@/services/proxy-service'
 import mitt from '@/utils/mitt'
 import i18n from '@/locales'
 import { useRouter } from 'vue-router'
+import { tauriApi } from '@/services/tauri-api'
 
 // 自定义菜单项类型定义
 export interface TrayMenuOptions {
@@ -183,13 +184,26 @@ export const useTrayStore = defineStore(
           enabled: currentProxyMode !== 'tun',
           action: async () => {
             try {
-              const needClose = await proxyService.switchMode('tun')
-              appStore.proxyMode = 'tun'
-              // 强制立即刷新菜单
-              await refreshTrayMenu()
-              if (needClose) {
-                const appWindow = Window.getCurrent()
-                await appWindow.close()
+              // 检查是否有管理员权限
+              const isAdmin = await tauriApi.system.checkAdmin()
+              
+              if (!isAdmin) {
+                // 没有管理员权限，先切换模式然后以管理员重启
+                await tauriApi.proxy.setTunProxy()
+                await appStore.switchProxyMode('tun')
+                
+                // 以管理员重启
+                await tauriApi.system.restartAsAdmin()
+              } else {
+                // 有管理员权限，正常切换
+                const needClose = await proxyService.switchMode('tun')
+                appStore.proxyMode = 'tun'
+                // 强制立即刷新菜单
+                await refreshTrayMenu()
+                if (needClose) {
+                  const appWindow = Window.getCurrent()
+                  await appWindow.close()
+                }
               }
             } catch (error) {
               console.error('切换到TUN模式失败:', error)
