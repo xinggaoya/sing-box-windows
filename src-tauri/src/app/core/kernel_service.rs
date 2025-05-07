@@ -45,6 +45,53 @@ pub async fn check_kernel_version() -> Result<String, String> {
     Ok(version_info.to_string())
 }
 
+// 检查配置是否正常
+#[tauri::command]
+pub async fn check_config_validity(config_path: String) -> Result<(), String> {
+    let kernel_path = paths::get_kernel_path();
+
+    if !kernel_path.exists() {
+        return Err(messages::ERR_KERNEL_NOT_FOUND.to_string());
+    }
+
+    // 确保配置文件路径存在
+    let path = if config_path.is_empty() {
+        paths::get_config_path().to_string_lossy().to_string()
+    } else {
+        config_path
+    };
+
+    // 检查配置文件是否存在
+    if !std::path::Path::new(&path).exists() {
+        return Err(format!("配置文件不存在: {}", path));
+    }
+
+    let output = std::process::Command::new(kernel_path)
+        .arg("check")
+        .arg("--config")
+        .arg(path)
+        .creation_flags(process::CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| format!("执行配置检查命令失败: {}", e))?;
+
+    // 检查命令是否成功执行
+    if !output.status.success() {
+        // 如果有错误输出，返回错误信息
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("配置检查失败: {}", error));
+    }
+
+    // 检查是否有标准输出（即使命令成功，可能也有警告信息）
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if !stdout.is_empty() {
+        info!("配置检查有输出信息: {}", stdout);
+        return Err(format!("配置检查警告: {}", stdout));
+    }
+
+    // 如果没有任何输出且命令成功执行，则配置正常
+    Ok(())
+}
+
 // 运行内核
 #[tauri::command]
 pub async fn start_kernel(proxy_mode: Option<String>) -> Result<(), String> {
@@ -127,7 +174,13 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
     );
 
     // 获取最新版本信息
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(
+            network_config::HTTP_TIMEOUT_SECONDS,
+        ))
+        .no_proxy() // 禁用代理
+        .build()
+        .map_err(|e| format!("{}: {}", messages::ERR_HTTP_CLIENT_FAILED, e))?;
     let releases_url = "https://api.github.com/repos/SagerNet/sing-box/releases/latest";
     let response = client
         .get(releases_url)

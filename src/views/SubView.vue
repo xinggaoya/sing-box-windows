@@ -245,12 +245,12 @@
         </n-tab-pane>
       </n-tabs>
 
-      <!-- 添加规则集开关 -->
-      <n-form-item :label="t('sub.useRules')" label-placement="left">
+      <!-- 移除规则集开关，仅保留原始订阅开关 -->
+      <n-form-item :label="t('sub.useOriginal')" label-placement="left">
         <n-space align="center">
-          <n-switch v-model:value="formValue.useSubscriptionRules" size="small" />
+          <n-switch v-model:value="formValue.useOriginalConfig" size="small" />
           <n-text depth="3" style="font-size: 12px">{{
-            formValue.useSubscriptionRules ? t('sub.useSubRules') : t('sub.useDefaultRules')
+            formValue.useOriginalConfig ? t('sub.useOriginalConfig') : t('sub.useExtractedNodes')
           }}</n-text>
         </n-space>
       </n-form-item>
@@ -327,7 +327,7 @@ interface Subscription {
   isLoading: boolean
   isManual: boolean
   manualContent?: string
-  useSubscriptionRules: boolean
+  useOriginalConfig: boolean
 }
 
 const message = useMessage()
@@ -358,7 +358,7 @@ const formValue = ref<Subscription>({
   isLoading: false,
   isManual: false,
   manualContent: '',
-  useSubscriptionRules: false,
+  useOriginalConfig: false,
 })
 
 const rules: FormRules = {
@@ -403,7 +403,7 @@ const resetForm = () => {
     isLoading: false,
     isManual: false,
     manualContent: '',
-    useSubscriptionRules: false,
+    useOriginalConfig: false,
   }
   editIndex.value = null
 }
@@ -416,7 +416,7 @@ const handleEdit = (index: number, item: Subscription) => {
     isLoading: item.isLoading,
     isManual: item.isManual,
     manualContent: item.manualContent,
-    useSubscriptionRules: item.useSubscriptionRules,
+    useOriginalConfig: item.useOriginalConfig,
   }
   // 根据订阅类型设置activeTab
   activeTab.value = item.isManual ? 'manual' : 'url'
@@ -438,7 +438,7 @@ const handleConfirm = () => {
             // 如果是新建订阅，同时使用这个内容
             await tauriApi.subscription.addManualSubscription(
               formValue.value.manualContent,
-              formValue.value.useSubscriptionRules,
+              formValue.value.useOriginalConfig
             )
           }
         } else if (!isManual) {
@@ -446,7 +446,7 @@ const handleConfirm = () => {
           if (editIndex.value === null) {
             await tauriApi.subscription.downloadSubscription(
               formValue.value.url,
-              formValue.value.useSubscriptionRules,
+              formValue.value.useOriginalConfig
             )
           }
         }
@@ -460,7 +460,7 @@ const handleConfirm = () => {
             isLoading: false,
             isManual: isManual,
             manualContent: isManual ? formValue.value.manualContent : undefined,
-            useSubscriptionRules: formValue.value.useSubscriptionRules,
+            useOriginalConfig: formValue.value.useOriginalConfig,
           })
 
           // 自动设置为当前活跃订阅（无论是手动还是URL订阅）
@@ -474,7 +474,7 @@ const handleConfirm = () => {
             url: formValue.value.url,
             isManual: isManual,
             manualContent: isManual ? formValue.value.manualContent : undefined,
-            useSubscriptionRules: formValue.value.useSubscriptionRules,
+            useOriginalConfig: formValue.value.useOriginalConfig,
           }
           message.success(t('sub.updateSuccess'))
         }
@@ -514,11 +514,14 @@ const useSubscription = async (url: string, index: number) => {
       // 如果是手动配置，直接使用保存的内容
       await tauriApi.subscription.addManualSubscription(
         item.manualContent,
-        item.useSubscriptionRules,
+        item.useOriginalConfig
       )
     } else {
       // 否则从URL下载内容
-      await tauriApi.subscription.downloadSubscription(url, item.useSubscriptionRules)
+      await tauriApi.subscription.downloadSubscription(
+        url, 
+        item.useOriginalConfig
+      )
     }
 
     // 更新订阅状态
@@ -569,7 +572,10 @@ const saveCurrentConfig = async () => {
     isConfigLoading.value = true
 
     // 保存配置内容
-    await tauriApi.subscription.addManualSubscription(currentConfig.value)
+    await tauriApi.subscription.addManualSubscription(
+      currentConfig.value,
+      false
+    )
 
     // 如果当前活跃订阅是手动配置，更新其内容
     if (subStore.activeIndex !== null) {

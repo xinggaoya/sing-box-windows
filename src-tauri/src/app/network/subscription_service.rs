@@ -16,12 +16,12 @@ use tracing::{error, info};
 #[tauri::command]
 pub async fn download_subscription(
     url: String,
-    use_subscription_rules: bool,
+    use_original_config: bool,
     window: tauri::Window,
 ) -> Result<(), String> {
     let app_handle = window.app_handle();
 
-    download_and_process_subscription(url, use_subscription_rules, app_handle.clone())
+    download_and_process_subscription(url, use_original_config, app_handle.clone())
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
     let _ = crate::app::proxy_service::set_system_proxy();
@@ -32,12 +32,12 @@ pub async fn download_subscription(
 #[tauri::command]
 pub async fn add_manual_subscription(
     content: String,
-    use_subscription_rules: bool,
+    use_original_config: bool,
     window: tauri::Window,
 ) -> Result<(), String> {
     let app_handle = window.app_handle();
 
-    process_subscription_content(content, use_subscription_rules, app_handle.clone())
+    process_subscription_content(content, use_original_config, app_handle.clone())
         .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
     let _ = crate::app::proxy_service::set_system_proxy();
     Ok(())
@@ -120,8 +120,8 @@ fn modify_default_mode(config_path: &Path, mode: String) -> Result<(), Box<dyn E
 
 async fn download_and_process_subscription(
     url: String,
-    use_subscription_rules: bool,
-    app_handle: tauri::AppHandle,
+    use_original_config: bool,
+    _app_handle: tauri::AppHandle,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir();
@@ -137,7 +137,7 @@ async fn download_and_process_subscription(
     }
 
     // 检查模板文件是否存在
-    let template_path = app_handle
+    let template_path = _app_handle
         .path()
         .resolve("src/config/template.json", BaseDirectory::Resource)?;
     if !template_path.exists() {
@@ -146,7 +146,13 @@ async fn download_and_process_subscription(
         return Err(err_msg.into());
     }
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(
+            network_config::HTTP_TIMEOUT_SECONDS,
+        ))
+        .no_proxy() // 禁用代理
+        .build()
+        .map_err(|e| format!("{}: {}", messages::ERR_HTTP_CLIENT_FAILED, e))?;
     let mut headers = reqwest::header::HeaderMap::new();
     let user_agent = reqwest::header::HeaderValue::from_static(
         "sing-box-windows/1.0 (sing-box; compatible; Windows NT 10.0)",
@@ -165,9 +171,14 @@ async fn download_and_process_subscription(
     let response_text = response.text().await?;
     info!("订阅下载成功，内容长度: {} 字节", response_text.len());
 
-    // 检查是否使用订阅的规则集
-    info!("使用订阅规则集: {}", use_subscription_rules);
+    // 如果使用原始配置，直接处理原始内容
+    if use_original_config {
+        info!("使用原始订阅内容，仅修改必要的端口和地址");
+        process_original_config(&response_text, _app_handle)?;
+        return Ok(());
+    }
 
+    // 如果不使用原始配置，使用现有的提取节点到模板的方式
     // 直接尝试从原始内容提取节点
     let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
     info!("从原始内容提取到 {} 个节点", extracted_nodes.len());
@@ -260,28 +271,6 @@ async fn download_and_process_subscription(
 
     // 将模板内容解析为JSON对象
     let mut config: Value = serde_json::from_str(&template_content)?;
-
-    // 如果使用订阅规则集，从订阅内容中提取规则
-    if use_subscription_rules {
-        info!("尝试从订阅中提取规则集...");
-        let subscription_rules = extract_rules_from_subscription(&response_text);
-
-        if let Some(rules) = subscription_rules {
-            info!("成功从订阅中提取到规则集");
-            // 将订阅中的规则添加到配置中，替换模板中的规则
-            if let Some(config_obj) = config.as_object_mut() {
-                if let Some(route) = config_obj.get_mut("route") {
-                    if let Some(route_obj) = route.as_object_mut() {
-                        route_obj.insert("rules".to_string(), rules);
-                    }
-                }
-            }
-        } else {
-            info!("未能从订阅中提取到规则集，将使用模板中的默认规则");
-        }
-    } else {
-        info!("不使用订阅规则集，将使用模板中的默认规则");
-    }
 
     // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {
@@ -997,8 +986,8 @@ fn extract_rules_from_subscription(content: &str) -> Option<Value> {
 // 更新处理订阅内容的函数，添加use_subscription_rules参数
 fn process_subscription_content(
     content: String,
-    use_subscription_rules: bool,
-    app_handle: tauri::AppHandle,
+    use_original_config: bool,
+    _app_handle: tauri::AppHandle,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir();
@@ -1015,8 +1004,15 @@ fn process_subscription_content(
 
     info!("处理订阅内容，长度: {} 字节", content.len());
 
+    // 如果使用原始配置，直接处理原始内容
+    if use_original_config {
+        info!("使用原始订阅内容，仅修改必要的端口和地址");
+        process_original_config(&content, _app_handle)?;
+        return Ok(());
+    }
+
     // 检查是否使用订阅的规则集
-    info!("使用订阅规则集: {}", use_subscription_rules);
+    info!("使用订阅规则集: {}", use_original_config);
 
     // 尝试从内容中提取节点
     let extracted_nodes = extract_nodes_from_subscription(&content)?;
@@ -1033,7 +1029,7 @@ fn process_subscription_content(
     );
 
     // 使用Tauri资源路径API获取模板文件路径
-    let template_path = app_handle
+    let template_path = _app_handle
         .path()
         .resolve("src/config/template.json", BaseDirectory::Resource)?;
     if !template_path.exists() {
@@ -1050,28 +1046,6 @@ fn process_subscription_content(
 
     // 将模板内容解析为JSON对象
     let mut config: Value = serde_json::from_str(&template_content)?;
-
-    // 如果使用订阅规则集，从内容中提取规则
-    if use_subscription_rules {
-        info!("尝试从内容中提取规则集...");
-        let subscription_rules = extract_rules_from_subscription(&content);
-
-        if let Some(rules) = subscription_rules {
-            info!("成功从内容中提取到规则集");
-            // 将内容中的规则添加到配置中，替换模板中的规则
-            if let Some(config_obj) = config.as_object_mut() {
-                if let Some(route) = config_obj.get_mut("route") {
-                    if let Some(route_obj) = route.as_object_mut() {
-                        route_obj.insert("rules".to_string(), rules);
-                    }
-                }
-            }
-        } else {
-            info!("未能从内容中提取到规则集，将使用模板中的默认规则");
-        }
-    } else {
-        info!("不使用订阅规则集，将使用模板中的默认规则");
-    }
 
     // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {
@@ -1164,6 +1138,116 @@ fn process_subscription_content(
     }
 
     info!("订阅已更新并应用到模板，配置已保存");
+    Ok(())
+}
+
+// 添加一个处理原始订阅配置的函数
+fn process_original_config(
+    content: &str,
+    _app_handle: tauri::AppHandle,
+) -> Result<(), Box<dyn Error>> {
+    info!("处理原始订阅配置...");
+
+    // 解析内容为JSON
+    let content_cleaned = clean_json_content(content);
+    let mut config: Value = match serde_json::from_str(&content_cleaned) {
+        Ok(json) => {
+            info!("成功解析订阅内容为JSON格式");
+            json
+        }
+        Err(e) => {
+            // 尝试解码base64
+            info!("解析JSON失败: {}，尝试base64解码...", e);
+
+            // 尝试标准base64解码
+            let decoded_result = base64::decode(content.trim());
+            if let Ok(decoded) = decoded_result {
+                if let Ok(decoded_text) = String::from_utf8(decoded) {
+                    match serde_json::from_str(&decoded_text) {
+                        Ok(json) => {
+                            info!("成功解析base64解码内容为JSON");
+                            json
+                        }
+                        Err(e) => {
+                            return Err(format!("解析base64解码内容为JSON失败: {}", e).into());
+                        }
+                    }
+                } else {
+                    return Err("base64解码成功但无法转换为UTF-8文本".into());
+                }
+            } else {
+                return Err(format!("无法解析订阅内容为JSON格式: {}", e).into());
+            }
+        }
+    };
+
+    // 修改必要的端口和地址设置
+    if let Some(config_obj) = config.as_object_mut() {
+        // 修改experimental.clash_api配置（如果存在）
+        if let Some(experimental) = config_obj.get_mut("experimental") {
+            if let Some(exp_obj) = experimental.as_object_mut() {
+                // 添加或修改clash_api配置
+                let clash_api = exp_obj.entry("clash_api").or_insert(json!({}));
+
+                if let Some(clash_api_obj) = clash_api.as_object_mut() {
+                    // 设置external_controller为本地端口
+                    clash_api_obj.insert(
+                        "external_controller".to_string(),
+                        json!(format!(
+                            "127.0.0.1:{}",
+                            network_config::DEFAULT_CLASH_API_PORT
+                        )),
+                    );
+
+                    // 添加external_ui配置
+                    clash_api_obj.insert("external_ui".to_string(), json!("metacubexd"));
+
+                    // 如果没有default_mode，设置默认值
+                    if !clash_api_obj.contains_key("default_mode") {
+                        clash_api_obj.insert("default_mode".to_string(), json!("rule"));
+                    }
+                }
+            }
+        } else {
+            // 如果不存在experimental字段，添加它
+            config_obj.insert(
+                "experimental".to_string(), 
+                json!({
+                    "clash_api": {
+                        "external_controller": format!("127.0.0.1:{}", network_config::DEFAULT_CLASH_API_PORT),
+                        "external_ui": "metacubexd",
+                        "default_mode": "rule"
+                    }
+                })
+            );
+        }
+    }
+
+    // 保存配置到文件
+    let work_dir = get_work_dir();
+    let config_path = Path::new(&work_dir).join("sing-box/config.json");
+    info!("正在保存配置到: {:?}", config_path);
+
+    // 确保目录存在
+    if let Some(parent) = config_path.parent() {
+        if !parent.exists() {
+            info!("创建配置目录: {:?}", parent);
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                let err_msg = format!("创建配置目录失败: {}", e);
+                error!("{}", err_msg);
+                return Err(err_msg.into());
+            }
+        }
+    }
+
+    // 将配置转换为JSON字符串
+    let config_str = serde_json::to_string_pretty(&config)?;
+
+    // 写入配置文件
+    let mut file = File::create(&config_path)?;
+    file.write_all(config_str.as_bytes())?;
+
+    info!("原始订阅配置（修改端口后）已成功保存");
     Ok(())
 }
 

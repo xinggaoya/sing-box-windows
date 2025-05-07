@@ -98,8 +98,8 @@ export const proxyApi = {
 // 订阅相关接口
 export const subscriptionApi = {
   // 下载订阅
-  downloadSubscription: (url: string, useSubscriptionRules: boolean = false) =>
-    invoke<void>('download_subscription', { url, useSubscriptionRules }),
+  downloadSubscription: (url: string, useOriginalConfig: boolean = false) =>
+    invoke<void>('download_subscription', { url, useOriginalConfig }),
 
   // 下载最新内核
   downloadLatestKernel: () => invoke<void>('download_latest_kernel'),
@@ -108,8 +108,8 @@ export const subscriptionApi = {
   getCurrentConfig: () => invoke<string>('get_current_config'),
 
   // 添加手动配置
-  addManualSubscription: (content: string, useSubscriptionRules: boolean = false) =>
-    invoke<void>('add_manual_subscription', { content, useSubscriptionRules }),
+  addManualSubscription: (content: string, useOriginalConfig: boolean = false) =>
+    invoke<void>('add_manual_subscription', { content, useOriginalConfig }),
 }
 
 // 统一导出所有 API
@@ -124,16 +124,8 @@ export const tauriApi = {
     checkAdmin: () => invoke<boolean>('check_admin'),
     // 以管理员权限重启
     restartAsAdmin: () => invoke<void>('restart_as_admin'),
-    // 安装服务
-    installService: () => invoke('install_service'),
-    // 卸载服务
-    uninstallService: () => invoke('uninstall_service'),
-    // 检查服务状态
-    checkServiceStatus: () => invoke<{installed: boolean, running: boolean}>('check_service_status'),
-    // 更新服务
-    updateService: () => invoke<{success: boolean, updated: boolean, message: string}>('update_service'),
-    // 检查服务是否需要更新
-    checkServiceUpdateNeeded: () => invoke<{success: boolean, need_update: boolean, message: string}>('check_service_update_needed'),
+    // 退出应用程序
+    exitApplication: () => invoke<void>('exit_application'),
   },
 
   // 更新相关 API

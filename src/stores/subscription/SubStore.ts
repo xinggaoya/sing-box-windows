@@ -8,7 +8,7 @@ export interface Subscription {
   lastUpdate?: number
   isManual: boolean
   manualContent?: string
-  useSubscriptionRules: boolean
+  useOriginalConfig: boolean
 }
 
 export const useSubStore = defineStore(
@@ -22,7 +22,7 @@ export const useSubStore = defineStore(
       url: string,
       isManual: boolean = false,
       manualContent?: string,
-      useSubscriptionRules: boolean = false,
+      useOriginalConfig: boolean = false,
     ) => {
       list.value.push({
         name,
@@ -31,7 +31,7 @@ export const useSubStore = defineStore(
         lastUpdate: undefined,
         isManual,
         manualContent,
-        useSubscriptionRules,
+        useOriginalConfig,
       })
     }
 

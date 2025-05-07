@@ -7,8 +7,10 @@
       :is-admin="isAdmin"
       :is-starting="isStarting"
       :is-stopping="isStopping"
+      :is-restarting="isRestarting"
       @start="runKernel"
       @stop="stopKernel"
+      @restart-as-admin="restartAsAdmin"
     />
 
     <!-- 代理模式设置区域 -->
@@ -35,11 +37,23 @@
       />
     </div>
 
+    <!-- 流量数据卡片 -->
+    <TrafficStatsCard 
+      :active-connections-count="activeConnectionsCount"
+      :traffic-up="trafficStore.traffic.up"
+      :traffic-down="trafficStore.traffic.down"
+      :total-up="trafficStore.traffic.totalUp"
+      :total-down="trafficStore.traffic.totalDown"
+      :memory="connectionStore.memory?.inuse || 0"
+      :is-route-active="isRouteActive"
+    />
+
     <!-- 节点模式切换确认对话框 -->
     <n-modal
       v-model:show="showNodeModeChangeModal"
       preset="dialog"
       :title="`${t('proxy.switchTo')}${targetNodeProxyMode ? getNodeProxyModeText(targetNodeProxyMode) : ''}`"
+      class="node-mode-modal"
     >
       <template #header>
         <div class="modal-header">
@@ -65,17 +79,6 @@
         </div>
       </template>
     </n-modal>
-
-    <!-- 流量数据卡片 -->
-    <TrafficStatsCard 
-      :active-connections-count="activeConnectionsCount"
-      :traffic-up="trafficStore.traffic.up"
-      :traffic-down="trafficStore.traffic.down"
-      :total-up="trafficStore.traffic.totalUp"
-      :total-down="trafficStore.traffic.totalDown"
-      :memory="connectionStore.memory?.inuse || 0"
-      :is-route-active="isRouteActive"
-    />
   </div>
 </template>
 
@@ -107,6 +110,7 @@ import {
   InformationCircleOutline,
   ChevronDownOutline,
   LayersOutline,
+  RefreshOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -132,6 +136,7 @@ const proxyService = ProxyService.getInstance()
 const isStarting = ref(false)
 const isStopping = ref(false)
 const isSwitching = ref(false)
+const isRestarting = ref(false)
 const { t } = useI18n()
 const isAdmin = ref(false)
 
@@ -268,6 +273,19 @@ const confirmNodeProxyModeChange = async () => {
   }
 }
 
+/**
+ * 以管理员权限重启应用
+ */
+const restartAsAdmin = async () => {
+  isRestarting.value = true
+  try {
+    await tauriApi.system.restartAsAdmin()
+  } catch (error) {
+    message.error(`${t('notification.restartFailed')}: ${error}`)
+    isRestarting.value = false
+  }
+}
+
 // 监听路由可见性变化
 const route = useRoute()
 const isRouteActive = computed(() => route.path === '/')
@@ -287,6 +305,22 @@ const runKernel = async () => {
     isStarting.value = true
     // 确保当前模式已设置到appStore
     appState.setProxyMode(currentProxyMode.value)
+    
+    // 检查TUN模式下是否需要管理员权限
+    if (currentProxyMode.value === 'tun' && !isAdmin.value) {
+      dialog.warning({
+        title: t('notification.adminRequired'),
+        content: t('notification.tunModeAdminRequired'),
+        positiveText: t('common.restart'),
+        negativeText: t('common.cancel'),
+        onPositiveClick: async () => {
+          await restartAsAdmin()
+        }
+      })
+      isStarting.value = false
+      return
+    }
+    
     await kernelStore.startKernel()
     appState.setRunningState(true)
     message.success(t('notification.kernelStarted'))
@@ -327,6 +361,26 @@ const onModeChange = async (value: string) => {
 
   try {
     isSwitching.value = true
+    
+    // 检查如果切换到TUN模式且不是管理员权限，则先提示
+    if (value === 'tun' && !isAdmin.value) {
+      dialog.warning({
+        title: t('notification.adminRequired'),
+        content: t('notification.tunModeAdminRequired'),
+        positiveText: t('common.restart'),
+        negativeText: t('common.cancel'),
+        onPositiveClick: async () => {
+          await restartAsAdmin()
+        },
+        onNegativeClick: () => {
+          // 取消操作，恢复之前的选择
+          currentProxyMode.value = appState.proxyMode
+          isSwitching.value = false
+        }
+      })
+      return
+    }
+    
     // 切换模式
     let needClose = false
     let modeChanged = false
@@ -369,6 +423,7 @@ const checkAdminStatus = async () => {
     isAdmin.value = await tauriApi.system.checkAdmin()
   } catch (error) {
     console.error('检查管理员权限失败:', error)
+    isAdmin.value = false
   }
 }
 
@@ -469,19 +524,36 @@ onUnmounted(() => {
 .home-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 12px 10px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  animation: fade-in 0.3s ease;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .proxy-modes-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 /* 确认对话框 */
+.node-mode-modal {
+  width: 400px;
+  max-width: 95vw;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -505,6 +577,7 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .home-container {
     padding: 12px 8px;
+    gap: 12px;
   }
   
   .proxy-modes-container {

@@ -4,6 +4,7 @@ use serde_json::json;
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use tauri::Emitter;
+use crate::app::network_config;
 
 // 添加新的结构体用于版本信息
 #[derive(serde::Serialize)]
@@ -16,7 +17,13 @@ pub struct UpdateInfo {
 // 检查更新
 #[tauri::command]
 pub async fn check_update(current_version: String) -> Result<UpdateInfo, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(
+            network_config::HTTP_TIMEOUT_SECONDS,
+        ))
+        .no_proxy() // 禁用代理
+        .build()
+        .map_err(|e| format!("{}: {}", messages::ERR_HTTP_CLIENT_FAILED, e))?;
 
     // 获取最新版本信息
     let response = client

@@ -34,6 +34,23 @@
         </div>
       </div>
       <div class="status-right">
+        <!-- 非管理员模式时显示重启按钮 -->
+        <n-button
+          v-if="!isAdmin"
+          type="warning"
+          size="small"
+          @click="$emit('restart-as-admin')"
+          :loading="isRestarting"
+          class="admin-button"
+        >
+          <template #icon>
+            <n-icon>
+              <refresh-outline />
+            </n-icon>
+          </template>
+          {{ t('notification.restartAsAdmin') }}
+        </n-button>
+
         <!-- 启动/停止按钮 -->
         <n-button
           :type="isRunning ? 'error' : 'primary'"
@@ -55,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { PowerOutline, WifiOutline, CloseCircleOutline, ShieldCheckmarkOutline, ShieldOutline } from '@vicons/ionicons5'
+import { PowerOutline, WifiOutline, CloseCircleOutline, ShieldCheckmarkOutline, ShieldOutline, RefreshOutline } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 
 defineOptions({
@@ -82,10 +99,14 @@ const props = defineProps({
   isStopping: {
     type: Boolean,
     default: false
+  },
+  isRestarting: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['start', 'stop'])
+const emit = defineEmits(['start', 'stop', 'restart-as-admin'])
 const { t } = useI18n()
 
 const handleToggle = () => {
@@ -127,7 +148,8 @@ const handleToggle = () => {
 
 .status-right {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
 }
 
 .status-indicator {
@@ -211,6 +233,18 @@ const handleToggle = () => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.admin-button {
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  height: 32px;
+}
+
+.admin-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(250, 173, 20, 0.25);
+}
+
 @media (max-width: 768px) {
   .status-card :deep(.n-card__content) {
     padding: 12px 16px;
@@ -230,8 +264,18 @@ const handleToggle = () => {
     justify-content: space-between;
   }
   
+  .status-right {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  
+  .admin-button {
+    flex: 1;
+    margin-right: 8px;
+  }
+  
   .control-button {
-    width: 100%;
+    flex: 1;
   }
 }
 </style> 

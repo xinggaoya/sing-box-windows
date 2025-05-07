@@ -17,7 +17,7 @@
 <script lang="ts" setup>
 import { ref, defineProps, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useThemeVars } from 'naive-ui'
-import { formatBandwidth } from '@/utils/index' // 导入formatBandwidth函数
+import { formatBandwidth } from '@/utils/index'
 import { useI18n } from 'vue-i18n'
 
 defineOptions({
@@ -46,11 +46,13 @@ const uploadData = ref<number[]>([]) // 上传速度数据
 const downloadData = ref<number[]>([]) // 下载速度数据
 const timeLabels = ref<string[]>([]) // 时间标签
 
-// 计算最大值
+// 计算最大值，使用动态变化的最大值，确保图表更平滑
 const maxValue = computed(() => {
   const uploadMax = Math.max(...uploadData.value, 0.1)
   const downloadMax = Math.max(...downloadData.value, 0.1)
-  return Math.max(uploadMax, downloadMax) * 1.2 // 留出20%的空间
+  const currentMax = Math.max(uploadMax, downloadMax)
+  // 使用平滑变化的最大值，避免图表剧烈跳动
+  return Math.max(currentMax * 1.2, 0.1) // 留出20%的空间，确保最小值不为0
 })
 
 // 初始化图表
@@ -138,7 +140,7 @@ const drawChart = () => {
 
     // 绘制网格线 - 使用虚线样式并降低不透明度提高视觉效果
     ctx.beginPath()
-    ctx.strokeStyle = `${gridColor}40` // 增加透明度
+    ctx.strokeStyle = `${gridColor}30` // 增加透明度
     ctx.lineWidth = 0.5 * dpr
     ctx.setLineDash([4 * dpr, 4 * dpr]) // 设置虚线样式
     ctx.moveTo(padding.left, y)
@@ -152,8 +154,8 @@ const drawChart = () => {
 
   // 绘制X轴 - 使用实线样式，稍微加粗提高可读性
   ctx.beginPath()
-  ctx.strokeStyle = gridColor
-  ctx.lineWidth = 1 * dpr
+  ctx.strokeStyle = `${gridColor}80`
+  ctx.lineWidth = 0.8 * dpr
   ctx.moveTo(padding.left, padding.top + chartHeight)
   ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight)
   ctx.stroke()
@@ -193,63 +195,83 @@ const drawCurve = (
 ) => {
   const max = maxValue.value || 0.1 // 避免除以零
 
-  // 绘制曲线 - 使用圆角连接和更粗的线条
+  // 绘制曲线渐变区域
+  ctx.beginPath()
+  
+  // 移动到第一个点的位置
+  const firstX = padding.left
+  const firstY = padding.top + chartHeight - (data[0] / max) * chartHeight
+  ctx.moveTo(firstX, firstY)
+  
+  // 使用贝塞尔曲线绘制平滑曲线
+  for (let i = 1; i < data.length; i++) {
+    const x = padding.left + (i / (MAX_DATA_POINTS - 1)) * chartWidth
+    const y = padding.top + chartHeight - (data[i] / max) * chartHeight
+    
+    const prevX = padding.left + ((i - 1) / (MAX_DATA_POINTS - 1)) * chartWidth
+    const prevY = padding.top + chartHeight - (data[i - 1] / max) * chartHeight
+    
+    // 控制点 - 使曲线更平滑
+    const cpX1 = prevX + (x - prevX) / 3
+    const cpX2 = prevX + (x - prevX) * 2 / 3
+    
+    ctx.bezierCurveTo(cpX1, prevY, cpX2, y, x, y)
+  }
+  
+  // 完成渐变区域路径
+  ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight)
+  ctx.lineTo(padding.left, padding.top + chartHeight)
+  ctx.closePath()
+  
+  // 绘制填充渐变
+  const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight)
+  gradient.addColorStop(0, `${color}30`) // 顶部适当透明
+  gradient.addColorStop(1, `${color}05`) // 底部更透明
+  
+  ctx.fillStyle = gradient
+  ctx.fill()
+  
+  // 绘制曲线
   ctx.beginPath()
   ctx.strokeStyle = color
   ctx.lineWidth = 2.5 * dpr
   ctx.lineJoin = 'round'
-  ctx.lineCap = 'round' // 设置线段端点为圆形
-
-  data.forEach((value, index) => {
-    const x = padding.left + (index / (MAX_DATA_POINTS - 1)) * chartWidth
-    const y = padding.top + chartHeight - (value / max) * chartHeight
-
-    if (index === 0) {
-      ctx.moveTo(x, y)
-    } else {
-      // 使用贝塞尔曲线平滑绘制
-      const prevX = padding.left + ((index - 1) / (MAX_DATA_POINTS - 1)) * chartWidth
-      const prevY = padding.top + chartHeight - (data[index - 1] / max) * chartHeight
-      
-      const cpX1 = prevX + (x - prevX) / 3
-      const cpX2 = prevX + (x - prevX) * 2 / 3
-      
-      ctx.bezierCurveTo(cpX1, prevY, cpX2, y, x, y)
-    }
-  })
-
+  ctx.lineCap = 'round'
+  
+  ctx.moveTo(firstX, firstY)
+  
+  // 再次绘制贝塞尔曲线（只绘制线条）
+  for (let i = 1; i < data.length; i++) {
+    const x = padding.left + (i / (MAX_DATA_POINTS - 1)) * chartWidth
+    const y = padding.top + chartHeight - (data[i] / max) * chartHeight
+    
+    const prevX = padding.left + ((i - 1) / (MAX_DATA_POINTS - 1)) * chartWidth
+    const prevY = padding.top + chartHeight - (data[i - 1] / max) * chartHeight
+    
+    const cpX1 = prevX + (x - prevX) / 3
+    const cpX2 = prevX + (x - prevX) * 2 / 3
+    
+    ctx.bezierCurveTo(cpX1, prevY, cpX2, y, x, y)
+  }
+  
   ctx.stroke()
-
-  // 绘制渐变区域
-  ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight)
-  ctx.lineTo(padding.left, padding.top + chartHeight)
-  ctx.closePath()
-
-  const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight)
-  gradient.addColorStop(0, `${color}35`) // 顶部稍微透明
-  gradient.addColorStop(1, `${color}05`) // 底部更透明
-
-  ctx.fillStyle = gradient
+  
+  // 绘制结束点高亮
+  const lastIndex = data.length - 1
+  const lastX = padding.left + (lastIndex / (MAX_DATA_POINTS - 1)) * chartWidth
+  const lastY = padding.top + chartHeight - (data[lastIndex] / max) * chartHeight
+  
+  // 外圈光晕
+  ctx.beginPath()
+  ctx.fillStyle = `${color}30`
+  ctx.arc(lastX, lastY, 6 * dpr, 0, Math.PI * 2)
   ctx.fill()
   
-  // 绘制高亮点 - 在最后一个数据点上显示圆点
-  if (data.length > 0) {
-    const lastIndex = data.length - 1
-    const lastX = padding.left + (lastIndex / (MAX_DATA_POINTS - 1)) * chartWidth
-    const lastY = padding.top + chartHeight - (data[lastIndex] / max) * chartHeight
-    
-    // 绘制内外两层圆点
-    ctx.beginPath()
-    ctx.fillStyle = themeVars.value.bodyColor // 内圆使用背景色
-    ctx.arc(lastX, lastY, 4 * dpr, 0, Math.PI * 2)
-    ctx.fill()
-    
-    ctx.beginPath()
-    ctx.strokeStyle = color
-    ctx.lineWidth = 2 * dpr
-    ctx.arc(lastX, lastY, 4 * dpr, 0, Math.PI * 2)
-    ctx.stroke()
-  }
+  // 内圈实心点
+  ctx.beginPath()
+  ctx.fillStyle = color
+  ctx.arc(lastX, lastY, 3 * dpr, 0, Math.PI * 2)
+  ctx.fill()
 }
 
 // 更新数据
@@ -271,8 +293,10 @@ const updateData = () => {
   const timeStr = `${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
   timeLabels.value.push(timeStr)
 
-  // 重绘图表
-  drawChart()
+  // 使用requestAnimationFrame优化性能
+  requestAnimationFrame(() => {
+    drawChart()
+  })
 }
 
 let updateTimer: number | null = null
@@ -283,7 +307,7 @@ const startUpdates = () => {
     clearInterval(updateTimer)
   }
 
-  console.log(t('chart.startUpdateTimer'))
+  // 使用1秒的更新频率，足够流畅同时不会造成性能问题
   updateTimer = setInterval(() => {
     updateData()
   }, 1000) as unknown as number
@@ -291,8 +315,6 @@ const startUpdates = () => {
 
 // 重置并刷新图表
 const resetAndRefresh = () => {
-  console.log(t('chart.resetRefresh'))
-
   // 清除所有数据
   uploadData.value = Array(MAX_DATA_POINTS).fill(0)
   downloadData.value = Array(MAX_DATA_POINTS).fill(0)
@@ -311,26 +333,46 @@ const resetAndRefresh = () => {
   }
 
   // 重新初始化图表
-  setTimeout(() => {
-    initChart()
-    // 立即更新一次数据以显示当前状态
-    updateData()
+  requestAnimationFrame(() => {
+    drawChart()
     // 确保定时更新器在运行
     if (updateTimer === null) {
       startUpdates()
     }
-  }, 50)
+  })
 }
 
 // 组件挂载时初始化
 onMounted(() => {
-  // 延迟执行以确保DOM已完全渲染
-  setTimeout(() => {
+  // 使用requestAnimationFrame确保DOM已完全渲染
+  requestAnimationFrame(() => {
     initChart()
     startUpdates()
-  }, 100)
+  })
 
-  // 添加窗口大小变化事件监听器
+  // 添加窗口大小变化事件监听器，使用防抖处理
+  let resizeTimeout: number | null = null
+  const handleResize = () => {
+    if (resizeTimeout) {
+      clearTimeout(resizeTimeout)
+    }
+    
+    resizeTimeout = window.setTimeout(() => {
+      if (chartContainer.value && chartCanvas.value) {
+        const { width, height } = chartContainer.value.getBoundingClientRect()
+        const dpr = window.devicePixelRatio || 1
+        
+        chartCanvas.value.width = width * dpr
+        chartCanvas.value.height = height * dpr
+        chartCanvas.value.style.width = `${width}px`
+        chartCanvas.value.style.height = `${height}px`
+        
+        drawChart()
+      }
+      resizeTimeout = null
+    }, 100) as unknown as number
+  }
+  
   window.addEventListener('resize', handleResize)
 })
 
@@ -346,15 +388,21 @@ onUnmounted(() => {
 
 // 监听主题变化
 watch(themeVars, () => {
-  console.log(t('chart.themeChanged'))
   drawChart()
 })
 
-// 处理窗口大小变化
+// 处理窗口大小变化，使用防抖优化
 const handleResize = () => {
   if (chartContainer.value && chartCanvas.value) {
-    console.log(t('chart.windowResized'))
-    initChart()
+    const { width, height } = chartContainer.value.getBoundingClientRect()
+    const dpr = window.devicePixelRatio || 1
+    
+    chartCanvas.value.width = width * dpr
+    chartCanvas.value.height = height * dpr
+    chartCanvas.value.style.width = `${width}px`
+    chartCanvas.value.style.height = `${height}px`
+    
+    drawChart()
   }
 }
 </script>
@@ -372,34 +420,37 @@ const handleResize = () => {
   flex-grow: 1;
   width: 100%;
   height: 100%;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.05));
 }
 
 .chart-legend {
   position: absolute;
-  top: 8px;
+  top: 12px;
   right: 16px;
   display: flex;
   gap: 16px;
   z-index: 1;
-  background-color: rgba(var(--n-body-color-rgb), 0.5);
-  border-radius: 8px;
-  padding: 6px 12px;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background-color: rgba(var(--n-body-color-rgb), 0.6);
+  border-radius: 10px;
+  padding: 8px 14px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(128, 128, 128, 0.1);
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
+  transform: translateZ(0);
 }
 
 .chart-legend:hover {
-  background-color: rgba(var(--n-body-color-rgb), 0.7);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background-color: rgba(var(--n-body-color-rgb), 0.8);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
 .legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--n-text-color-1);
 }
@@ -432,9 +483,9 @@ const handleResize = () => {
 @media (max-width: 768px) {
   .chart-legend {
     top: auto;
-    bottom: 10px;
-    right: 10px;
-    padding: 4px 10px;
+    bottom: 12px;
+    right: 12px;
+    padding: 6px 12px;
   }
 }
 </style>
