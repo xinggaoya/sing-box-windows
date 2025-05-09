@@ -448,14 +448,6 @@ const downloadTheKernel = async () => {
 // 开机自启动设置
 const onAutoStartChange = async (value: boolean) => {
   try {
-    // 检查管理员权限
-    const isAdmin = await tauriApi.system.checkAdmin()
-    if (!isAdmin) {
-      // 如果没有管理员权限，请求以管理员权限重启
-      await tauriApi.system.restartAsAdmin()
-      return
-    }
-
     if (value) {
       await enable()
       notification.success({
@@ -561,8 +553,7 @@ const initializeSettings = async () => {
   await Promise.all([
     updateStore.fetchAppVersion(),
     kernelStore.updateVersion(),
-    appDataDir().then(path => appDataPath.value = path),
-    tauriApi.system.checkAdmin()
+    appDataDir().then(path => appDataPath.value = path)
   ])
   
   // 检查更新（非阻塞）
