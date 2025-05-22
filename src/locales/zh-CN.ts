@@ -43,11 +43,11 @@ export default {
       manualTip: '需要手动配置系统代理',
       systemDescription: '自动配置系统代理设置，为浏览器和应用程序提供代理服务',
       tunDescription: '通过虚拟网卡捕获并代理所有系统流量，需要管理员权限',
-      manualDescription: '需要在应用程序和浏览器中手动配置代理设置'
+      manualDescription: '需要在应用程序和浏览器中手动配置代理设置',
     },
     proxyHeader: {
       flowMode: '流量代理模式',
-      nodeMode: '节点代理模式'
+      nodeMode: '节点代理模式',
     },
     adminStatus: {
       admin: '管理员',
@@ -70,7 +70,7 @@ export default {
       memory: '内存占用',
       connections: '活动连接',
       title: '流量统计',
-      connectionsLabel: '个连接'
+      connectionsLabel: '个连接',
     },
   },
   status: {
@@ -81,7 +81,7 @@ export default {
     restarting: '重启中',
     connecting: '连接中',
     disconnected: '已断开',
-    error: '错误'
+    error: '错误',
   },
   chart: {
     startUpdateTimer: '启动图表更新定时器',
@@ -134,7 +134,7 @@ export default {
       tun: 'TUN模式',
       unknown: '未知模式',
       globalDescription: '所有流量将无视目标地址，全部通过代理转发',
-      ruleDescription: '流量将根据路由规则和地理位置信息进行转发'
+      ruleDescription: '流量将根据路由规则和地理位置信息进行转发',
     },
   },
   sub: {
@@ -207,13 +207,13 @@ export default {
       info: '信息',
       warning: '警告',
       error: '错误',
-      success: '成功'
-    }
+      success: '成功',
+    },
   },
   setting: {
     title: '设置',
     general: {
-      title: '常规设置'
+      title: '常规设置',
     },
     theme: {
       title: '主题',
@@ -295,6 +295,18 @@ export default {
       ipVersionChanged: 'IP 版本已更改',
       ipv6Enabled: 'IPv6 支持已启用',
       ipv4Only: 'IPv4 优先模式已启用',
+      ports: '端口设置',
+      portsDesc: '配置代理端口和API端口',
+      configure: '配置',
+      portSettings: '端口设置',
+      proxyPort: '代理端口',
+      apiPort: 'API端口',
+      invalidPort: '端口号必须在1024-65535之间',
+      portConflict: '代理端口和API端口不能相同',
+      restartRequired: '需要重启',
+      restartDesc: '端口更改需要重启内核才能生效，是否立即重启？',
+      portChanged: '端口已更改',
+      portChangeSuccess: '端口设置已成功更新',
     },
     about: {
       title: '关于',
@@ -355,10 +367,11 @@ export default {
       updateNeeded: '服务需要更新',
       updateDescription: '检测到服务文件已更新，建议点击"更新服务"按钮进行更新',
       updateNeededAdmin: '服务需要更新 (需要管理员权限)',
-      updateDescriptionAdmin: '检测到服务文件已更新，请先以管理员身份重启应用程序，然后再点击"更新服务"按钮',
+      updateDescriptionAdmin:
+        '检测到服务文件已更新，请先以管理员身份重启应用程序，然后再点击"更新服务"按钮',
       needAdmin: '需要管理员',
       available: '有更新',
-    }
+    },
   },
   rules: {
     title: '规则管理',
@@ -439,6 +452,11 @@ export default {
     updateDownloaded: '更新已下载，即将安装',
     updateFailed: '更新失败',
     kernelFailed: '内核启动失败',
-    proxySetFailed: '设置代理失败'
+    proxySetFailed: '设置代理失败',
+    kernelStartFailed: '内核启动失败',
+    kernelAlreadyRunning: '检测到内核已经在运行',
+    tryingToConnectWebSocket: '正在尝试连接WebSocket服务',
+    webSocketConnected: 'WebSocket连接成功',
+    webSocketConnectionFailed: 'WebSocket连接失败，但内核仍在运行中',
   },
 }

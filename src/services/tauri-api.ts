@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { useAppStore } from '../stores/app/AppStore'
 
 // 定义接口类型
 interface ProxyData {
@@ -44,6 +45,9 @@ export const kernelApi = {
 
   // 启动WebSocket数据中继
   startWebsocketRelay: () => invoke<void>('start_websocket_relay'),
+
+  // 检查内核是否运行中
+  isKernelRunning: () => invoke<boolean>('is_kernel_running'),
 }
 
 // 代理模式相关接口
@@ -95,6 +99,19 @@ export const proxyApi = {
   setManualProxy: () => invoke<void>('set_manual_proxy'),
 }
 
+// 配置服务
+export const config = {
+  // 获取当前端口配置
+  getCurrentPortConfig: async () => {
+    return await invoke<{ proxyPort: number; apiPort: number }>('get_port_config')
+  },
+
+  // 更新端口配置
+  updatePortConfig: async (proxyPort: number, apiPort: number) => {
+    return await invoke<boolean>('update_port_config', { proxyPort, apiPort })
+  },
+}
+
 // 订阅相关接口
 export const subscriptionApi = {
   // 下载订阅
@@ -117,6 +134,7 @@ export const tauriApi = {
   kernel: kernelApi,
   proxy: proxyApi,
   subscription: subscriptionApi,
+  config: config,
 
   // 系统服务相关 API
   system: {
@@ -143,5 +161,89 @@ export const tauriApi = {
     downloadAndInstallUpdate: async (downloadUrl: string) => {
       return await invoke<void>('download_and_install_update', { downloadUrl })
     },
+  },
+}
+
+// 代理服务
+export const proxy = {
+  // 获取代理列表
+  getProxies: async () => {
+    const appStore = useAppStore()
+    return await invoke<unknown>('get_proxies', { apiPort: appStore.apiPort })
+  },
+
+  // 切换代理
+  changeProxy: async (group: string, proxy: string) => {
+    const appStore = useAppStore()
+    return await invoke<void>('change_proxy', { group, proxy, apiPort: appStore.apiPort })
+  },
+
+  // 测试节点延迟
+  testNodeDelay: async (proxy: string, server?: string) => {
+    const appStore = useAppStore()
+    return await invoke<void>('test_node_delay', { proxy, server, apiPort: appStore.apiPort })
+  },
+
+  // 测试节点组延迟
+  testGroupDelay: async (group: string, server?: string) => {
+    const appStore = useAppStore()
+    return await invoke<void>('test_group_delay', { group, server, apiPort: appStore.apiPort })
+  },
+
+  // 获取API Token
+  getApiToken: async () => {
+    return await invoke<string>('get_api_token')
+  },
+
+  // 切换IP版本
+  toggleIpVersion: async (preferIpv6: boolean) => {
+    return await invoke<void>('toggle_ip_version', { preferIpv6 })
+  },
+
+  // 设置系统代理
+  setSystemProxy: async () => {
+    const appStore = useAppStore()
+    return await invoke<void>('set_system_proxy', { proxyPort: appStore.proxyPort })
+  },
+
+  // 设置手动代理
+  setManualProxy: async () => {
+    const appStore = useAppStore()
+    return await invoke<void>('set_manual_proxy', { proxyPort: appStore.proxyPort })
+  },
+}
+
+// 订阅服务
+export const subscription = {
+  // 下载订阅
+  downloadSubscription: async (url: string, useOriginalConfig: boolean) => {
+    const appStore = useAppStore()
+    return await invoke<void>('download_subscription', {
+      url,
+      useOriginalConfig,
+      proxyPort: appStore.proxyPort,
+      apiPort: appStore.apiPort,
+    })
+  },
+
+  // 手动添加订阅
+  addManualSubscription: async (content: string, useOriginalConfig: boolean) => {
+    const appStore = useAppStore()
+    return await invoke<void>('add_manual_subscription', {
+      content,
+      useOriginalConfig,
+      proxyPort: appStore.proxyPort,
+      apiPort: appStore.apiPort,
+    })
+  },
+
+  // 切换代理模式
+  toggleProxyMode: async (mode: string) => {
+    return await invoke<string>('toggle_proxy_mode', { mode })
+  },
+
+  // 获取当前代理模式
+  getCurrentProxyMode: async () => {
+    return await invoke<string>('get_current_proxy_mode')
   },
 }

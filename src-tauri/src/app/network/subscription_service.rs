@@ -18,13 +18,19 @@ pub async fn download_subscription(
     url: String,
     use_original_config: bool,
     window: tauri::Window,
+    proxy_port: Option<u16>,
+    api_port: Option<u16>,
 ) -> Result<(), String> {
     let app_handle = window.app_handle();
 
-    download_and_process_subscription(url, use_original_config, app_handle.clone())
+    download_and_process_subscription(url, use_original_config, app_handle.clone(), proxy_port, api_port)
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
-    let _ = crate::app::proxy_service::set_system_proxy();
+    
+    // 使用传入的代理端口
+    if let Some(port) = proxy_port {
+        let _ = crate::app::core::proxy_service::set_system_proxy(port);
+    }
     Ok(())
 }
 
@@ -34,12 +40,18 @@ pub async fn add_manual_subscription(
     content: String,
     use_original_config: bool,
     window: tauri::Window,
+    proxy_port: Option<u16>,
+    api_port: Option<u16>,
 ) -> Result<(), String> {
     let app_handle = window.app_handle();
 
-    process_subscription_content(content, use_original_config, app_handle.clone())
+    process_subscription_content(content, use_original_config, app_handle.clone(), proxy_port, api_port)
         .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
-    let _ = crate::app::proxy_service::set_system_proxy();
+    
+    // 使用传入的代理端口
+    if let Some(port) = proxy_port {
+        let _ = crate::app::core::proxy_service::set_system_proxy(port);
+    }
     Ok(())
 }
 
@@ -122,6 +134,8 @@ async fn download_and_process_subscription(
     url: String,
     use_original_config: bool,
     _app_handle: tauri::AppHandle,
+    proxy_port: Option<u16>,
+    api_port: Option<u16>,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir();
@@ -174,7 +188,7 @@ async fn download_and_process_subscription(
     // 如果使用原始配置，直接处理原始内容
     if use_original_config {
         info!("使用原始订阅内容，仅修改必要的端口和地址");
-        process_original_config(&response_text, _app_handle)?;
+        process_original_config(&response_text, _app_handle, proxy_port, api_port)?;
         return Ok(());
     }
 
@@ -968,6 +982,8 @@ fn process_subscription_content(
     content: String,
     use_original_config: bool,
     _app_handle: tauri::AppHandle,
+    proxy_port: Option<u16>,
+    api_port: Option<u16>,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir();
@@ -987,7 +1003,7 @@ fn process_subscription_content(
     // 如果使用原始配置，直接处理原始内容
     if use_original_config {
         info!("使用原始订阅内容，仅修改必要的端口和地址");
-        process_original_config(&content, _app_handle)?;
+        process_original_config(&content, _app_handle, proxy_port, api_port)?;
         return Ok(());
     }
 
@@ -1125,8 +1141,14 @@ fn process_subscription_content(
 fn process_original_config(
     content: &str,
     _app_handle: tauri::AppHandle,
+    proxy_port: Option<u16>,
+    api_port: Option<u16>,
 ) -> Result<(), Box<dyn Error>> {
     info!("处理原始订阅配置...");
+
+    // 获取端口
+    let proxy_port = proxy_port.unwrap_or_else(|| crate::app::system::config_service::get_proxy_port());
+    let api_port = api_port.unwrap_or_else(|| crate::app::system::config_service::get_api_port());
 
     // 解析内容为JSON
     let content_cleaned = clean_json_content(content);
@@ -1170,13 +1192,10 @@ fn process_original_config(
                 let clash_api = exp_obj.entry("clash_api").or_insert(json!({}));
 
                 if let Some(clash_api_obj) = clash_api.as_object_mut() {
-                    // 设置external_controller为本地端口
+                    // 设置external_controller为本地端口，使用传入的端口
                     clash_api_obj.insert(
                         "external_controller".to_string(),
-                        json!(format!(
-                            "127.0.0.1:{}",
-                            network_config::DEFAULT_CLASH_API_PORT
-                        )),
+                        json!(format!("127.0.0.1:{}", api_port)),
                     );
 
                     // 添加external_ui配置
@@ -1189,17 +1208,30 @@ fn process_original_config(
                 }
             }
         } else {
-            // 如果不存在experimental字段，添加它
+            // 如果不存在experimental字段，添加它，使用传入的端口
             config_obj.insert(
                 "experimental".to_string(), 
                 json!({
                     "clash_api": {
-                        "external_controller": format!("127.0.0.1:{}", network_config::DEFAULT_CLASH_API_PORT),
+                        "external_controller": format!("127.0.0.1:{}", api_port),
                         "external_ui": "metacubexd",
                         "default_mode": "rule"
                     }
                 })
             );
+        }
+        
+        // 修改入站端口（如果有inbounds）
+        if let Some(inbounds) = config_obj.get_mut("inbounds") {
+            if let Some(inbounds_array) = inbounds.as_array_mut() {
+                for inbound in inbounds_array {
+                    if let Some(inbound_obj) = inbound.as_object_mut() {
+                        if inbound_obj.get("tag").and_then(|t| t.as_str()) == Some("mixed-in") {
+                            inbound_obj.insert("listen_port".to_string(), json!(proxy_port));
+                        }
+                    }
+                }
+            }
         }
     }
 

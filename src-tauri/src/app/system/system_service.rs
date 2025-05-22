@@ -96,3 +96,27 @@ pub fn check_admin() -> bool {
 pub fn exit_application(app_handle: tauri::AppHandle) {
     app_handle.exit(0);
 }
+
+// 安装Windows服务
+#[tauri::command]
+pub fn install_service() -> Result<(), String> {
+    tracing::info!("安装Windows服务");
+    // 实现安装服务的逻辑
+    Ok(())
+}
+
+// 卸载Windows服务
+#[tauri::command]
+pub fn uninstall_service() -> Result<(), String> {
+    tracing::info!("卸载Windows服务");
+    // 实现卸载服务的逻辑
+    Ok(())
+}
+
+// 检查服务状态
+#[tauri::command]
+pub fn check_service_status() -> Result<bool, String> {
+    tracing::info!("检查服务状态");
+    // 实现检查服务状态的逻辑
+    Ok(false)
+}

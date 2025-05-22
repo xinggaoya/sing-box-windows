@@ -107,7 +107,8 @@ pub async fn start_kernel(_proxy_mode: Option<String>) -> Result<(), String> {
                 .build()
                 .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
             
-            let url = format!("http://127.0.0.1:{}/version?token=", network_config::DEFAULT_CLASH_API_PORT);
+            let api_port = crate::app::system::config_service::get_api_port();
+            let url = format!("http://127.0.0.1:{}/version?token=", api_port);
             
             // 内核启动检查的最大时间（秒）
             let max_check_time_secs = 20;
@@ -376,13 +377,14 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
-    let token = crate::app::proxy_service::get_api_token();
+    let api_port = crate::app::system::config_service::get_api_port();
+    let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
     let _handle = task::spawn(async move {
         let url = Url::parse(&format!(
             "ws://127.0.0.1:{}/traffic?token={}",
-            network_config::DEFAULT_CLASH_API_PORT,
+            api_port,
             token
         ))
         .unwrap();
@@ -464,13 +466,14 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
-    let token = crate::app::proxy_service::get_api_token();
+    let api_port = crate::app::system::config_service::get_api_port();
+    let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
     let _handle = task::spawn(async move {
         let url = Url::parse(&format!(
             "ws://127.0.0.1:{}/memory?token={}",
-            network_config::DEFAULT_CLASH_API_PORT,
+            api_port,
             token
         ))
         .unwrap();
@@ -552,13 +555,14 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
-    let token = crate::app::proxy_service::get_api_token();
+    let api_port = crate::app::system::config_service::get_api_port();
+    let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
     let _handle = task::spawn(async move {
         let url = Url::parse(&format!(
             "ws://127.0.0.1:{}/logs?token={}",
-            network_config::DEFAULT_CLASH_API_PORT,
+            api_port,
             token
         ))
         .unwrap();
@@ -640,13 +644,14 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
-    let token = crate::app::proxy_service::get_api_token();
+    let api_port = crate::app::system::config_service::get_api_port();
+    let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
     let _handle = task::spawn(async move {
         let url = Url::parse(&format!(
             "ws://127.0.0.1:{}/connections?token={}",
-            network_config::DEFAULT_CLASH_API_PORT,
+            api_port,
             token
         ))
         .unwrap();
@@ -721,5 +726,23 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), St
     });
 
     Ok(())
+}
+
+// 检查内核是否正在运行
+#[tauri::command]
+pub async fn is_kernel_running() -> Result<bool, String> {
+    // 通过tasklist命令检查sing-box.exe是否在运行
+    let output = std::process::Command::new("tasklist")
+        .args(&["/FI", "IMAGENAME eq sing-box.exe", "/FO", "CSV", "/NH"])
+        .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| format!("检查内核进程失败: {}", e))?;
+    
+    // 检查输出中是否包含sing-box.exe
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let is_running = stdout.contains("sing-box.exe");
+    
+    info!("内核运行状态检查: {}", is_running);
+    Ok(is_running)
 }
 

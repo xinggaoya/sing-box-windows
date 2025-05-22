@@ -1,7 +1,7 @@
 <template>
   <div class="home-container">
     <!-- 顶部状态卡片 -->
-    <StatusCard 
+    <StatusCard
       :is-running="appState.isRunning"
       :ws-connected="appState.wsConnected"
       :is-admin="isAdmin"
@@ -39,7 +39,7 @@
     </div>
 
     <!-- 流量数据卡片 -->
-    <TrafficStatsCard 
+    <TrafficStatsCard
       :active-connections-count="activeConnectionsCount"
       :traffic-up="trafficStore.traffic.up"
       :traffic-down="trafficStore.traffic.down"
@@ -61,7 +61,10 @@
           <n-icon size="22" class="modal-icon">
             <information-circle-outline />
           </n-icon>
-          <span>{{ t('proxy.switchTo') }}{{ targetNodeProxyMode ? getNodeProxyModeText(targetNodeProxyMode) : '' }}</span>
+          <span
+            >{{ t('proxy.switchTo')
+            }}{{ targetNodeProxyMode ? getNodeProxyModeText(targetNodeProxyMode) : '' }}</span
+          >
         </div>
       </template>
       <div class="modal-content">{{ t('proxy.switchModeConfirm') }}</div>
@@ -196,7 +199,7 @@ watch(
     if (newMode !== currentProxyMode.value) {
       currentProxyMode.value = newMode
     }
-  }
+  },
 )
 
 // 为节点代理模式添加监听
@@ -240,10 +243,10 @@ const handleNodeProxyModeChange = (key: string) => {
   // 保存当前选中项，以便用户取消时恢复
   const prevMode = currentNodeProxyMode.value
   targetNodeProxyMode.value = key
-  
+
   // 打开确认对话框
   showNodeModeChangeModal.value = true
-  
+
   // 如果用户取消操作，恢复之前的选择
   const unwatch = watch(showNodeModeChangeModal, (isVisible) => {
     if (!isVisible && !isChangingNodeMode.value) {
@@ -307,7 +310,7 @@ const runKernel = async () => {
     isStarting.value = true
     // 确保当前模式已设置到appStore
     appState.setProxyMode(currentProxyMode.value)
-    
+
     // 检查TUN模式下是否需要管理员权限
     if (currentProxyMode.value === 'tun' && !isAdmin.value) {
       dialog.warning({
@@ -317,22 +320,22 @@ const runKernel = async () => {
         negativeText: t('common.cancel'),
         onPositiveClick: async () => {
           await restartAsAdmin()
-        }
+        },
       })
       isStarting.value = false
       return
     }
-    
+
     // 显示启动中提示
     message.info(t('notification.startingKernel'))
-    
+
     // 监听启动失败事件
     const onStartFailed = (event: { error: string }) => {
       message.error(event.error)
       mitt.off('kernel-start-failed', onStartFailed)
     }
     mitt.on('kernel-start-failed', onStartFailed)
-    
+
     // 监听连接状态变化
     const onConnectionChange = (isConnecting: boolean) => {
       if (isConnecting) {
@@ -340,32 +343,66 @@ const runKernel = async () => {
       }
     }
     mitt.on('connecting-status-changed', onConnectionChange)
-    
+
     // 尝试启动内核
-    await kernelStore.startKernel()
-    
-    // 启动成功，显示提示
-    if (appState.isRunning && appState.wsConnected) {
+    try {
+      await kernelStore.startKernel()
       message.success(t('notification.kernelStarted'))
+      return // 成功启动则直接返回
+    } catch (startError) {
+      // 启动失败，检查内核是否已经在运行
+      const isKernelRunning = await tauriApi.kernel.isKernelRunning().catch(() => false)
+
+      if (isKernelRunning) {
+        // 内核已经在运行，但可能WebSocket连接有问题
+        message.info(t('notification.kernelAlreadyRunning'))
+
+        // 设置内核运行状态为true
+        appState.setRunningState(true)
+
+        // 尝试一次WebSocket连接
+        if (!appState.wsConnected) {
+          message.info(t('notification.tryingToConnectWebSocket'))
+
+          // 禁用WebSocket重试，避免循环
+          const wsConnected = await kernelStore.setupWebsocketConnection().catch(() => false)
+
+          if (wsConnected) {
+            message.success(t('notification.webSocketConnected'))
+          } else {
+            message.warning(t('notification.webSocketConnectionFailed'))
+            // 即使WebSocket连接失败，仍然保持内核运行状态
+          }
+        }
+
+        return // 内核运行状态已设置，直接返回
+      }
+
+      // 如果内核不在运行，继续抛出错误让catch处理
+      throw startError
     }
   } catch (error) {
     // 处理已知错误
-    let errorMessage = typeof error === 'string' ? error : 
-                       error instanceof Error ? error.message : 
-                       t('notification.unknownError')
-    
+    let errorMessage =
+      typeof error === 'string'
+        ? error
+        : error instanceof Error
+          ? error.message
+          : t('notification.unknownError')
+
     // 如果错误信息太长，截取一部分
     if (errorMessage.length > 150) {
       errorMessage = errorMessage.substring(0, 150) + '...'
     }
-    
+
     // 显示错误并带有详细说明
     dialog.error({
       title: t('notification.startFailed'),
       content: `${errorMessage}\n\n${t('notification.checkTheFollowing')}:\n1. ${t('notification.checkConfig')}\n2. ${t('notification.checkNetwork')}\n3. ${t('notification.checkPermissions')}`,
-      positiveText: t('common.ok')
+      positiveText: t('common.ok'),
     })
-    
+
+    // 确保内核状态设为关闭
     appState.setRunningState(false)
   } finally {
     isStarting.value = false
@@ -405,7 +442,7 @@ const onModeChange = async (value: string) => {
 
   try {
     isSwitching.value = true
-    
+
     // 检查如果切换到TUN模式且不是管理员权限，则先提示
     if (value === 'tun' && !isAdmin.value) {
       dialog.warning({
@@ -420,11 +457,11 @@ const onModeChange = async (value: string) => {
           // 取消操作，恢复之前的选择
           currentProxyMode.value = appState.proxyMode
           isSwitching.value = false
-        }
+        },
       })
       return
     }
-    
+
     // 切换模式
     let needClose = false
     let modeChanged = false
@@ -623,7 +660,7 @@ onUnmounted(() => {
     padding: 12px 8px;
     gap: 12px;
   }
-  
+
   .proxy-modes-container {
     grid-template-columns: 1fr;
     gap: 12px;

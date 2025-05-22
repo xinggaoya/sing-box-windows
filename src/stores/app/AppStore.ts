@@ -70,7 +70,11 @@ export const useAppStore = defineStore(
     const preferIpv6 = ref(false)
 
     // 连接检查超时处理
-    let connectionCheckTimeout: number | null = null;
+    let connectionCheckTimeout: number | null = null
+
+    // 端口配置
+    const proxyPort = ref(12080) // 代理端口
+    const apiPort = ref(12081) // API端口
 
     onMounted(async () => {
       autoStartApp.value = await isEnabled()
@@ -139,9 +143,31 @@ export const useAppStore = defineStore(
         clearTimeout(connectionCheckTimeout)
       }
 
+      // 只在isRunning为true时才执行WebSocket检查
+      if (!isRunning.value) return
+
       // 启动连接检查
       connectionCheckTimeout = window.setTimeout(async () => {
         try {
+          // 首先检查内核是否真的在运行
+          let kernelRunning = false
+          try {
+            // 这里使用导入的tauriApi而不是依赖注入，避免循环依赖问题
+            const { invoke } = await import('@tauri-apps/api/core')
+            kernelRunning = await invoke<boolean>('is_kernel_running').catch(() => false)
+          } catch (e) {
+            console.error('内核运行状态检查失败:', e)
+          }
+
+          // 如果内核没有运行，则设置状态为未运行并退出
+          if (!kernelRunning) {
+            console.log('检测到内核未运行，设置状态为stopped')
+            isRunning.value = false
+            wsConnected.value = false
+            mitt.emit('process-status')
+            return
+          }
+
           // 获取WebSocket服务实例
           const wsService = WebSocketService.getInstance()
           // 检查WebSocket连接状态
@@ -149,33 +175,37 @@ export const useAppStore = defineStore(
           const connectionStore = useConnectionStore()
 
           // 如果连接状态正常，则确认运行状态
-          if (trafficStore.connectionState.connected || connectionStore.connectionsState.connected) {
+          if (
+            trafficStore.connectionState.connected ||
+            connectionStore.connectionsState.connected
+          ) {
             wsConnected.value = true
-          } else {
-            // 如果连接状态异常，尝试重新建立连接
-            console.log('内核启动但WebSocket未连接，尝试建立连接...')
-            await Promise.allSettled([
-              trafficStore.setupTrafficListener(),
-              connectionStore.setupConnectionsListener(),
-              connectionStore.setupMemoryListener()
-            ])
+            return // 连接正常，不需要继续处理
+          }
 
-            // 再次检查连接状态
-            if (trafficStore.connectionState.connected || connectionStore.connectionsState.connected) {
-              wsConnected.value = true
-            } else {
-              // 如果仍然无法连接，认为内核未正常启动
-              console.error('无法建立WebSocket连接，内核可能未正常启动')
-              isRunning.value = false
-              wsConnected.value = false
-              mitt.emit('process-status')
-            }
+          // 最多尝试一次WebSocket重连
+          console.log('内核运行但WebSocket未连接，尝试建立连接...')
+          await Promise.allSettled([
+            trafficStore.setupTrafficListener().catch(() => {}),
+            connectionStore.setupConnectionsListener().catch(() => {}),
+            connectionStore.setupMemoryListener().catch(() => {}),
+          ])
+
+          // 再次检查连接状态
+          if (
+            trafficStore.connectionState.connected ||
+            connectionStore.connectionsState.connected
+          ) {
+            wsConnected.value = true
+            console.log('WebSocket重连成功')
+          } else {
+            // 即使WebSocket连接失败，只要内核确认在运行，也保持运行状态
+            console.warn('WebSocket连接失败，但内核仍在运行')
+            // 不改变isRunning状态，保持内核运行状态
           }
         } catch (error) {
           console.error('WebSocket连接检查失败:', error)
-          isRunning.value = false
-          wsConnected.value = false
-          mitt.emit('process-status')
+          // 不自动设置内核状态，避免循环重试
         }
       }, 2000) // 给内核2秒时间启动
     }
@@ -212,6 +242,12 @@ export const useAppStore = defineStore(
       proxyMode.value = mode
     }
 
+    // 更新端口配置
+    const updatePorts = (newProxyPort: number, newApiPort: number) => {
+      proxyPort.value = newProxyPort
+      apiPort.value = newApiPort
+    }
+
     return {
       isRunning,
       wsConnected,
@@ -221,6 +257,8 @@ export const useAppStore = defineStore(
       autoStartApp,
       autoStartKernel,
       preferIpv6,
+      proxyPort,
+      apiPort,
       setRunningState,
       setConnectingState,
       toggleAutoStart,
@@ -231,10 +269,11 @@ export const useAppStore = defineStore(
       showSuccessMessage,
       showErrorMessage,
       showWarningMessage,
-      showInfoMessage
+      showInfoMessage,
+      updatePorts,
     }
   },
   {
     persist: true,
-  }
+  },
 )
