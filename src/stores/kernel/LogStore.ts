@@ -139,16 +139,7 @@ export const useLogStore = defineStore(
         mittListenerSet = false
       }
     }
-    
-    // 添加内部日志测试功能，用于调试
-    const addTestLog = (count: number = 1) => {
-      for (let i = 0; i < count; i++) {
-        const types = ['info', 'success', 'warning', 'error']
-        const type = types[Math.floor(Math.random() * types.length)]
-        addLog(type, `测试日志 #${i+1}: ${new Date().toLocaleTimeString()}`)
-      }
-    }
-    
+
     // 组件卸载时清理监听器
     onUnmounted(() => {
       cleanupListeners()
@@ -167,8 +158,7 @@ export const useLogStore = defineStore(
       setMessageCallback,
       showMessage,
       setupLogListener,
-      cleanupListeners,
-      addTestLog
+      cleanupListeners
     }
   }
 )

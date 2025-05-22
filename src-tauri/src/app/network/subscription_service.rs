@@ -91,7 +91,7 @@ pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
     }
 
     // 修改配置文件
-    match modify_default_mode(&path, mode.clone()) {
+    match modify_default_mode(&path, mode.clone(), None) {
         Ok(_) => {
             info!("代理模式已切换为: {}", mode);
             Ok(format!("代理模式已切换为: {}", mode))
@@ -104,17 +104,20 @@ pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
 }
 
 // 修改配置文件中的default_mode
-fn modify_default_mode(config_path: &Path, mode: String) -> Result<(), Box<dyn Error>> {
+fn modify_default_mode(config_path: &Path, mode: String, api_port: Option<u16>) -> Result<(), Box<dyn Error>> {
     // 读取现有配置
     let mut json_util = ConfigUtil::new(config_path.to_str().unwrap())?;
 
     // 而是直接创建新的配置并修改
     let target_keys = vec!["experimental"];
 
+    // 使用传入的 api_port 或使用默认值
+    let port = api_port.unwrap_or(network_config::DEFAULT_API_PORT);
+
     // 创建新的配置，设置mode
     let config = Config {
         clash_api: ClashApiConfig {
-            external_controller: format!("127.0.0.1:{}", network_config::DEFAULT_CLASH_API_PORT),
+            external_controller: format!("127.0.0.1:{}", port),
             external_ui: "metacubexd".to_string(),
             external_ui_download_url: "".to_string(),
             external_ui_download_detour: "手动切换".to_string(),

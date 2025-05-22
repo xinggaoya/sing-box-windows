@@ -54,7 +54,7 @@
           />
         </div>
         <n-empty v-else :description="searchQuery || typeFilter || proxyFilter ? t('rules.noMatchingRules') : t('rules.noRules')" />
-        
+
         <div class="stats-bar">
           <n-tag type="info" size="small">{{ t('rules.totalRules') }}: {{ rules.length }}</n-tag>
           <n-tag v-if="searchQuery || typeFilter || proxyFilter" type="success" size="small">
@@ -91,18 +91,18 @@ const proxyFilter = ref(null)
 // 计算筛选后的规则
 const filteredRules = computed(() => {
   return rules.value.filter(rule => {
-    const matchesSearch = !searchQuery.value || 
+    const matchesSearch = !searchQuery.value ||
       rule.payload.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       rule.proxy.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       rule.type.toLowerCase().includes(searchQuery.value.toLowerCase())
-    
+
     const matchesType = !typeFilter.value || rule.type === typeFilter.value
-    
-    const matchesProxy = !proxyFilter.value || 
+
+    const matchesProxy = !proxyFilter.value ||
       (proxyFilter.value === 'direct' && rule.proxy === t('rules.directConnect')) ||
       (proxyFilter.value === 'reject' && rule.proxy === 'reject') ||
       (proxyFilter.value !== 'direct' && proxyFilter.value !== 'reject' && rule.proxy.includes(proxyFilter.value))
-    
+
     return matchesSearch && matchesType && matchesProxy
   })
 })
@@ -116,23 +116,23 @@ const typeOptions = computed(() => {
 // 代理过滤选项
 const proxyOptions = computed(() => {
   const proxies = new Set<string>()
-  
+
   // 添加常见特殊代理
   proxies.add('direct')
   proxies.add('reject')
-  
+
   // 添加其他代理
   rules.value.forEach(rule => {
     let proxyName = rule.proxy
     if (proxyName.startsWith('route(') && proxyName.endsWith(')')) {
       proxyName = proxyName.substring(6, proxyName.length - 1)
     }
-    
+
     if (proxyName !== t('rules.directConnect') && proxyName !== 'reject') {
       proxies.add(proxyName)
     }
   })
-  
+
   return [
     { label: t('rules.directConnect'), value: 'direct' },
     { label: '拦截', value: 'reject' },
@@ -196,21 +196,21 @@ const columns: DataTableColumns<Rule> = [
           }),
         ])
       }
-      
+
       // 高亮搜索关键字
       if (searchQuery.value && row.payload.toLowerCase().includes(searchQuery.value.toLowerCase())) {
         const index = row.payload.toLowerCase().indexOf(searchQuery.value.toLowerCase())
         const beforeMatch = row.payload.substring(0, index)
         const match = row.payload.substring(index, index + searchQuery.value.length)
         const afterMatch = row.payload.substring(index + searchQuery.value.length)
-        
+
         return h('div', {}, [
           beforeMatch,
           h('span', { style: { backgroundColor: 'rgba(var(--primary-color), 0.1)', fontWeight: 'bold' } }, match),
           afterMatch
         ])
       }
-      
+
       return row.payload
     },
   },

@@ -24,7 +24,9 @@
                 class="refresh-button"
               >
                 <template #icon>
-                  <n-icon><refresh-outline /></n-icon>
+                  <n-icon>
+                    <refresh-outline />
+                  </n-icon>
                 </template>
               </n-button>
             </template>
@@ -50,19 +52,25 @@
                 <n-space :size="10" wrap-item>
                   <n-tag :bordered="false" type="success" size="small" class="proxy-tag">
                     <template #icon>
-                      <n-icon size="14"><checkmark-circle-outline /></n-icon>
+                      <n-icon size="14">
+                        <checkmark-circle-outline />
+                      </n-icon>
                     </template>
                     {{ t('proxy.currentNode') }}: {{ group.now }}
                   </n-tag>
                   <n-tag :bordered="false" type="info" size="small" class="proxy-tag">
                     <template #icon>
-                      <n-icon size="14"><layers-outline /></n-icon>
+                      <n-icon size="14">
+                        <layers-outline />
+                      </n-icon>
                     </template>
                     {{ group.all.length }} {{ t('proxy.nodeCount') }}
                   </n-tag>
                   <n-tag :bordered="false" type="warning" size="small" class="proxy-tag">
                     <template #icon>
-                      <n-icon size="14"><information-circle-outline /></n-icon>
+                      <n-icon size="14">
+                        <information-circle-outline />
+                      </n-icon>
                     </template>
                     {{ group.type }}
                   </n-tag>
@@ -75,7 +83,9 @@
                     class="proxy-button"
                   >
                     <template #icon>
-                      <n-icon><speedometer-outline /></n-icon>
+                      <n-icon>
+                        <speedometer-outline />
+                      </n-icon>
                     </template>
                     {{ t('proxy.speedTest') }}
                   </n-button>
@@ -83,11 +93,7 @@
               </div>
 
               <div class="proxy-grid">
-                <div 
-                  v-for="(proxy, i) in group.all" 
-                  :key="i"
-                  class="proxy-grid-item"
-                >
+                <div v-for="(proxy, i) in group.all" :key="i" class="proxy-grid-item">
                   <n-card
                     :class="{
                       'proxy-node-card': true,
@@ -103,7 +109,7 @@
                           {{ proxy }}
                         </n-ellipsis>
                       </div>
-                      
+
                       <!-- 底部操作区 -->
                       <div class="proxy-card-footer">
                         <!-- 延迟标签 -->
@@ -119,7 +125,7 @@
                         >
                           {{ getNodeStatusText(proxy) }}
                         </n-tag>
-                        
+
                         <!-- 切换按钮 -->
                         <n-button
                           @click="changeProxy(group.name, proxy)"
@@ -169,6 +175,7 @@ import { Component } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores'
 
 // 接口定义
 interface ProxyHistory {
@@ -209,6 +216,7 @@ const message = useMessage()
 const isLoading = ref(false)
 const { width } = useWindowSize()
 const { t } = useI18n()
+const appStore = useAppStore()
 
 // 代理数据
 const rawProxies = ref<Record<string, ProxyData>>({})
@@ -279,15 +287,15 @@ const setupEventListeners = async () => {
   unlistenTestComplete = await listen('test-nodes-complete', () => {
     message.success(t('proxy.batchTestComplete'))
   })
-  
+
   // 添加节点测试结果监听
   unlistenNodeResult = await listen('test-node-result', (event) => {
     const data = event.payload as TestNodeResult
     const { proxy, success, delay, error } = data
-    
+
     // 取消该节点的加载状态
     testingNodes[proxy] = false
-    
+
     if (success) {
       if (delay !== undefined) {
         // 更新节点延迟
@@ -311,7 +319,8 @@ const init = async () => {
   isLoading.value = true
   try {
     // 使用Tauri API获取代理信息
-    const data = await tauriApi.proxy.getProxies()
+
+    const data = await tauriApi.proxy.getProxies(appStore.apiPort)
     rawProxies.value = data.proxies
 
     // 提取代理组
@@ -358,10 +367,10 @@ const init = async () => {
 const getNodeStatusType = (name: string): string => {
   // 如果节点有错误，返回错误状态
   if (nodeErrors[name]) return 'error'
-  
+
   // 如果节点正在测试中
   if (testingNodes[name]) return 'info'
-  
+
   // 否则根据延迟返回状态
   const delay = testResults[name] || 0
   if (delay === 0) return 'default'
@@ -379,10 +388,10 @@ const getNodeStatusType = (name: string): string => {
 const getNodeStatusText = (name: string): string => {
   // 如果节点正在测试中
   if (testingNodes[name]) return t('proxy.testing')
-  
+
   // 如果节点有错误
   if (nodeErrors[name]) return t('proxy.timeout')
-  
+
   // 否则显示延迟
   const delay = testResults[name] || 0
   if (delay === 0) return t('proxy.notTested')
@@ -405,17 +414,17 @@ const isRealNode = (name: string): boolean => {
  */
 const testSingleNode = async (proxy: string) => {
   if (testingNodes[proxy]) return
-  
+
   // 设置测试中状态
   testingNodes[proxy] = true
-  
+
   try {
     // 清除之前的错误信息
     delete nodeErrors[proxy]
-    
+
     // 调用后端API测试节点
     await tauriApi.proxy.testNodeDelay(proxy)
-    
+
     // 注意：此时不设置 testingNodes[proxy] = false
     // 因为这将由事件监听器在收到结果时设置
   } catch (error) {
@@ -435,7 +444,7 @@ const testNodeDelay = async (group: string) => {
 
   testingGroup.value = group
   try {
-    await tauriApi.proxy.testGroupDelay(group)
+    await tauriApi.proxy.testGroupDelay(group, appStore.apiPort)
   } catch (error) {
     console.error(t('proxy.testFailed'), error)
     message.error(t('proxy.testErrorMessage'))
@@ -669,12 +678,12 @@ const changeProxy = async (group: string, proxy: string) => {
   .proxy-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .proxy-tag {
     height: 24px;
     font-size: 12px;
   }
-  
+
   .switch-button {
     height: 26px;
     font-size: 12px;

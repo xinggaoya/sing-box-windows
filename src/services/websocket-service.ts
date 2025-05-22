@@ -3,6 +3,7 @@ import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useLogStore } from '@/stores/kernel/LogStore'
 import { useAppStore } from '@/stores/app/AppStore'
+import { useProxyStore } from '@/stores/kernel/ProxyStore'
 import mitt from '@/utils/mitt'
 
 /**
@@ -25,6 +26,8 @@ export class WebSocketService {
   private trafficWs: WebSocket | null = null
   private logWs: WebSocket | null = null
   private memoryWs: WebSocket | null = null
+  private proxyWs: WebSocket | null = null
+  private rulesWs: WebSocket | null = null
 
   // 连接状态跟踪
   private hasActiveConnection: boolean = false
@@ -34,6 +37,8 @@ export class WebSocketService {
   private trafficIsClosing: boolean = false
   private logIsClosing: boolean = false
   private memoryIsClosing: boolean = false
+  private proxyIsClosing: boolean = false
+  private rulesIsClosing: boolean = false
 
   // 重连计时器
   private reconnectTimers: Record<string, number | null> = {
@@ -41,6 +46,8 @@ export class WebSocketService {
     traffic: null,
     logs: null,
     memory: null,
+    proxy: null,
+    rules: null,
   }
 
   // 记录监听器移除函数
@@ -49,6 +56,8 @@ export class WebSocketService {
     traffic: null,
     logs: null,
     memory: null,
+    proxy: null,
+    rules: null,
   }
 
   private constructor() {}
@@ -117,7 +126,9 @@ export class WebSocketService {
       this.connectionWs !== null ||
       this.trafficWs !== null ||
       this.logWs !== null ||
-      this.memoryWs !== null
+      this.memoryWs !== null ||
+      this.proxyWs !== null ||
+      this.rulesWs !== null
 
     if (this.hasActiveConnection !== isConnected) {
       this.updateConnectionStatus(isConnected)
@@ -152,7 +163,7 @@ export class WebSocketService {
 
   /**
    * 连接特定类型的WebSocket
-   * @param type WebSocket类型: 'connections' | 'traffic' | 'logs' | 'memory'
+   * @param type WebSocket类型: 'connections' | 'traffic' | 'logs' | 'memory' | 'proxy' | 'rules'
    * @returns 是否连接成功
    */
   public async connect(type: string): Promise<boolean> {
@@ -183,6 +194,13 @@ export class WebSocketService {
         case 'memory':
           const memoryStore = useConnectionStore()
           result = await this.setupMemoryListener(memoryStore)
+          break
+        case 'proxy':
+          const proxyStore = useProxyStore()
+          result = await this.setupProxyListener(proxyStore)
+          break
+        case 'rules':
+          result = await this.setupRulesListener()
           break
         default:
           return false
@@ -217,6 +235,10 @@ export class WebSocketService {
         return this.logIsClosing
       case 'memory':
         return this.memoryIsClosing
+      case 'proxy':
+        return this.proxyIsClosing
+      case 'rules':
+        return this.rulesIsClosing
       default:
         return false
     }
@@ -239,6 +261,12 @@ export class WebSocketService {
       case 'memory':
         this.memoryIsClosing = isClosing
         break
+      case 'proxy':
+        this.proxyIsClosing = isClosing
+        break
+      case 'rules':
+        this.rulesIsClosing = isClosing
+        break
     }
   }
 
@@ -255,7 +283,7 @@ export class WebSocketService {
 
   /**
    * 断开特定类型的WebSocket连接
-   * @param type WebSocket类型: 'connections' | 'traffic' | 'logs' | 'memory'
+   * @param type WebSocket类型: 'connections' | 'traffic' | 'logs' | 'memory' | 'proxy' | 'rules'
    */
   public async disconnect(type: string): Promise<void> {
     // 清除重连计时器
@@ -281,6 +309,14 @@ export class WebSocketService {
       case 'memory':
         ws = this.memoryWs
         isClosing = this.memoryIsClosing
+        break
+      case 'proxy':
+        ws = this.proxyWs
+        isClosing = this.proxyIsClosing
+        break
+      case 'rules':
+        ws = this.rulesWs
+        isClosing = this.rulesIsClosing
         break
       default:
         return
@@ -325,6 +361,12 @@ export class WebSocketService {
         case 'memory':
           this.memoryWs = null
           break
+        case 'proxy':
+          this.proxyWs = null
+          break
+        case 'rules':
+          this.rulesWs = null
+          break
       }
 
       // 重置关闭状态
@@ -353,6 +395,14 @@ export class WebSocketService {
           this.memoryWs = null
           this.setClosingState('memory', false)
           break
+        case 'proxy':
+          this.proxyWs = null
+          this.setClosingState('proxy', false)
+          break
+        case 'rules':
+          this.rulesWs = null
+          this.setClosingState('rules', false)
+          break
       }
       this.checkConnectionStatus()
     }
@@ -368,6 +418,7 @@ export class WebSocketService {
       const connectionStore = useConnectionStore()
       const trafficStore = useTrafficStore()
       const logStore = useLogStore()
+      const proxyStore = useProxyStore()
 
       // 增加日志输出
       console.log('开始初始化WebSocket连接...')
@@ -381,6 +432,8 @@ export class WebSocketService {
         this.setupTrafficListener(trafficStore),
         this.setupLogListener(logStore),
         this.setupMemoryListener(connectionStore),
+        this.setupProxyListener(proxyStore),
+        this.setupRulesListener(),
       ])
 
       // 建立连接后检查并更新连接状态
@@ -400,7 +453,7 @@ export class WebSocketService {
         console.warn(
           `部分WebSocket连接失败 (${results.length - successCount}/${results.length})，后台将自动重试`,
         )
-        const types = ['connections', 'traffic', 'logs', 'memory']
+        const types = ['connections', 'traffic', 'logs', 'memory', 'proxy', 'rules']
         results.forEach((result, index) => {
           if (result.status === 'rejected' || (result.status === 'fulfilled' && !result.value)) {
             const type = types[index]
@@ -414,7 +467,7 @@ export class WebSocketService {
     } catch (error) {
       console.error('WebSocket连接检查失败:', error)
       // 全部尝试后台重连
-      ;['connections', 'traffic', 'logs', 'memory'].forEach((type) => {
+      ;['connections', 'traffic', 'logs', 'memory', 'proxy', 'rules'].forEach((type) => {
         this.scheduleReconnect(type, 3000)
       })
       this.checkConnectionStatus()
@@ -455,6 +508,16 @@ export class WebSocketService {
       this.memoryIsClosing = true
     }
 
+    if (this.proxyWs && !this.proxyIsClosing) {
+      activeConnections.push({ type: 'proxy', ws: this.proxyWs })
+      this.proxyIsClosing = true
+    }
+
+    if (this.rulesWs && !this.rulesIsClosing) {
+      activeConnections.push({ type: 'rules', ws: this.rulesWs })
+      this.rulesIsClosing = true
+    }
+
     try {
       // 清除所有监听器
       Object.keys(this.removeListenerFuncs).forEach((key) => {
@@ -479,6 +542,8 @@ export class WebSocketService {
       this.trafficWs = null
       this.logWs = null
       this.memoryWs = null
+      this.proxyWs = null
+      this.rulesWs = null
 
       // 断开后更新连接状态
       this.updateConnectionStatus(false)
@@ -490,6 +555,8 @@ export class WebSocketService {
       this.trafficIsClosing = false
       this.logIsClosing = false
       this.memoryIsClosing = false
+      this.proxyIsClosing = false
+      this.rulesIsClosing = false
       this.checkConnectionStatus()
     }
   }
@@ -779,6 +846,132 @@ export class WebSocketService {
     } catch (error) {
       this.memoryWs = null
       this.removeListenerFuncs['memory'] = null
+      return false
+    }
+  }
+
+  /**
+   * 建立代理数据监听器
+   */
+  private async setupProxyListener(proxyStore: ReturnType<typeof useProxyStore>): Promise<boolean> {
+    try {
+      // 清除可能存在的旧监听器
+      this.cleanupListener('proxy')
+
+      // 断开旧连接
+      if (this.proxyWs) {
+        this.proxyIsClosing = true
+        try {
+          await this.proxyWs.disconnect()
+        } catch (e) {
+          // 忽略错误
+        } finally {
+          this.proxyWs = null
+          this.proxyIsClosing = false
+        }
+      }
+
+      // 建立新连接，使用动态端口
+      this.proxyWs = await WebSocket.connect(this.buildWsUrl('proxies'))
+
+      // 添加消息监听器
+      const removeListener = this.proxyWs.addListener((message) => {
+        try {
+          // 在处理消息前检查WebSocket状态
+          if (!this.proxyWs || this.proxyIsClosing) {
+            return
+          }
+
+          if (!message.data) {
+            return
+          }
+
+          let data
+          if (typeof message.data === 'string') {
+            data = JSON.parse(message.data)
+          } else {
+            data = JSON.parse(JSON.stringify(message.data))
+          }
+
+          // 更新代理数据
+          proxyStore.updateProxies(data)
+        } catch (error) {
+          // 忽略错误
+        }
+      })
+
+      // 保存移除监听器的函数
+      this.removeListenerFuncs['proxy'] = removeListener
+
+      // 连接成功，更新状态
+      this.updateConnectionStatus(true)
+      return true
+    } catch (error) {
+      this.proxyWs = null
+      this.removeListenerFuncs['proxy'] = null
+      return false
+    }
+  }
+
+  /**
+   * 建立规则监听器
+   */
+  private async setupRulesListener(): Promise<boolean> {
+    try {
+      // 清除可能存在的旧监听器
+      this.cleanupListener('rules')
+
+      // 断开旧连接
+      if (this.rulesWs) {
+        this.rulesIsClosing = true
+        try {
+          await this.rulesWs.disconnect()
+        } catch (e) {
+          // 忽略错误
+        } finally {
+          this.rulesWs = null
+          this.rulesIsClosing = false
+        }
+      }
+
+      // 建立新连接，使用动态端口
+      this.rulesWs = await WebSocket.connect(this.buildWsUrl('rules'))
+
+      // 添加消息监听器
+      const removeListener = this.rulesWs.addListener((message) => {
+        try {
+          // 在处理消息前检查WebSocket状态
+          if (!this.rulesWs || this.rulesIsClosing) {
+            return
+          }
+
+          if (!message.data) {
+            return
+          }
+
+          let data
+          if (typeof message.data === 'string') {
+            data = JSON.parse(message.data)
+          } else {
+            data = JSON.parse(JSON.stringify(message.data))
+          }
+
+          // 发送规则数据事件
+          mitt.emit('rules-data', data)
+        } catch (error) {
+          // 忽略错误
+        }
+      })
+
+      // 保存移除监听器的函数
+      this.removeListenerFuncs['rules'] = removeListener
+
+      // 连接成功，更新状态
+      this.updateConnectionStatus(true)
+      return true
+    } catch (error) {
+      this.rulesWs = null
+      this.removeListenerFuncs['rules'] = null
       return false
     }
   }

@@ -74,23 +74,34 @@ export const proxyApi = {
   getCurrentProxyMode: () => invoke<string>('get_current_proxy_mode'),
 
   // 获取代理列表
-  getProxies: () => invoke<ProxiesData>('get_proxies'),
+  getProxies: (port: number) => invoke<ProxiesData>('get_proxies', { port }),
 
   // 切换代理
   changeProxy: (group: string, proxy: string) => invoke<void>('change_proxy', { group, proxy }),
 
   // 测试节点组延迟
-  testGroupDelay: (group: string) => invoke<void>('test_group_delay', { group }),
+  testGroupDelay: (group: string, port: number) =>
+    invoke<void>('test_group_delay', { group, port }),
 
   // 测试节点延迟
-  testNodeDelay: (proxy: string) => invoke<void>('test_node_delay', { proxy }),
+  testNodeDelay: (proxy: string) => {
+    const appStore = useAppStore()
+    return invoke<void>('test_node_delay', { proxy, port: appStore.apiPort })
+  },
 
   // 获取版本信息
-  getVersionInfo: () => invoke<VersionInfo>('get_version_info'),
+  getVersionInfo: () => {
+    const appStore = useAppStore()
+    return invoke<VersionInfo>('get_version_info', { port: appStore.apiPort })
+  },
 
   // 获取规则列表
-  getRules: () =>
-    invoke<{ rules: Array<{ type: string; payload: string; proxy: string }> }>('get_rules'),
+  getRules: () => {
+    const appStore = useAppStore()
+    return invoke<{ rules: Array<{ type: string; payload: string; proxy: string }> }>('get_rules', {
+      port: appStore.apiPort,
+    })
+  },
 
   // 获取API令牌
   getApiToken: () => invoke<string>('get_api_token'),
@@ -181,7 +192,7 @@ export const proxy = {
   // 测试节点延迟
   testNodeDelay: async (proxy: string, server?: string) => {
     const appStore = useAppStore()
-    return await invoke<void>('test_node_delay', { proxy, server, apiPort: appStore.apiPort })
+    return await invoke<void>('test_node_delay', { proxy, server, port: appStore.apiPort })
   },
 
   // 测试节点组延迟

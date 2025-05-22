@@ -41,13 +41,15 @@ export default {
       systemTip: '自動的にシステムプロキシを設定する',
       tunTip: 'TUN仮想ネットワークカードですべてのトラフィックをプロキシ、管理者権限が必要',
       manualTip: '手動でシステムプロキシを設定する必要があります',
-      systemDescription: 'ウェブブラウザやアプリケーションのシステムプロキシ設定を自動的に構成します',
-      tunDescription: '仮想ネットワークカードを通じてすべてのシステムトラフィックをキャプチャしプロキシします、管理者権限が必要です',
-      manualDescription: 'アプリケーションやブラウザでプロキシ設定を手動で構成します'
+      systemDescription:
+        'ウェブブラウザやアプリケーションのシステムプロキシ設定を自動的に構成します',
+      tunDescription:
+        '仮想ネットワークカードを通じてすべてのシステムトラフィックをキャプチャしプロキシします、管理者権限が必要です',
+      manualDescription: 'アプリケーションやブラウザでプロキシ設定を手動で構成します',
     },
     proxyHeader: {
       flowMode: 'トラフィックプロキシモード',
-      nodeMode: 'ノードプロキシモード'
+      nodeMode: 'ノードプロキシモード',
     },
     adminStatus: {
       admin: '管理者',
@@ -70,7 +72,7 @@ export default {
       memory: 'メモリ',
       connections: 'アクティブ接続',
       title: 'トラフィック統計',
-      connectionsLabel: '接続'
+      connectionsLabel: '接続',
     },
   },
   status: {
@@ -81,7 +83,7 @@ export default {
     restarting: '再起動中',
     connecting: '接続中',
     disconnected: '切断',
-    error: 'エラー'
+    error: 'エラー',
   },
   notification: {
     startingKernel: 'カーネルを起動中です、しばらくお待ちください...',
@@ -95,7 +97,8 @@ export default {
     checkNetwork: 'ネットワーク接続は正常ですか',
     checkPermissions: 'アプリケーションに十分な権限がありますか',
     adminRequired: '管理者権限が必要',
-    tunModeAdminRequired: 'TUNモードには管理者権限が必要です。アプリケーションを管理者として再起動してください。',
+    tunModeAdminRequired:
+      'TUNモードには管理者権限が必要です。アプリケーションを管理者として再起動してください。',
     restartFailed: '再起動に失敗しました',
     restartAsAdmin: '管理者として再起動',
     systemProxyEnabled: 'システムプロキシが有効になりました',
@@ -109,7 +112,12 @@ export default {
     updateDownloaded: '更新がダウンロードされました、まもなくインストールされます',
     updateFailed: '更新に失敗しました',
     kernelFailed: 'カーネルの起動に失敗しました',
-    proxySetFailed: 'プロキシの設定に失敗しました'
+    proxySetFailed: 'プロキシの設定に失敗しました',
+    kernelStartFailed: 'カーネルの起動に失敗しました',
+    kernelAlreadyRunning: 'カーネルはすでに実行中です',
+    tryingToConnectWebSocket: 'WebSocketサービスへの接続を試みています',
+    webSocketConnected: 'WebSocket接続に成功しました',
+    webSocketConnectionFailed: 'WebSocket接続に失敗しましたが、カーネルは実行中です',
   },
   chart: {
     startUpdateTimer: 'チャート更新タイマー開始',
@@ -163,7 +171,7 @@ export default {
       tun: 'TUNモード',
       unknown: '不明なモード',
       globalDescription: '宛先に関係なく、すべてのトラフィックがプロキシを通して転送されます',
-      ruleDescription: 'トラフィックはルーティングルールと地理的位置に基づいて転送されます'
+      ruleDescription: 'トラフィックはルーティングルールと地理的位置に基づいて転送されます',
     },
   },
   sub: {
@@ -236,13 +244,13 @@ export default {
       info: '情報',
       warning: '警告',
       error: 'エラー',
-      success: '成功'
-    }
+      success: '成功',
+    },
   },
   setting: {
     title: '設定',
     general: {
-      title: '一般設定'
+      title: '一般設定',
     },
     theme: {
       title: 'テーマ',
@@ -325,6 +333,18 @@ export default {
       ipVersionChanged: 'IPバージョンが変更されました',
       ipv6Enabled: 'IPv6サポートが有効になりました',
       ipv4Only: 'IPv4のみモードが有効になりました',
+      ports: 'ポート設定',
+      portsDesc: 'プロキシポートとAPIポートの設定',
+      configure: '設定',
+      portSettings: 'ポート設定',
+      proxyPort: 'プロキシポート',
+      apiPort: 'APIポート',
+      invalidPort: 'ポート番号は1024から65535の間である必要があります',
+      portConflict: 'プロキシポートとAPIポートは異なる必要があります',
+      restartRequired: '再起動が必要',
+      restartDesc: 'ポート変更を適用するには内核の再起動が必要です。今すぐ再起動しますか？',
+      portChanged: 'ポートが変更されました',
+      portChangeSuccess: 'ポート設定が正常に更新されました',
     },
     about: {
       title: '情報',
@@ -341,8 +361,10 @@ export default {
   service: {
     install: {
       title: 'サービス管理',
-      description: 'システムサービスはTUNプロキシモードやその他の高度な機能を正常に動作させるために必要です。インストールには管理者権限が必要です。',
-      notAdmin: '現在のユーザーには管理者権限がないため、サービスをインストール/アンインストールできません',
+      description:
+        'システムサービスはTUNプロキシモードやその他の高度な機能を正常に動作させるために必要です。インストールには管理者権限が必要です。',
+      notAdmin:
+        '現在のユーザーには管理者権限がないため、サービスをインストール/アンインストールできません',
       restartAsAdmin: '管理者として再起動',
       restartError: '管理者として再起動できませんでした: {error}',
       installed: 'インストール済み',
@@ -363,16 +385,19 @@ export default {
       startupType: '起動タイプ',
       servicePath: 'サービスパス',
       serviceDescription: 'Sing-Box TUNプロキシサービス',
-      requiredWarning: 'システムサービスはTUNプロキシモードを使用するために必要なコンポーネントです',
+      requiredWarning:
+        'システムサービスはTUNプロキシモードを使用するために必要なコンポーネントです',
       installButton: 'サービスインストール',
       uninstallButton: 'サービスアンインストール',
       continueButton: '続ける',
-      installSuccess: 'サービスが正常にインストールされました！TUNモードやその他の高度な機能が使用可能になりました',
+      installSuccess:
+        'サービスが正常にインストールされました！TUNモードやその他の高度な機能が使用可能になりました',
       installError: 'サービスのインストールに失敗しました: {error}',
       uninstallSuccess: 'サービスが正常にアンインストールされました',
       uninstallError: 'サービスのアンインストールに失敗しました: {error}',
       uninstallConfirmTitle: 'サービスアンインストール確認',
-      uninstallConfirmContent: 'サービスをアンインストールするとTUNモード機能が無効になります。続行してもよろしいですか？',
+      uninstallConfirmContent:
+        'サービスをアンインストールするとTUNモード機能が無効になります。続行してもよろしいですか？',
       uninstallConfirmButton: 'アンインストール確認',
       cancelButton: 'キャンセル',
     },
@@ -383,12 +408,14 @@ export default {
       alreadyUpdate: 'サービスファイルは既に最新です',
       updateBefore: 'サービスを更新する前に、アプリケーションが最新であることを確認してください',
       updateNeeded: 'サービス更新が必要',
-      updateDescription: 'サービスファイルの更新が検出されました。「サービス更新」ボタンをクリックして更新することをお勧めします。',
+      updateDescription:
+        'サービスファイルの更新が検出されました。「サービス更新」ボタンをクリックして更新することをお勧めします。',
       updateNeededAdmin: 'サービス更新が必要（管理者権限が必要）',
-      updateDescriptionAdmin: 'サービスファイルの更新が検出されました。まず管理者として再起動してから、「サービス更新」ボタンをクリックしてください。',
+      updateDescriptionAdmin:
+        'サービスファイルの更新が検出されました。まず管理者として再起動してから、「サービス更新」ボタンをクリックしてください。',
       needAdmin: '管理者権限が必要',
       available: '更新可能',
-    }
+    },
   },
   rules: {
     title: 'ルール管理',

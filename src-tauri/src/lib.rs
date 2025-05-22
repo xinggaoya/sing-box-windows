@@ -1,4 +1,6 @@
-use tauri::{AppHandle, Manager};use tracing_subscriber::{fmt, EnvFilter};use std::sync::Mutex;
+use std::sync::Mutex;
+use tauri::{AppHandle, Manager};
+use tracing_subscriber::{fmt, EnvFilter};
 
 pub mod app;
 pub mod entity;
@@ -37,22 +39,20 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
-                        // Core - Kernel service commands            
-            crate::app::core::kernel_service::start_kernel,            
-            crate::app::core::kernel_service::stop_kernel,            
-            crate::app::core::kernel_service::restart_kernel,            
-            crate::app::core::kernel_service::download_latest_kernel,            
-            crate::app::core::kernel_service::check_kernel_version,            
+            // Core - Kernel service commands
+            crate::app::core::kernel_service::start_kernel,
+            crate::app::core::kernel_service::stop_kernel,
+            crate::app::core::kernel_service::restart_kernel,
+            crate::app::core::kernel_service::download_latest_kernel,
+            crate::app::core::kernel_service::check_kernel_version,
             crate::app::core::kernel_service::start_websocket_relay,
             crate::app::core::kernel_service::is_kernel_running,
-
             // Network - Subscription service commands
             crate::app::network::subscription_service::download_subscription,
             crate::app::network::subscription_service::add_manual_subscription,
             crate::app::network::subscription_service::get_current_config,
             crate::app::network::subscription_service::toggle_proxy_mode,
             crate::app::network::subscription_service::get_current_proxy_mode,
-
             // System - System service commands
             crate::app::system::system_service::check_admin,
             crate::app::system::system_service::restart_as_admin,
@@ -60,15 +60,12 @@ pub fn run() {
             crate::app::system::system_service::install_service,
             crate::app::system::system_service::uninstall_service,
             crate::app::system::system_service::check_service_status,
-
             // System - Update service commands
             crate::app::system::update_service::check_update,
             crate::app::system::update_service::download_and_install_update,
-
             // System - Config service commands
             crate::app::system::config_service::get_port_config,
             crate::app::system::config_service::update_port_config,
-
             // Core - Proxy service commands
             crate::app::core::proxy_service::set_system_proxy,
             crate::app::core::proxy_service::set_manual_proxy,

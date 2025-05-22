@@ -16,6 +16,15 @@ export interface UpdateInfo {
   has_update: boolean
 }
 
+// 定义规则数据接口
+export interface RulesData {
+  rules: Array<{
+    type: string
+    payload: string
+    proxy: string
+  }>
+}
+
 // 定义事件类型
 export type Events = {
   // 窗口相关事件
@@ -23,7 +32,7 @@ export type Events = {
   'window-hide': void
   'window-show': void
   'window-restore': void
-  
+
   // 进程相关事件
   'process-status': void
   'download-progress': DownloadProgress
@@ -36,21 +45,22 @@ export type Events = {
   'kernel-start-failed': { error: string }
   'connecting-status-changed': boolean
   'tray-clicked': void
-  'error': string
-  
+  error: string
+
   // WebSocket 连接状态事件
   'traffic-connection-state': ConnectionState
   'memory-connection-state': ConnectionState
   'connections-connection-state': ConnectionState
   'logs-connection-state': ConnectionState
-  'ws-connected': void  // 添加WebSocket连接成功事件
-  'ws-disconnected': void  // 添加WebSocket连接断开事件
-  
+  'ws-connected': void // 添加WebSocket连接成功事件
+  'ws-disconnected': void // 添加WebSocket连接断开事件
+
   // WebSocket 数据事件
-  'traffic-data': any
-  'memory-data': any
-  'connections-data': any
+  'traffic-data': Record<string, unknown>
+  'memory-data': Record<string, unknown>
+  'connections-data': Record<string, unknown>
   'log-data': { type: string; payload: string }
+  'rules-data': RulesData
 }
 
 // 创建 mitt 实例

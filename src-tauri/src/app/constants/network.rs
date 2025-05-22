@@ -6,16 +6,9 @@
 pub mod network_config {
     /// 默认监听地址
     pub const DEFAULT_LISTEN_ADDRESS: &str = "0.0.0.0";
-
-    /// 默认代理端口
-    pub const DEFAULT_PROXY_PORT: u16 = 12080;
-
     /// 默认 Clash API 地址
     pub const DEFAULT_CLASH_API_ADDRESS: &str = "127.0.0.1";
-
-    /// 默认 Clash API 端口
-    pub const DEFAULT_CLASH_API_PORT: u16 = 12081;
-
+    
     /// 默认 API Token
     pub const DEFAULT_API_TOKEN: &str = "";
 

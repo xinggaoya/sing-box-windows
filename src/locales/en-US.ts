@@ -41,13 +41,15 @@ export default {
       systemTip: 'Automatically set system proxy',
       tunTip: 'Use TUN virtual network card to proxy all traffic, requires admin',
       manualTip: 'Manually configure system proxy',
-      systemDescription: 'Automatically configure system proxy settings for web browsers and applications',
-      tunDescription: 'Capture and proxy all system traffic via virtual network card, requires administrator privileges',
-      manualDescription: 'Configure proxy settings manually in your applications and browsers'
+      systemDescription:
+        'Automatically configure system proxy settings for web browsers and applications',
+      tunDescription:
+        'Capture and proxy all system traffic via virtual network card, requires administrator privileges',
+      manualDescription: 'Configure proxy settings manually in your applications and browsers',
     },
     proxyHeader: {
       flowMode: 'Traffic Proxy Mode',
-      nodeMode: 'Node Proxy Mode'
+      nodeMode: 'Node Proxy Mode',
     },
     adminStatus: {
       admin: 'Administrator',
@@ -70,7 +72,7 @@ export default {
       memory: 'Memory',
       connections: 'Active Connections',
       title: 'Traffic Statistics',
-      connectionsLabel: 'connections'
+      connectionsLabel: 'connections',
     },
   },
   status: {
@@ -81,7 +83,7 @@ export default {
     restarting: 'Restarting',
     connecting: 'Connecting',
     disconnected: 'Disconnected',
-    error: 'Error'
+    error: 'Error',
   },
   notification: {
     startingKernel: 'Starting kernel, please wait...',
@@ -95,7 +97,8 @@ export default {
     checkNetwork: 'Is your network connection normal',
     checkPermissions: 'Does the application have sufficient permissions',
     adminRequired: 'Admin Required',
-    tunModeAdminRequired: 'TUN mode requires administrator privileges. Please restart the application as administrator.',
+    tunModeAdminRequired:
+      'TUN mode requires administrator privileges. Please restart the application as administrator.',
     restartFailed: 'Restart failed',
     restartAsAdmin: 'Restart as Admin',
     systemProxyEnabled: 'System proxy enabled',
@@ -109,7 +112,12 @@ export default {
     updateDownloaded: 'Update downloaded, will install soon',
     updateFailed: 'Update failed',
     kernelFailed: 'Kernel start failed',
-    proxySetFailed: 'Failed to set proxy'
+    proxySetFailed: 'Failed to set proxy',
+    kernelStartFailed: 'Kernel start failed',
+    kernelAlreadyRunning: 'Kernel is already running',
+    tryingToConnectWebSocket: 'Trying to connect to WebSocket service',
+    webSocketConnected: 'WebSocket connected successfully',
+    webSocketConnectionFailed: 'WebSocket connection failed, but kernel is still running',
   },
   chart: {
     startUpdateTimer: 'Starting chart update timer',
@@ -163,7 +171,7 @@ export default {
       tun: 'TUN Mode',
       unknown: 'Unknown Mode',
       globalDescription: 'All traffic will be forwarded through proxies regardless of destination',
-      ruleDescription: 'Traffic will be forwarded based on routing rules and geo-location'
+      ruleDescription: 'Traffic will be forwarded based on routing rules and geo-location',
     },
   },
   sub: {
@@ -236,13 +244,13 @@ export default {
       info: 'Info',
       warning: 'Warning',
       error: 'Error',
-      success: 'Success'
-    }
+      success: 'Success',
+    },
   },
   setting: {
     title: 'Settings',
     general: {
-      title: 'General Settings'
+      title: 'General Settings',
     },
     theme: {
       title: 'Theme',
@@ -325,6 +333,18 @@ export default {
       ipVersionChanged: 'IP Version Changed',
       ipv6Enabled: 'IPv6 support enabled',
       ipv4Only: 'IPv4 only mode enabled',
+      ports: 'Port Settings',
+      portsDesc: 'Configure proxy port and API port',
+      configure: 'Configure',
+      portSettings: 'Port Settings',
+      proxyPort: 'Proxy Port',
+      apiPort: 'API Port',
+      invalidPort: 'Port number must be between 1024-65535',
+      portConflict: 'Proxy port and API port cannot be the same',
+      restartRequired: 'Restart Required',
+      restartDesc: 'Port changes require kernel restart to take effect. Restart now?',
+      portChanged: 'Port Changed',
+      portChangeSuccess: 'Port settings have been successfully updated',
     },
     about: {
       title: 'About',
@@ -341,8 +361,10 @@ export default {
   service: {
     install: {
       title: 'Service Management',
-      description: 'System service allows TUN proxy mode and other advanced features to work properly. Administrator privileges are required for installation.',
-      notAdmin: 'Current user does not have administrator privileges, cannot install/uninstall service',
+      description:
+        'System service allows TUN proxy mode and other advanced features to work properly. Administrator privileges are required for installation.',
+      notAdmin:
+        'Current user does not have administrator privileges, cannot install/uninstall service',
       restartAsAdmin: 'Restart as Administrator',
       restartError: 'Failed to restart as administrator: {error}',
       installed: 'Installed',
@@ -367,12 +389,14 @@ export default {
       installButton: 'Install Service',
       uninstallButton: 'Uninstall Service',
       continueButton: 'Continue',
-      installSuccess: 'Service installed successfully! You can now use TUN mode and more advanced features',
+      installSuccess:
+        'Service installed successfully! You can now use TUN mode and more advanced features',
       installError: 'Service installation failed: {error}',
       uninstallSuccess: 'Service uninstalled successfully',
       uninstallError: 'Service uninstallation failed: {error}',
       uninstallConfirmTitle: 'Confirm Uninstall Service',
-      uninstallConfirmContent: 'Uninstalling the service will disable TUN mode functionality. Are you sure you want to continue?',
+      uninstallConfirmContent:
+        'Uninstalling the service will disable TUN mode functionality. Are you sure you want to continue?',
       uninstallConfirmButton: 'Confirm Uninstall',
       cancelButton: 'Cancel',
     },
@@ -383,12 +407,14 @@ export default {
       alreadyUpdate: 'Service file is already up to date',
       updateBefore: 'Before updating the service, please make sure the application is up to date',
       updateNeeded: 'Service Update Required',
-      updateDescription: 'Service file update detected. It is recommended to click the "Update Service" button to update.',
+      updateDescription:
+        'Service file update detected. It is recommended to click the "Update Service" button to update.',
       updateNeededAdmin: 'Service Update Required (Administrator Required)',
-      updateDescriptionAdmin: 'Service file update detected. Please restart the application as administrator first, then click the "Update Service" button.',
+      updateDescriptionAdmin:
+        'Service file update detected. Please restart the application as administrator first, then click the "Update Service" button.',
       needAdmin: 'Admin Required',
       available: 'Update Available',
-    }
+    },
   },
   rules: {
     title: 'Rules Management',

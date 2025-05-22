@@ -1,4 +1,3 @@
-use crate::app::constants::network_config;
 use crate::utils::app_util::get_work_dir;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -20,8 +19,8 @@ pub struct PortConfig {
 impl Default for PortConfig {
     fn default() -> Self {
         Self {
-            proxy_port: network_config::DEFAULT_PROXY_PORT,
-            api_port: network_config::DEFAULT_CLASH_API_PORT,
+            proxy_port: 12080, // 默认代理端口
+            api_port: 12081, // 默认API端口
         }
     }
 }
@@ -242,7 +241,7 @@ pub fn update_port_config(proxy_port: u16, api_port: u16) -> Result<bool, String
 pub fn get_proxy_port() -> u16 {
     match PORT_CONFIG.lock() {
         Ok(config) => config.proxy_port,
-        Err(_) => network_config::DEFAULT_PROXY_PORT, // 默认值
+        Err(_) => 12080, // 默认代理端口
     }
 }
 
@@ -250,6 +249,6 @@ pub fn get_proxy_port() -> u16 {
 pub fn get_api_port() -> u16 {
     match PORT_CONFIG.lock() {
         Ok(config) => config.api_port,
-        Err(_) => network_config::DEFAULT_CLASH_API_PORT, // 默认值
+        Err(_) => 12081, // 默认API端口
     }
 } 
