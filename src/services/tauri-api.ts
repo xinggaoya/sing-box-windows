@@ -53,10 +53,16 @@ export const kernelApi = {
 // 代理模式相关接口
 export const proxyApi = {
   // 设置系统代理模式
-  setSystemProxy: () => invoke<void>('set_system_proxy'),
+  setSystemProxy: () => {
+    const appStore = useAppStore()
+    return invoke<void>('set_system_proxy', { port: appStore.proxyPort })
+  },
 
   // 设置 TUN 代理模式
-  setTunProxy: () => invoke<void>('set_tun_proxy'),
+  setTunProxy: () => {
+    const appStore = useAppStore()
+    return invoke<void>('set_tun_proxy', { port: appStore.proxyPort })
+  },
 
   // 检查管理员权限
   checkAdmin: () => invoke<boolean>('check_admin'),
@@ -107,7 +113,10 @@ export const proxyApi = {
   getApiToken: () => invoke<string>('get_api_token'),
 
   // 设置手动代理
-  setManualProxy: () => invoke<void>('set_manual_proxy'),
+  setManualProxy: () => {
+    const appStore = useAppStore()
+    return invoke<void>('set_manual_proxy', { port: appStore.proxyPort })
+  },
 }
 
 // 配置服务
@@ -214,13 +223,13 @@ export const proxy = {
   // 设置系统代理
   setSystemProxy: async () => {
     const appStore = useAppStore()
-    return await invoke<void>('set_system_proxy', { proxyPort: appStore.proxyPort })
+    return await invoke<void>('set_system_proxy', { port: appStore.proxyPort })
   },
 
   // 设置手动代理
   setManualProxy: async () => {
     const appStore = useAppStore()
-    return await invoke<void>('set_manual_proxy', { proxyPort: appStore.proxyPort })
+    return await invoke<void>('set_manual_proxy', { port: appStore.proxyPort })
   },
 }
 

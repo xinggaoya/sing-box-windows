@@ -31,7 +31,7 @@ export class ProxyService {
    */
   public async switchMode(
     mode: 'system' | 'tun' | 'manual',
-    messageCallback?: (type: 'success' | 'info' | 'error', content: string) => void
+    messageCallback?: (type: 'success' | 'info' | 'error', content: string) => void,
   ): Promise<boolean> {
     try {
       // 根据模式设置代理
