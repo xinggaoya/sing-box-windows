@@ -1,68 +1,152 @@
 <template>
   <div class="rules-container">
-    <n-card class="rules-card" :bordered="false">
-      <template #header>
-        <div class="card-header">
-          <h2>{{ t('rules.title') }}</h2>
-          <n-space>
-            <n-button type="primary" @click="fetchRules" :loading="loading">
-              <template #icon>
-                <n-icon><refresh-outline /></n-icon>
-              </template>
-              {{ t('common.refresh') }}
-            </n-button>
-          </n-space>
+    <!-- 顶部标题区 -->
+    <div class="header-section">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="title-wrapper">
+            <div class="title-icon">
+              <n-icon size="20">
+                <search-outline />
+              </n-icon>
+            </div>
+            <h2 class="page-title">{{ t('rules.title') }}</h2>
+            <n-badge
+              :value="rules.length"
+              :max="999"
+              show-zero
+              type="info"
+              size="small"
+              class="count-badge"
+            />
+          </div>
         </div>
-      </template>
-
-      <n-spin :show="loading">
-        <div class="search-filter-bar">
-          <n-input
-            v-model:value="searchQuery"
-            placeholder="搜索规则..."
-            clearable
-            :style="{ width: '300px' }"
+        <div class="header-actions">
+          <n-button
+            @click="fetchRules"
+            :loading="loading"
+            size="small"
+            type="primary"
+            class="refresh-btn"
+            round
           >
-            <template #prefix>
-              <n-icon><search-outline /></n-icon>
+            <template #icon>
+              <n-icon>
+                <refresh-outline />
+              </n-icon>
             </template>
-          </n-input>
-          <n-select
-            v-model:value="typeFilter"
-            :options="typeOptions"
-            placeholder="按类型筛选"
-            clearable
-            :style="{ width: '180px' }"
-          />
-          <n-select
-            v-model:value="proxyFilter"
-            :options="proxyOptions"
-            placeholder="按代理筛选"
-            clearable
-            :style="{ width: '180px' }"
-          />
+            {{ t('common.refresh') }}
+          </n-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 规则内容区 -->
+    <div class="rules-content">
+      <n-spin :show="loading">
+        <!-- 搜索筛选区 -->
+        <div class="search-section">
+          <div class="search-filters">
+            <div class="search-input-wrapper">
+              <n-input
+                v-model:value="searchQuery"
+                placeholder="搜索规则..."
+                clearable
+                class="search-input"
+              >
+                <template #prefix>
+                  <n-icon size="16">
+                    <search-outline />
+                  </n-icon>
+                </template>
+              </n-input>
+            </div>
+
+            <div class="filter-group">
+              <n-select
+                v-model:value="typeFilter"
+                :options="typeOptions"
+                placeholder="按类型筛选"
+                clearable
+                class="filter-select"
+                size="small"
+              />
+              <n-select
+                v-model:value="proxyFilter"
+                :options="proxyOptions"
+                placeholder="按代理筛选"
+                clearable
+                class="filter-select"
+                size="small"
+              />
+            </div>
+          </div>
+
+          <!-- 统计信息 -->
+          <div class="stats-section">
+            <div class="stats-item">
+              <span class="stats-label">总规则</span>
+              <span class="stats-value">{{ rules.length }}</span>
+            </div>
+            <div v-if="searchQuery || typeFilter || proxyFilter" class="stats-item filtered">
+              <span class="stats-label">匹配</span>
+              <span class="stats-value">{{ filteredRules.length }}</span>
+            </div>
+          </div>
         </div>
 
-        <div v-if="filteredRules.length > 0" class="rules-list">
-          <n-data-table
-            :columns="columns"
-            :data="filteredRules"
-            :pagination="pagination"
-            :bordered="false"
-            :max-height="600"
-            striped
-          />
-        </div>
-        <n-empty v-else :description="searchQuery || typeFilter || proxyFilter ? t('rules.noMatchingRules') : t('rules.noRules')" />
+        <!-- 规则表格区 -->
+        <div class="table-section">
+          <div v-if="filteredRules.length > 0" class="table-wrapper">
+            <n-data-table
+              :columns="columns"
+              :data="filteredRules"
+              :pagination="pagination"
+              :bordered="false"
+              :max-height="600"
+              striped
+              class="rules-table"
+            />
+          </div>
 
-        <div class="stats-bar">
-          <n-tag type="info" size="small">{{ t('rules.totalRules') }}: {{ rules.length }}</n-tag>
-          <n-tag v-if="searchQuery || typeFilter || proxyFilter" type="success" size="small">
-            {{ t('rules.matchingRules') }}: {{ filteredRules.length }}
-          </n-tag>
+          <!-- 空状态 -->
+          <div v-else class="empty-state">
+            <div class="empty-content">
+              <div class="empty-icon">
+                <n-icon size="48" color="#d1d5db">
+                  <search-outline />
+                </n-icon>
+              </div>
+              <h3 class="empty-title">
+                {{ searchQuery || typeFilter || proxyFilter ? '没有匹配的规则' : '暂无规则数据' }}
+              </h3>
+              <p class="empty-description">
+                {{
+                  searchQuery || typeFilter || proxyFilter
+                    ? '请尝试调整搜索条件或筛选条件'
+                    : '点击刷新按钮获取规则数据'
+                }}
+              </p>
+              <n-button
+                v-if="!searchQuery && !typeFilter && !proxyFilter"
+                @click="fetchRules"
+                type="primary"
+                size="medium"
+                class="empty-action-btn"
+                round
+              >
+                <template #icon>
+                  <n-icon>
+                    <refresh-outline />
+                  </n-icon>
+                </template>
+                获取规则
+              </n-button>
+            </div>
+          </div>
         </div>
       </n-spin>
-    </n-card>
+    </div>
   </div>
 </template>
 
@@ -90,18 +174,22 @@ const proxyFilter = ref(null)
 
 // 计算筛选后的规则
 const filteredRules = computed(() => {
-  return rules.value.filter(rule => {
-    const matchesSearch = !searchQuery.value ||
+  return rules.value.filter((rule) => {
+    const matchesSearch =
+      !searchQuery.value ||
       rule.payload.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       rule.proxy.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       rule.type.toLowerCase().includes(searchQuery.value.toLowerCase())
 
     const matchesType = !typeFilter.value || rule.type === typeFilter.value
 
-    const matchesProxy = !proxyFilter.value ||
+    const matchesProxy =
+      !proxyFilter.value ||
       (proxyFilter.value === 'direct' && rule.proxy === t('rules.directConnect')) ||
       (proxyFilter.value === 'reject' && rule.proxy === 'reject') ||
-      (proxyFilter.value !== 'direct' && proxyFilter.value !== 'reject' && rule.proxy.includes(proxyFilter.value))
+      (proxyFilter.value !== 'direct' &&
+        proxyFilter.value !== 'reject' &&
+        rule.proxy.includes(proxyFilter.value))
 
     return matchesSearch && matchesType && matchesProxy
   })
@@ -109,8 +197,8 @@ const filteredRules = computed(() => {
 
 // 类型过滤选项
 const typeOptions = computed(() => {
-  const types = [...new Set(rules.value.map(rule => rule.type))]
-  return types.map(type => ({ label: type, value: type }))
+  const types = [...new Set(rules.value.map((rule) => rule.type))]
+  return types.map((type) => ({ label: type, value: type }))
 })
 
 // 代理过滤选项
@@ -122,7 +210,7 @@ const proxyOptions = computed(() => {
   proxies.add('reject')
 
   // 添加其他代理
-  rules.value.forEach(rule => {
+  rules.value.forEach((rule) => {
     let proxyName = rule.proxy
     if (proxyName.startsWith('route(') && proxyName.endsWith(')')) {
       proxyName = proxyName.substring(6, proxyName.length - 1)
@@ -137,8 +225,8 @@ const proxyOptions = computed(() => {
     { label: t('rules.directConnect'), value: 'direct' },
     { label: '拦截', value: 'reject' },
     ...Array.from(proxies)
-      .filter(proxy => proxy !== 'direct' && proxy !== 'reject')
-      .map(proxy => ({ label: proxy, value: proxy }))
+      .filter((proxy) => proxy !== 'direct' && proxy !== 'reject')
+      .map((proxy) => ({ label: proxy, value: proxy })),
   ]
 })
 
@@ -198,7 +286,10 @@ const columns: DataTableColumns<Rule> = [
       }
 
       // 高亮搜索关键字
-      if (searchQuery.value && row.payload.toLowerCase().includes(searchQuery.value.toLowerCase())) {
+      if (
+        searchQuery.value &&
+        row.payload.toLowerCase().includes(searchQuery.value.toLowerCase())
+      ) {
         const index = row.payload.toLowerCase().indexOf(searchQuery.value.toLowerCase())
         const beforeMatch = row.payload.substring(0, index)
         const match = row.payload.substring(index, index + searchQuery.value.length)
@@ -206,8 +297,12 @@ const columns: DataTableColumns<Rule> = [
 
         return h('div', {}, [
           beforeMatch,
-          h('span', { style: { backgroundColor: 'rgba(var(--primary-color), 0.1)', fontWeight: 'bold' } }, match),
-          afterMatch
+          h(
+            'span',
+            { style: { backgroundColor: 'rgba(var(--primary-color), 0.1)', fontWeight: 'bold' } },
+            match,
+          ),
+          afterMatch,
         ])
       }
 
@@ -288,48 +383,419 @@ onMounted(() => {
 
 <style scoped>
 .rules-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 12px 8px;
+  min-height: calc(100vh - 120px);
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(64, 128, 255, 0.02), rgba(144, 147, 153, 0.02));
+  animation: fadeIn 0.4s ease-out;
 }
 
-.rules-card {
-  border-radius: 16px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+/* 顶部标题区 */
+.header-section {
+  margin-bottom: 20px;
 }
 
-.rules-card :deep(.n-card__content) {
-  padding: 16px;
-}
-
-.card-header {
+.header-content {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+.header-content:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+.title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #4080ff, #2266dd);
+  border-radius: 10px;
+  color: white;
+  box-shadow: 0 4px 12px rgba(64, 128, 255, 0.3);
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-color-1);
+  background: linear-gradient(135deg, #4080ff, #2266dd);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.count-badge {
+  margin-left: 8px;
+}
+
+.refresh-btn {
+  height: 36px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.refresh-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(64, 128, 255, 0.2);
+}
+
+/* 规则内容区 */
+.rules-content {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.rules-content:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+/* 搜索筛选区 */
+.search-section {
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(64, 128, 255, 0.05), rgba(144, 147, 153, 0.05));
+  border-radius: 16px;
+  border: 1px solid rgba(64, 128, 255, 0.1);
+}
+
+.search-filters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
   align-items: center;
 }
 
-.card-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 500;
+.search-input-wrapper {
+  flex: 1;
+  min-width: 280px;
+  max-width: 400px;
 }
 
-.search-filter-bar {
+.search-input {
+  width: 100%;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.search-input:hover {
+  box-shadow: 0 2px 8px rgba(64, 128, 255, 0.1);
+}
+
+.search-input:focus-within {
+  box-shadow: 0 4px 12px rgba(64, 128, 255, 0.2);
+}
+
+.filter-group {
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
-.rules-list {
-  margin-top: 12px;
+.filter-select {
+  min-width: 160px;
+  border-radius: 10px;
+  transition: all 0.3s ease;
 }
 
-.stats-bar {
+.filter-select:hover {
+  box-shadow: 0 2px 8px rgba(64, 128, 255, 0.1);
+}
+
+/* 统计信息区 */
+.stats-section {
   display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(64, 128, 255, 0.1);
+}
+
+.stats-item {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  margin-top: 12px;
-  padding: 8px 0;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.stats-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.stats-item.filtered {
+  background: linear-gradient(135deg, rgba(0, 180, 42, 0.1), rgba(0, 154, 26, 0.1));
+  border-color: rgba(0, 180, 42, 0.2);
+}
+
+.stats-label {
+  font-size: 11px;
+  color: var(--text-color-3);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stats-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color-1);
+}
+
+.stats-item.filtered .stats-value {
+  color: #009a1a;
+}
+
+/* 表格区域 */
+.table-section {
+  margin-top: 0;
+}
+
+.table-wrapper {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.rules-table {
+  border-radius: 16px;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: 40px 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.empty-content {
+  text-align: center;
+  max-width: 300px;
+}
+
+.empty-icon {
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.empty-title {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-color-1);
+}
+
+.empty-description {
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: var(--text-color-3);
+  line-height: 1.5;
+}
+
+.empty-action-btn {
+  height: 40px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.empty-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(64, 128, 255, 0.2);
+}
+
+/* 暗黑模式适配 */
+:deep(.dark) .header-content {
+  background: rgba(24, 24, 28, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.dark) .rules-content {
+  background: rgba(24, 24, 28, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.dark) .search-section {
+  background: linear-gradient(135deg, rgba(64, 128, 255, 0.08), rgba(144, 147, 153, 0.08));
+  border-color: rgba(64, 128, 255, 0.15);
+}
+
+:deep(.dark) .stats-item {
+  background: rgba(40, 40, 48, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.dark) .table-wrapper,
+:deep(.dark) .empty-state {
+  background: rgba(40, 40, 48, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .rules-container {
+    padding: 12px;
+  }
+
+  .header-content {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .title-wrapper {
+    justify-content: center;
+  }
+
+  .rules-content {
+    padding: 16px;
+  }
+
+  .search-section {
+    padding: 12px 16px;
+  }
+
+  .search-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .search-input-wrapper {
+    min-width: auto;
+    max-width: none;
+  }
+
+  .filter-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filter-select {
+    min-width: auto;
+  }
+
+  .stats-section {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stats-item {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .search-section {
+    padding: 10px 12px;
+  }
+
+  .stats-section {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .empty-state {
+    padding: 30px 15px;
+    min-height: 250px;
+  }
+
+  .empty-title {
+    font-size: 16px;
+  }
+
+  .empty-description {
+    font-size: 13px;
+  }
+}
+
+/* Naive UI 组件样式覆盖 */
+:deep(.n-data-table) {
+  background: transparent;
+}
+
+:deep(.n-data-table-thead) {
+  background: rgba(248, 250, 252, 0.8);
+}
+
+:deep(.n-data-table-th) {
+  background: rgba(248, 250, 252, 0.8);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  font-weight: 600;
+}
+
+:deep(.n-data-table-td) {
+  border-bottom: 1px solid rgba(241, 245, 249, 0.8);
+}
+
+:deep(.n-data-table-tr:hover .n-data-table-td) {
+  background: rgba(236, 254, 255, 0.3);
+}
+
+:deep(.dark .n-data-table-thead),
+:deep(.dark .n-data-table-th) {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(71, 85, 105, 0.8);
+}
+
+:deep(.dark .n-data-table-td) {
+  border-color: rgba(51, 65, 85, 0.8);
+}
+
+:deep(.dark .n-data-table-tr:hover .n-data-table-td) {
+  background: rgba(51, 65, 85, 0.3);
+}
+
+:deep(.n-badge) {
+  --n-font-size: 10px;
+}
+
+:deep(.n-spin-container) {
+  min-height: 200px;
 }
 </style>

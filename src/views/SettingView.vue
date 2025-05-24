@@ -1,43 +1,48 @@
 <template>
-  <div class="setting-container">
-    <!-- 内容布局使用网格 -->
-    <n-grid :cols="1" :x-gap="16" :y-gap="16">
-      <!-- 内核管理卡片 -->
-      <n-gi>
-        <n-card class="setting-card setting-card-primary feature-card" :bordered="false">
-          <template #header>
-            <div class="card-header">
-              <n-h3 class="card-title">
-                <n-icon size="22" class="card-icon">
-                  <settings-outline />
-                </n-icon>
-                {{ t('setting.kernel.title') }}
-              </n-h3>
-              <n-space align="center" :size="8">
-                <n-tag
-                  v-if="kernelStore.version.version"
-                  :bordered="false"
-                  type="default"
-                  size="small"
-                  class="version-tag"
-                >
-                  {{ formatVersion(kernelStore.version.version) }}
-                </n-tag>
-                <n-tag v-else :bordered="false" type="error" size="small" class="version-tag">
-                  {{ t('setting.kernel.notInstalled') }}
-                </n-tag>
-                <n-tag
-                  v-if="hasNewVersion"
-                  :bordered="false"
-                  type="warning"
-                  size="small"
-                  class="version-tag"
-                >
-                  {{ t('setting.kernel.newVersion') }}{{ formatVersion(kernelStore.newVersion) }}
-                </n-tag>
-              </n-space>
+  <div class="setting-view">
+    <!-- 主要内容区 -->
+    <div class="page-container">
+      <!-- 页面标题栏 -->
+      <div class="page-header">
+        <div class="header-content">
+          <div class="title-section">
+            <h1 class="page-title">设置</h1>
+            <div class="title-divider"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设置内容区 -->
+      <div class="settings-grid">
+        <!-- 内核管理卡片 -->
+        <div class="setting-card kernel-card">
+          <div class="card-header">
+            <div class="header-left">
+              <div class="card-icon kernel-icon">
+                <n-icon size="24"><settings-outline /></n-icon>
+              </div>
+              <div class="header-info">
+                <h3 class="card-title">{{ t('setting.kernel.title') }}</h3>
+                <div class="version-tags">
+                  <n-tag
+                    v-if="kernelStore.version.version"
+                    type="success"
+                    size="small"
+                    round
+                    class="version-tag"
+                  >
+                    {{ formatVersion(kernelStore.version.version) }}
+                  </n-tag>
+                  <n-tag v-else type="error" size="small" round class="version-tag">
+                    {{ t('setting.kernel.notInstalled') }}
+                  </n-tag>
+                  <n-tag v-if="hasNewVersion" type="warning" size="small" round class="version-tag">
+                    {{ t('setting.kernel.newVersion') }}{{ formatVersion(kernelStore.newVersion) }}
+                  </n-tag>
+                </div>
+              </div>
             </div>
-          </template>
+          </div>
 
           <div class="card-content">
             <n-alert
@@ -45,7 +50,7 @@
               type="warning"
               :show-icon="true"
               :title="t('setting.kernel.newVersionFound')"
-              class="version-alert compact-alert"
+              class="status-alert"
             >
               {{ t('setting.kernel.updateTip') }}
             </n-alert>
@@ -55,7 +60,7 @@
               type="error"
               :show-icon="true"
               :title="t('setting.kernel.notInstalled')"
-              class="version-alert compact-alert"
+              class="status-alert"
             >
               {{ t('setting.kernel.installPrompt') }}
             </n-alert>
@@ -66,25 +71,23 @@
               :percentage="downloadProgress"
               :processing="downloadProgress < 100"
               :indicator-placement="'inside'"
-              :rail-style="{ background: 'var(--n-color-disabled)' }"
               class="download-progress"
             >
               {{ downloadMessage }}
             </n-progress>
 
-            <div class="action-row">
+            <div class="action-section">
               <n-button
                 type="primary"
                 @click="downloadTheKernel"
                 :loading="loading"
                 :disabled="downloading"
-                size="small"
-                class="download-button"
+                size="large"
+                class="primary-action-btn"
+                round
               >
                 <template #icon>
-                  <n-icon>
-                    <download-outline />
-                  </n-icon>
+                  <n-icon><download-outline /></n-icon>
                 </template>
                 {{
                   hasNewVersion
@@ -95,50 +98,52 @@
                 }}
               </n-button>
 
-              <n-space :size="8">
+              <div class="secondary-actions">
                 <n-button
-                  text
-                  size="small"
+                  quaternary
                   @click="showManualDownloadModal"
                   :disabled="downloading"
-                  class="action-button"
+                  class="secondary-action-btn"
                 >
                   {{ t('setting.kernel.manualDownload') }}
                 </n-button>
-                <n-button text size="small" @click="checkManualInstall" :disabled="downloading">
+                <n-button
+                  quaternary
+                  @click="checkManualInstall"
+                  :disabled="downloading"
+                  class="secondary-action-btn"
+                >
                   {{ t('setting.kernel.checkInstall') }}
                 </n-button>
-              </n-space>
+              </div>
             </div>
 
-            <n-alert v-if="downloadError" type="error" :show-icon="true" class="compact-alert">
-              <template #header> {{ t('setting.kernel.downloadFailed') }} </template>
+            <n-alert v-if="downloadError" type="error" :show-icon="true" class="status-alert">
+              <template #header>{{ t('setting.kernel.downloadFailed') }}</template>
               <div style="white-space: pre-line">{{ downloadError }}</div>
             </n-alert>
           </div>
-        </n-card>
-      </n-gi>
+        </div>
 
-      <!-- 启动设置卡片 -->
-      <n-gi>
-        <n-card class="setting-card" :bordered="false">
-          <template #header>
-            <div class="card-header">
-              <n-h3 class="card-title">
-                <n-icon size="18" class="card-icon">
-                  <power-outline />
-                </n-icon>
-                {{ t('setting.startup.title') }}
-              </n-h3>
+        <!-- 启动设置卡片 -->
+        <div class="setting-card">
+          <div class="card-header">
+            <div class="header-left">
+              <div class="card-icon startup-icon">
+                <n-icon size="24"><power-outline /></n-icon>
+              </div>
+              <div class="header-info">
+                <h3 class="card-title">{{ t('setting.startup.title') }}</h3>
+              </div>
             </div>
-          </template>
+          </div>
 
           <div class="card-content">
-            <div class="setting-grid">
-              <div class="setting-row">
-                <div class="setting-item">
-                  <div class="setting-title">{{ t('setting.autoStart.app') }}</div>
-                  <div class="setting-desc">
+            <div class="setting-list">
+              <div class="setting-item">
+                <div class="setting-info">
+                  <div class="setting-name">{{ t('setting.autoStart.app') }}</div>
+                  <div class="setting-description">
                     {{
                       appStore.autoStartApp
                         ? t('setting.startup.bootTip')
@@ -149,17 +154,18 @@
                 <n-switch
                   v-model:value="appStore.autoStartApp"
                   @update-value="onAutoStartChange"
-                  size="small"
+                  size="large"
+                  class="setting-switch"
                 >
                   <template #checked>{{ t('common.on') }}</template>
                   <template #unchecked>{{ t('common.off') }}</template>
                 </n-switch>
               </div>
 
-              <div class="setting-row">
-                <div class="setting-item">
-                  <div class="setting-title">{{ t('setting.autoStart.kernel') }}</div>
-                  <div class="setting-desc">
+              <div class="setting-item">
+                <div class="setting-info">
+                  <div class="setting-name">{{ t('setting.autoStart.kernel') }}</div>
+                  <div class="setting-description">
                     {{
                       appStore.autoStartKernel
                         ? t('setting.startup.autoKernelTip')
@@ -167,47 +173,51 @@
                     }}
                   </div>
                 </div>
-                <n-switch v-model:value="appStore.autoStartKernel" size="small">
+                <n-switch
+                  v-model:value="appStore.autoStartKernel"
+                  size="large"
+                  class="setting-switch"
+                >
                   <template #checked>{{ t('common.on') }}</template>
                   <template #unchecked>{{ t('common.off') }}</template>
                 </n-switch>
               </div>
             </div>
           </div>
-        </n-card>
-      </n-gi>
+        </div>
 
-      <!-- 常规设置卡片 -->
-      <n-gi>
-        <n-card class="setting-card" :bordered="false">
-          <template #header>
-            <div class="card-header">
-              <n-h3 class="card-title">
-                <n-icon size="18" class="card-icon">
-                  <globe-outline />
-                </n-icon>
-                {{ t('setting.general.title') }}
-              </n-h3>
+        <!-- 常规设置卡片 -->
+        <div class="setting-card">
+          <div class="card-header">
+            <div class="header-left">
+              <div class="card-icon general-icon">
+                <n-icon size="24"><globe-outline /></n-icon>
+              </div>
+              <div class="header-info">
+                <h3 class="card-title">{{ t('setting.general.title') }}</h3>
+              </div>
             </div>
-          </template>
+          </div>
 
           <div class="card-content">
-            <div class="general-settings">
-              <div class="setting-row">
-                <div class="setting-title">{{ $t('setting.language.title') }}</div>
+            <div class="setting-list">
+              <div class="setting-item">
+                <div class="setting-info">
+                  <div class="setting-name">{{ $t('setting.language.title') }}</div>
+                </div>
                 <n-select
                   v-model:value="localeStore.locale"
                   :options="languageOptions"
-                  size="small"
-                  class="language-select"
+                  size="large"
+                  class="setting-select"
                   @update:value="handleChangeLanguage"
                 />
               </div>
 
-              <div class="setting-row">
-                <div class="setting-item">
-                  <div class="setting-title">{{ t('setting.network.ipv6') }}</div>
-                  <div class="setting-desc">
+              <div class="setting-item">
+                <div class="setting-info">
+                  <div class="setting-name">{{ t('setting.network.ipv6') }}</div>
+                  <div class="setting-description">
                     {{
                       appStore.preferIpv6
                         ? t('setting.network.preferIpv6')
@@ -218,125 +228,122 @@
                 <n-switch
                   v-model:value="appStore.preferIpv6"
                   @update-value="onIpVersionChange"
-                  size="small"
+                  size="large"
+                  class="setting-switch"
                 >
                   <template #checked>{{ t('common.on') }}</template>
                   <template #unchecked>{{ t('common.off') }}</template>
                 </n-switch>
               </div>
 
-              <div class="setting-row">
-                <div class="setting-item">
-                  <div class="setting-title">{{ t('setting.network.ports') }}</div>
-                  <div class="setting-desc">
+              <div class="setting-item">
+                <div class="setting-info">
+                  <div class="setting-name">{{ t('setting.network.ports') }}</div>
+                  <div class="setting-description">
                     {{ t('setting.network.portsDesc') }}
                   </div>
                 </div>
-                <n-button size="small" @click="showPortSettings">
+                <n-button size="large" @click="showPortSettings" class="config-btn">
                   {{ t('setting.network.configure') }}
                 </n-button>
               </div>
             </div>
           </div>
-        </n-card>
-      </n-gi>
+        </div>
 
-      <!-- 关于信息卡片 -->
-      <n-gi>
-        <n-card class="setting-card about-card" :bordered="false">
-          <template #header>
-            <div class="card-header">
-              <n-h3 class="card-title">
-                <n-icon size="18" class="card-icon">
-                  <information-circle-outline />
-                </n-icon>
-                {{ t('setting.about.title') }}
-              </n-h3>
+        <!-- 关于信息卡片 -->
+        <div class="setting-card about-card">
+          <div class="card-header">
+            <div class="header-left">
+              <div class="card-icon about-icon">
+                <n-icon size="24"><information-circle-outline /></n-icon>
+              </div>
+              <div class="header-info">
+                <h3 class="card-title">{{ t('setting.about.title') }}</h3>
+              </div>
             </div>
-          </template>
+          </div>
 
           <div class="card-content">
-            <n-grid :cols="isMobile ? 1 : 4" :x-gap="16" :y-gap="16">
-              <n-gi>
-                <div class="about-item">
-                  <div class="about-content">
-                    <span class="about-label">{{ t('setting.about.appVersion') }}</span>
-                    <span class="about-value">{{ updateStore.appVersion }}</span>
-                  </div>
-                  <n-button
-                    text
-                    size="tiny"
-                    @click="handleCheckUpdate"
-                    :loading="checkingUpdate"
-                    class="check-button"
-                  >
-                    <template #icon>
-                      <n-icon><refresh-outline /></n-icon>
-                    </template>
-                    {{ t('setting.update.check') }}
-                  </n-button>
+            <div class="about-grid">
+              <div class="about-item">
+                <div class="about-info">
+                  <div class="about-label">{{ t('setting.about.appVersion') }}</div>
+                  <div class="about-value">{{ updateStore.appVersion }}</div>
                 </div>
-              </n-gi>
-              <n-gi>
-                <div class="about-item">
-                  <span class="about-label">{{ t('setting.about.kernelVersion') }}</span>
-                  <span class="about-value">{{ formatVersion(kernelStore.version.version) }}</span>
+                <n-button
+                  ghost
+                  @click="handleCheckUpdate"
+                  :loading="checkingUpdate"
+                  class="update-btn"
+                >
+                  <template #icon>
+                    <n-icon><refresh-outline /></n-icon>
+                  </template>
+                  {{ t('setting.update.check') }}
+                </n-button>
+              </div>
+
+              <div class="about-item">
+                <div class="about-info">
+                  <div class="about-label">{{ t('setting.about.kernelVersion') }}</div>
+                  <div class="about-value">{{ formatVersion(kernelStore.version.version) }}</div>
                 </div>
-              </n-gi>
-              <n-gi>
-                <div class="about-item">
-                  <span class="about-label">{{ t('setting.about.system') }}</span>
-                  <span class="about-value">Windows</span>
+              </div>
+
+              <div class="about-item">
+                <div class="about-info">
+                  <div class="about-label">{{ t('setting.about.system') }}</div>
+                  <div class="about-value">Windows</div>
                 </div>
-              </n-gi>
-              <n-gi>
-                <div class="about-item">
-                  <span class="about-label">{{ t('setting.about.license') }}</span>
-                  <span class="about-value">MIT License</span>
+              </div>
+
+              <div class="about-item">
+                <div class="about-info">
+                  <div class="about-label">{{ t('setting.about.license') }}</div>
+                  <div class="about-value">MIT License</div>
                 </div>
-              </n-gi>
-            </n-grid>
+              </div>
+            </div>
 
             <div class="about-footer">
-              <n-space justify="center" align="center">
+              <div class="footer-links">
                 <n-button
                   text
                   tag="a"
-                  size="small"
                   href="https://github.com/xinggaoya/sing-box-windows"
                   target="_blank"
+                  class="footer-link"
                 >
                   <template #icon>
                     <n-icon><logo-github /></n-icon>
                   </template>
                   GitHub
                 </n-button>
-                <n-divider vertical />
+                <div class="divider"></div>
                 <n-button
                   text
                   tag="a"
-                  size="small"
                   href="https://github.com/xinggaoya/sing-box-windows"
                   target="_blank"
+                  class="footer-link"
                 >
                   <template #icon>
                     <n-icon><globe-outline /></n-icon>
                   </template>
                   {{ t('setting.about.website') }}
                 </n-button>
-              </n-space>
+              </div>
             </div>
           </div>
-        </n-card>
-      </n-gi>
-    </n-grid>
+        </div>
+      </div>
+    </div>
 
     <!-- 回到顶部 -->
-    <n-back-top :right="16" :bottom="16" @click="scrollToTop">
-      <div class="back-top-btn">
-        <n-icon>
-          <chevron-up-outline />
-        </n-icon>
+    <n-back-top :right="24" :bottom="24" @click="scrollToTop">
+      <div class="back-top-button">
+        <n-icon size="20"><chevron-up-outline /></n-icon>
       </div>
     </n-back-top>
   </div>
@@ -771,20 +778,617 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.setting-container {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 20px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  animation: fade-in 0.4s ease;
+.setting-view {
+  min-height: 100vh;
+  background: linear-gradient(
+    135deg,
+    rgba(64, 128, 255, 0.02) 0%,
+    rgba(144, 147, 153, 0.02) 35%,
+    rgba(0, 180, 42, 0.02) 100%
+  );
+  padding: 0;
 }
 
-@keyframes fade-in {
+.page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* 页面标题栏 */
+.page-header {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.8) 100%);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 24px 32px;
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.title-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.title-divider {
+  width: 4px;
+  height: 32px;
+  background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
+  border-radius: 2px;
+}
+
+/* 设置网格 */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+/* 设置卡片 */
+.setting-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 0;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.setting-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.12),
+    0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.kernel-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.kernel-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
+}
+
+/* 卡片头部 */
+.card-header {
+  padding: 24px 32px 16px;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.2);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+}
+
+.kernel-icon {
+  background: linear-gradient(135deg, #4080ff 0%, #2266dd 100%);
+  box-shadow: 0 8px 24px rgba(64, 128, 255, 0.3);
+}
+
+.startup-icon {
+  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
+  box-shadow: 0 8px 24px rgba(0, 180, 42, 0.3);
+}
+
+.general-icon {
+  background: linear-gradient(135deg, #909399 0%, #7b7e83 100%);
+  box-shadow: 0 8px 24px rgba(144, 147, 153, 0.3);
+}
+
+.about-icon {
+  background: linear-gradient(135deg, #ff7d00 0%, #d66600 100%);
+  box-shadow: 0 8px 24px rgba(255, 125, 0, 0.3);
+}
+
+.header-info {
+  flex: 1;
+}
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.version-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.version-tag {
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+}
+
+/* 卡片内容 */
+.card-content {
+  padding: 24px 32px 32px;
+}
+
+/* 状态提醒 */
+.status-alert {
+  margin-bottom: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(229, 231, 235, 0.3);
+}
+
+/* 下载进度 */
+.download-progress {
+  margin-bottom: 20px;
+  height: 40px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(229, 231, 235, 0.2);
+}
+
+/* 操作区域 */
+.action-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.primary-action-btn {
+  font-weight: 600;
+  height: 48px;
+  padding: 0 24px;
+  box-shadow:
+    0 8px 32px rgba(64, 128, 255, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.primary-action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 40px rgba(64, 128, 255, 0.4),
+    0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.secondary-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.secondary-action-btn {
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.secondary-action-btn:hover:not(:disabled) {
+  color: #4080ff;
+  transform: translateY(-1px);
+}
+
+/* 设置列表 */
+.setting-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.2);
+  transition: all 0.3s ease;
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-item:hover {
+  background: linear-gradient(135deg, rgba(64, 128, 255, 0.02) 0%, rgba(144, 147, 153, 0.02) 100%);
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-left: -16px;
+  margin-right: -16px;
+  border-radius: 12px;
+}
+
+.setting-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.setting-description {
+  font-size: 0.875rem;
+  color: rgba(107, 114, 128, 0.8);
+  line-height: 1.4;
+}
+
+.setting-switch {
+  flex-shrink: 0;
+  margin-left: 20px;
+}
+
+.setting-select {
+  flex-shrink: 0;
+  min-width: 140px;
+  max-width: 150px;
+  margin-left: 20px;
+}
+
+.setting-select :deep(.n-base-selection) {
+  border-radius: 12px;
+  border: 2px solid rgba(229, 231, 235, 0.5);
+  transition: all 0.3s ease;
+}
+
+.setting-select :deep(.n-base-selection:hover) {
+  border-color: rgba(64, 128, 255, 0.3);
+}
+
+.setting-select :deep(.n-base-selection.n-base-selection--focus) {
+  border-color: #4080ff;
+  box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
+}
+
+.config-btn {
+  flex-shrink: 0;
+  margin-left: 20px;
+  border: 2px solid rgba(229, 231, 235, 0.5);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.config-btn:hover {
+  border-color: rgba(64, 128, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+/* 关于信息 */
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.about-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(248, 250, 252, 0.4) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(229, 231, 235, 0.3);
+  transition: all 0.3s ease;
+}
+
+.about-item:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.6) 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.about-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.about-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(107, 114, 128, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.about-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.update-btn {
+  margin-left: 12px;
+  border: 2px solid rgba(229, 231, 235, 0.5);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.update-btn:hover {
+  border-color: rgba(64, 128, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+/* 页脚 */
+.about-footer {
+  padding-top: 20px;
+  border-top: 1px solid rgba(229, 231, 235, 0.3);
+}
+
+.footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.footer-link {
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.footer-link:hover {
+  color: #4080ff;
+  transform: translateY(-1px);
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(229, 231, 235, 0.5);
+}
+
+/* 回到顶部 */
+.back-top-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #4080ff 0%, #2266dd 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 8px 32px rgba(64, 128, 255, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.back-top-button:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 40px rgba(64, 128, 255, 0.4),
+    0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 端口设置表单 */
+.port-settings-form {
+  padding: 16px 0;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .setting-view {
+    background: linear-gradient(
+      135deg,
+      rgba(17, 24, 39, 0.95) 0%,
+      rgba(31, 41, 55, 0.9) 35%,
+      rgba(55, 65, 81, 0.85) 100%
+    );
+  }
+
+  .page-header,
+  .setting-card {
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
+    border-color: rgba(75, 85, 99, 0.3);
+  }
+
+  .page-title {
+    color: white;
+    -webkit-text-fill-color: unset;
+    background: unset;
+    background-clip: unset;
+    -webkit-background-clip: unset;
+  }
+
+  .card-title {
+    color: #f9fafb;
+  }
+
+  .setting-name {
+    color: #f9fafb;
+  }
+
+  .setting-description {
+    color: rgba(156, 163, 175, 0.8);
+  }
+
+  .about-label {
+    color: rgba(156, 163, 175, 0.8);
+  }
+
+  .about-value {
+    color: #f9fafb;
+  }
+
+  .about-item {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.4) 100%);
+    border-color: rgba(75, 85, 99, 0.3);
+  }
+
+  .about-item:hover {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.6) 100%);
+  }
+
+  .card-header {
+    border-bottom-color: rgba(75, 85, 99, 0.3);
+  }
+
+  .setting-item {
+    border-bottom-color: rgba(75, 85, 99, 0.3);
+  }
+
+  .about-footer {
+    border-top-color: rgba(75, 85, 99, 0.3);
+  }
+
+  .divider {
+    background: rgba(75, 85, 99, 0.5);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 16px 12px;
+    gap: 20px;
+  }
+
+  .page-header {
+    padding: 20px 24px;
+    border-radius: 16px;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .card-header {
+    padding: 20px 24px 12px;
+  }
+
+  .header-left {
+    gap: 12px;
+  }
+
+  .card-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .card-title {
+    font-size: 1.125rem;
+  }
+
+  .card-content {
+    padding: 20px 24px 24px;
+  }
+
+  .setting-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 16px 0;
+  }
+
+  .setting-switch,
+  .setting-select,
+  .config-btn {
+    margin-left: 0;
+    align-self: flex-end;
+  }
+
+  .setting-select {
+    min-width: 160px;
+  }
+
+  .about-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .about-item {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .footer-links {
+    gap: 12px;
+  }
+
+  .action-section {
+    gap: 12px;
+  }
+
+  .secondary-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-container {
+    padding: 12px 8px;
+  }
+
+  .card-header {
+    padding: 16px 20px 8px;
+  }
+
+  .card-content {
+    padding: 16px 20px 20px;
+  }
+
+  .setting-card {
+    border-radius: 16px;
+  }
+
+  .primary-action-btn {
+    height: 44px;
+  }
+}
+
+/* 动画效果 */
+@keyframes slide-up {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
@@ -792,294 +1396,24 @@ onMounted(() => {
   }
 }
 
-.setting-card {
-  border-radius: 16px;
-  transition: all 0.3s ease;
-  box-shadow: var(--shadow-light, 0 2px 12px rgba(0, 0, 0, 0.08));
-  overflow: hidden;
-  height: 100%;
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border-color, rgba(239, 239, 245, 0.6));
+.setting-view {
+  animation: slide-up 0.4s ease;
 }
 
-.setting-card-primary {
-  background: linear-gradient(135deg, var(--primary-color-fade-1, #f0f7ff), transparent);
-}
-
-.feature-card {
-  min-height: 180px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  margin-bottom: 4px;
-}
-
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--n-text-color);
-}
-
-.card-icon {
-  color: var(--primary-color);
-}
-
-.card-content {
-  padding: 0 16px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.compact-card {
-  gap: 10px;
-}
-
-.compact-alert {
-  padding: 10px;
-  margin: 0;
-  font-size: 13px;
-  border-radius: 8px;
-}
-
-.version-tag {
-  font-weight: 500;
-  padding: 0 10px;
-  height: 22px;
-  border-radius: 11px;
-}
-
-.action-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.download-progress {
-  margin: 10px 0;
-  height: 32px;
-  font-weight: 500;
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.download-button {
-  font-weight: 500;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.download-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px var(--primary-color-fade-3, rgba(64, 158, 255, 0.25));
-}
-
-.action-button {
-  font-weight: 500;
-  color: var(--n-text-color);
-  transition: all 0.25s ease;
-}
-
-.action-button:hover:not(:disabled) {
-  color: var(--primary-color);
-  transform: translateY(-1px);
-}
-
-.setting-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.setting-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px;
-  border-radius: 10px;
-  background-color: var(--card-color, rgba(0, 0, 0, 0.01));
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-}
-
-.setting-row .setting-item {
-  flex: 1;
-  padding-right: 16px;
-}
-
-.setting-row:hover {
-  background-color: var(--hover-color, rgba(0, 0, 0, 0.03));
-  border-color: var(--border-color, rgba(239, 239, 245, 0.6));
-  transform: translateY(-1px);
-}
-
-.setting-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.setting-title {
-  font-size: 14px;
-  font-weight: 500;
-  width: 180px;
-  min-width: max-content;
-  color: var(--text-color-1);
-}
-
-.setting-desc {
-  font-size: 12px;
-  color: var(--text-color-3);
-}
-
-/* 语言和网络设置 */
-.general-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.language-select {
-  min-width: 120px;
-}
-
-.about-card {
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, var(--card-color, rgba(255, 255, 255, 0.8)), transparent);
-}
-
-.about-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px;
-  border-radius: 10px;
-  background-color: var(--card-color, rgba(0, 0, 0, 0.01));
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-}
-
-.about-item:hover {
-  background-color: var(--hover-color, rgba(0, 0, 0, 0.03));
-  border-color: var(--border-color, rgba(239, 239, 245, 0.6));
-  transform: translateY(-1px);
-}
-
-.about-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.about-label {
-  color: var(--text-color-2);
-  font-size: 12px;
-}
-
-.about-value {
-  color: var(--text-color-1);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.about-footer {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--divider-color);
-  text-align: center;
-}
-
-.check-button {
-  font-size: 12px;
+/* 开关和按钮的增强样式 */
+:deep(.n-switch) {
   transition: all 0.3s ease;
 }
 
-.check-button:hover {
-  transform: translateY(-1px);
-  color: var(--primary-color);
+:deep(.n-switch:hover) {
+  transform: scale(1.05);
 }
 
-.back-top-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 40px;
-  width: 40px;
-  border-radius: 20px;
-  background-color: var(--primary-color);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.back-top-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-}
-
-/* 按钮效果 */
 :deep(.n-button) {
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-:deep(.n-button:not(.n-button--disabled)):hover {
-  transform: translateY(-2px);
-}
-
-:deep(.n-button--primary-type:not(.n-button--disabled)):hover {
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
-}
-
-:deep(.n-button--error-type:not(.n-button--disabled)):hover {
-  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3);
-}
-
-:deep(.n-button--warning-type:not(.n-button--disabled)):hover {
-  box-shadow: 0 4px 12px rgba(250, 173, 20, 0.3);
-}
-
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .setting-container {
-    padding: 12px 8px;
-    gap: 16px;
-  }
-
-  .card-content {
-    padding: 0 12px 12px;
-    gap: 12px;
-  }
-
-  .card-header {
-    padding: 10px 12px;
-  }
-
-  .action-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .about-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .check-button {
-    align-self: flex-end;
-  }
+:deep(.n-button:not(.n-button--disabled):hover) {
+  transform: translateY(-1px);
 }
 </style>

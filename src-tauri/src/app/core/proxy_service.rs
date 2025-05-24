@@ -289,7 +289,7 @@ pub async fn test_group_delay<R: Runtime>(
     port: u16
 ) -> Result<(), String> {
     // 使用默认测试URL或指定的URL
-    let test_url = server.unwrap_or_else(|| "https://www.gstatic.com/generate_204".to_string());
+    let test_url = server.unwrap_or_else(|| "http://cp.cloudflare.com".to_string());
     let token = get_api_token();
 
     // 构建请求URL
@@ -438,7 +438,7 @@ pub async fn test_node_delay<R: Runtime>(
     port: u16,
 ) -> Result<(), String> {
     // 使用默认测试URL或指定的URL
-    let test_url = server.unwrap_or_else(|| "https://www.gstatic.com/generate_204".to_string());
+    let test_url = server.unwrap_or_else(|| "http://cp.cloudflare.com".to_string());
     let token = get_api_token();
 
     // 构建请求URL

@@ -1,181 +1,215 @@
 <template>
-  <div class="log-container">
-    <!-- 日志头部卡片 -->
-    <n-card class="log-header-card" :bordered="false">
-      <n-space align="center" justify="space-between">
-        <div class="title-container">
-          <n-h3 class="card-title">
-            <n-icon size="24" class="card-icon">
-              <document-text-outline />
-            </n-icon>
-            {{ t('log.title') }}
-          </n-h3>
-          <n-tag :bordered="false" type="info" size="medium" class="log-count-tag">
-            {{ displayedLogs.length }}/{{ totalLogs }} {{ t('log.records') }}
-          </n-tag>
+  <div class="log-view">
+    <!-- 主要内容区 -->
+    <div class="page-container">
+      <!-- 页面标题栏 -->
+      <div class="page-header">
+        <div class="header-content">
+          <div class="title-section">
+            <h1 class="page-title">{{ t('log.title') }}</h1>
+            <div class="title-divider"></div>
+            <n-tag type="primary" size="medium" class="log-count-tag" round>
+              {{ displayedLogs.length }}/{{ totalLogs }} {{ t('log.records') }}
+            </n-tag>
+          </div>
+          <div class="header-actions">
+            <n-switch v-model:value="autoScroll" size="large" class="auto-scroll-switch" round>
+              <template #checked>{{ t('log.autoScroll') }}</template>
+              <template #unchecked>{{ t('log.manualScroll') }}</template>
+            </n-switch>
+
+            <n-select
+              v-model:value="filterType"
+              :options="logTypeOptions"
+              :placeholder="t('log.filterType')"
+              size="large"
+              class="log-filter-select"
+            />
+
+            <div class="action-buttons">
+              <n-tooltip trigger="hover" placement="top">
+                <template #trigger>
+                  <n-button
+                    type="error"
+                    ghost
+                    circle
+                    size="large"
+                    @click="clearLogs"
+                    :disabled="!displayedLogs.length"
+                    class="action-btn clear-btn"
+                  >
+                    <template #icon>
+                      <n-icon><trash-outline /></n-icon>
+                    </template>
+                  </n-button>
+                </template>
+                {{ t('log.clear') }}
+              </n-tooltip>
+
+              <n-tooltip trigger="hover" placement="top">
+                <template #trigger>
+                  <n-button
+                    type="info"
+                    ghost
+                    circle
+                    size="large"
+                    @click="copyLogs"
+                    :disabled="!displayedLogs.length"
+                    class="action-btn copy-btn"
+                  >
+                    <template #icon>
+                      <n-icon><copy-outline /></n-icon>
+                    </template>
+                  </n-button>
+                </template>
+                {{ t('log.copy') }}
+              </n-tooltip>
+
+              <n-tooltip trigger="hover" placement="top">
+                <template #trigger>
+                  <n-button
+                    type="success"
+                    ghost
+                    circle
+                    size="large"
+                    @click="exportLogs"
+                    :disabled="!displayedLogs.length"
+                    class="action-btn export-btn"
+                  >
+                    <template #icon>
+                      <n-icon><download-outline /></n-icon>
+                    </template>
+                  </n-button>
+                </template>
+                {{ t('log.export') }}
+              </n-tooltip>
+            </div>
+          </div>
         </div>
-        <n-space :size="12">
-          <n-switch v-model:value="autoScroll" size="medium" class="auto-scroll-switch">
-            <template #checked>{{ t('log.autoScroll') }}</template>
-            <template #unchecked>{{ t('log.manualScroll') }}</template>
-          </n-switch>
+      </div>
 
-          <n-select
-            v-model:value="filterType"
-            :options="logTypeOptions"
-            :placeholder="t('log.filterType')"
-            size="medium"
-            style="width: 120px"
-            class="log-filter-select"
-          />
-
-          <n-space>
-            <n-tooltip trigger="hover" placement="top">
-              <template #trigger>
-                <n-button
-                  quaternary
-                  circle
-                  size="medium"
-                  @click="clearLogs"
-                  :disabled="!displayedLogs.length"
-                  class="log-action-button"
-                >
-                  <template #icon>
-                    <n-icon><trash-outline /></n-icon>
-                  </template>
-                </n-button>
-              </template>
-              {{ t('log.clear') }}
-            </n-tooltip>
-
-            <n-tooltip trigger="hover" placement="top">
-              <template #trigger>
-                <n-button
-                  quaternary
-                  circle
-                  size="medium"
-                  @click="copyLogs"
-                  :disabled="!displayedLogs.length"
-                  class="log-action-button"
-                >
-                  <template #icon>
-                    <n-icon><copy-outline /></n-icon>
-                  </template>
-                </n-button>
-              </template>
-              {{ t('log.copy') }}
-            </n-tooltip>
-
-            <n-tooltip trigger="hover" placement="top">
-              <template #trigger>
-                <n-button
-                  quaternary
-                  circle
-                  size="medium"
-                  @click="exportLogs"
-                  :disabled="!displayedLogs.length"
-                  class="log-action-button"
-                >
-                  <template #icon>
-                    <n-icon><download-outline /></n-icon>
-                  </template>
-                </n-button>
-              </template>
-              {{ t('log.export') }}
-            </n-tooltip>
-          </n-space>
-        </n-space>
-      </n-space>
-    </n-card>
-
-    <!-- 搜索和统计卡片 -->
-    <n-card class="log-search-card" :bordered="false">
-      <div class="search-stats-container">
-        <div class="search-container">
-          <n-input 
-            v-model:value="searchQuery" 
-            :placeholder="t('log.searchLogs')" 
+      <!-- 搜索统计区 -->
+      <div class="search-stats-section">
+        <div class="search-card">
+          <n-input
+            v-model:value="searchQuery"
+            :placeholder="t('log.searchLogs')"
             clearable
             class="search-input"
+            size="large"
           >
             <template #prefix>
               <n-icon><search-outline /></n-icon>
             </template>
           </n-input>
         </div>
-        <div class="stats-container">
-          <n-space justify="end" align="center" :wrap="false">
-            <n-statistic v-for="(count, type) in logTypeCounts" :key="type" class="log-type-statistic">
-              <template #label>
-                <n-tag :type="getLogTagType(type)" size="small" round>
-                  {{ t(`log.types.${type}`) }}
-                </n-tag>
-              </template>
-              <template #prefix>
-                <n-icon :color="getLogColor(type)">
-                  <information-circle-outline v-if="type === 'info'" />
-                  <warning-outline v-else-if="type === 'warning'" />
-                  <alert-circle-outline v-else-if="type === 'error'" />
-                  <checkmark-circle-outline v-else-if="type === 'success'" />
-                </n-icon>
-              </template>
-              {{ count }}
-            </n-statistic>
-          </n-space>
-        </div>
-      </div>
-    </n-card>
 
-    <!-- 日志内容卡片 -->
-    <n-card class="log-content-card" :bordered="false">
-      <div class="log-content-wrapper">
-        <div v-if="displayedLogs.length">
-          <!-- 使用 Naive UI 的虚拟列表组件 -->
-          <n-virtual-list
-            ref="virtualListRef"
-            class="log-virtual-list"
-            :items="formattedLogs"
-            :item-size="68"
-            :show-scrollbar="true"
-            container-style="max-height: calc(100vh - 320px); overflow: auto;"
-            @scroll="handleVirtualScroll"
+        <div class="stats-grid">
+          <div
+            v-for="(count, type) in logTypeCounts"
+            :key="type"
+            class="stat-card"
+            :class="`stat-${type}`"
           >
-            <template #default="{ item }">
-              <div class="log-item" :key="item.key" :class="`log-item-${item.type}`">
-                <div class="log-item-header">
-                  <n-tag :type="getLogTagType(item.type)" size="small" round class="log-tag">
-                    {{ t(`log.types.${item.type}`) }}
-                  </n-tag>
-                  <span class="log-time">{{ formatTime(item.timestamp, true) }}</span>
-                </div>
-                <div class="log-message-container">
-                  <span class="log-message" :class="getLogClass(item.type)">
-                    <n-ellipsis v-if="item.payload.length > 150" :line-clamp="2" expand-trigger="click">
-                      <template v-if="searchQuery && item.payload.toLowerCase().includes(searchQuery.toLowerCase())">
-                        <highlight-text :text="item.payload" :keyword="searchQuery" />
-                      </template>
-                      <template v-else>
-                        {{ item.payload }}
-                      </template>
-                    </n-ellipsis>
-                    <template v-else>
-                      <template v-if="searchQuery && item.payload.toLowerCase().includes(searchQuery.toLowerCase())">
-                        <highlight-text :text="item.payload" :keyword="searchQuery" />
-                      </template>
-                      <template v-else>
-                        {{ item.payload }}
-                      </template>
-                    </template>
-                  </span>
-                </div>
-              </div>
-            </template>
-          </n-virtual-list>
+            <div class="stat-icon">
+              <n-icon size="24">
+                <information-circle-outline v-if="type === 'info'" />
+                <warning-outline v-else-if="type === 'warning'" />
+                <alert-circle-outline v-else-if="type === 'error'" />
+                <checkmark-circle-outline v-else-if="type === 'success'" />
+              </n-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-label">{{ t(`log.types.${type}`) }}</div>
+              <div class="stat-value">{{ count }}</div>
+            </div>
+          </div>
         </div>
-        <n-empty v-else-if="searchActive && !displayedLogs.length" :description="t('log.noSearchResults')" class="log-empty" />
-        <n-empty v-else :description="t('log.noLogs')" class="log-empty" />
       </div>
-    </n-card>
+
+      <!-- 日志内容区 -->
+      <div class="log-content-section">
+        <div class="log-content-wrapper">
+          <div v-if="displayedLogs.length" class="log-list-container">
+            <n-virtual-list
+              ref="virtualListRef"
+              class="log-virtual-list"
+              :items="formattedLogs"
+              :item-size="80"
+              :show-scrollbar="true"
+              container-style="max-height: calc(100vh - 400px); overflow: auto;"
+              @scroll="handleVirtualScroll"
+            >
+              <template #default="{ item }">
+                <div class="log-item" :key="item.key" :class="`log-item-${item.type}`">
+                  <div class="log-item-indicator"></div>
+                  <div class="log-item-content">
+                    <div class="log-item-header">
+                      <n-tag :type="getLogTagType(item.type)" size="small" round class="log-tag">
+                        {{ t(`log.types.${item.type}`) }}
+                      </n-tag>
+                      <span class="log-time">{{ formatTime(item.timestamp, true) }}</span>
+                    </div>
+                    <div class="log-message-container">
+                      <div class="log-message" :class="getLogClass(item.type)">
+                        <n-ellipsis
+                          v-if="item.payload.length > 150"
+                          :line-clamp="2"
+                          expand-trigger="click"
+                        >
+                          <template
+                            v-if="
+                              searchQuery &&
+                              item.payload.toLowerCase().includes(searchQuery.toLowerCase())
+                            "
+                          >
+                            <highlight-text :text="item.payload" :keyword="searchQuery" />
+                          </template>
+                          <template v-else>
+                            {{ item.payload }}
+                          </template>
+                        </n-ellipsis>
+                        <template v-else>
+                          <template
+                            v-if="
+                              searchQuery &&
+                              item.payload.toLowerCase().includes(searchQuery.toLowerCase())
+                            "
+                          >
+                            <highlight-text :text="item.payload" :keyword="searchQuery" />
+                          </template>
+                          <template v-else>
+                            {{ item.payload }}
+                          </template>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </n-virtual-list>
+          </div>
+
+          <div v-else class="empty-state">
+            <div class="empty-content">
+              <n-icon size="48" class="empty-icon">
+                <document-text-outline />
+              </n-icon>
+              <h3 class="empty-title">
+                {{ searchActive && !displayedLogs.length ? '无搜索结果' : '暂无日志' }}
+              </h3>
+              <p class="empty-description">
+                {{
+                  searchActive && !displayedLogs.length
+                    ? '尝试调整搜索条件或筛选器'
+                    : '当前没有日志记录'
+                }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -183,16 +217,16 @@
 import { useLogStore } from '@/stores/kernel/LogStore'
 import { onMounted, ref, computed, onUnmounted, watch, nextTick, defineComponent, h } from 'vue'
 import { useMessage } from 'naive-ui'
-import { 
-  TrashOutline, 
-  CopyOutline, 
-  DownloadOutline, 
+import {
+  TrashOutline,
+  CopyOutline,
+  DownloadOutline,
   DocumentTextOutline,
   SearchOutline,
   InformationCircleOutline,
   WarningOutline,
   AlertCircleOutline,
-  CheckmarkCircleOutline
+  CheckmarkCircleOutline,
 } from '@vicons/ionicons5'
 import type { VirtualListInst } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
@@ -213,53 +247,57 @@ const HighlightText = defineComponent({
   props: {
     text: {
       type: String,
-      required: true
+      required: true,
     },
     keyword: {
       type: String,
-      required: true
-    }
+      required: true,
+    },
   },
   setup(props) {
     return () => {
       if (!props.keyword) return h('span', {}, props.text)
-      
+
       const keyword = props.keyword.toLowerCase()
       const text = props.text
       const parts = []
       let lastIndex = 0
-      
+
       let index = text.toLowerCase().indexOf(keyword)
       while (index !== -1) {
         // 添加前面的文本
         if (index > lastIndex) {
           parts.push(h('span', {}, text.substring(lastIndex, index)))
         }
-        
+
         // 添加高亮部分
         parts.push(
-          h('span', { 
-            style: { 
-              backgroundColor: 'rgba(var(--primary-color), 0.1)',
-              fontWeight: 'bold',
-              padding: '0 2px',
-              borderRadius: '2px'
-            } 
-          }, text.substring(index, index + keyword.length))
+          h(
+            'span',
+            {
+              style: {
+                backgroundColor: 'rgba(var(--primary-color), 0.1)',
+                fontWeight: 'bold',
+                padding: '0 2px',
+                borderRadius: '2px',
+              },
+            },
+            text.substring(index, index + keyword.length),
+          ),
         )
-        
+
         lastIndex = index + keyword.length
         index = text.toLowerCase().indexOf(keyword, lastIndex)
       }
-      
+
       // 添加剩余部分
       if (lastIndex < text.length) {
         parts.push(h('span', {}, text.substring(lastIndex)))
       }
-      
+
       return h('span', {}, parts)
     }
-  }
+  },
 })
 
 const message = useMessage()
@@ -290,15 +328,15 @@ const logTypeCounts = computed(() => {
     info: 0,
     warning: 0,
     error: 0,
-    success: 0
+    success: 0,
   }
-  
-  logStore.logs.forEach(log => {
+
+  logStore.logs.forEach((log) => {
     if (counts[log.type] !== undefined) {
       counts[log.type]++
     }
   })
-  
+
   return counts
 })
 
@@ -318,19 +356,19 @@ const handleVirtualScroll = (e: Event) => {
 // 更新显示的日志 - 确保此函数在watch之前定义
 const updateDisplayedLogs = () => {
   let filtered = [...logStore.logs]
-  
+
   // 按类型筛选
   if (filterType.value) {
     filtered = filtered.filter((log) => log.type === filterType.value)
   }
-  
+
   // 按搜索关键词筛选
   if (searchQuery.value) {
-    filtered = filtered.filter((log) => 
-      log.payload.toLowerCase().includes(searchQuery.value.toLowerCase())
+    filtered = filtered.filter((log) =>
+      log.payload.toLowerCase().includes(searchQuery.value.toLowerCase()),
     )
   }
-  
+
   displayedLogs.value = filtered
 }
 
@@ -358,14 +396,18 @@ watch(
 )
 
 // 监听筛选条件变化
-watch([filterType, searchQuery], () => {
-  updateDisplayedLogs()
-  nextTick(() => {
-    if (autoScroll.value) {
-      scrollToBottom()
-    }
-  })
-}, { immediate: true })
+watch(
+  [filterType, searchQuery],
+  () => {
+    updateDisplayedLogs()
+    nextTick(() => {
+      if (autoScroll.value) {
+        scrollToBottom()
+      }
+    })
+  },
+  { immediate: true },
+)
 
 // 监听自动滚动状态变化
 watch(autoScroll, (newValue) => {
@@ -469,235 +511,659 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.log-container {
-  max-width: 1200px;
+.log-view {
+  min-height: 100vh;
+  background: linear-gradient(
+    135deg,
+    rgba(64, 128, 255, 0.02) 0%,
+    rgba(144, 147, 153, 0.02) 35%,
+    rgba(0, 180, 42, 0.02) 100%
+  );
+  padding: 0;
+}
+
+.page-container {
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 16px 8px;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  height: calc(100vh - 100px);
-  animation: slide-up 0.4s ease;
+  gap: 24px;
+  min-height: calc(100vh - 48px);
 }
 
-.log-header-card,
-.log-search-card,
-.log-content-card {
-  border-radius: 16px;
-  transition: all 0.3s ease;
-  box-shadow: var(--shadow-light);
+/* 页面标题栏 */
+.page-header {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.8) 100%);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 24px 32px;
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.log-header-card:hover,
-.log-search-card:hover,
-.log-content-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-medium);
-}
-
-.title-container {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-weight: 600;
-}
-
-.card-icon {
-  color: var(--primary-color);
-}
-
-.log-count-tag {
-  font-weight: 500;
-  padding: 0 12px;
-  height: 28px;
-  background-color: rgba(144, 147, 153, 0.12);
-  color: var(--n-text-color-2);
-}
-
-.search-stats-container {
+.header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 24px;
   flex-wrap: wrap;
-  gap: 16px;
 }
 
-.search-container {
-  flex: 1;
-  min-width: 250px;
+.title-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.title-divider {
+  width: 4px;
+  height: 32px;
+  background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
+  border-radius: 2px;
+}
+
+.log-count-tag {
+  font-weight: 600;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  box-shadow: 0 4px 16px rgba(64, 128, 255, 0.2);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.auto-scroll-switch {
+  min-width: 140px;
+  font-weight: 500;
+}
+
+.log-filter-select {
+  min-width: 160px;
+}
+
+.log-filter-select :deep(.n-base-selection) {
+  border-radius: 12px;
+  border: 2px solid rgba(229, 231, 235, 0.5);
+  transition: all 0.3s ease;
+}
+
+.log-filter-select :deep(.n-base-selection:hover) {
+  border-color: rgba(64, 128, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.log-filter-select :deep(.n-base-selection.n-base-selection--focus) {
+  border-color: #4080ff;
+  box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.action-btn {
+  width: 48px;
+  height: 48px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-width: 2px;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.clear-btn:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(245, 63, 63, 0.3);
+}
+
+.copy-btn:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(64, 128, 255, 0.3);
+}
+
+.export-btn:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(0, 180, 42, 0.3);
+}
+
+/* 搜索统计区 */
+.search-stats-section {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: start;
+}
+
+.search-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  backdrop-filter: blur(20px);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .search-input {
   width: 100%;
-  max-width: 400px;
+}
+
+.search-input :deep(.n-input) {
+  border-radius: 12px;
+  border: 2px solid rgba(229, 231, 235, 0.5);
   transition: all 0.3s ease;
 }
 
-.search-input:hover {
-  transform: translateY(-1px);
+.search-input :deep(.n-input:hover) {
+  border-color: rgba(64, 128, 255, 0.3);
 }
 
-.stats-container {
-  display: flex;
-  flex-wrap: wrap;
+.search-input :deep(.n-input.n-input--focus) {
+  border-color: #4080ff;
+  box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  justify-content: flex-end;
+  min-width: 480px;
 }
 
-.log-type-statistic {
-  margin-left: 14px;
-  min-width: 60px;
-  text-align: center;
-}
-
-.log-content-card {
-  flex: 1;
+.stat-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  backdrop-filter: blur(20px);
   border-radius: 16px;
-  min-height: 300px;
+  padding: 16px;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
   overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+}
+
+.stat-card.stat-info::before {
+  background: linear-gradient(90deg, #909399 0%, #7b7e83 100%);
+}
+
+.stat-card.stat-warning::before {
+  background: linear-gradient(90deg, #ff7d00 0%, #d66600 100%);
+}
+
+.stat-card.stat-error::before {
+  background: linear-gradient(90deg, #f53f3f 0%, #cb2a2a 100%);
+}
+
+.stat-card.stat-success::before {
+  background: linear-gradient(90deg, #00b42a 0%, #009a1a 100%);
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.stat-info .stat-icon {
+  background: linear-gradient(135deg, #909399 0%, #7b7e83 100%);
+  color: white;
+  box-shadow: 0 6px 20px rgba(144, 147, 153, 0.3);
+}
+
+.stat-warning .stat-icon {
+  background: linear-gradient(135deg, #ff7d00 0%, #d66600 100%);
+  color: white;
+  box-shadow: 0 6px 20px rgba(255, 125, 0, 0.3);
+}
+
+.stat-error .stat-icon {
+  background: linear-gradient(135deg, #f53f3f 0%, #cb2a2a 100%);
+  color: white;
+  box-shadow: 0 6px 20px rgba(245, 63, 63, 0.3);
+}
+
+.stat-success .stat-icon {
+  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
+  color: white;
+  box-shadow: 0 6px 20px rgba(0, 180, 42, 0.3);
+}
+
+.stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(107, 114, 128, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+/* 日志内容区 */
+.log-content-section {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  backdrop-filter: blur(20px);
+  border-radius: 18px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+  flex: 1;
+  min-height: 400px;
 }
 
 .log-content-wrapper {
   height: 100%;
-  padding: 8px 4px;
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-list-container {
+  flex: 1;
+  padding: 16px;
 }
 
 .log-virtual-list {
-  height: calc(100vh - 320px);
-  padding: 4px;
+  height: calc(100vh - 400px);
+  min-height: 300px;
 }
 
 .log-item {
-  padding: 10px 14px;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  transition: all 0.3s ease;
-  border-left: 3px solid transparent;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.6) 100%);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  overflow: hidden;
+  display: flex;
+  gap: 16px;
+  border: 1px solid rgba(229, 231, 235, 0.3);
 }
 
 .log-item:hover {
-  transform: translateX(2px);
-  background-color: rgba(var(--primary-color), 0.03);
+  transform: translateX(4px);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.8) 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.log-item-indicator {
+  width: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.log-item-info .log-item-indicator {
+  background: linear-gradient(135deg, #909399 0%, #7b7e83 100%);
+}
+
+.log-item-warning .log-item-indicator {
+  background: linear-gradient(135deg, #ff7d00 0%, #d66600 100%);
+}
+
+.log-item-error .log-item-indicator {
+  background: linear-gradient(135deg, #f53f3f 0%, #cb2a2a 100%);
+}
+
+.log-item-success .log-item-indicator {
+  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
+}
+
+.log-item-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .log-item-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .log-tag {
   flex-shrink: 0;
-  min-width: 50px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  min-width: 60px;
   text-align: center;
-  font-weight: 500;
 }
 
 .log-time {
   flex-shrink: 0;
-  color: var(--n-text-color-3);
-  font-family: monospace;
-  font-size: 13px;
-  min-width: 80px;
+  color: rgba(107, 114, 128, 0.8);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: rgba(156, 163, 175, 0.1);
+  padding: 4px 8px;
+  border-radius: 6px;
 }
 
 .log-message-container {
-  padding-left: 8px;
-  border-left: 1px dashed rgba(var(--primary-color), 0.2);
+  padding-left: 0;
 }
 
 .log-message {
   word-break: break-word;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
 }
 
 .log-info {
-  color: var(--n-text-color-1);
+  color: #7b7e83;
 }
 
 .log-warning {
-  color: var(--warning-color);
+  color: #d66600;
 }
 
 .log-error {
-  color: var(--error-color);
+  color: #cb2a2a;
 }
 
 .log-success {
-  color: var(--success-color);
+  color: #009a1a;
 }
 
-.log-action-button {
-  transition: all 0.3s ease;
+/* 空状态 */
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
 }
 
-.log-action-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  color: var(--primary-color);
-  background-color: rgba(64, 128, 255, 0.1);
+.empty-content {
+  text-align: center;
+  max-width: 400px;
 }
 
-.auto-scroll-switch {
-  min-width: 100px;
+.empty-icon {
+  color: rgba(156, 163, 175, 0.6);
+  margin-bottom: 24px;
 }
 
-.log-filter-select {
-  transition: all 0.3s ease;
+.empty-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
 }
 
-.log-filter-select:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-focus);
+.empty-description {
+  font-size: 0.875rem;
+  color: rgba(107, 114, 128, 0.8);
+  margin: 0;
+  line-height: 1.5;
 }
 
-.log-empty {
-  margin: 60px 0;
-  opacity: 0.8;
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .log-view {
+    background: linear-gradient(
+      135deg,
+      rgba(17, 24, 39, 0.95) 0%,
+      rgba(31, 41, 55, 0.9) 35%,
+      rgba(55, 65, 81, 0.85) 100%
+    );
+  }
+
+  .page-header,
+  .search-card,
+  .stat-card,
+  .log-content-section {
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
+    border-color: rgba(75, 85, 99, 0.3);
+  }
+
+  .page-title {
+    color: white;
+    -webkit-text-fill-color: unset;
+    background: unset;
+    background-clip: unset;
+    -webkit-background-clip: unset;
+  }
+
+  .stat-label {
+    color: rgba(156, 163, 175, 0.8);
+  }
+
+  .stat-value {
+    color: #f9fafb;
+  }
+
+  .empty-title {
+    color: #f9fafb;
+  }
+
+  .log-item {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.6) 100%);
+    border-color: rgba(75, 85, 99, 0.3);
+  }
+
+  .log-item:hover {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.95) 0%, rgba(31, 41, 55, 0.8) 100%);
+  }
+
+  .log-time {
+    background: rgba(75, 85, 99, 0.2);
+    color: rgba(156, 163, 175, 0.9);
+  }
+
+  .log-info {
+    color: #a6a9ad;
+  }
+
+  .log-warning {
+    color: #ff952b;
+  }
+
+  .log-error {
+    color: #f76560;
+  }
+
+  .log-success {
+    color: #20c040;
+  }
 }
 
-.log-item-info {
-  border-left-color: var(--info-color);
-}
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .search-stats-section {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
 
-.log-item-warning {
-  border-left-color: var(--warning-color);
-}
-
-.log-item-error {
-  border-left-color: var(--error-color);
-}
-
-.log-item-success {
-  border-left-color: var(--success-color);
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    min-width: unset;
+  }
 }
 
 @media (max-width: 768px) {
-  .search-stats-container {
+  .page-container {
+    padding: 16px 12px;
+    gap: 20px;
+  }
+
+  .page-header {
+    padding: 20px 24px;
+    border-radius: 16px;
+  }
+
+  .header-content {
     flex-direction: column;
     align-items: stretch;
+    gap: 16px;
   }
-  
-  .stats-container {
-    justify-content: space-between;
+
+  .title-section {
+    justify-content: center;
+    text-align: center;
   }
-  
-  .log-type-statistic {
-    margin-left: 0;
+
+  .page-title {
+    font-size: 1.5rem;
   }
+
+  .header-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .action-buttons {
+    justify-content: center;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .stat-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .log-content-section {
+    border-radius: 16px;
+  }
+
+  .log-virtual-list {
+    height: calc(100vh - 450px);
+  }
+
+  .log-item {
+    padding: 12px 16px;
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-container {
+    padding: 12px 8px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .log-filter-select {
+    min-width: 120px;
+  }
+
+  .auto-scroll-switch {
+    min-width: 120px;
+  }
+}
+
+/* 滚动条样式 */
+:deep(.n-scrollbar-rail) {
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:deep(.n-scrollbar-rail--vertical) {
+  width: 8px;
+}
+
+:deep(.n-scrollbar-rail--horizontal) {
+  height: 8px;
+}
+
+:deep(.n-scrollbar-content) {
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4080ff 0%, #2266dd 100%);
+  transition: all 0.3s ease;
+}
+
+:deep(.n-scrollbar-content:hover) {
+  background: linear-gradient(135deg, #6699ff 0%, #4080ff 100%);
+}
+
+/* 动画效果 */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.log-view {
+  animation: slide-up 0.4s ease;
 }
 </style>

@@ -33,6 +33,12 @@ export default {
       starting: 'Starting...',
       stopping: 'Stopping...',
       restarting: 'Restarting...',
+      runningDesc: 'Kernel is running, proxy service is available',
+      stoppedDesc: 'Kernel is stopped, proxy service is unavailable',
+      startingDesc: 'Starting kernel, please wait...',
+      stoppingDesc: 'Stopping kernel, please wait...',
+      disconnected: 'Connection Error',
+      disconnectedDesc: 'Kernel is running but connection failed, please check configuration',
     },
     proxyMode: {
       system: 'System Proxy',

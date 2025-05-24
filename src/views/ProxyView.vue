@@ -1,86 +1,111 @@
 <template>
   <div class="proxy-container">
-    <!-- 顶部标题卡片 -->
-    <n-card class="proxy-card" :bordered="false">
-      <div class="card-header">
+    <!-- 顶部标题区 -->
+    <div class="header-section">
+      <div class="header-content">
         <div class="header-left">
-          <n-h3 class="card-title">
-            <n-icon size="22" class="card-icon">
-              <swap-horizontal-outline />
-            </n-icon>
-            {{ t('proxy.title') }}
-          </n-h3>
+          <div class="title-wrapper">
+            <div class="title-icon">
+              <n-icon size="20">
+                <swap-horizontal-outline />
+              </n-icon>
+            </div>
+            <h2 class="page-title">{{ t('proxy.title') }}</h2>
+          </div>
         </div>
-        <div class="header-right">
-          <!-- 刷新按钮 -->
-          <n-tooltip trigger="hover" placement="top">
-            <template #trigger>
-              <n-button
-                quaternary
-                circle
-                size="small"
-                @click="init"
-                :loading="isLoading"
-                class="refresh-button"
-              >
-                <template #icon>
-                  <n-icon>
-                    <refresh-outline />
-                  </n-icon>
-                </template>
-              </n-button>
+        <div class="header-actions">
+          <n-button
+            @click="init"
+            :loading="isLoading"
+            size="small"
+            type="primary"
+            ghost
+            class="refresh-btn"
+            round
+          >
+            <template #icon>
+              <n-icon>
+                <refresh-outline />
+              </n-icon>
             </template>
             {{ t('proxy.refreshList') }}
-          </n-tooltip>
+          </n-button>
         </div>
       </div>
-    </n-card>
+    </div>
 
-    <!-- 代理列表卡片 -->
-    <n-spin :show="isLoading">
-      <n-card class="proxy-list-card" :bordered="false">
-        <!-- 代理分组内容 -->
-        <n-tabs type="line" animated v-model:value="activeGroupTab">
+    <!-- 代理内容区 -->
+    <div class="proxy-content">
+      <n-spin :show="isLoading">
+        <n-tabs
+          type="card"
+          animated
+          v-model:value="activeGroupTab"
+          class="proxy-tabs"
+          tab-style="padding: 8px 16px; font-weight: 500;"
+        >
           <n-tab-pane
             v-for="(group, index) in [...proxyGroups].reverse()"
             :key="index"
             :name="group.name"
-            :tab="group.name"
+            class="tab-content"
           >
-            <div class="proxy-group">
-              <div class="proxy-group-info">
-                <n-space :size="10" wrap-item>
-                  <n-tag :bordered="false" type="success" size="small" class="proxy-tag">
-                    <template #icon>
-                      <n-icon size="14">
+            <template #tab>
+              <div class="tab-header">
+                <span>{{ group.name }}</span>
+                <n-badge :value="group.all.length" :max="99" show-zero type="info" size="small" />
+              </div>
+            </template>
+
+            <div class="proxy-group-container">
+              <!-- 组信息快览 -->
+              <div class="group-overview">
+                <div class="overview-cards">
+                  <div class="overview-card current-node">
+                    <div class="card-icon">
+                      <n-icon size="16">
                         <checkmark-circle-outline />
                       </n-icon>
-                    </template>
-                    {{ t('proxy.currentNode') }}: {{ group.now }}
-                  </n-tag>
-                  <n-tag :bordered="false" type="info" size="small" class="proxy-tag">
-                    <template #icon>
-                      <n-icon size="14">
+                    </div>
+                    <div class="card-content">
+                      <div class="card-label">{{ t('proxy.currentNode') }}</div>
+                      <div class="card-value">{{ group.now }}</div>
+                    </div>
+                  </div>
+
+                  <div class="overview-card node-count">
+                    <div class="card-icon">
+                      <n-icon size="16">
                         <layers-outline />
                       </n-icon>
-                    </template>
-                    {{ group.all.length }} {{ t('proxy.nodeCount') }}
-                  </n-tag>
-                  <n-tag :bordered="false" type="warning" size="small" class="proxy-tag">
-                    <template #icon>
-                      <n-icon size="14">
+                    </div>
+                    <div class="card-content">
+                      <div class="card-label">{{ t('proxy.nodeCount') }}</div>
+                      <div class="card-value">{{ group.all.length }}</div>
+                    </div>
+                  </div>
+
+                  <div class="overview-card group-type">
+                    <div class="card-icon">
+                      <n-icon size="16">
                         <information-circle-outline />
                       </n-icon>
-                    </template>
-                    {{ group.type }}
-                  </n-tag>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-label">类型</div>
+                      <div class="card-value">{{ group.type }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="overview-actions">
                   <n-button
                     @click="testNodeDelay(group.name)"
                     :loading="testingGroup === group.name"
                     size="small"
                     type="info"
-                    ghost
-                    class="proxy-button"
+                    class="test-btn"
+                    round
                   >
                     <template #icon>
                       <n-icon>
@@ -89,70 +114,66 @@
                     </template>
                     {{ t('proxy.speedTest') }}
                   </n-button>
-                </n-space>
+                </div>
               </div>
 
-              <div class="proxy-grid">
-                <div v-for="(proxy, i) in group.all" :key="i" class="proxy-grid-item">
-                  <n-card
-                    :class="{
-                      'proxy-node-card': true,
-                      'proxy-node-card-active': group.now === proxy,
-                    }"
-                    :bordered="false"
-                    hoverable
-                  >
-                    <div class="proxy-card-content">
-                      <!-- 节点名称 - 单独占一行 -->
-                      <div class="proxy-name-wrapper">
-                        <n-ellipsis :tooltip="{ width: 'trigger' }">
-                          {{ proxy }}
-                        </n-ellipsis>
-                      </div>
-
-                      <!-- 底部操作区 -->
-                      <div class="proxy-card-footer">
-                        <!-- 延迟标签 -->
-                        <n-tag
-                          :type="getNodeStatusType(proxy)"
-                          size="small"
-                          :bordered="false"
-                          round
-                          class="delay-tag"
-                          @click="testSingleNode(proxy)"
-                          :loading="testingNodes[proxy]"
-                          hoverable
-                        >
-                          {{ getNodeStatusText(proxy) }}
-                        </n-tag>
-
-                        <!-- 切换按钮 -->
-                        <n-button
-                          @click="changeProxy(group.name, proxy)"
-                          :type="group.now === proxy ? 'default' : 'primary'"
-                          size="small"
-                          :disabled="group.now === proxy"
-                          :ghost="group.now !== proxy"
-                          class="proxy-button switch-button"
-                        >
-                          <template #icon>
-                            <n-icon>
-                              <checkmark-circle-outline v-if="group.now === proxy" />
-                              <swap-horizontal-outline v-else />
-                            </n-icon>
-                          </template>
-                          {{ group.now === proxy ? t('proxy.inUse') : t('proxy.switch') }}
-                        </n-button>
-                      </div>
+              <!-- 代理节点网格 -->
+              <div class="nodes-grid">
+                <div
+                  v-for="(proxy, i) in group.all"
+                  :key="i"
+                  class="node-card"
+                  :class="{ 'node-active': group.now === proxy }"
+                >
+                  <div class="node-content">
+                    <!-- 节点名称 -->
+                    <div class="node-name">
+                      <n-ellipsis :tooltip="{ width: 'trigger' }">
+                        {{ proxy }}
+                      </n-ellipsis>
                     </div>
-                  </n-card>
+
+                    <!-- 节点状态和操作 -->
+                    <div class="node-footer">
+                      <div
+                        class="delay-indicator"
+                        :class="getNodeStatusType(proxy)"
+                        @click="testSingleNode(proxy)"
+                      >
+                        <n-icon v-if="testingNodes[proxy]" size="12" class="loading-icon">
+                          <refresh-outline />
+                        </n-icon>
+                        <span class="delay-text">{{ getNodeStatusText(proxy) }}</span>
+                      </div>
+
+                      <n-button
+                        @click="changeProxy(group.name, proxy)"
+                        :type="group.now === proxy ? 'success' : 'default'"
+                        size="tiny"
+                        :disabled="group.now === proxy"
+                        class="switch-btn"
+                        round
+                      >
+                        <template #icon>
+                          <n-icon size="12">
+                            <checkmark-circle-outline v-if="group.now === proxy" />
+                            <swap-horizontal-outline v-else />
+                          </n-icon>
+                        </template>
+                        {{ group.now === proxy ? t('proxy.inUse') : t('proxy.switch') }}
+                      </n-button>
+                    </div>
+                  </div>
+
+                  <!-- 活跃指示器 -->
+                  <div v-if="group.now === proxy" class="active-indicator"></div>
                 </div>
               </div>
             </div>
           </n-tab-pane>
         </n-tabs>
-      </n-card>
-    </n-spin>
+      </n-spin>
+    </div>
   </div>
 </template>
 
@@ -373,7 +394,7 @@ const getNodeStatusType = (name: string): string => {
 
   // 否则根据延迟返回状态
   const delay = testResults[name] || 0
-  if (delay === 0) return 'default'
+  if (delay === 0) return 'warning' // 没有测试数据，用警告色提示
   if (delay < 100) return 'success'
   if (delay < 200) return 'info'
   if (delay < 300) return 'warning'
@@ -394,7 +415,7 @@ const getNodeStatusText = (name: string): string => {
 
   // 否则显示延迟
   const delay = testResults[name] || 0
-  if (delay === 0) return t('proxy.notTested')
+  if (delay === 0) return '--'
   return `${delay}ms`
 }
 
@@ -474,219 +495,519 @@ const changeProxy = async (group: string, proxy: string) => {
 
 <style scoped>
 .proxy-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 12px 8px;
-  animation: slide-up 0.3s ease;
+  min-height: calc(100vh - 120px);
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(64, 128, 255, 0.02), rgba(144, 147, 153, 0.02));
+  animation: fadeIn 0.4s ease-out;
 }
 
-.proxy-card {
-  margin-bottom: 12px;
-  border-radius: 16px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+/* 顶部标题区 */
+.header-section {
+  margin-bottom: 20px;
 }
 
-.proxy-card:hover,
-.proxy-list-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-}
-
-.proxy-list-card {
-  border-radius: 16px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.card-header {
+.header-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-weight: 600;
-  font-size: 18px;
-}
-
-.card-icon {
-  color: var(--primary-color);
-}
-
-.refresh-button {
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease;
 }
 
-.refresh-button:hover:not(:disabled) {
+.header-content:hover {
   transform: translateY(-2px);
-  color: var(--primary-color);
-  background-color: rgba(64, 128, 255, 0.1);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
 
-.proxy-group {
-  margin-bottom: 16px;
-}
-
-.proxy-group-info {
-  margin-bottom: 16px;
-  padding: 0 2px;
-}
-
-.proxy-tag {
-  font-weight: 500;
-  padding: 0 10px;
-  height: 26px;
-  border-radius: 13px;
-}
-
-.proxy-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+.title-wrapper {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
-.proxy-node-card {
+.title-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #4080ff, #2266dd);
+  border-radius: 10px;
+  color: white;
+  box-shadow: 0 4px 12px rgba(64, 128, 255, 0.3);
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-color-1);
+  background: linear-gradient(135deg, #4080ff, #2266dd);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.refresh-btn {
+  height: 36px;
+  font-weight: 500;
   transition: all 0.3s ease;
-  border-radius: 12px;
-  border-left: 3px solid transparent;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-  background: var(--card-color);
-  backdrop-filter: blur(8px);
+}
+
+.refresh-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(64, 128, 255, 0.2);
+}
+
+/* 代理内容区 */
+.proxy-content {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   overflow: hidden;
-  height: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
 }
 
-.proxy-node-card :deep(.n-card__content) {
-  padding: 12px 14px;
+.proxy-content:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
 }
 
-.proxy-node-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+/* 标签页样式 */
+.proxy-tabs {
+  --n-tab-padding: 12px 20px;
 }
 
-.proxy-node-card-active {
-  border-left: 3px solid var(--success-color);
-  background: linear-gradient(135deg, rgba(var(--success-color-rgb), 0.05), transparent);
+.tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
 }
 
-.proxy-card-content {
+.tab-content {
+  padding: 20px;
+}
+
+/* 组概览区 */
+.group-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(64, 128, 255, 0.05), rgba(144, 147, 153, 0.05));
+  border-radius: 16px;
+  border: 1px solid rgba(64, 128, 255, 0.1);
+}
+
+.overview-cards {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.overview-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.overview-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.overview-card .card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: white;
+}
+
+.current-node .card-icon {
+  background: linear-gradient(135deg, #00b42a, #009a1a);
+}
+
+.node-count .card-icon {
+  background: linear-gradient(135deg, #4080ff, #2266dd);
+}
+
+.group-type .card-icon {
+  background: linear-gradient(135deg, #ff7d00, #d66600);
+}
+
+.card-content {
+  flex: 1;
+}
+
+.card-label {
+  font-size: 11px;
+  color: var(--text-color-3);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.card-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-color-1);
+}
+
+.test-btn {
+  height: 34px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.test-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 128, 255, 0.2);
+}
+
+/* 节点网格 */
+.nodes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  padding: 10px;
+}
+
+.node-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  min-height: 95px;
   display: flex;
   flex-direction: column;
-  height: 100%;
 }
 
-.proxy-name-wrapper {
-  font-weight: 500;
-  font-size: 14px;
-  color: var(--n-text-color-1);
-  margin-bottom: 10px;
-  padding: 2px 0;
-  line-height: 1.4;
-  border-bottom: 1px dashed rgba(128, 128, 128, 0.15);
-  padding-bottom: 8px;
+.node-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-color: rgba(64, 128, 255, 0.2);
 }
 
-.proxy-card-footer {
+.node-card.node-active {
+  background: linear-gradient(135deg, rgba(0, 180, 42, 0.08), rgba(0, 154, 26, 0.08));
+  border-color: rgba(0, 180, 42, 0.3);
+  box-shadow: 0 6px 18px rgba(0, 180, 42, 0.12);
+}
+
+.node-card.node-active:hover {
+  box-shadow: 0 8px 24px rgba(0, 180, 42, 0.16);
+}
+
+.node-content {
+  padding: 12px;
+  flex: 1;
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
+  min-height: 0;
+}
+
+.node-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-color-1);
+  margin-bottom: 8px;
+  line-height: 1.3;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+}
+
+.node-footer {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
   margin-top: auto;
 }
 
-.delay-tag {
-  font-weight: 500;
+.delay-indicator {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
   transition: all 0.2s ease;
   cursor: pointer;
-  min-width: 64px;
-  text-align: center;
-  padding: 0 8px;
-  font-size: 12px;
+  min-width: 45px;
+  justify-content: center;
+  height: 24px;
 }
 
-.delay-tag:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+.delay-indicator:hover {
+  transform: scale(1.05);
 }
 
-.proxy-button {
-  border-radius: 6px;
+.delay-indicator.success {
+  background: linear-gradient(135deg, rgba(0, 180, 42, 0.15), rgba(0, 154, 26, 0.15));
+  color: #009a1a;
+}
+
+.delay-indicator.info {
+  background: linear-gradient(135deg, rgba(144, 147, 153, 0.15), rgba(123, 126, 131, 0.15));
+  color: #7b7e83;
+}
+
+.delay-indicator.warning {
+  background: linear-gradient(135deg, rgba(255, 125, 0, 0.15), rgba(214, 102, 0, 0.15));
+  color: #d66600;
+}
+
+.delay-indicator.error {
+  background: linear-gradient(135deg, rgba(245, 63, 63, 0.15), rgba(203, 42, 42, 0.15));
+  color: #cb2a2a;
+}
+
+.loading-icon {
+  animation: spin 1s linear infinite;
+}
+
+.delay-text {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.switch-btn {
+  height: 24px;
+  font-size: 10px;
   font-weight: 500;
   transition: all 0.2s ease;
+  min-width: 50px;
+  flex-shrink: 0;
+  padding: 0 8px;
 }
 
-.switch-button {
-  height: 28px;
-  font-size: 12px;
-}
-
-.proxy-button:hover:not(:disabled) {
+.switch-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
 }
 
-:deep(.dark) .proxy-button:hover:not(:disabled) {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+/* 活跃指示器 */
+.active-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #00b42a, #009a1a);
+  animation: pulse 2s ease-in-out infinite;
 }
 
-:deep(.n-tabs .n-tab-pane) {
-  padding: 14px 0;
+/* 暗黑模式适配 */
+:deep(.dark) .header-content {
+  background: rgba(24, 24, 28, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-:deep(.n-card.proxy-node-card) {
-  background-color: var(--card-color);
+:deep(.dark) .proxy-content {
+  background: rgba(24, 24, 28, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-:deep(.n-card.proxy-node-card:hover) {
-  background-color: var(--card-color-hover);
+:deep(.dark) .overview-card {
+  background: rgba(40, 40, 48, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-:deep(.n-card.proxy-node-card-active) {
-  background: linear-gradient(135deg, rgba(var(--success-color-rgb), 0.08), transparent);
+:deep(.dark) .node-card {
+  background: rgba(40, 40, 48, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-@keyframes slide-up {
-  0% {
+:deep(.dark) .node-card:hover {
+  border-color: rgba(64, 128, 255, 0.3);
+}
+
+:deep(.dark) .group-overview {
+  background: linear-gradient(135deg, rgba(64, 128, 255, 0.08), rgba(144, 147, 153, 0.08));
+  border-color: rgba(64, 128, 255, 0.15);
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(20px);
   }
-  100% {
+  to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-@media (max-width: 640px) {
-  .proxy-grid {
-    grid-template-columns: 1fr;
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .proxy-container {
+    padding: 12px;
   }
 
-  .proxy-tag {
-    height: 24px;
-    font-size: 12px;
+  .header-content {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 12px;
   }
 
-  .switch-button {
-    height: 26px;
-    font-size: 12px;
+  .title-wrapper {
+    justify-content: center;
   }
+
+  .group-overview {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .overview-cards {
+    justify-content: center;
+  }
+
+  .overview-actions {
+    align-self: center;
+  }
+
+  .nodes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+  }
+
+  .node-card {
+    min-height: 85px;
+  }
+
+  .tab-content {
+    padding: 16px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .overview-cards {
+    flex-direction: column;
+  }
+
+  .overview-card {
+    min-width: auto;
+  }
+
+  .nodes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .node-card {
+    min-height: 80px;
+  }
+
+  .node-content {
+    padding: 10px;
+  }
+
+  .node-name {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+
+  .node-footer {
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+  }
+
+  .delay-indicator {
+    align-self: center;
+    min-width: 60px;
+    height: 22px;
+    font-size: 9px;
+  }
+
+  .switch-btn {
+    width: 100%;
+    min-width: auto;
+    height: 22px;
+    font-size: 9px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .nodes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 24px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .nodes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 28px;
+  }
+}
+
+/* Naive UI 组件样式覆盖 */
+:deep(.n-tabs .n-tabs-nav) {
+  background: rgba(248, 250, 252, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+:deep(.n-tabs .n-tab-pane) {
+  padding: 0;
+}
+
+:deep(.n-spin-container) {
+  min-height: 200px;
+}
+
+:deep(.n-badge) {
+  --n-font-size: 10px;
 }
 </style>

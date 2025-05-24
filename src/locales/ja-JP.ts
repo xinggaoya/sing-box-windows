@@ -33,6 +33,12 @@ export default {
       starting: '起動中...',
       stopping: '停止中...',
       restarting: '再起動中...',
+      runningDesc: 'カーネルが実行中です、プロキシサービスが利用可能です',
+      stoppedDesc: 'カーネルが停止しています、プロキシサービスは利用できません',
+      startingDesc: 'カーネルを起動中です、お待ちください...',
+      stoppingDesc: 'カーネルを停止中です、お待ちください...',
+      disconnected: '接続異常',
+      disconnectedDesc: 'カーネルは起動していますが接続に異常があります、設定を確認してください',
     },
     proxyMode: {
       system: 'システムプロキシ',

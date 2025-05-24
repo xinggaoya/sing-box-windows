@@ -33,6 +33,12 @@ export default {
       starting: '启动中...',
       stopping: '停止中...',
       restarting: '重启中...',
+      runningDesc: '内核正在运行，代理服务可用',
+      stoppedDesc: '内核已停止，代理服务不可用',
+      startingDesc: '正在启动内核，请稍候...',
+      stoppingDesc: '正在停止内核，请稍候...',
+      disconnected: '连接异常',
+      disconnectedDesc: '内核已启动但连接异常，请检查配置',
     },
     proxyMode: {
       system: '系统代理',
