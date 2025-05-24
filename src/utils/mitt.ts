@@ -33,6 +33,9 @@ export type Events = {
   'window-show': void
   'window-restore': void
 
+  // 应用初始化事件
+  'message-instance-ready': unknown
+
   // 进程相关事件
   'process-status': void
   'download-progress': DownloadProgress
