@@ -191,11 +191,6 @@ export class MemoryMonitor {
     const performanceWithMemory = performance as PerformanceWithMemory
     if (performanceWithMemory.memory) {
       const memory = performanceWithMemory.memory
-      console.log('Memory Usage:', {
-        used: `${Math.round(memory.usedJSHeapSize / 1024 / 1024)}MB`,
-        total: `${Math.round(memory.totalJSHeapSize / 1024 / 1024)}MB`,
-        limit: `${Math.round(memory.jsHeapSizeLimit / 1024 / 1024)}MB`,
-      })
     }
   }
 

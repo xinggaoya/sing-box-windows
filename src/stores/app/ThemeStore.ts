@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { darkTheme } from 'naive-ui'
 import { useOsTheme } from 'naive-ui'
 
@@ -10,6 +10,26 @@ export const useThemeStore = defineStore(
     const osTheme = useOsTheme()
     const isDark = ref(osTheme.value === 'dark')
     const theme = computed(() => (isDark.value ? darkTheme : null))
+
+    // 应用暗黑类到DOM
+    const applyThemeClass = (dark: boolean) => {
+      if (typeof document !== 'undefined') {
+        if (dark) {
+          document.documentElement.classList.add('dark')
+        } else {
+          document.documentElement.classList.remove('dark')
+        }
+      }
+    }
+
+    // 监听主题变化并应用到DOM
+    watch(
+      isDark,
+      (newValue) => {
+        applyThemeClass(newValue)
+      },
+      { immediate: true },
+    )
 
     // 主题切换
     const toggleTheme = () => {
@@ -30,5 +50,5 @@ export const useThemeStore = defineStore(
   },
   {
     persist: true,
-  }
+  },
 )

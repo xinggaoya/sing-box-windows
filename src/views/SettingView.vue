@@ -1213,74 +1213,72 @@ onMounted(() => {
 }
 
 /* 深色模式支持 */
-@media (prefers-color-scheme: dark) {
-  .setting-view {
-    background: linear-gradient(
-      135deg,
-      rgba(17, 24, 39, 0.95) 0%,
-      rgba(31, 41, 55, 0.9) 35%,
-      rgba(55, 65, 81, 0.85) 100%
-    );
-  }
+:deep(.dark) .setting-view {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 24, 39, 0.95) 0%,
+    rgba(31, 41, 55, 0.9) 35%,
+    rgba(55, 65, 81, 0.85) 100%
+  );
+}
 
-  .page-header,
-  .setting-card {
-    background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
-    border-color: rgba(75, 85, 99, 0.3);
-  }
+:deep(.dark) .page-header,
+:deep(.dark) .setting-card {
+  background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
+  border-color: rgba(75, 85, 99, 0.3);
+}
 
-  .page-title {
-    color: white;
-    -webkit-text-fill-color: unset;
-    background: unset;
-    background-clip: unset;
-    -webkit-background-clip: unset;
-  }
+:deep(.dark) .page-title {
+  color: white;
+  -webkit-text-fill-color: unset;
+  background: unset;
+  background-clip: unset;
+  -webkit-background-clip: unset;
+}
 
-  .card-title {
-    color: #f9fafb;
-  }
+:deep(.dark) .card-title {
+  color: #f9fafb;
+}
 
-  .setting-name {
-    color: #f9fafb;
-  }
+:deep(.dark) .setting-name {
+  color: #f9fafb;
+}
 
-  .setting-description {
-    color: rgba(156, 163, 175, 0.8);
-  }
+:deep(.dark) .setting-description {
+  color: rgba(156, 163, 175, 0.8);
+}
 
-  .about-label {
-    color: rgba(156, 163, 175, 0.8);
-  }
+:deep(.dark) .about-label {
+  color: rgba(156, 163, 175, 0.8);
+}
 
-  .about-value {
-    color: #f9fafb;
-  }
+:deep(.dark) .about-value {
+  color: #f9fafb;
+}
 
-  .about-item {
-    background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.4) 100%);
-    border-color: rgba(75, 85, 99, 0.3);
-  }
+:deep(.dark) .about-item {
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.4) 100%);
+  border-color: rgba(75, 85, 99, 0.3);
+}
 
-  .about-item:hover {
-    background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.6) 100%);
-  }
+:deep(.dark) .about-item:hover {
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.6) 100%);
+}
 
-  .card-header {
-    border-bottom-color: rgba(75, 85, 99, 0.3);
-  }
+:deep(.dark) .card-header {
+  border-bottom-color: rgba(75, 85, 99, 0.3);
+}
 
-  .setting-item {
-    border-bottom-color: rgba(75, 85, 99, 0.3);
-  }
+:deep(.dark) .setting-item {
+  border-bottom-color: rgba(75, 85, 99, 0.3);
+}
 
-  .about-footer {
-    border-top-color: rgba(75, 85, 99, 0.3);
-  }
+:deep(.dark) .about-footer {
+  border-top-color: rgba(75, 85, 99, 0.3);
+}
 
-  .divider {
-    background: rgba(75, 85, 99, 0.5);
-  }
+:deep(.dark) .divider {
+  background: rgba(75, 85, 99, 0.5);
 }
 
 /* 响应式设计 */

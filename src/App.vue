@@ -1,5 +1,6 @@
 <template>
-  <n-config-provider :theme="themeStore?.theme" :theme-overrides="themeOverrides">
+  <n-config-provider :theme="themeStore.theme" :theme-overrides="themeOverrides">
+    <n-global-style />
     <n-dialog-provider>
       <n-modal-provider>
         <n-notification-provider>
@@ -27,6 +28,9 @@ import type { Router } from 'vue-router'
 import { eventListenerManager, memoryMonitor } from '@/utils/performance'
 import { storeManager, type StoreType } from '@/stores/StoreManager'
 
+// 直接导入需要的Store
+import { useThemeStore } from '@/stores/app/ThemeStore'
+
 // Store类型定义
 interface AppStore {
   setMessageInstance: (instance: ReturnType<typeof useMessage>) => void
@@ -35,10 +39,6 @@ interface AppStore {
   isRunning: boolean
   switchProxyMode: (mode: string) => Promise<void>
   setRunningState: (state: boolean) => void
-}
-
-interface ThemeStore {
-  theme: unknown
 }
 
 interface LocaleStore {
@@ -86,9 +86,11 @@ const MessageConsumer = defineComponent({
 const router = useRouter()
 const { locale } = useI18n()
 
+// 直接使用主题Store（保证与MainLayout.vue使用同一个实例）
+const themeStore = useThemeStore()
+
 // 核心Store（按需懒加载）
 let appStore: AppStore | null = null
-let themeStore: ThemeStore | null = null
 let localeStore: LocaleStore | null = null
 let windowStore: WindowStore | null = null
 
@@ -97,9 +99,8 @@ onMounted(async () => {
     // 初始化Store管理器
     await storeManager.initialize()
 
-    // 加载核心Store
+    // 加载核心Store（不包括theme，因为已经直接导入了）
     appStore = await storeManager.loadStore<AppStore>('app')
-    themeStore = await storeManager.loadStore<ThemeStore>('theme')
     localeStore = await storeManager.loadStore<LocaleStore>('locale')
     windowStore = await storeManager.loadStore<WindowStore>('window')
 

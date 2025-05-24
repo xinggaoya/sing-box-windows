@@ -161,12 +161,14 @@ import {
 } from '@vicons/ionicons5'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useI18n } from 'vue-i18n'
+import { useThemeStore } from '@/stores/app/ThemeStore'
 
 const message = useMessage()
 const loading = ref(false)
 const connectionStore = useConnectionStore()
 const { t } = useI18n()
 const activeCountRef = ref(null)
+const themeStore = useThemeStore()
 
 // 搜索和筛选
 const searchQuery = ref('')
@@ -994,49 +996,47 @@ onUnmounted(() => {
 }
 
 /* 深色模式支持 */
-@media (prefers-color-scheme: dark) {
-  .connections-view {
-    background: linear-gradient(
-      135deg,
-      rgba(17, 24, 39, 0.95) 0%,
-      rgba(31, 41, 55, 0.9) 35%,
-      rgba(55, 65, 81, 0.85) 100%
-    );
-  }
+:deep(.dark) .connections-view {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 24, 39, 0.95) 0%,
+    rgba(31, 41, 55, 0.9) 35%,
+    rgba(55, 65, 81, 0.85) 100%
+  );
+}
 
-  .page-header,
-  .stat-card,
-  .filter-card,
-  .connections-section {
-    background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
-    border-color: rgba(75, 85, 99, 0.3);
-  }
+:deep(.dark) .page-header,
+:deep(.dark) .stat-card,
+:deep(.dark) .filter-card,
+:deep(.dark) .connections-section {
+  background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
+  border-color: rgba(75, 85, 99, 0.3);
+}
 
-  .page-title {
-    color: white;
-    -webkit-text-fill-color: unset;
-    background: unset;
-    background-clip: unset;
-    -webkit-background-clip: unset;
-  }
+:deep(.dark) .page-title {
+  color: white;
+  -webkit-text-fill-color: unset;
+  background: unset;
+  background-clip: unset;
+  -webkit-background-clip: unset;
+}
 
-  .stat-label {
-    color: rgba(156, 163, 175, 0.8);
-  }
+:deep(.dark) .stat-label {
+  color: rgba(156, 163, 175, 0.8);
+}
 
-  .stat-value {
-    color: #f9fafb;
-  }
+:deep(.dark) .stat-value {
+  color: #f9fafb;
+}
 
-  .empty-title {
-    color: #f9fafb;
-  }
+:deep(.dark) .empty-title {
+  color: #f9fafb;
+}
 
-  .connections-table :deep(.n-data-table-th) {
-    background: linear-gradient(135deg, rgba(55, 65, 81, 0.9) 0%, rgba(31, 41, 55, 0.8) 100%);
-    color: #f9fafb;
-    border-bottom-color: rgba(75, 85, 99, 0.5);
-  }
+:deep(.dark) .connections-table :deep(.n-data-table-th) {
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.9) 0%, rgba(31, 41, 55, 0.8) 100%);
+  color: #f9fafb;
+  border-bottom-color: rgba(75, 85, 99, 0.5);
 }
 
 /* 响应式设计 */

@@ -959,73 +959,71 @@ onUnmounted(() => {
 }
 
 /* 深色模式支持 */
-@media (prefers-color-scheme: dark) {
-  .log-view {
-    background: linear-gradient(
-      135deg,
-      rgba(17, 24, 39, 0.95) 0%,
-      rgba(31, 41, 55, 0.9) 35%,
-      rgba(55, 65, 81, 0.85) 100%
-    );
-  }
+:deep(.dark) .log-view {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 24, 39, 0.95) 0%,
+    rgba(31, 41, 55, 0.9) 35%,
+    rgba(55, 65, 81, 0.85) 100%
+  );
+}
 
-  .page-header,
-  .search-card,
-  .stat-card,
-  .log-content-section {
-    background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
-    border-color: rgba(75, 85, 99, 0.3);
-  }
+:deep(.dark) .page-header,
+:deep(.dark) .search-card,
+:deep(.dark) .stat-card,
+:deep(.dark) .log-content-section {
+  background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
+  border-color: rgba(75, 85, 99, 0.3);
+}
 
-  .page-title {
-    color: white;
-    -webkit-text-fill-color: unset;
-    background: unset;
-    background-clip: unset;
-    -webkit-background-clip: unset;
-  }
+:deep(.dark) .page-title {
+  color: white;
+  -webkit-text-fill-color: unset;
+  background: unset;
+  background-clip: unset;
+  -webkit-background-clip: unset;
+}
 
-  .stat-label {
-    color: rgba(156, 163, 175, 0.8);
-  }
+:deep(.dark) .stat-label {
+  color: rgba(156, 163, 175, 0.8);
+}
 
-  .stat-value {
-    color: #f9fafb;
-  }
+:deep(.dark) .stat-value {
+  color: #f9fafb;
+}
 
-  .empty-title {
-    color: #f9fafb;
-  }
+:deep(.dark) .empty-title {
+  color: #f9fafb;
+}
 
-  .log-item {
-    background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.6) 100%);
-    border-color: rgba(75, 85, 99, 0.3);
-  }
+:deep(.dark) .log-item {
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.6) 100%);
+  border-color: rgba(75, 85, 99, 0.3);
+}
 
-  .log-item:hover {
-    background: linear-gradient(135deg, rgba(55, 65, 81, 0.95) 0%, rgba(31, 41, 55, 0.8) 100%);
-  }
+:deep(.dark) .log-item:hover {
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.95) 0%, rgba(31, 41, 55, 0.8) 100%);
+}
 
-  .log-time {
-    background: rgba(75, 85, 99, 0.2);
-    color: rgba(156, 163, 175, 0.9);
-  }
+:deep(.dark) .log-time {
+  background: rgba(75, 85, 99, 0.2);
+  color: rgba(156, 163, 175, 0.9);
+}
 
-  .log-info {
-    color: #a6a9ad;
-  }
+:deep(.dark) .log-info {
+  color: #a6a9ad;
+}
 
-  .log-warning {
-    color: #ff952b;
-  }
+:deep(.dark) .log-warning {
+  color: #ff952b;
+}
 
-  .log-error {
-    color: #f76560;
-  }
+:deep(.dark) .log-error {
+  color: #f76560;
+}
 
-  .log-success {
-    color: #20c040;
-  }
+:deep(.dark) .log-success {
+  color: #20c040;
 }
 
 /* 响应式设计 */

@@ -1012,48 +1012,81 @@ onMounted(() => {
 
 /* 暗黑模式适配 */
 :deep(.dark) .header-content {
-  background: rgba(24, 24, 28, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(31, 41, 55, 0.95);
+  border-color: rgba(75, 85, 99, 0.3);
 }
 
 :deep(.dark) .sub-content {
-  background: linear-gradient(135deg, rgba(248, 250, 252, 0.8), rgba(241, 245, 249, 0.8));
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(31, 41, 55, 0.95);
+  border-color: rgba(75, 85, 99, 0.3);
 }
 
 :deep(.dark) .sub-card {
-  background: rgba(40, 40, 48, 0.9);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(55, 65, 81, 0.9);
+  border-color: rgba(75, 85, 99, 0.3);
 }
 
 :deep(.dark) .sub-card:hover {
   border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(55, 65, 81, 0.95);
+}
+
+:deep(.dark) .sub-card.sub-active {
+  background: rgba(6, 78, 59, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+:deep(.dark) .page-title {
+  color: white;
+  -webkit-text-fill-color: unset;
+  background: unset;
+  background-clip: unset;
+  -webkit-background-clip: unset;
+}
+
+:deep(.dark) .sub-name {
+  color: #f9fafb;
+}
+
+:deep(.dark) .update-time {
+  color: rgba(156, 163, 175, 0.8);
+}
+
+:deep(.dark) .empty-title {
+  color: #f9fafb;
+}
+
+:deep(.dark) .empty-description {
+  color: rgba(156, 163, 175, 0.8);
 }
 
 :deep(.dark) .url-display {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
-  border-color: rgba(71, 85, 105, 0.8);
+  background: rgba(17, 24, 39, 0.8);
+  border-color: rgba(75, 85, 99, 0.5);
+  color: rgba(156, 163, 175, 0.9);
 }
 
 :deep(.dark) .url-display:hover {
-  background: linear-gradient(135deg, rgba(51, 65, 85, 0.8), rgba(30, 41, 59, 0.8));
-  border-color: rgba(100, 116, 139, 0.8);
+  background: rgba(31, 41, 55, 0.8);
+  border-color: rgba(99, 102, 241, 0.3);
 }
 
 :deep(.dark) .code-input {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
+  background: rgba(17, 24, 39, 0.8);
+  border-color: rgba(75, 85, 99, 0.5);
 }
 
 :deep(.dark) .modal-content {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
+  background: rgba(31, 41, 55, 0.95);
 }
 
 :deep(.dark) .active-indicator {
-  background: linear-gradient(135deg, rgba(51, 65, 85, 0.8), rgba(30, 41, 59, 0.8));
+  background: linear-gradient(90deg, #10b981, #059669);
 }
 
-:deep(.dark) .sub-content:hover {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
+:deep(.dark) .status-tag.active {
+  background: rgba(6, 78, 59, 0.3);
+  color: #10b981;
 }
 
 /* 动画效果 */
