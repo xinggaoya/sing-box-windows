@@ -1,5 +1,6 @@
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
+use tauri_plugin_autostart::MacosLauncher;
 use tracing_subscriber::{fmt, EnvFilter};
 
 pub mod app;
@@ -30,7 +31,10 @@ pub fn run() {
         .manage(state)
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_websocket::init())
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--hide"]),
+        ))
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             // 已有实例正在运行时的处理
             tracing::info!("应用已在运行中: {:?}, {:?}", argv, cwd);

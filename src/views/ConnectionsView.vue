@@ -677,20 +677,20 @@ onUnmounted(() => {
 .page-container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 24px 20px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 /* 页面标题栏 */
 .page-header {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.8) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 20px;
-  padding: 24px 32px;
+  border-radius: 16px;
+  padding: 16px 24px;
   box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.08),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -699,17 +699,17 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
 }
 
 .title-section {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .page-title {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
   background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
@@ -720,18 +720,18 @@ onUnmounted(() => {
 }
 
 .title-divider {
-  width: 4px;
-  height: 32px;
+  width: 3px;
+  height: 24px;
   background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
   border-radius: 2px;
 }
 
 .refresh-btn {
   font-weight: 600;
-  padding: 0 24px;
-  height: 48px;
+  padding: 0 20px;
+  height: 40px;
   box-shadow:
-    0 8px 32px rgba(64, 128, 255, 0.3),
+    0 6px 24px rgba(64, 128, 255, 0.25),
     0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -746,20 +746,20 @@ onUnmounted(() => {
 /* 统计卡片区 */
 .stats-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
 }
 
 .stat-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 18px;
-  padding: 24px;
+  border-radius: 14px;
+  padding: 16px;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 6px 24px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.3);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -774,7 +774,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 3px;
-  border-radius: 18px 18px 0 0;
+  border-radius: 14px 14px 0 0;
 }
 
 .stat-card.active-connections::before {
@@ -797,13 +797,13 @@ onUnmounted(() => {
 }
 
 .stat-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 600;
 }
 
@@ -839,7 +839,7 @@ onUnmounted(() => {
 }
 
 .stat-value {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: #1f2937;
   line-height: 1.2;
@@ -853,10 +853,10 @@ onUnmounted(() => {
 .filter-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 18px;
-  padding: 24px;
+  border-radius: 14px;
+  padding: 16px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 6px 24px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.3);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -864,9 +864,9 @@ onUnmounted(() => {
 
 .filter-row {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: stretch;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
 
@@ -925,9 +925,9 @@ onUnmounted(() => {
 .connections-section {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 18px;
+  border-radius: 14px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 6px 24px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.3);
   overflow: hidden;
@@ -950,11 +950,11 @@ onUnmounted(() => {
   font-weight: 600;
   color: #374151;
   border-bottom: 2px solid rgba(229, 231, 235, 0.5);
-  padding: 16px 12px;
+  padding: 12px 8px;
 }
 
 .connections-table :deep(.n-data-table-td) {
-  padding: 12px;
+  padding: 8px;
   border-bottom: 1px solid rgba(229, 231, 235, 0.3);
 }
 
@@ -1042,39 +1042,39 @@ onUnmounted(() => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .page-container {
-    padding: 16px 12px;
-    gap: 20px;
+    padding: 12px 8px;
+    gap: 12px;
   }
 
   .page-header {
-    padding: 20px 24px;
-    border-radius: 16px;
+    padding: 12px 16px;
+    border-radius: 12px;
   }
 
   .header-content {
     flex-direction: column;
     align-items: stretch;
-    gap: 16px;
+    gap: 12px;
   }
 
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     text-align: center;
   }
 
   .stats-section {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 10px;
   }
 
   .stat-card {
-    padding: 20px;
-    border-radius: 16px;
+    padding: 12px;
+    border-radius: 12px;
   }
 
   .filter-row {
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   .search-input {
@@ -1086,16 +1086,16 @@ onUnmounted(() => {
   }
 
   .connections-section {
-    border-radius: 16px;
+    border-radius: 12px;
   }
 
   .connections-table :deep(.n-data-table) {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
   }
 
   .connections-table :deep(.n-data-table-th),
   .connections-table :deep(.n-data-table-td) {
-    padding: 8px 6px;
+    padding: 6px 4px;
   }
 }
 

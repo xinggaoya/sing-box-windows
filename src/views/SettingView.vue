@@ -792,20 +792,20 @@ onMounted(() => {
 .page-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px 20px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 /* 页面标题栏 */
 .page-header {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.8) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 20px;
-  padding: 24px 32px;
+  border-radius: 16px;
+  padding: 16px 24px;
   box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.08),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -814,17 +814,17 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
 }
 
 .title-section {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .page-title {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
   background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
@@ -835,8 +835,8 @@ onMounted(() => {
 }
 
 .title-divider {
-  width: 4px;
-  height: 32px;
+  width: 3px;
+  height: 24px;
   background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
   border-radius: 2px;
 }
@@ -845,17 +845,17 @@ onMounted(() => {
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
+  gap: 16px;
 }
 
 /* 设置卡片 */
 .setting-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 0;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 6px 24px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.3);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -886,20 +886,20 @@ onMounted(() => {
 
 /* 卡片头部 */
 .card-header {
-  padding: 24px 32px 16px;
+  padding: 16px 24px 12px;
   border-bottom: 1px solid rgba(229, 231, 235, 0.2);
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -932,15 +932,15 @@ onMounted(() => {
 }
 
 .card-title {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 600;
   color: #1f2937;
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
 }
 
 .version-tags {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -952,21 +952,21 @@ onMounted(() => {
 
 /* 卡片内容 */
 .card-content {
-  padding: 24px 32px 32px;
+  padding: 16px 24px 20px;
 }
 
 /* 状态提醒 */
 .status-alert {
-  margin-bottom: 16px;
-  border-radius: 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
   border: 1px solid rgba(229, 231, 235, 0.3);
 }
 
 /* 下载进度 */
 .download-progress {
-  margin-bottom: 20px;
-  height: 40px;
-  border-radius: 20px;
+  margin-bottom: 16px;
+  height: 36px;
+  border-radius: 18px;
   overflow: hidden;
   background: rgba(229, 231, 235, 0.2);
 }
@@ -975,15 +975,15 @@ onMounted(() => {
 .action-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .primary-action-btn {
   font-weight: 600;
-  height: 48px;
-  padding: 0 24px;
+  height: 40px;
+  padding: 0 20px;
   box-shadow:
-    0 8px 32px rgba(64, 128, 255, 0.3),
+    0 6px 24px rgba(64, 128, 255, 0.25),
     0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -997,7 +997,7 @@ onMounted(() => {
 
 .secondary-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   justify-content: center;
 }
 
@@ -1022,7 +1022,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 0;
+  padding: 16px 0;
   border-bottom: 1px solid rgba(229, 231, 235, 0.2);
   transition: all 0.3s ease;
 }
@@ -1033,11 +1033,11 @@ onMounted(() => {
 
 .setting-item:hover {
   background: linear-gradient(135deg, rgba(64, 128, 255, 0.02) 0%, rgba(144, 147, 153, 0.02) 100%);
-  padding-left: 16px;
-  padding-right: 16px;
-  margin-left: -16px;
-  margin-right: -16px;
-  border-radius: 12px;
+  padding-left: 12px;
+  padding-right: 12px;
+  margin-left: -12px;
+  margin-right: -12px;
+  border-radius: 10px;
 }
 
 .setting-info {
@@ -1060,14 +1060,14 @@ onMounted(() => {
 
 .setting-switch {
   flex-shrink: 0;
-  margin-left: 20px;
+  margin-left: 16px;
 }
 
 .setting-select {
   flex-shrink: 0;
-  min-width: 140px;
-  max-width: 150px;
-  margin-left: 20px;
+  min-width: 120px;
+  max-width: 130px;
+  margin-left: 16px;
 }
 
 .setting-select :deep(.n-base-selection) {
@@ -1087,9 +1087,9 @@ onMounted(() => {
 
 .config-btn {
   flex-shrink: 0;
-  margin-left: 20px;
+  margin-left: 16px;
   border: 2px solid rgba(229, 231, 235, 0.5);
-  border-radius: 12px;
+  border-radius: 10px;
   transition: all 0.3s ease;
 }
 
@@ -1101,18 +1101,18 @@ onMounted(() => {
 /* 关于信息 */
 .about-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .about-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px;
+  padding: 16px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(248, 250, 252, 0.4) 100%);
-  border-radius: 16px;
+  border-radius: 12px;
   border: 1px solid rgba(229, 231, 235, 0.3);
   transition: all 0.3s ease;
 }
@@ -1144,9 +1144,9 @@ onMounted(() => {
 }
 
 .update-btn {
-  margin-left: 12px;
+  margin-left: 10px;
   border: 2px solid rgba(229, 231, 235, 0.5);
-  border-radius: 12px;
+  border-radius: 10px;
   transition: all 0.3s ease;
 }
 
@@ -1157,7 +1157,7 @@ onMounted(() => {
 
 /* 页脚 */
 .about-footer {
-  padding-top: 20px;
+  padding-top: 16px;
   border-top: 1px solid rgba(229, 231, 235, 0.3);
 }
 
@@ -1165,7 +1165,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .footer-link {
@@ -1180,22 +1180,22 @@ onMounted(() => {
 
 .divider {
   width: 1px;
-  height: 20px;
+  height: 16px;
   background: rgba(229, 231, 235, 0.5);
 }
 
 /* 回到顶部 */
 .back-top-button {
-  width: 48px;
-  height: 48px;
-  border-radius: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
   background: linear-gradient(135deg, #4080ff 0%, #2266dd 100%);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow:
-    0 8px 32px rgba(64, 128, 255, 0.3),
+    0 6px 24px rgba(64, 128, 255, 0.25),
     0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1209,7 +1209,7 @@ onMounted(() => {
 
 /* 端口设置表单 */
 .port-settings-form {
-  padding: 16px 0;
+  padding: 12px 0;
 }
 
 /* 深色模式支持 */
@@ -1284,45 +1284,45 @@ onMounted(() => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .page-container {
-    padding: 16px 12px;
-    gap: 20px;
-  }
-
-  .page-header {
-    padding: 20px 24px;
-    border-radius: 16px;
-  }
-
-  .page-title {
-    font-size: 1.5rem;
-  }
-
-  .card-header {
-    padding: 20px 24px 12px;
-  }
-
-  .header-left {
+    padding: 12px 8px;
     gap: 12px;
   }
 
+  .page-header {
+    padding: 12px 16px;
+    border-radius: 12px;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .card-header {
+    padding: 12px 16px 8px;
+  }
+
+  .header-left {
+    gap: 8px;
+  }
+
   .card-icon {
-    width: 44px;
-    height: 44px;
+    width: 36px;
+    height: 36px;
   }
 
   .card-title {
-    font-size: 1.125rem;
+    font-size: 1rem;
   }
 
   .card-content {
-    padding: 20px 24px 24px;
+    padding: 12px 16px 16px;
   }
 
   .setting-item {
     flex-direction: column;
     align-items: stretch;
-    gap: 16px;
-    padding: 16px 0;
+    gap: 12px;
+    padding: 12px 0;
   }
 
   .setting-switch,
@@ -1333,30 +1333,30 @@ onMounted(() => {
   }
 
   .setting-select {
-    min-width: 160px;
+    min-width: 140px;
   }
 
   .about-grid {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 10px;
   }
 
   .about-item {
-    padding: 16px;
-    border-radius: 12px;
+    padding: 12px;
+    border-radius: 10px;
   }
 
   .footer-links {
-    gap: 12px;
+    gap: 8px;
   }
 
   .action-section {
-    gap: 12px;
+    gap: 8px;
   }
 
   .secondary-actions {
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
 }
 

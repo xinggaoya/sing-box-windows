@@ -525,21 +525,21 @@ onUnmounted(() => {
 .page-container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 24px 20px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  min-height: calc(100vh - 48px);
+  gap: 16px;
+  min-height: calc(100vh - 32px);
 }
 
 /* 页面标题栏 */
 .page-header {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.8) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 20px;
-  padding: 24px 32px;
+  border-radius: 16px;
+  padding: 16px 24px;
   box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.08),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -548,19 +548,19 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .title-section {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .page-title {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
   background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
@@ -571,23 +571,23 @@ onUnmounted(() => {
 }
 
 .title-divider {
-  width: 4px;
-  height: 32px;
+  width: 3px;
+  height: 24px;
   background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
   border-radius: 2px;
 }
 
 .log-count-tag {
   font-weight: 600;
-  padding: 8px 16px;
-  font-size: 0.875rem;
-  box-shadow: 0 4px 16px rgba(64, 128, 255, 0.2);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  box-shadow: 0 3px 12px rgba(64, 128, 255, 0.2);
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -622,8 +622,8 @@ onUnmounted(() => {
 }
 
 .action-btn {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border-width: 2px;
 }
@@ -649,17 +649,17 @@ onUnmounted(() => {
 .search-stats-section {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 20px;
+  gap: 12px;
   align-items: start;
 }
 
 .search-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 18px;
-  padding: 20px;
+  border-radius: 14px;
+  padding: 16px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 6px 24px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
@@ -686,20 +686,20 @@ onUnmounted(() => {
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  min-width: 480px;
+  gap: 10px;
+  min-width: 400px;
 }
 
 .stat-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 6px 24px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.3);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -714,7 +714,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 3px;
-  border-radius: 16px 16px 0 0;
+  border-radius: 12px 12px 0 0;
 }
 
 .stat-card.stat-info::before {
@@ -741,9 +741,9 @@ onUnmounted(() => {
 }
 
 .stat-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -789,7 +789,7 @@ onUnmounted(() => {
 }
 
 .stat-value {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #1f2937;
   line-height: 1.2;
@@ -799,14 +799,14 @@ onUnmounted(() => {
 .log-content-section {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
   backdrop-filter: blur(20px);
-  border-radius: 18px;
+  border-radius: 14px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 6px 24px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.3);
   overflow: hidden;
   flex: 1;
-  min-height: 400px;
+  min-height: 350px;
 }
 
 .log-content-wrapper {
@@ -818,24 +818,24 @@ onUnmounted(() => {
 
 .log-list-container {
   flex: 1;
-  padding: 16px;
+  padding: 12px;
 }
 
 .log-virtual-list {
-  height: calc(100vh - 400px);
-  min-height: 300px;
+  height: calc(100vh - 350px);
+  min-height: 250px;
 }
 
 .log-item {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.6) 100%);
-  border-radius: 12px;
-  padding: 16px 20px;
-  margin-bottom: 12px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
   display: flex;
-  gap: 16px;
+  gap: 12px;
   border: 1px solid rgba(229, 231, 235, 0.3);
 }
 
@@ -875,8 +875,8 @@ onUnmounted(() => {
 .log-item-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .log-tag {
@@ -1030,7 +1030,7 @@ onUnmounted(() => {
 @media (max-width: 1024px) {
   .search-stats-section {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 12px;
   }
 
   .stats-grid {
@@ -1041,19 +1041,19 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .page-container {
-    padding: 16px 12px;
-    gap: 20px;
+    padding: 12px 8px;
+    gap: 12px;
   }
 
   .page-header {
-    padding: 20px 24px;
-    border-radius: 16px;
+    padding: 12px 16px;
+    border-radius: 12px;
   }
 
   .header-content {
     flex-direction: column;
     align-items: stretch;
-    gap: 16px;
+    gap: 12px;
   }
 
   .title-section {
@@ -1062,12 +1062,12 @@ onUnmounted(() => {
   }
 
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
   }
 
   .header-actions {
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   .action-buttons {
@@ -1076,30 +1076,30 @@ onUnmounted(() => {
 
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 8px;
   }
 
   .stat-card {
-    padding: 12px;
-    border-radius: 12px;
+    padding: 8px;
+    border-radius: 10px;
   }
 
   .stat-icon {
-    width: 36px;
-    height: 36px;
+    width: 28px;
+    height: 28px;
   }
 
   .log-content-section {
-    border-radius: 16px;
+    border-radius: 12px;
   }
 
   .log-virtual-list {
-    height: calc(100vh - 450px);
+    height: calc(100vh - 380px);
   }
 
   .log-item {
-    padding: 12px 16px;
-    border-radius: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
   }
 }
 

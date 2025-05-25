@@ -32,7 +32,12 @@
               </n-icon>
             </template>
           </n-button>
-          <n-button quaternary size="medium" @click="windowStore.minimizeWindow" class="header-button">
+          <n-button
+            quaternary
+            size="medium"
+            @click="windowStore.minimizeWindow"
+            class="header-button"
+          >
             <template #icon>
               <n-icon>
                 <remove-outline />
@@ -89,7 +94,15 @@
 </template>
 
 <script setup lang="ts">
-import { darkTheme, useOsTheme, NIcon, useNotification, NButton, NProgress, type MenuOption } from 'naive-ui'
+import {
+  darkTheme,
+  useOsTheme,
+  NIcon,
+  useNotification,
+  NButton,
+  NProgress,
+  type MenuOption,
+} from 'naive-ui'
 import type { NotificationReactive } from 'naive-ui'
 import { h, ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
@@ -189,7 +202,7 @@ const menuOptions = computed<MenuOption[]>(() => [
     label: t('nav.home'),
     key: '0',
     icon: renderIcon(HomeOutline),
-    disabled: false
+    disabled: false,
   },
   {
     label: t('nav.proxy'),
@@ -201,7 +214,7 @@ const menuOptions = computed<MenuOption[]>(() => [
     label: t('nav.sub'),
     key: '4',
     icon: renderIcon(AtCircleOutline),
-    disabled: false
+    disabled: false,
   },
   {
     label: t('nav.rules'),
@@ -219,13 +232,13 @@ const menuOptions = computed<MenuOption[]>(() => [
     label: t('nav.log'),
     key: '5',
     icon: renderIcon(DocumentTextOutline),
-    disabled: false
+    disabled: false,
   },
   {
     label: t('nav.setting'),
     key: '6',
     icon: renderIcon(SettingsOutline),
-    disabled: false
+    disabled: false,
   },
 ])
 
