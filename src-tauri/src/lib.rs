@@ -42,6 +42,24 @@ pub fn run() {
             show_window(app);
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .setup(|app| {
+            // if cfg!(debug_assertions) {
+            //     app.handle().plugin(
+            //         tauri_plugin_log::Builder::default()
+            //             .level("info")
+            //             .build(),
+            //     )?;
+            // }
+            // 判断参数
+            let args: Vec<String> = std::env::args().collect();
+            if args.len() > 1 {
+                if args[1] == "--hide" {
+                    let window = app.get_window("main").unwrap();
+                    window.hide().unwrap();
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Core - Kernel service commands
             crate::app::core::kernel_service::start_kernel,
