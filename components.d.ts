@@ -18,6 +18,7 @@ declare module 'vue' {
     NConfigProvider: typeof import('naive-ui')['NConfigProvider']
     NDataTable: typeof import('naive-ui')['NDataTable']
     NDialogProvider: typeof import('naive-ui')['NDialogProvider']
+    NDivider: typeof import('naive-ui')['NDivider']
     NEllipsis: typeof import('naive-ui')['NEllipsis']
     NFlex: typeof import('naive-ui')['NFlex']
     NForm: typeof import('naive-ui')['NForm']
@@ -58,6 +59,7 @@ declare module 'vue' {
     TrafficChart: typeof import('./src/components/layout/TrafficChart.vue')['default']
     TrafficStatsCard: typeof import('./src/components/home/TrafficStatsCard.vue')['default']
     UpdateModal: typeof import('./src/components/UpdateModal.vue')['default']
+    UpdateNotification: typeof import('./src/components/UpdateNotification.vue')['default']
     VirtualList: typeof import('./src/components/VirtualList.vue')['default']
   }
 }

@@ -6,6 +6,7 @@
         <n-notification-provider>
           <n-message-provider>
             <message-consumer />
+            <update-notification />
             <router-view />
           </n-message-provider>
         </n-notification-provider>
@@ -30,6 +31,9 @@ import { storeManager, type StoreType } from '@/stores/StoreManager'
 
 // 直接导入需要的Store
 import { useThemeStore } from '@/stores/app/ThemeStore'
+
+// 导入组件
+import UpdateNotification from '@/components/UpdateNotification.vue'
 
 // Store类型定义
 interface AppStore {
@@ -236,8 +240,32 @@ async function initializeApp() {
       const kernelStore = await storeManager.loadStore<KernelStore>('kernel')
       kernelStore?.initEventListeners()
     }
+
+    // 延迟执行自动更新检查（避免阻塞启动）
+    setTimeout(async () => {
+      await handleAutoUpdateCheck()
+    }, 5000) // 5秒后检查更新
   } catch (error) {
     console.error('应用初始化过程中出错:', error)
+  }
+}
+
+// 处理自动更新检查
+async function handleAutoUpdateCheck() {
+  try {
+    interface UpdateStore {
+      autoCheckUpdate: boolean
+      fetchAppVersion: () => Promise<string>
+      checkUpdate: (silent: boolean) => Promise<unknown>
+    }
+
+    const updateStore = await storeManager.loadStore<UpdateStore>('update')
+    if (updateStore?.autoCheckUpdate) {
+      await updateStore.fetchAppVersion()
+      await updateStore.checkUpdate(true) // 静默检查
+    }
+  } catch (error) {
+    console.error('自动检查更新失败:', error)
   }
 }
 

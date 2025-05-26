@@ -348,16 +348,6 @@
     </n-back-top>
   </div>
 
-  <!-- 应用更新对话框 -->
-  <update-modal
-    v-model:show="showUpdateModal"
-    :latest-version="latestVersion"
-    :current-version="updateStore.appVersion"
-    :download-url="downloadUrl"
-    @update="handleUpdate"
-    @cancel="skipUpdate"
-  />
-
   <!-- 端口设置对话框 -->
   <n-modal v-model:show="showPortModal" preset="dialog" :title="t('setting.network.portSettings')">
     <div class="port-settings-form">
@@ -385,7 +375,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMessage, useDialog, useNotification } from 'naive-ui'
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -406,7 +396,6 @@ import {
 import { listen } from '@tauri-apps/api/event'
 import { tauriApi } from '@/services/tauri-api'
 import { appDataDir } from '@tauri-apps/api/path'
-import UpdateModal from '@/components/UpdateModal.vue'
 import { supportedLocales } from '@/locales'
 import { Locale } from '@/stores/app/LocaleStore'
 import { useI18n } from 'vue-i18n'
@@ -435,12 +424,6 @@ const updateMobileStatus = () => {
   isMobile.value = window.innerWidth < 768
 }
 
-// 更新相关状态
-const showUpdateModal = ref(false)
-const latestVersion = ref('')
-const downloadUrl = ref('')
-const skipUpdateFlag = ref(false)
-
 // 检查更新状态
 const checkingUpdate = ref(false)
 
@@ -465,51 +448,22 @@ const scrollToTop = () => {
   })
 }
 
-// 检查更新
-const checkUpdate = async () => {
-  try {
-    if (skipUpdateFlag.value) return
-
-    const result = await tauriApi.update.checkUpdate(updateStore.appVersion)
-    if (result.has_update) {
-      showUpdateModal.value = true
-      latestVersion.value = result.latest_version
-      downloadUrl.value = result.download_url
-    }
-  } catch (error) {
-    console.error(t('setting.update.checkError'), error)
-  }
-}
-
-// 处理更新
-const handleUpdate = async () => {
-  try {
-    notification.info({
-      title: t('setting.update.downloading'),
-      content: t('setting.update.downloadingDescription'),
-      duration: 3000,
-    })
-    await tauriApi.update.downloadAndInstallUpdate(downloadUrl.value)
-  } catch (error) {
-    message.error(t('setting.update.updateError') + error)
-  }
-}
-
-// 跳过更新
-const skipUpdate = () => {
-  showUpdateModal.value = false
-  skipUpdateFlag.value = true
-}
-
 // 手动检查更新
 const handleCheckUpdate = async () => {
   try {
     checkingUpdate.value = true
     const result = await updateStore.checkUpdate(false)
     if (result?.has_update) {
-      showUpdateModal.value = true
-      latestVersion.value = result.latest_version
-      downloadUrl.value = result.download_url
+      // 发送全局更新弹窗事件
+      mitt.emit('show-update-modal', {
+        show: true,
+        latestVersion: result.latest_version,
+        currentVersion: updateStore.appVersion,
+        downloadUrl: result.download_url,
+        releaseNotes: result.release_notes || '',
+        releaseDate: result.release_date || '',
+        fileSize: result.file_size || 0,
+      })
       message.success(t('setting.update.newVersionFound', { version: result.latest_version }))
     } else {
       message.info(t('setting.update.alreadyLatest'))
@@ -666,6 +620,15 @@ listen(
   },
 )
 
+// 监听应用更新进度事件
+listen(
+  'update-progress',
+  (event: { payload: { status: string; progress: number; message: string } }) => {
+    const { status, progress, message: msg } = event.payload
+    updateStore.updateProgress(status, progress, msg)
+  },
+)
+
 // 切换语言
 const handleChangeLanguage = async (value: string) => {
   localeStore.setLocale(value as Locale)
@@ -690,7 +653,7 @@ const initializeSettings = async () => {
   ])
 
   // 检查更新（非阻塞）
-  checkUpdate()
+  handleCheckUpdate()
 }
 
 // 端口设置对话框
@@ -774,6 +737,11 @@ onMounted(() => {
 
   // 初始化数据（非阻塞）
   initializeSettings()
+})
+
+// 清理事件监听器
+onUnmounted(() => {
+  window.removeEventListener('resize', updateMobileStatus)
 })
 </script>
 

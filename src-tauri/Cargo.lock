@@ -3780,6 +3780,7 @@ dependencies = [
  "futures-util",
  "lazy_static",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "sha2",

@@ -5,13 +5,33 @@ use std::os::windows::process::CommandExt;
 use std::path::Path;
 use tauri::Emitter;
 use crate::app::network_config;
+use semver::Version;
 
-// 添加新的结构体用于版本信息
-#[derive(serde::Serialize)]
+// 更新信息结构体
+#[derive(serde::Serialize, Debug)]
 pub struct UpdateInfo {
     pub latest_version: String,
     pub download_url: String,
     pub has_update: bool,
+    pub release_notes: Option<String>,
+    pub release_date: Option<String>,
+    pub file_size: Option<u64>,
+}
+
+// 版本比较函数
+fn compare_versions(current: &str, latest: &str) -> bool {
+    // 清理版本号，移除 'v' 前缀和其他非版本信息
+    let clean_current = current.trim_start_matches('v').split_whitespace().next().unwrap_or(current);
+    let clean_latest = latest.trim_start_matches('v').split_whitespace().next().unwrap_or(latest);
+    
+    // 尝试使用 semver 进行比较
+    match (Version::parse(clean_current), Version::parse(clean_latest)) {
+        (Ok(curr), Ok(lat)) => lat > curr,
+        _ => {
+            // 如果无法解析为语义版本，则进行字符串比较
+            clean_latest != clean_current
+        }
+    }
 }
 
 // 检查更新
@@ -44,13 +64,21 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
         .ok_or_else(|| format!("{}: 无法解析版本号", messages::ERR_GET_VERSION_FAILED))
         .map(|v| v.trim_start_matches('v').to_string())?;
 
-    // 获取下载链接
+    // 获取发布说明
+    let release_notes = release["body"].as_str().map(|s| s.to_string());
+
+    // 获取发布日期
+    let release_date = release["published_at"].as_str().map(|s| s.to_string());
+
+    // 获取下载链接和文件大小
     let assets = release["assets"]
         .as_array()
         .ok_or_else(|| format!("{}: 无法获取下载资源", messages::ERR_GET_VERSION_FAILED))?;
 
     // 查找Windows安装程序
     let mut download_url = String::new();
+    let mut file_size: Option<u64> = None;
+    
     for asset in assets {
         let name = asset["name"].as_str().unwrap_or("");
         if name.ends_with(".msi") || name.ends_with(".exe") {
@@ -58,6 +86,7 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
                 .as_str()
                 .unwrap_or("")
                 .to_string();
+            file_size = asset["size"].as_u64();
             break;
         }
     }
@@ -69,13 +98,16 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
         ));
     }
 
-    // 简单比较版本号
-    let has_update = tag_name != current_version;
+    // 使用改进的版本比较
+    let has_update = compare_versions(&current_version, &tag_name);
 
     Ok(UpdateInfo {
         latest_version: tag_name.to_string(),
         download_url,
         has_update,
+        release_notes,
+        release_date,
+        file_size,
     })
 }
 
@@ -117,7 +149,29 @@ pub async fn download_and_install_update(
     )
     .await
     {
+        let _ = window.emit(
+            "update-progress",
+            json!({
+                "status": "error",
+                "progress": 0,
+                "message": format!("下载失败: {}", e)
+            }),
+        );
         return Err(format!("下载更新失败: {}", e));
+    }
+
+    // 验证下载的文件
+    if !download_path.exists() {
+        let error_msg = "下载的文件不存在";
+        let _ = window.emit(
+            "update-progress",
+            json!({
+                "status": "error",
+                "progress": 0,
+                "message": error_msg
+            }),
+        );
+        return Err(error_msg.to_string());
     }
 
     // 发送下载完成事件
@@ -130,11 +184,34 @@ pub async fn download_and_install_update(
         }),
     );
 
-    // 启动安装程序
-    std::process::Command::new(download_path)
+    // 启动安装程序（在后台运行）
+    match std::process::Command::new(download_path)
         .creation_flags(0x08000000)
         .spawn()
-        .map_err(|e| format!("启动安装程序失败: {}", e))?;
-
+    {
+        Ok(_) => {
+            // 安装程序启动成功，发送安装开始事件
+            let _ = window.emit(
+                "update-progress",
+                json!({
+                    "status": "installing",
+                    "progress": 100,
+                    "message": "安装程序已启动，请按照提示完成安装"
+                }),
+            );
     Ok(())
+        }
+        Err(e) => {
+            let error_msg = format!("启动安装程序失败: {}", e);
+            let _ = window.emit(
+                "update-progress",
+                json!({
+                    "status": "error",
+                    "progress": 0,
+                    "message": error_msg.clone()
+                }),
+            );
+            Err(error_msg)
+        }
+    }
 }

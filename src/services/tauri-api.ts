@@ -174,6 +174,9 @@ export const tauriApi = {
         latest_version: string
         download_url: string
         has_update: boolean
+        release_notes?: string
+        release_date?: string
+        file_size?: number
       }>('check_update', { currentVersion })
     },
 

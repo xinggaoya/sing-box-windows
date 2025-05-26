@@ -14,6 +14,19 @@ export interface UpdateInfo {
   latest_version: string
   download_url: string
   has_update: boolean
+  release_date?: string
+  file_size?: number
+}
+
+// 定义更新弹窗数据接口
+export interface UpdateModalData {
+  show: boolean
+  latestVersion: string
+  currentVersion: string
+  downloadUrl: string
+  releaseNotes: string
+  releaseDate: string
+  fileSize: number
 }
 
 // 定义规则数据接口
@@ -42,6 +55,7 @@ export type Events = {
   'proxy-mode-changed': void
   'refresh-tray-menu': void
   'update-available': UpdateInfo
+  'show-update-modal': UpdateModalData
   'language-changed': void
   'kernel-started': void
   'kernel-stopped': void

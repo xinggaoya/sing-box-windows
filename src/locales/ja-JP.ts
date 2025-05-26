@@ -285,6 +285,12 @@ export default {
       updateError: '更新失敗: ',
       newVersionFound: '新バージョンが見つかりました: {version}',
       alreadyLatest: '既に最新バージョンです',
+      skipVersion: 'このバージョンをスキップ',
+      releaseNotes: 'リリースノート',
+      updateNotice: '更新通知',
+      updateFailed: '更新失敗',
+      installing: 'インストール中',
+      preparingDownload: 'ダウンロード準備中...',
     },
     autoStart: {
       title: '自動起動',

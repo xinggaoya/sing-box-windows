@@ -253,6 +253,12 @@ export default {
       updateError: 'Ошибка обновления: ',
       newVersionFound: 'Найдена новая версия: {version}',
       alreadyLatest: 'У вас уже последняя версия',
+      skipVersion: 'Пропустить эту версию',
+      releaseNotes: 'Примечания к выпуску',
+      updateNotice: 'Уведомление об обновлении',
+      updateFailed: 'Обновление не удалось',
+      installing: 'Установка',
+      preparingDownload: 'Подготовка к загрузке...',
     },
     autoStart: {
       title: 'Автозапуск',
