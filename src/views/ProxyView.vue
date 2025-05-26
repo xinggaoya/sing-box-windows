@@ -497,7 +497,7 @@ const changeProxy = async (group: string, proxy: string) => {
 .proxy-container {
   min-height: calc(100vh - 120px);
   padding: 20px;
-  background: linear-gradient(135deg, rgba(64, 128, 255, 0.02), rgba(144, 147, 153, 0.02));
+  background: var(--n-color-embedded);
   animation: fadeIn 0.4s ease-out;
 }
 
@@ -511,11 +511,11 @@ const changeProxy = async (group: string, proxy: string) => {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--n-card-color);
   backdrop-filter: blur(10px);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--n-border-color);
+  box-shadow: var(--n-box-shadow-1);
   transition: all 0.3s ease;
 }
 
@@ -566,12 +566,12 @@ const changeProxy = async (group: string, proxy: string) => {
 
 /* 代理内容区 */
 .proxy-content {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--n-card-color);
   backdrop-filter: blur(12px);
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--n-border-color);
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--n-box-shadow-2);
   transition: all 0.3s ease;
 }
 
@@ -602,9 +602,9 @@ const changeProxy = async (group: string, proxy: string) => {
   justify-content: space-between;
   margin-bottom: 24px;
   padding: 16px 20px;
-  background: linear-gradient(135deg, rgba(64, 128, 255, 0.05), rgba(144, 147, 153, 0.05));
+  background: var(--n-color-embedded-popover);
   border-radius: 16px;
-  border: 1px solid rgba(64, 128, 255, 0.1);
+  border: 1px solid var(--n-border-color);
 }
 
 .overview-cards {
@@ -618,10 +618,10 @@ const changeProxy = async (group: string, proxy: string) => {
   align-items: center;
   gap: 10px;
   padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--n-card-color);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--n-border-color);
+  box-shadow: var(--n-box-shadow-1);
   transition: all 0.2s ease;
   min-width: 120px;
 }
@@ -693,8 +693,8 @@ const changeProxy = async (group: string, proxy: string) => {
 
 .node-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--n-card-color);
+  border: 1px solid var(--n-border-color);
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -826,35 +826,7 @@ const changeProxy = async (group: string, proxy: string) => {
   animation: pulse 2s ease-in-out infinite;
 }
 
-/* 暗黑模式适配 */
-:deep(.dark) .header-content {
-  background: rgba(24, 24, 28, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(.dark) .proxy-content {
-  background: rgba(24, 24, 28, 0.9);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(.dark) .overview-card {
-  background: rgba(40, 40, 48, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(.dark) .node-card {
-  background: rgba(40, 40, 48, 0.9);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(.dark) .node-card:hover {
-  border-color: rgba(64, 128, 255, 0.3);
-}
-
-:deep(.dark) .group-overview {
-  background: linear-gradient(135deg, rgba(64, 128, 255, 0.08), rgba(144, 147, 153, 0.08));
-  border-color: rgba(64, 128, 255, 0.15);
-}
+/* 暗黑模式样式会通过CSS变量自动应用 */
 
 /* 动画效果 */
 @keyframes fadeIn {
@@ -995,7 +967,7 @@ const changeProxy = async (group: string, proxy: string) => {
 
 /* Naive UI 组件样式覆盖 */
 :deep(.n-tabs .n-tabs-nav) {
-  background: rgba(248, 250, 252, 0.8);
+  background: var(--n-color-embedded);
   backdrop-filter: blur(8px);
 }
 

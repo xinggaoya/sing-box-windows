@@ -20,9 +20,183 @@
         "errorColorHover": "#F76560",
         "errorColorPressed": "#CB2A2A",
         "errorColorSuppl": "#CB2A2A",
-        "borderRadius": "5px",
-        "fontFamily": "Lato, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        "borderRadius": "12px",
+        "borderRadiusSmall": "8px",
+        "fontFamily": "Lato, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif",
         "fontSize": "14px",
-        "fontWeight": "400"
+        "fontWeight": "400",
+        "fontWeightStrong": "600",
+        "lineHeight": "1.6",
+        "heightTiny": "32px",
+        "heightSmall": "36px",
+        "heightMedium": "40px",
+        "heightLarge": "44px",
+        "heightHuge": "48px",
+        "boxShadow1": "0 4px 16px rgba(0, 0, 0, 0.04)",
+        "boxShadow2": "0 8px 32px rgba(0, 0, 0, 0.08)",
+        "boxShadow3": "0 16px 48px rgba(0, 0, 0, 0.12)"
+    },
+    "Button": {
+        "borderRadius": "12px",
+        "borderRadiusSmall": "10px",
+        "borderRadiusLarge": "14px",
+        "paddingTiny": "0 12px",
+        "paddingSmall": "0 16px",
+        "paddingMedium": "0 20px",
+        "paddingLarge": "0 24px",
+        "paddingRound": "0 18px",
+        "fontWeight": "600",
+        "fontWeightStrong": "700",
+        "textColor": "#1f2937",
+        "textColorHover": "#1f2937",
+        "textColorPressed": "#1f2937",
+        "textColorFocus": "#1f2937",
+        "textColorDisabled": "#9ca3af",
+        "border": "2px solid rgba(229, 231, 235, 0.5)",
+        "borderHover": "2px solid rgba(64, 128, 255, 0.3)",
+        "borderPressed": "2px solid #4080FF",
+        "borderFocus": "2px solid #4080FF",
+        "borderDisabled": "2px solid rgba(229, 231, 235, 0.3)",
+        "rippleColor": "rgba(64, 128, 255, 0.1)",
+        "opacityDisabled": "0.5"
+    },
+    "Card": {
+        "borderRadius": "16px",
+        "paddingMedium": "20px 24px",
+        "paddingLarge": "24px 28px",
+        "paddingSmall": "16px 20px",
+        "paddingHuge": "28px 32px",
+        "titleFontWeight": "700",
+        "titleTextColor": "#1f2937",
+        "borderColor": "rgba(255, 255, 255, 0.08)",
+        "actionColor": "rgba(255, 255, 255, 0.05)"
+    },
+    "Input": {
+        "borderRadius": "12px",
+        "paddingMedium": "0 16px",
+        "paddingLarge": "0 20px",
+        "paddingSmall": "0 14px",
+        "heightMedium": "40px",
+        "heightLarge": "44px",
+        "heightSmall": "36px",
+        "border": "2px solid rgba(229, 231, 235, 0.5)",
+        "borderHover": "2px solid rgba(64, 128, 255, 0.3)",
+        "borderFocus": "2px solid #4080FF",
+        "borderError": "2px solid #F53F3F",
+        "borderWarning": "2px solid #FF7D00",
+        "boxShadowFocus": "0 0 0 3px rgba(64, 128, 255, 0.1)",
+        "caretColor": "#4080FF"
+    },
+    "Select": {
+        "borderRadius": "12px",
+        "paddingMedium": "0 16px",
+        "paddingLarge": "0 20px",
+        "paddingSmall": "0 14px",
+        "heightMedium": "40px",
+        "heightLarge": "44px",
+        "heightSmall": "36px"
+    },
+    "Switch": {
+        "borderRadius": "20px",
+        "heightMedium": "24px",
+        "heightLarge": "28px",
+        "heightSmall": "20px",
+        "railWidthMedium": "48px",
+        "railWidthLarge": "54px",
+        "railWidthSmall": "42px",
+        "buttonWidthMedium": "20px",
+        "buttonWidthLarge": "24px",
+        "buttonWidthSmall": "16px",
+        "railColorActive": "#4080FF",
+        "railColor": "rgba(156, 163, 175, 0.3)",
+        "buttonBoxShadow": "0 2px 8px rgba(0, 0, 0, 0.12)",
+        "buttonBoxShadowActive": "0 2px 12px rgba(64, 128, 255, 0.3)"
+    },
+    "Tag": {
+        "borderRadius": "8px",
+        "paddingMedium": "0 12px",
+        "paddingLarge": "0 16px",
+        "paddingSmall": "0 10px",
+        "heightMedium": "28px",
+        "heightLarge": "32px",
+        "heightSmall": "24px",
+        "fontWeight": "600"
+    },
+    "DataTable": {
+        "borderRadius": "14px",
+        "thPaddingMedium": "12px 16px",
+        "tdPaddingMedium": "12px 16px",
+        "thFontWeight": "600",
+        "borderColor": "rgba(229, 231, 235, 0.3)"
+    },
+    "Modal": {
+        "borderRadius": "16px",
+        "paddingMedium": "24px",
+        "paddingLarge": "28px",
+        "titleFontWeight": "700",
+        "iconSize": "22px"
+    },
+    "Dialog": {
+        "borderRadius": "16px",
+        "paddingMedium": "24px",
+        "paddingLarge": "28px",
+        "titleFontWeight": "700",
+        "iconSize": "22px"
+    },
+    "Tooltip": {
+        "borderRadius": "10px",
+        "padding": "8px 12px",
+        "fontSize": "13px",
+        "boxShadow": "0 8px 24px rgba(0, 0, 0, 0.15)"
+    },
+    "Notification": {
+        "borderRadius": "12px",
+        "padding": "16px 20px",
+        "titleFontWeight": "600",
+        "iconSize": "20px",
+        "boxShadow": "0 12px 40px rgba(0, 0, 0, 0.15)"
+    },
+    "Message": {
+        "borderRadius": "10px",
+        "padding": "12px 16px",
+        "fontWeight": "500",
+        "iconSize": "18px",
+        "boxShadow": "0 8px 24px rgba(0, 0, 0, 0.12)"
+    },
+    "Popover": {
+        "borderRadius": "12px",
+        "padding": "12px 16px",
+        "boxShadow": "0 12px 40px rgba(0, 0, 0, 0.15)"
+    },
+    "Dropdown": {
+        "borderRadius": "12px",
+        "padding": "8px",
+        "optionHeightMedium": "36px",
+        "optionPadding": "0 12px",
+        "boxShadow": "0 12px 40px rgba(0, 0, 0, 0.15)"
+    },
+    "Tabs": {
+        "tabBorderRadius": "8px",
+        "tabGapMedium": "16px",
+        "tabGapLarge": "20px",
+        "tabPaddingMedium": "12px 16px",
+        "tabPaddingLarge": "14px 20px",
+        "tabFontWeight": "600",
+        "tabTextColorActiveBar": "#4080FF"
+    },
+    "Progress": {
+        "borderRadius": "10px",
+        "railHeight": "8px",
+        "fillBorderRadius": "10px"
+    },
+    "Slider": {
+        "railHeight": "6px",
+        "railBorderRadius": "3px",
+        "handleSize": "18px",
+        "dotBorder": "2px solid #ffffff",
+        "dotBoxShadow": "0 2px 8px rgba(0, 0, 0, 0.12)"
+    },
+    "Spin": {
+        "colorPrimary": "#4080FF"
     }
 }

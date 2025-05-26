@@ -629,7 +629,7 @@ onMounted(() => {
 .sub-container {
   min-height: calc(100vh - 120px);
   padding: 20px;
-  background: linear-gradient(135deg, rgba(64, 128, 255, 0.02), rgba(144, 147, 153, 0.02));
+  background: var(--n-color-embedded);
   animation: fadeIn 0.4s ease-out;
 }
 
@@ -643,11 +643,11 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--n-card-color);
   backdrop-filter: blur(10px);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--n-border-color);
+  box-shadow: var(--n-box-shadow-1);
   transition: all 0.3s ease;
 }
 
@@ -702,12 +702,12 @@ onMounted(() => {
 
 /* 订阅内容区 */
 .sub-content {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--n-card-color);
   backdrop-filter: blur(12px);
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--n-border-color);
   padding: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--n-box-shadow-2);
   transition: all 0.3s ease;
 }
 
@@ -724,8 +724,8 @@ onMounted(() => {
 
 .sub-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--n-card-color);
+  border: 1px solid var(--n-border-color);
   border-radius: 16px;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -868,8 +868,8 @@ onMounted(() => {
 
 .url-display {
   padding: 10px 12px;
-  background: linear-gradient(135deg, rgba(248, 250, 252, 0.8), rgba(241, 245, 249, 0.8));
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: var(--n-color-embedded-popover);
+  border: 1px solid var(--n-border-color);
   border-radius: 8px;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
   font-size: 11px;
@@ -884,8 +884,8 @@ onMounted(() => {
 }
 
 .url-display:hover {
-  background: linear-gradient(135deg, rgba(236, 254, 255, 0.8), rgba(225, 245, 254, 0.8));
-  border-color: rgba(186, 230, 253, 0.8);
+  background: var(--n-color-base);
+  border-color: var(--n-color-primary);
 }
 
 /* 卡片底部 */
@@ -996,7 +996,7 @@ onMounted(() => {
 .code-input {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
   font-size: 12px;
-  background: linear-gradient(135deg, rgba(248, 250, 252, 0.8), rgba(241, 245, 249, 0.8));
+  background: var(--n-color-embedded-popover);
   border-radius: 8px;
 }
 
@@ -1010,84 +1010,7 @@ onMounted(() => {
   font-weight: 500;
 }
 
-/* 暗黑模式适配 */
-:deep(.dark) .header-content {
-  background: rgba(31, 41, 55, 0.95);
-  border-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .sub-content {
-  background: rgba(31, 41, 55, 0.95);
-  border-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .sub-card {
-  background: rgba(55, 65, 81, 0.9);
-  border-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .sub-card:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  background: rgba(55, 65, 81, 0.95);
-}
-
-:deep(.dark) .sub-card.sub-active {
-  background: rgba(6, 78, 59, 0.2);
-  border-color: rgba(16, 185, 129, 0.4);
-}
-
-:deep(.dark) .page-title {
-  color: white;
-  -webkit-text-fill-color: unset;
-  background: unset;
-  background-clip: unset;
-  -webkit-background-clip: unset;
-}
-
-:deep(.dark) .sub-name {
-  color: #f9fafb;
-}
-
-:deep(.dark) .update-time {
-  color: rgba(156, 163, 175, 0.8);
-}
-
-:deep(.dark) .empty-title {
-  color: #f9fafb;
-}
-
-:deep(.dark) .empty-description {
-  color: rgba(156, 163, 175, 0.8);
-}
-
-:deep(.dark) .url-display {
-  background: rgba(17, 24, 39, 0.8);
-  border-color: rgba(75, 85, 99, 0.5);
-  color: rgba(156, 163, 175, 0.9);
-}
-
-:deep(.dark) .url-display:hover {
-  background: rgba(31, 41, 55, 0.8);
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-:deep(.dark) .code-input {
-  background: rgba(17, 24, 39, 0.8);
-  border-color: rgba(75, 85, 99, 0.5);
-}
-
-:deep(.dark) .modal-content {
-  background: rgba(31, 41, 55, 0.95);
-}
-
-:deep(.dark) .active-indicator {
-  background: linear-gradient(90deg, #10b981, #059669);
-}
-
-:deep(.dark) .status-tag.active {
-  background: rgba(6, 78, 59, 0.3);
-  color: #10b981;
-}
+/* 暗黑模式样式会通过CSS变量自动应用 */
 
 /* 动画效果 */
 @keyframes fadeIn {

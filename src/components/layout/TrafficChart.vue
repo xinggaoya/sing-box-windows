@@ -90,13 +90,13 @@ const drawChart = () => {
   const dpr = window.devicePixelRatio || 1
   const width = canvas.width
   const height = canvas.height
-  
+
   // 减小内边距使图表更紧凑，但增加左侧内边距确保文本不被截断
-  const padding = { 
-    top: 24 * dpr, 
-    right: 15 * dpr, 
-    bottom: 28 * dpr, 
-    left: 65 * dpr
+  const padding = {
+    top: 24 * dpr,
+    right: 15 * dpr,
+    bottom: 28 * dpr,
+    left: 65 * dpr,
   }
 
   // 清除画布
@@ -127,10 +127,10 @@ const drawChart = () => {
 
     // 将值从B/s转换为适当单位的字符串
     const formattedValue = formatBandwidth(value * 1024 * 1024)
-    
+
     // 使用更紧凑的标签格式
     let speedLabel = `${formattedValue}/s`
-    
+
     // 简化大单位的显示
     speedLabel = speedLabel
       .replace(' MB/s', 'MB/s')
@@ -197,76 +197,76 @@ const drawCurve = (
 
   // 绘制曲线渐变区域
   ctx.beginPath()
-  
+
   // 移动到第一个点的位置
   const firstX = padding.left
   const firstY = padding.top + chartHeight - (data[0] / max) * chartHeight
   ctx.moveTo(firstX, firstY)
-  
+
   // 使用贝塞尔曲线绘制平滑曲线
   for (let i = 1; i < data.length; i++) {
     const x = padding.left + (i / (MAX_DATA_POINTS - 1)) * chartWidth
     const y = padding.top + chartHeight - (data[i] / max) * chartHeight
-    
+
     const prevX = padding.left + ((i - 1) / (MAX_DATA_POINTS - 1)) * chartWidth
     const prevY = padding.top + chartHeight - (data[i - 1] / max) * chartHeight
-    
+
     // 控制点 - 使曲线更平滑
     const cpX1 = prevX + (x - prevX) / 3
-    const cpX2 = prevX + (x - prevX) * 2 / 3
-    
+    const cpX2 = prevX + ((x - prevX) * 2) / 3
+
     ctx.bezierCurveTo(cpX1, prevY, cpX2, y, x, y)
   }
-  
+
   // 完成渐变区域路径
   ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight)
   ctx.lineTo(padding.left, padding.top + chartHeight)
   ctx.closePath()
-  
+
   // 绘制填充渐变
   const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight)
   gradient.addColorStop(0, `${color}30`) // 顶部适当透明
   gradient.addColorStop(1, `${color}05`) // 底部更透明
-  
+
   ctx.fillStyle = gradient
   ctx.fill()
-  
+
   // 绘制曲线
   ctx.beginPath()
   ctx.strokeStyle = color
   ctx.lineWidth = 2.5 * dpr
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
-  
+
   ctx.moveTo(firstX, firstY)
-  
+
   // 再次绘制贝塞尔曲线（只绘制线条）
   for (let i = 1; i < data.length; i++) {
     const x = padding.left + (i / (MAX_DATA_POINTS - 1)) * chartWidth
     const y = padding.top + chartHeight - (data[i] / max) * chartHeight
-    
+
     const prevX = padding.left + ((i - 1) / (MAX_DATA_POINTS - 1)) * chartWidth
     const prevY = padding.top + chartHeight - (data[i - 1] / max) * chartHeight
-    
+
     const cpX1 = prevX + (x - prevX) / 3
-    const cpX2 = prevX + (x - prevX) * 2 / 3
-    
+    const cpX2 = prevX + ((x - prevX) * 2) / 3
+
     ctx.bezierCurveTo(cpX1, prevY, cpX2, y, x, y)
   }
-  
+
   ctx.stroke()
-  
+
   // 绘制结束点高亮
   const lastIndex = data.length - 1
   const lastX = padding.left + (lastIndex / (MAX_DATA_POINTS - 1)) * chartWidth
   const lastY = padding.top + chartHeight - (data[lastIndex] / max) * chartHeight
-  
+
   // 外圈光晕
   ctx.beginPath()
   ctx.fillStyle = `${color}30`
   ctx.arc(lastX, lastY, 6 * dpr, 0, Math.PI * 2)
   ctx.fill()
-  
+
   // 内圈实心点
   ctx.beginPath()
   ctx.fillStyle = color
@@ -356,23 +356,23 @@ onMounted(() => {
     if (resizeTimeout) {
       clearTimeout(resizeTimeout)
     }
-    
+
     resizeTimeout = window.setTimeout(() => {
       if (chartContainer.value && chartCanvas.value) {
         const { width, height } = chartContainer.value.getBoundingClientRect()
         const dpr = window.devicePixelRatio || 1
-        
+
         chartCanvas.value.width = width * dpr
         chartCanvas.value.height = height * dpr
         chartCanvas.value.style.width = `${width}px`
         chartCanvas.value.style.height = `${height}px`
-        
+
         drawChart()
       }
       resizeTimeout = null
     }, 100) as unknown as number
   }
-  
+
   window.addEventListener('resize', handleResize)
 })
 
@@ -396,12 +396,12 @@ const handleResize = () => {
   if (chartContainer.value && chartCanvas.value) {
     const { width, height } = chartContainer.value.getBoundingClientRect()
     const dpr = window.devicePixelRatio || 1
-    
+
     chartCanvas.value.width = width * dpr
     chartCanvas.value.height = height * dpr
     chartCanvas.value.style.width = `${width}px`
     chartCanvas.value.style.height = `${height}px`
-    
+
     drawChart()
   }
 }
@@ -470,15 +470,7 @@ const handleResize = () => {
   background-color: #2080f0;
 }
 
-/* 适应深色/浅色模式 */
-:deep(.dark) .chart-legend {
-  background-color: rgba(30, 30, 30, 0.6);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(.dark) .legend-color {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-}
+/* 深色模式样式会通过CSS变量自动应用，删除手动适配代码 */
 
 @media (max-width: 768px) {
   .chart-legend {

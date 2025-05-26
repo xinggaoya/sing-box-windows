@@ -665,12 +665,7 @@ onUnmounted(() => {
 <style scoped>
 .connections-view {
   min-height: 100vh;
-  background: linear-gradient(
-    135deg,
-    rgba(64, 128, 255, 0.02) 0%,
-    rgba(144, 147, 153, 0.02) 35%,
-    rgba(0, 180, 42, 0.02) 100%
-  );
+  background: var(--n-color-embedded);
   padding: 0;
 }
 
@@ -685,14 +680,12 @@ onUnmounted(() => {
 
 /* 页面标题栏 */
 .page-header {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.8) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 16px;
   padding: 16px 24px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: var(--n-box-shadow-2);
+  border: 1px solid var(--n-border-color);
 }
 
 .header-content {
@@ -751,17 +744,15 @@ onUnmounted(() => {
 }
 
 .stat-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 14px;
   padding: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -832,7 +823,7 @@ onUnmounted(() => {
 .stat-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: rgba(107, 114, 128, 0.8);
+  color: var(--n-text-color-3);
   margin-bottom: 4px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -841,7 +832,7 @@ onUnmounted(() => {
 .stat-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--n-text-color-1);
   line-height: 1.2;
 }
 
@@ -851,14 +842,12 @@ onUnmounted(() => {
 }
 
 .filter-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 14px;
   padding: 16px;
-  box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -881,7 +870,7 @@ onUnmounted(() => {
 
 .search-input :deep(.n-input) {
   border-radius: 12px;
-  border: 2px solid rgba(229, 231, 235, 0.5);
+  border: 2px solid var(--n-border-color);
   transition: all 0.3s ease;
 }
 
@@ -896,7 +885,7 @@ onUnmounted(() => {
 
 .filter-select :deep(.n-base-selection) {
   border-radius: 12px;
-  border: 2px solid rgba(229, 231, 235, 0.5);
+  border: 2px solid var(--n-border-color);
   transition: all 0.3s ease;
 }
 
@@ -923,13 +912,11 @@ onUnmounted(() => {
 
 /* 连接列表区 */
 .connections-section {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 14px;
-  box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
   overflow: hidden;
 }
 
@@ -946,16 +933,16 @@ onUnmounted(() => {
 }
 
 .connections-table :deep(.n-data-table-th) {
-  background: linear-gradient(135deg, rgba(249, 250, 251, 0.9) 0%, rgba(243, 244, 246, 0.8) 100%);
+  background: var(--n-color-embedded);
   font-weight: 600;
-  color: #374151;
-  border-bottom: 2px solid rgba(229, 231, 235, 0.5);
+  color: var(--n-text-color-1);
+  border-bottom: 2px solid var(--n-border-color);
   padding: 12px 8px;
 }
 
 .connections-table :deep(.n-data-table-td) {
   padding: 8px;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.3);
+  border-bottom: 1px solid var(--n-border-color);
 }
 
 .connections-table :deep(.n-data-table-tr:hover .n-data-table-td) {
@@ -984,60 +971,20 @@ onUnmounted(() => {
 .empty-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--n-text-color-1);
   margin: 0 0 12px 0;
 }
 
 .empty-description {
   font-size: 0.875rem;
-  color: rgba(107, 114, 128, 0.8);
+  color: var(--n-text-color-3);
   margin: 0;
   line-height: 1.5;
 }
 
-/* 深色模式支持 */
-:deep(.dark) .connections-view {
-  background: linear-gradient(
-    135deg,
-    rgba(17, 24, 39, 0.95) 0%,
-    rgba(31, 41, 55, 0.9) 35%,
-    rgba(55, 65, 81, 0.85) 100%
-  );
-}
+/* 深色模式样式会通过CSS变量自动应用 */
 
-:deep(.dark) .page-header,
-:deep(.dark) .stat-card,
-:deep(.dark) .filter-card,
-:deep(.dark) .connections-section {
-  background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
-  border-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .page-title {
-  color: white;
-  -webkit-text-fill-color: unset;
-  background: unset;
-  background-clip: unset;
-  -webkit-background-clip: unset;
-}
-
-:deep(.dark) .stat-label {
-  color: rgba(156, 163, 175, 0.8);
-}
-
-:deep(.dark) .stat-value {
-  color: #f9fafb;
-}
-
-:deep(.dark) .empty-title {
-  color: #f9fafb;
-}
-
-:deep(.dark) .connections-table :deep(.n-data-table-th) {
-  background: linear-gradient(135deg, rgba(55, 65, 81, 0.9) 0%, rgba(31, 41, 55, 0.8) 100%);
-  color: #f9fafb;
-  border-bottom-color: rgba(75, 85, 99, 0.5);
-}
+/* 文本颜色会通过CSS变量自动适配暗色模式 */
 
 /* 响应式设计 */
 @media (max-width: 768px) {

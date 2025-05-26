@@ -1357,30 +1357,7 @@ onUnmounted(() => {
   margin-top: 8px;
 }
 
-/* 深色模式适配 */
-:deep(.dark) .status-card {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.05) 0%,
-    rgba(var(--primary-color-rgb), 0.02) 100%
-  );
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-:deep(.dark) .stat-item {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-:deep(.dark) .config-card,
-:deep(.dark) .chart-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-:deep(.dark) .mode-description {
-  background: rgba(255, 255, 255, 0.05);
-}
+/* 深色模式样式会通过CSS变量自动应用，删除手动适配代码 */
 
 /* 响应式设计 */
 @media (max-width: 768px) {

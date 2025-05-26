@@ -780,12 +780,7 @@ onMounted(() => {
 <style scoped>
 .setting-view {
   min-height: 100vh;
-  background: linear-gradient(
-    135deg,
-    rgba(64, 128, 255, 0.02) 0%,
-    rgba(144, 147, 153, 0.02) 35%,
-    rgba(0, 180, 42, 0.02) 100%
-  );
+  background: var(--n-color-embedded);
   padding: 0;
 }
 
@@ -800,14 +795,12 @@ onMounted(() => {
 
 /* 页面标题栏 */
 .page-header {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.8) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 16px;
   padding: 16px 24px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: var(--n-box-shadow-2);
+  border: 1px solid var(--n-border-color);
 }
 
 .header-content {
@@ -850,14 +843,12 @@ onMounted(() => {
 
 /* 设置卡片 */
 .setting-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 16px;
   padding: 0;
-  box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
@@ -887,7 +878,7 @@ onMounted(() => {
 /* 卡片头部 */
 .card-header {
   padding: 16px 24px 12px;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.2);
+  border-bottom: 1px solid var(--n-border-color);
 }
 
 .header-left {
@@ -934,7 +925,7 @@ onMounted(() => {
 .card-title {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--n-text-color-1);
   margin: 0 0 6px 0;
 }
 
@@ -959,7 +950,7 @@ onMounted(() => {
 .status-alert {
   margin-bottom: 12px;
   border-radius: 10px;
-  border: 1px solid rgba(229, 231, 235, 0.3);
+  border: 1px solid var(--n-border-color);
 }
 
 /* 下载进度 */
@@ -968,7 +959,7 @@ onMounted(() => {
   height: 36px;
   border-radius: 18px;
   overflow: hidden;
-  background: rgba(229, 231, 235, 0.2);
+  background: var(--n-color-embedded);
 }
 
 /* 操作区域 */
@@ -1007,7 +998,7 @@ onMounted(() => {
 }
 
 .secondary-action-btn:hover:not(:disabled) {
-  color: #4080ff;
+  color: var(--n-color-primary);
   transform: translateY(-1px);
 }
 
@@ -1023,7 +1014,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 16px 0;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.2);
+  border-bottom: 1px solid var(--n-border-color);
   transition: all 0.3s ease;
 }
 
@@ -1032,7 +1023,7 @@ onMounted(() => {
 }
 
 .setting-item:hover {
-  background: linear-gradient(135deg, rgba(64, 128, 255, 0.02) 0%, rgba(144, 147, 153, 0.02) 100%);
+  background: var(--n-color-embedded-popover);
   padding-left: 12px;
   padding-right: 12px;
   margin-left: -12px;
@@ -1048,13 +1039,13 @@ onMounted(() => {
 .setting-name {
   font-size: 1rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--n-text-color-1);
   margin-bottom: 4px;
 }
 
 .setting-description {
   font-size: 0.875rem;
-  color: rgba(107, 114, 128, 0.8);
+  color: var(--n-text-color-3);
   line-height: 1.4;
 }
 
@@ -1072,29 +1063,29 @@ onMounted(() => {
 
 .setting-select :deep(.n-base-selection) {
   border-radius: 12px;
-  border: 2px solid rgba(229, 231, 235, 0.5);
+  border: 2px solid var(--n-border-color);
   transition: all 0.3s ease;
 }
 
 .setting-select :deep(.n-base-selection:hover) {
-  border-color: rgba(64, 128, 255, 0.3);
+  border-color: var(--n-color-primary);
 }
 
 .setting-select :deep(.n-base-selection.n-base-selection--focus) {
-  border-color: #4080ff;
-  box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
+  border-color: var(--n-color-primary);
+  box-shadow: 0 0 0 3px var(--n-color-primary-hover);
 }
 
 .config-btn {
   flex-shrink: 0;
   margin-left: 16px;
-  border: 2px solid rgba(229, 231, 235, 0.5);
+  border: 2px solid var(--n-border-color);
   border-radius: 10px;
   transition: all 0.3s ease;
 }
 
 .config-btn:hover {
-  border-color: rgba(64, 128, 255, 0.3);
+  border-color: var(--n-color-primary);
   transform: translateY(-1px);
 }
 
@@ -1111,16 +1102,16 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(248, 250, 252, 0.4) 100%);
+  background: var(--n-color-embedded-popover);
   border-radius: 12px;
-  border: 1px solid rgba(229, 231, 235, 0.3);
+  border: 1px solid var(--n-border-color);
   transition: all 0.3s ease;
 }
 
 .about-item:hover {
   transform: translateY(-2px);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.6) 100%);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  background: var(--n-card-color);
+  box-shadow: var(--n-box-shadow-2);
 }
 
 .about-info {
@@ -1131,7 +1122,7 @@ onMounted(() => {
 .about-label {
   font-size: 0.75rem;
   font-weight: 500;
-  color: rgba(107, 114, 128, 0.8);
+  color: var(--n-text-color-3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -1140,25 +1131,25 @@ onMounted(() => {
 .about-value {
   font-size: 1rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--n-text-color-1);
 }
 
 .update-btn {
   margin-left: 10px;
-  border: 2px solid rgba(229, 231, 235, 0.5);
+  border: 2px solid var(--n-border-color);
   border-radius: 10px;
   transition: all 0.3s ease;
 }
 
 .update-btn:hover {
-  border-color: rgba(64, 128, 255, 0.3);
+  border-color: var(--n-color-primary);
   transform: translateY(-1px);
 }
 
 /* 页脚 */
 .about-footer {
   padding-top: 16px;
-  border-top: 1px solid rgba(229, 231, 235, 0.3);
+  border-top: 1px solid var(--n-border-color);
 }
 
 .footer-links {
@@ -1174,14 +1165,14 @@ onMounted(() => {
 }
 
 .footer-link:hover {
-  color: #4080ff;
+  color: var(--n-color-primary);
   transform: translateY(-1px);
 }
 
 .divider {
   width: 1px;
   height: 16px;
-  background: rgba(229, 231, 235, 0.5);
+  background: var(--n-border-color);
 }
 
 /* 回到顶部 */
@@ -1212,74 +1203,9 @@ onMounted(() => {
   padding: 12px 0;
 }
 
-/* 深色模式支持 */
-:deep(.dark) .setting-view {
-  background: linear-gradient(
-    135deg,
-    rgba(17, 24, 39, 0.95) 0%,
-    rgba(31, 41, 55, 0.9) 35%,
-    rgba(55, 65, 81, 0.85) 100%
-  );
-}
+/* 深色模式样式会通过CSS变量自动应用 */
 
-:deep(.dark) .page-header,
-:deep(.dark) .setting-card {
-  background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
-  border-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .page-title {
-  color: white;
-  -webkit-text-fill-color: unset;
-  background: unset;
-  background-clip: unset;
-  -webkit-background-clip: unset;
-}
-
-:deep(.dark) .card-title {
-  color: #f9fafb;
-}
-
-:deep(.dark) .setting-name {
-  color: #f9fafb;
-}
-
-:deep(.dark) .setting-description {
-  color: rgba(156, 163, 175, 0.8);
-}
-
-:deep(.dark) .about-label {
-  color: rgba(156, 163, 175, 0.8);
-}
-
-:deep(.dark) .about-value {
-  color: #f9fafb;
-}
-
-:deep(.dark) .about-item {
-  background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.4) 100%);
-  border-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .about-item:hover {
-  background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.6) 100%);
-}
-
-:deep(.dark) .card-header {
-  border-bottom-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .setting-item {
-  border-bottom-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .about-footer {
-  border-top-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .divider {
-  background: rgba(75, 85, 99, 0.5);
-}
+/* 文本颜色和边框会通过CSS变量自动适配暗色模式 */
 
 /* 响应式设计 */
 @media (max-width: 768px) {

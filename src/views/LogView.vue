@@ -513,12 +513,7 @@ onUnmounted(() => {
 <style scoped>
 .log-view {
   min-height: 100vh;
-  background: linear-gradient(
-    135deg,
-    rgba(64, 128, 255, 0.02) 0%,
-    rgba(144, 147, 153, 0.02) 35%,
-    rgba(0, 180, 42, 0.02) 100%
-  );
+  background: var(--n-color-embedded);
   padding: 0;
 }
 
@@ -534,14 +529,12 @@ onUnmounted(() => {
 
 /* 页面标题栏 */
 .page-header {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.8) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 16px;
   padding: 16px 24px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: var(--n-box-shadow-2);
+  border: 1px solid var(--n-border-color);
 }
 
 .header-content {
@@ -602,7 +595,7 @@ onUnmounted(() => {
 
 .log-filter-select :deep(.n-base-selection) {
   border-radius: 12px;
-  border: 2px solid rgba(229, 231, 235, 0.5);
+  border: 2px solid var(--n-border-color);
   transition: all 0.3s ease;
 }
 
@@ -654,14 +647,12 @@ onUnmounted(() => {
 }
 
 .search-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 14px;
   padding: 16px;
-  box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
 }
 
 .search-input {
@@ -670,7 +661,7 @@ onUnmounted(() => {
 
 .search-input :deep(.n-input) {
   border-radius: 12px;
-  border: 2px solid rgba(229, 231, 235, 0.5);
+  border: 2px solid var(--n-border-color);
   transition: all 0.3s ease;
 }
 
@@ -691,17 +682,15 @@ onUnmounted(() => {
 }
 
 .stat-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 12px;
   padding: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -782,7 +771,7 @@ onUnmounted(() => {
 .stat-label {
   font-size: 0.75rem;
   font-weight: 500;
-  color: rgba(107, 114, 128, 0.8);
+  color: var(--n-text-color-3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 2px;
@@ -791,19 +780,17 @@ onUnmounted(() => {
 .stat-value {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--n-text-color-1);
   line-height: 1.2;
 }
 
 /* 日志内容区 */
 .log-content-section {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  background: var(--n-card-color);
   backdrop-filter: blur(20px);
   border-radius: 14px;
-  box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
   overflow: hidden;
   flex: 1;
   min-height: 350px;
@@ -827,7 +814,7 @@ onUnmounted(() => {
 }
 
 .log-item {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.6) 100%);
+  background: var(--n-color-embedded-popover);
   border-radius: 10px;
   padding: 12px 16px;
   margin-bottom: 8px;
@@ -836,13 +823,13 @@ onUnmounted(() => {
   overflow: hidden;
   display: flex;
   gap: 12px;
-  border: 1px solid rgba(229, 231, 235, 0.3);
+  border: 1px solid var(--n-border-color);
 }
 
 .log-item:hover {
   transform: translateX(4px);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.8) 100%);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  background: var(--n-color-base);
+  box-shadow: var(--n-box-shadow-2);
 }
 
 .log-item-indicator {
@@ -889,11 +876,11 @@ onUnmounted(() => {
 
 .log-time {
   flex-shrink: 0;
-  color: rgba(107, 114, 128, 0.8);
+  color: var(--n-text-color-3);
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
   font-size: 0.8rem;
   font-weight: 500;
-  background: rgba(156, 163, 175, 0.1);
+  background: var(--n-color-embedded);
   padding: 4px 8px;
   border-radius: 6px;
 }
@@ -947,84 +934,20 @@ onUnmounted(() => {
 .empty-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--n-text-color-1);
   margin: 0 0 12px 0;
 }
 
 .empty-description {
   font-size: 0.875rem;
-  color: rgba(107, 114, 128, 0.8);
+  color: var(--n-text-color-3);
   margin: 0;
   line-height: 1.5;
 }
 
-/* 深色模式支持 */
-:deep(.dark) .log-view {
-  background: linear-gradient(
-    135deg,
-    rgba(17, 24, 39, 0.95) 0%,
-    rgba(31, 41, 55, 0.9) 35%,
-    rgba(55, 65, 81, 0.85) 100%
-  );
-}
+/* 深色模式样式会通过CSS变量自动应用 */
 
-:deep(.dark) .page-header,
-:deep(.dark) .search-card,
-:deep(.dark) .stat-card,
-:deep(.dark) .log-content-section {
-  background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.9) 100%);
-  border-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .page-title {
-  color: white;
-  -webkit-text-fill-color: unset;
-  background: unset;
-  background-clip: unset;
-  -webkit-background-clip: unset;
-}
-
-:deep(.dark) .stat-label {
-  color: rgba(156, 163, 175, 0.8);
-}
-
-:deep(.dark) .stat-value {
-  color: #f9fafb;
-}
-
-:deep(.dark) .empty-title {
-  color: #f9fafb;
-}
-
-:deep(.dark) .log-item {
-  background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.6) 100%);
-  border-color: rgba(75, 85, 99, 0.3);
-}
-
-:deep(.dark) .log-item:hover {
-  background: linear-gradient(135deg, rgba(55, 65, 81, 0.95) 0%, rgba(31, 41, 55, 0.8) 100%);
-}
-
-:deep(.dark) .log-time {
-  background: rgba(75, 85, 99, 0.2);
-  color: rgba(156, 163, 175, 0.9);
-}
-
-:deep(.dark) .log-info {
-  color: #a6a9ad;
-}
-
-:deep(.dark) .log-warning {
-  color: #ff952b;
-}
-
-:deep(.dark) .log-error {
-  color: #f76560;
-}
-
-:deep(.dark) .log-success {
-  color: #20c040;
-}
+/* 文本颜色和样式会通过CSS变量自动适配暗色模式 */
 
 /* 响应式设计 */
 @media (max-width: 1024px) {

@@ -385,7 +385,7 @@ onMounted(() => {
 .rules-container {
   min-height: calc(100vh - 120px);
   padding: 20px;
-  background: linear-gradient(135deg, rgba(64, 128, 255, 0.02), rgba(144, 147, 153, 0.02));
+  background: var(--n-color-embedded);
   animation: fadeIn 0.4s ease-out;
 }
 
@@ -399,11 +399,11 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--n-card-color);
   backdrop-filter: blur(10px);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--n-border-color);
+  box-shadow: var(--n-box-shadow-1);
   transition: all 0.3s ease;
 }
 
@@ -458,12 +458,12 @@ onMounted(() => {
 
 /* 规则内容区 */
 .rules-content {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--n-card-color);
   backdrop-filter: blur(12px);
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--n-border-color);
   padding: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--n-box-shadow-2);
   transition: all 0.3s ease;
 }
 
@@ -475,9 +475,9 @@ onMounted(() => {
 .search-section {
   margin-bottom: 20px;
   padding: 16px 20px;
-  background: linear-gradient(135deg, rgba(64, 128, 255, 0.05), rgba(144, 147, 153, 0.05));
+  background: var(--n-color-embedded-popover);
   border-radius: 16px;
-  border: 1px solid rgba(64, 128, 255, 0.1);
+  border: 1px solid var(--n-border-color);
 }
 
 .search-filters {
@@ -537,10 +537,10 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--n-card-color);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--n-border-color);
+  box-shadow: var(--n-box-shadow-1);
   transition: all 0.2s ease;
 }
 
@@ -578,11 +578,11 @@ onMounted(() => {
 }
 
 .table-wrapper {
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--n-card-color);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--n-border-color);
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--n-box-shadow-1);
 }
 
 .rules-table {
@@ -596,10 +596,10 @@ onMounted(() => {
   justify-content: center;
   min-height: 300px;
   padding: 40px 20px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--n-card-color);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--n-border-color);
+  box-shadow: var(--n-box-shadow-1);
 }
 
 .empty-content {
@@ -637,32 +637,7 @@ onMounted(() => {
   box-shadow: 0 6px 16px rgba(64, 128, 255, 0.2);
 }
 
-/* 暗黑模式适配 */
-:deep(.dark) .header-content {
-  background: rgba(24, 24, 28, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(.dark) .rules-content {
-  background: rgba(24, 24, 28, 0.9);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(.dark) .search-section {
-  background: linear-gradient(135deg, rgba(64, 128, 255, 0.08), rgba(144, 147, 153, 0.08));
-  border-color: rgba(64, 128, 255, 0.15);
-}
-
-:deep(.dark) .stats-item {
-  background: rgba(40, 40, 48, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(.dark) .table-wrapper,
-:deep(.dark) .empty-state {
-  background: rgba(40, 40, 48, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
-}
+/* 暗黑模式样式会通过CSS变量自动应用 */
 
 /* 动画效果 */
 @keyframes fadeIn {
@@ -760,36 +735,24 @@ onMounted(() => {
 }
 
 :deep(.n-data-table-thead) {
-  background: rgba(248, 250, 252, 0.8);
+  background: var(--n-color-embedded);
 }
 
 :deep(.n-data-table-th) {
-  background: rgba(248, 250, 252, 0.8);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  background: var(--n-color-embedded);
+  border-bottom: 1px solid var(--n-border-color);
   font-weight: 600;
 }
 
 :deep(.n-data-table-td) {
-  border-bottom: 1px solid rgba(241, 245, 249, 0.8);
+  border-bottom: 1px solid var(--n-border-color);
 }
 
 :deep(.n-data-table-tr:hover .n-data-table-td) {
-  background: rgba(236, 254, 255, 0.3);
+  background: var(--n-color-embedded-popover);
 }
 
-:deep(.dark .n-data-table-thead),
-:deep(.dark .n-data-table-th) {
-  background: rgba(30, 41, 59, 0.8);
-  border-color: rgba(71, 85, 105, 0.8);
-}
-
-:deep(.dark .n-data-table-td) {
-  border-color: rgba(51, 65, 85, 0.8);
-}
-
-:deep(.dark .n-data-table-tr:hover .n-data-table-td) {
-  background: rgba(51, 65, 85, 0.3);
-}
+/* 删除暗色模式自定义样式，现在通过CSS变量自动应用 */
 
 :deep(.n-badge) {
   --n-font-size: 10px;
