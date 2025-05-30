@@ -64,6 +64,9 @@ export type Events = {
   'tray-clicked': void
   error: string
 
+  // 内存管理事件
+  'memory-cleanup-requested': void
+
   // WebSocket 连接状态事件
   'traffic-connection-state': ConnectionState
   'memory-connection-state': ConnectionState

@@ -8,10 +8,11 @@ use serde_json::Value;
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Emitter;
 use tauri::{Runtime, Window};
 use tokio::sync::mpsc;
-use tokio::task;
+use tokio::task::{self, JoinHandle};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tracing::{error, info, warn};
 use url::Url;
@@ -19,6 +20,12 @@ use url::Url;
 // 全局进程管理器
 lazy_static::lazy_static! {
     pub(crate) static ref PROCESS_MANAGER: Arc<ProcessManager> = Arc::new(ProcessManager::new());
+}
+
+// WebSocket任务管理器
+lazy_static::lazy_static! {
+    static ref WEBSOCKET_TASKS: Arc<tokio::sync::Mutex<Vec<JoinHandle<()>>>> = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+    static ref SHOULD_STOP_WS: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 }
 
 // 检查内核版本
@@ -165,6 +172,12 @@ pub async fn start_kernel(_proxy_mode: Option<String>) -> Result<(), String> {
 // 停止内核
 #[tauri::command]
 pub async fn stop_kernel() -> Result<(), String> {
+    // 设置停止标志
+    SHOULD_STOP_WS.store(true, Ordering::Relaxed);
+    
+    // 清理所有WebSocket任务
+    cleanup_websocket_tasks().await;
+    
     // 先尝试关闭系统代理，无论如何都继续执行后续操作
     if let Err(e) = crate::utils::proxy_util::disable_system_proxy() {
         warn!("关闭系统代理失败: {}", e);
@@ -176,9 +189,36 @@ pub async fn stop_kernel() -> Result<(), String> {
     PROCESS_MANAGER.stop().await.map_err(|e| e.to_string())
 }
 
+// 清理WebSocket任务
+async fn cleanup_websocket_tasks() {
+    info!("正在清理WebSocket任务...");
+    
+    let mut tasks = WEBSOCKET_TASKS.lock().await;
+    
+    // 中止所有任务
+    for task in tasks.iter() {
+        task.abort();
+    }
+    
+    // 等待所有任务完成（带超时）
+    let cleanup_futures = tasks.drain(..).map(|task| async move {
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_secs(3), 
+            task
+        ).await;
+    });
+    
+    futures_util::future::join_all(cleanup_futures).await;
+    
+    info!("WebSocket任务清理完成");
+}
+
 // 重启内核
 #[tauri::command]
 pub async fn restart_kernel() -> Result<(), String> {
+    // 重启前清理所有WebSocket任务
+    cleanup_websocket_tasks().await;
+    
     PROCESS_MANAGER.restart().await.map_err(|e| e.to_string())
 }
 
@@ -360,9 +400,15 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
     Ok(())
 }
 
-/// 启动WebSocket数据中继
+/// 启动WebSocket中继服务
 #[tauri::command]
 pub async fn start_websocket_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+    // 重置停止标志
+    SHOULD_STOP_WS.store(false, Ordering::Relaxed);
+    
+    // 清理旧任务
+    cleanup_websocket_tasks().await;
+    
     // 启动四个不同类型的WebSocket中继
     start_traffic_relay(window.clone()).await?;
     start_memory_relay(window.clone()).await?;
@@ -381,7 +427,7 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
     let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
-    let _handle = task::spawn(async move {
+    let ws_task = task::spawn(async move {
         let url = Url::parse(&format!(
             "ws://127.0.0.1:{}/traffic?token={}",
             api_port,
@@ -393,29 +439,54 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
             Ok((ws_stream, _)) => {
                 // 连接成功，发送通知
                 let _ = window_for_error.emit(
-                    "traffic-connection",
+                    "traffic-connection-state",
                     json!({
-                        "status": "connected"
+                        "connected": true,
+                        "connecting": false,
+                        "error": null
                     }),
                 );
 
                 let (mut _write, mut read) = ws_stream.split();
+                let mut message_count = 0;
+                const MAX_MESSAGES_PER_BATCH: usize = 100;
 
                 // 持续读取WebSocket消息
                 while let Some(message) = read.next().await {
+                    // 检查是否应该停止
+                    if SHOULD_STOP_WS.load(Ordering::Relaxed) {
+                        info!("收到停止信号，退出流量数据中继");
+                        break;
+                    }
+
                     match message {
                         Ok(Message::Text(text)) => {
                             if let Ok(data) = serde_json::from_str::<Value>(&text) {
-                                let _ = tx.send(data).await;
+                                // 限制发送频率，避免内存累积
+                                message_count += 1;
+                                if message_count % 10 == 0 || tx.capacity() > 16 {
+                                    if let Err(_) = tx.try_send(data) {
+                                        warn!("流量数据发送队列已满，跳过数据");
+                                    }
+                                } else {
+                                    let _ = tx.send(data).await;
+                                }
+                                
+                                // 定期重置计数器，防止溢出
+                                if message_count >= MAX_MESSAGES_PER_BATCH {
+                                    message_count = 0;
+                                    // 短暂休眠，给其他任务执行机会
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                                }
                             }
                         }
                         Ok(Message::Close(_)) => {
                             error!("WebSocket流量连接关闭");
-                            // 发送连接关闭通知
                             let _ = window_for_error.emit(
-                                "traffic-connection",
+                                "traffic-connection-state",
                                 json!({
-                                    "status": "closed",
+                                    "connected": false,
+                                    "connecting": false,
                                     "error": "WebSocket连接已关闭"
                                 }),
                             );
@@ -423,11 +494,11 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
                         }
                         Err(e) => {
                             error!("WebSocket流量数据读取错误: {}", e);
-                            // 发送错误通知
                             let _ = window_for_error.emit(
-                                "traffic-connection",
+                                "traffic-connection-state",
                                 json!({
-                                    "status": "error",
+                                    "connected": false,
+                                    "connecting": false,
                                     "error": format!("数据读取错误: {}", e)
                                 }),
                             );
@@ -439,11 +510,11 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
             }
             Err(e) => {
                 error!("WebSocket流量连接失败: {}", e);
-                // 发送连接失败通知
                 let _ = window_for_error.emit(
-                    "traffic-connection",
+                    "traffic-connection-state",
                     json!({
-                        "status": "failed",
+                        "connected": false,
+                        "connecting": false,
                         "error": format!("连接失败: {}", e)
                     }),
                 );
@@ -452,11 +523,22 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
     });
 
     // 启动事件发送任务
-    task::spawn(async move {
+    let emit_task = task::spawn(async move {
         while let Some(data) = rx.recv().await {
+            // 检查是否应该停止
+            if SHOULD_STOP_WS.load(Ordering::Relaxed) {
+                break;
+            }
             let _ = window_clone.emit("traffic-data", data);
         }
     });
+
+    // 将任务添加到管理器
+    {
+        let mut tasks = WEBSOCKET_TASKS.lock().await;
+        tasks.push(ws_task);
+        tasks.push(emit_task);
+    }
 
     Ok(())
 }

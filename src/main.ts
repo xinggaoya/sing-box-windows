@@ -6,6 +6,8 @@ import App from './App.vue'
 import router from './router'
 import { usePinia } from '@/stores'
 import i18n from './locales'
+import { storeManager } from './stores/StoreManager'
+import { memoryLeakDetector, webSocketCleaner, StoreCleaner } from '@/utils/memory-leak-fix'
 
 // 导入性能优化工具
 import { memoryMonitor, componentPreloader, eventListenerManager } from '@/utils/performance'
@@ -23,11 +25,54 @@ app.use(router)
 // 设置国际化
 app.use(i18n)
 
+// 初始化Store管理器
+storeManager.initialize()
+
+// 启动内存泄露监控（开发环境下更频繁）
+const isDev = import.meta.env.DEV
+memoryLeakDetector.startMonitoring(isDev ? 15000 : 30000) // 开发环境15秒，生产环境30秒
+
+// 设置应用关闭时的清理逻辑
+window.addEventListener('beforeunload', () => {
+  console.log('🧹 应用关闭，执行清理...')
+
+  // 停止内存监控
+  memoryLeakDetector.stopMonitoring()
+
+  // 清理所有WebSocket连接和定时器
+  webSocketCleaner.cleanupAll()
+
+  // 清理所有Store
+  StoreCleaner.cleanupAll()
+
+  // 清理性能优化工具资源
+  if (isDev) {
+    memoryMonitor.stopMonitoring()
+    componentPreloader.destroy()
+    eventListenerManager.cleanup()
+    codeSplittingManager.cleanup()
+    bundleAnalyzer.printReport()
+  }
+})
+
+// 开发环境下添加全局调试方法
+if (isDev) {
+  // @ts-expect-error - 开发环境调试方法
+  window.debugMemory = {
+    checkMemory: () => memoryLeakDetector.forceCheck(),
+    getStats: () => memoryLeakDetector.getMemoryStats(),
+    cleanupAll: () => {
+      webSocketCleaner.cleanupAll()
+      StoreCleaner.cleanupAll()
+    },
+  }
+}
+
 // 性能优化初始化
 if (import.meta.env.DEV) {
   console.log('🚀 开发环境性能优化工具已启用')
 
-  // 启动内存监控
+  // 启动内存监控（与内存泄露检测协同工作）
   memoryMonitor.startMonitoring(15000) // 每15秒监控一次
 
   // 预加载关键组件
@@ -35,6 +80,7 @@ if (import.meta.env.DEV) {
 
   // 输出初始化信息
   console.log('📊 性能监控工具状态:')
+  console.log('- 内存泄露检测: 已启动')
   console.log('- 内存监控: 已启动')
   console.log('- 组件预加载器: 已启动')
   console.log('- Bundle分析器: 已启动')
@@ -63,28 +109,6 @@ if (navigationEntry) {
     `- TCP Connect: ${(navigationEntry.connectEnd - navigationEntry.connectStart).toFixed(2)}ms`,
   )
 }
-
-// 在应用卸载时清理资源
-window.addEventListener('beforeunload', () => {
-  if (import.meta.env.DEV) {
-    console.log('🧹 清理性能优化工具资源...')
-
-    // 停止内存监控
-    memoryMonitor.stopMonitoring()
-
-    // 清理组件预加载器
-    componentPreloader.destroy()
-
-    // 清理事件监听器
-    eventListenerManager.cleanup()
-
-    // 清理代码分割管理器
-    codeSplittingManager.cleanup()
-
-    // 最终输出Bundle分析报告
-    bundleAnalyzer.printReport()
-  }
-})
 
 // 错误边界
 app.config.errorHandler = (err, instance, info) => {
