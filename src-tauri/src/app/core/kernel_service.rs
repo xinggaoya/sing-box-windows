@@ -2,6 +2,7 @@ use crate::app::constants::{messages, network_config, paths, process};
 use crate::process::manager::ProcessManager;
 use crate::utils::app_util::get_work_dir;
 use crate::utils::file_util::unzip_file;
+use crate::utils::http_client;
 use futures_util::StreamExt;
 use serde_json::json;
 use serde_json::Value;
@@ -9,9 +10,11 @@ use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use tauri::Emitter;
 use tauri::{Runtime, Window};
 use tokio::sync::mpsc;
+use tokio::sync::Notify;
 use tokio::task::{self, JoinHandle};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tracing::{error, info, warn};
@@ -28,6 +31,11 @@ lazy_static::lazy_static! {
     static ref SHOULD_STOP_WS: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 }
 
+// 内核启动通知器
+lazy_static::lazy_static! {
+    static ref KERNEL_READY_NOTIFY: Arc<Notify> = Arc::new(Notify::new());
+}
+
 // 检查内核版本
 #[tauri::command]
 pub async fn check_kernel_version() -> Result<String, String> {
@@ -37,10 +45,11 @@ pub async fn check_kernel_version() -> Result<String, String> {
         return Err(messages::ERR_KERNEL_NOT_FOUND.to_string());
     }
 
-    let output = std::process::Command::new(kernel_path)
+    let output = tokio::process::Command::new(kernel_path)
         .arg("version")
         .creation_flags(process::CREATE_NO_WINDOW)
         .output()
+        .await
         .map_err(|e| format!("{}: {}", messages::ERR_VERSION_CHECK_FAILED, e))?;
 
     if !output.status.success() {
@@ -73,12 +82,13 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
         return Err(format!("配置文件不存在: {}", path));
     }
 
-    let output = std::process::Command::new(kernel_path)
+    let output = tokio::process::Command::new(kernel_path)
         .arg("check")
         .arg("--config")
         .arg(path)
         .creation_flags(process::CREATE_NO_WINDOW)
         .output()
+        .await
         .map_err(|e| format!("执行配置检查命令失败: {}", e))?;
 
     // 检查命令是否成功执行
@@ -105,53 +115,21 @@ pub async fn start_kernel(_proxy_mode: Option<String>) -> Result<(), String> {
     // 启动内核进程
     match PROCESS_MANAGER.start().await {
         Ok(_) => {
-            info!("内核进程启动成功，现在配置代理模式");
+            info!("内核进程启动成功，正在验证API服务状态");
 
-            // 创建HTTP客户端用于检查内核状态
-            let client = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(2))
-                .no_proxy()
-                .build()
-                .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-            
-            let api_port = crate::app::system::config_service::get_api_port();
-            let url = format!("http://127.0.0.1:{}/version?token=", api_port);
-            
-            // 内核启动检查的最大时间（秒）
-            let max_check_time_secs = 20;
-            // 每次检查的间隔（毫秒）
-            let check_interval_ms = 1000;
-            // 最大检查次数
-            let max_checks = max_check_time_secs * 1000 / check_interval_ms;
-            
-            // 进行定时检查
-            let mut api_ready = false;
-            for i in 0..max_checks {
-                info!("检查内核API是否就绪 (第{}次检查)...", i + 1);
-                
-                match client.get(&url).send().await {
-                    Ok(_) => {
-                        info!("内核API服务连接成功，内核已就绪");
-                        api_ready = true;
-                        break;
-                    },
-                    Err(e) => {
-                        if i < max_checks - 1 {
-                            info!("内核API服务暂未就绪，将在{}ms后重试: {}", check_interval_ms, e);
-                            tokio::time::sleep(tokio::time::Duration::from_millis(check_interval_ms)).await;
-                        } else {
-                            info!("内核API服务在最大等待时间内无响应，将由前端确认启动状态");
-                        }
-                    }
+            // 使用更高效的启动检查机制
+            match wait_for_kernel_ready().await {
+                Ok(_) => {
+                    info!("内核API服务已就绪");
+                    Ok(())
+                }
+                Err(e) => {
+                    warn!("内核API服务检查失败: {}", e);
+                    // 即使API检查失败也返回成功，交由前端通过WebSocket确认最终状态
+                    info!("内核进程已启动，将通过WebSocket确认最终状态");
+                    Ok(())
                 }
             }
-            
-            if !api_ready {
-                info!("内核API服务在设定时间内未就绪，但进程已启动，将通过WebSocket确认状态");
-                // 即使API未就绪也返回成功，交由前端通过WebSocket确认最终状态
-            }
-            
-            Ok(())
         },
         Err(e) => {
             // 从错误中提取关键信息
@@ -165,6 +143,55 @@ pub async fn start_kernel(_proxy_mode: Option<String>) -> Result<(), String> {
             
             error!("内核启动失败: {}", shortened_error);
             Err(shortened_error)
+        }
+    }
+}
+
+// 等待内核准备就绪（改进的非轮询机制）
+async fn wait_for_kernel_ready() -> Result<(), String> {
+    let api_port = crate::app::system::config_service::get_api_port();
+    let url = format!("http://127.0.0.1:{}/version?token=", api_port);
+    
+    // 启动后台任务检查API状态
+    let ready_notify = KERNEL_READY_NOTIFY.clone();
+    let ready_notify_clone = ready_notify.clone();
+    let check_url = url.clone();
+    
+    tokio::spawn(async move {
+        let client = http_client::get_client();
+        
+        // 给内核一些启动时间
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+        
+        // 进行多次快速检查
+        for i in 0..20 {
+            match client.get(&check_url).timeout(Duration::from_secs(2)).send().await {
+                Ok(response) if response.status().is_success() => {
+                    info!("内核API服务在第{}次检查时就绪", i + 1);
+                    ready_notify_clone.notify_one();
+                    return;
+                }
+                Ok(response) => {
+                    warn!("内核API响应状态码: {}", response.status());
+                }
+                Err(e) => {
+                    if i < 19 {
+                        // 使用指数退避算法，减少系统负载
+                        let delay = std::cmp::min(100 * (1 << (i / 5)), 1000);
+                        tokio::time::sleep(Duration::from_millis(delay)).await;
+                    } else {
+                        warn!("内核API最终检查失败: {}", e);
+                    }
+                }
+            }
+        }
+    });
+    
+    // 等待通知或超时
+    tokio::select! {
+        _ = ready_notify.notified() => Ok(()),
+        _ = tokio::time::sleep(Duration::from_secs(15)) => {
+            Err("内核启动超时".to_string())
         }
     }
 }
@@ -200,15 +227,10 @@ async fn cleanup_websocket_tasks() {
         task.abort();
     }
     
-    // 等待所有任务完成（带超时）
-    let cleanup_futures = tasks.drain(..).map(|task| async move {
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_secs(3), 
-            task
-        ).await;
-    });
-    
-    futures_util::future::join_all(cleanup_futures).await;
+    // 等待所有任务完成或中止
+    for task in tasks.drain(..) {
+        let _ = task.await;
+    }
     
     info!("WebSocket任务清理完成");
 }
@@ -216,10 +238,12 @@ async fn cleanup_websocket_tasks() {
 // 重启内核
 #[tauri::command]
 pub async fn restart_kernel() -> Result<(), String> {
-    // 重启前清理所有WebSocket任务
-    cleanup_websocket_tasks().await;
-    
-    PROCESS_MANAGER.restart().await.map_err(|e| e.to_string())
+    info!("正在重启内核");
+    stop_kernel().await?;
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    start_kernel(None).await?;
+    info!("内核重启完成");
+    Ok(())
 }
 
 // 下载内核

@@ -16,6 +16,7 @@ export default {
     auto: 'Авто',
     description: 'Описание',
     restart: 'Перезапуск',
+    later: 'Позже',
   },
   nav: {
     home: 'Главная',

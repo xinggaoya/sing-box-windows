@@ -22,6 +22,7 @@ export default {
     darkMode: '深色模式',
     fullscreen: '全屏',
     exitFullscreen: '退出全屏',
+    later: '稍后',
   },
   nav: {
     home: '首页',

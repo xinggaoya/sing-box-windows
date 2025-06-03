@@ -16,6 +16,7 @@ export default {
     auto: '自動',
     description: '説明',
     restart: '再起動',
+    later: '後で',
   },
   nav: {
     home: 'ホーム',

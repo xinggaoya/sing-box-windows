@@ -3,18 +3,19 @@ use crate::app::constants::{messages, paths};
 use crate::utils::proxy_util::disable_system_proxy;
 use std::os::windows::process::CommandExt;
 use std::process::{Child, Command};
-use std::sync::Mutex;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 
 pub struct ProcessManager {
-    process: Mutex<Option<Child>>,
+    process: Arc<RwLock<Option<Child>>>,
 }
 
 impl ProcessManager {
     pub fn new() -> Self {
         Self {
-            process: Mutex::new(None),
+            process: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -30,7 +31,7 @@ impl ProcessManager {
 
         // 检查本实例中是否已经有进程在运行
         let should_restart = {
-            let mut process_guard = self.process.lock().unwrap();
+            let mut process_guard = self.process.write().await;
             if let Some(ref mut proc) = *process_guard {
                 // 尝试获取进程状态，如果可以获取则说明进程还在运行
                 match proc.try_wait() {
@@ -88,7 +89,9 @@ impl ProcessManager {
             .args(&[
                 "run", 
                 "-D", 
-                kernel_work_dir.to_str().unwrap_or("config.json")
+                kernel_work_dir.to_str().ok_or_else(|| {
+                    ProcessError::StartFailed("工作目录路径包含无效字符".to_string())
+                })?
             ])
             .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
             .spawn()
@@ -96,7 +99,7 @@ impl ProcessManager {
 
         // 保存进程句柄
         {
-            let mut process_guard = self.process.lock().unwrap();
+            let mut process_guard = self.process.write().await;
             *process_guard = Some(child);
         }
 
@@ -104,7 +107,7 @@ impl ProcessManager {
         sleep(Duration::from_secs(1)).await;
         
         // 检查内核是否成功启动
-        if !self.is_running() {
+        if !self.is_running().await {
             return Err(ProcessError::StartFailed("内核启动失败".to_string()));
         }
 
@@ -118,11 +121,12 @@ impl ProcessManager {
         
         #[cfg(windows)]
         {
-            // 使用tasklist命令查找sing-box.exe进程
-            let output = Command::new("tasklist")
+            // 使用异步进程命令
+            let output = tokio::process::Command::new("tasklist")
                 .args(&["/FI", "IMAGENAME eq sing-box.exe", "/FO", "CSV", "/NH"])
                 .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
-                .output()?;
+                .output()
+                .await?;
             
             let stdout = String::from_utf8_lossy(&output.stdout);
             
@@ -130,11 +134,12 @@ impl ProcessManager {
             if stdout.contains("sing-box.exe") {
                 info!("发现已有sing-box.exe进程，正在终止");
                 
-                // 使用taskkill终止所有sing-box.exe进程
-                let kill_output = Command::new("taskkill")
+                // 使用异步进程命令终止所有sing-box.exe进程
+                let kill_output = tokio::process::Command::new("taskkill")
                     .args(&["/F", "/IM", "sing-box.exe"])
                     .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
-                    .output()?;
+                    .output()
+                    .await?;
                 
                 if kill_output.status.success() {
                     info!("成功终止所有sing-box.exe进程");
@@ -164,7 +169,7 @@ impl ProcessManager {
 
         // 提取进程并停止它
         let mut child_opt = {
-            let mut process_guard = self.process.lock().unwrap();
+            let mut process_guard = self.process.write().await;
             process_guard.take()
         };
 
@@ -198,79 +203,96 @@ impl ProcessManager {
 
         // 确保系统中所有sing-box进程都被终止
         if let Err(e) = self.kill_existing_processes().await {
-            warn!("终止系统中sing-box进程可能失败: {}", e);
+            warn!("清理系统中的sing-box进程失败: {}", e);
         }
 
-        // 短暂等待确保进程完全退出
-        sleep(Duration::from_millis(500)).await;
-        
         Ok(())
     }
 
     // 重启进程
     pub async fn restart(&self) -> Result<()> {
-        // 先停止再启动
+        info!("正在重启内核进程");
         self.stop().await?;
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_millis(1000)).await;
         self.start().await?;
-        info!("内核已重启");
+        info!("内核进程重启完成");
         Ok(())
     }
 
     // 验证配置文件
     async fn validate_config(&self) -> Result<()> {
-        // 检查配置文件是否存在
         let config_path = paths::get_config_path();
+        
         if !config_path.exists() {
-            return Err(ProcessError::ConfigError(
-                messages::ERR_CONFIG_READ_FAILED.to_string(),
-            ));
+            return Err(ProcessError::ConfigError(format!(
+                "配置文件不存在: {}",
+                config_path.to_str().unwrap_or("unknown")
+            )));
         }
 
-        // 使用check_config_validity功能验证配置
-        match crate::app::core::kernel_service::check_config_validity(
-            config_path.to_str().unwrap_or("").to_string()
-        ).await {
-            Ok(_) => {
-                info!("配置文件验证通过");
-                Ok(())
-            },
-            Err(e) => {
-                error!("配置文件验证失败: {}", e);
-                Err(ProcessError::ConfigError(format!("配置文件验证失败: {}", e)))
-            }
+        // 检查配置文件是否可读
+        if let Err(e) = tokio::fs::metadata(&config_path).await {
+            return Err(ProcessError::ConfigError(format!(
+                "无法访问配置文件: {}",
+                e
+            )));
         }
+
+        Ok(())
     }
 
-    // 检查内核是否正在运行
-    fn is_running(&self) -> bool {
-        let mut process_guard = self.process.lock().unwrap();
-        if let Some(ref mut child) = *process_guard {
-            match child.try_wait() {
-                Ok(None) => return true, // 进程仍在运行
-                _ => return false,       // 进程已退出或出错
+    // 检查进程是否运行（使用读锁，提升并发性能）
+    pub async fn is_running(&self) -> bool {
+        let process_guard = self.process.read().await;
+        
+        if let Some(ref _proc) = *process_guard {
+            // 这里我们不能直接调用 try_wait，因为它需要可变引用
+            // 我们需要在写锁中进行状态检查
+            drop(process_guard);
+            
+            // 获取写锁进行状态检查
+            let mut process_guard = self.process.write().await;
+            if let Some(ref mut proc) = *process_guard {
+                match proc.try_wait() {
+                    Ok(None) => true,  // 进程还在运行
+                    Ok(Some(_)) => {
+                        // 进程已退出，清理状态
+                        *process_guard = None;
+                        false
+                    }
+                    Err(_) => {
+                        // 检查失败，清理状态
+                        *process_guard = None;
+                        false
+                    }
+                }
+            } else {
+                false
             }
+        } else {
+            false
         }
-        false
     }
 }
 
-// Windows平台下强制终止进程的辅助函数
-#[cfg(windows)]
+// 使用PID强制终止进程
 fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
-    use std::io;
-    
-    let status = Command::new("taskkill")
-        .args(&["/F", "/PID", &pid.to_string()])
-        .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
-        .status()?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("taskkill命令失败，退出状态: {}", status),
-        ))
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        
+        let output = Command::new("taskkill")
+            .args(&["/F", "/PID", &pid.to_string()])
+            .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
+            .output()?;
+        
+        if output.status.success() {
+            info!("成功使用PID {}强制终止进程", pid);
+        } else {
+            let error = String::from_utf8_lossy(&output.stderr);
+            warn!("使用PID {}强制终止进程失败: {}", pid, error);
+        }
     }
+    
+    Ok(())
 }

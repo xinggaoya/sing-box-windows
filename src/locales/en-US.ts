@@ -22,6 +22,7 @@ export default {
     darkMode: 'Dark Mode',
     fullscreen: 'Fullscreen',
     exitFullscreen: 'Exit Fullscreen',
+    later: 'Later',
   },
   nav: {
     home: 'Home',

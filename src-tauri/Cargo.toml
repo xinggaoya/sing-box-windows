@@ -46,3 +46,20 @@ tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-websocket = "2"
+
+# 性能优化配置
+[profile.dev]
+# 开发模式优化：保持编译速度的同时提升运行性能
+opt-level = 1
+debug = true
+lto = false
+
+[profile.release]
+# 发布模式优化：最大化运行时性能
+opt-level = 3
+debug = false
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = false

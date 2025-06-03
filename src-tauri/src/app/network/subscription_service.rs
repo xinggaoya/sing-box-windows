@@ -2,6 +2,7 @@ use crate::app::constants::{messages, network_config, paths};
 use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
 use crate::utils::app_util::get_work_dir;
 use crate::utils::config_util::ConfigUtil;
+use crate::utils::http_client;
 use base64;
 use serde_json::{json, Value};
 use std::error::Error;
@@ -10,7 +11,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use tauri::path::BaseDirectory;
 use tauri::Manager;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 // 下载订阅
 #[tauri::command]
@@ -29,7 +30,9 @@ pub async fn download_subscription(
     
     // 使用传入的代理端口
     if let Some(port) = proxy_port {
-        let _ = crate::app::core::proxy_service::set_system_proxy(port);
+        if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port) {
+            warn!("设置系统代理失败: {}", e);
+        }
     }
     Ok(())
 }
@@ -50,7 +53,9 @@ pub async fn add_manual_subscription(
     
     // 使用传入的代理端口
     if let Some(port) = proxy_port {
-        let _ = crate::app::core::proxy_service::set_system_proxy(port);
+        if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port) {
+            warn!("设置系统代理失败: {}", e);
+        }
     }
     Ok(())
 }
@@ -106,7 +111,9 @@ pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
 // 修改配置文件中的default_mode
 fn modify_default_mode(config_path: &Path, mode: String, api_port: Option<u16>) -> Result<(), Box<dyn Error>> {
     // 读取现有配置
-    let mut json_util = ConfigUtil::new(config_path.to_str().unwrap())?;
+    let config_path_str = config_path.to_str()
+        .ok_or("配置文件路径包含无效字符")?;
+    let mut json_util = ConfigUtil::new(config_path_str)?;
 
     // 而是直接创建新的配置并修改
     let target_keys = vec!["experimental"];
@@ -163,29 +170,12 @@ async fn download_and_process_subscription(
         return Err(err_msg.into());
     }
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(
-            network_config::HTTP_TIMEOUT_SECONDS,
-        ))
-        .no_proxy() // 禁用代理
-        .build()
-        .map_err(|e| format!("{}: {}", messages::ERR_HTTP_CLIENT_FAILED, e))?;
-    let mut headers = reqwest::header::HeaderMap::new();
-    let user_agent = reqwest::header::HeaderValue::from_static(
-        "sing-box-windows/1.0 (sing-box; compatible; Windows NT 10.0)",
-    );
-    headers.insert(reqwest::header::USER_AGENT, user_agent);
-
     info!("开始下载订阅: {}", url);
-    let response = client.get(url.trim()).headers(headers).send().await?;
-
-    if !response.status().is_success() {
-        let err_msg = format!("订阅下载失败，HTTP状态码: {}", response.status());
-        error!("{}", err_msg);
-        return Err(err_msg.into());
-    }
-
-    let response_text = response.text().await?;
+    
+    // 使用全局HTTP客户端
+    let response_text = http_client::get_text(url.trim()).await
+        .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
+    
     info!("订阅下载成功，内容长度: {} 字节", response_text.len());
 
     // 如果使用原始配置，直接处理原始内容

@@ -5,6 +5,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 pub mod app;
 pub mod entity;
+pub mod error;
 pub mod process;
 pub mod utils;
 

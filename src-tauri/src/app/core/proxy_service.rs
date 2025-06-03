@@ -2,18 +2,22 @@ use crate::app::constants::{config, messages, network_config, paths};
 use crate::entity::config_model;
 use crate::utils::app_util::get_work_dir;
 use crate::utils::config_util::ConfigUtil;
-use reqwest::Client;
+use crate::utils::http_client;
 use serde_json::{json, Value};
 use std::error::Error;
 use std::path::Path;
+use std::time::Duration;
 use tauri::{Emitter, Runtime};
-use tracing::info;
+use tracing::{info, warn, error};
 
 // 修改代理模式为系统代理
 #[tauri::command]
 pub fn set_system_proxy(port: u16) -> Result<(), String> {
     let config_path = paths::get_config_path();
-    let json_util = ConfigUtil::new(config_path.to_str().unwrap())
+    let config_path_str = config_path.to_str()
+        .ok_or("配置文件路径包含无效字符")?;
+        
+    let json_util = ConfigUtil::new(config_path_str)
         .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
 
     let mut json_util = json_util;
@@ -33,7 +37,8 @@ pub fn set_system_proxy(port: u16) -> Result<(), String> {
 
     json_util.update_key(
         target_keys.clone(),
-        serde_json::to_value(new_structs).unwrap(),
+        serde_json::to_value(new_structs)
+            .map_err(|e| format!("序列化配置失败: {}", e))?,
     );
     match json_util.save_to_file() {
         Ok(_) => {
@@ -48,7 +53,10 @@ pub fn set_system_proxy(port: u16) -> Result<(), String> {
 #[tauri::command]
 pub fn set_manual_proxy(port: u16) -> Result<(), String> {
     let config_path = paths::get_config_path();
-    let json_util = ConfigUtil::new(config_path.to_str().unwrap())
+    let config_path_str = config_path.to_str()
+        .ok_or("配置文件路径包含无效字符")?;
+        
+    let json_util = ConfigUtil::new(config_path_str)
         .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
 
     let mut json_util = json_util;
@@ -68,7 +76,8 @@ pub fn set_manual_proxy(port: u16) -> Result<(), String> {
 
     json_util.update_key(
         target_keys.clone(),
-        serde_json::to_value(new_structs).unwrap(),
+        serde_json::to_value(new_structs)
+            .map_err(|e| format!("序列化配置失败: {}", e))?,
     );
     match json_util.save_to_file() {
         Ok(_) => {
@@ -88,7 +97,9 @@ pub fn set_tun_proxy(port: u16) -> Result<(), String> {
 fn set_tun_proxy_impl(port: u16) -> Result<(), Box<dyn Error>> {
     let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/config.json");
-    let mut json_util = ConfigUtil::new(path.to_str().unwrap())?;
+    let path_str = path.to_str()
+        .ok_or("配置文件路径包含无效字符")?;
+    let mut json_util = ConfigUtil::new(path_str)?;
 
     let target_keys = vec!["inbounds"]; // 修改为你的属性路径
     let new_structs = vec![
@@ -198,89 +209,61 @@ pub fn toggle_ip_version(prefer_ipv6: bool) -> Result<(), String> {
     Ok(())
 }
 
-// 获取API Token
+// 获取API令牌
 #[tauri::command]
 pub fn get_api_token() -> String {
-    network_config::DEFAULT_API_TOKEN.to_string()
+    // 目前返回空字符串
+    "".to_string()
 }
 
-/// 获取代理列表
+// 获取代理节点列表
 #[tauri::command]
 pub async fn get_proxies(port: u16) -> Result<Value, String> {
-    let token = get_api_token();
-    let url = format!(
-        "http://{}:{}/proxies?token={}",
-        network_config::DEFAULT_CLASH_API_ADDRESS,
-        port,
-        token
-    );
-
-    // 创建禁用代理的HTTP客户端
-    let client = Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-
-    // 发送请求并获取响应
-    let response = client
-        .get(&url)
-        .header("Accept", "application/json")
-        .header("Content-Type", "application/json")
-        .send()
-        .await
-        .map_err(|e| format!("获取代理列表失败: {}", e))?;
-
-    // 解析响应为JSON
-    let json = response
-        .json::<Value>()
-        .await
-        .map_err(|e| format!("解析代理列表失败: {}", e))?;
-
-    Ok(json)
+    let url = format!("http://127.0.0.1:{}/proxies", port);
+    
+    match http_client::get_json::<Value>(&url).await {
+        Ok(data) => Ok(data),
+        Err(e) => {
+            error!("获取代理列表失败: {}", e);
+            Err(format!("获取代理列表失败: {}", e))
+        }
+    }
 }
 
-/// 切换代理
+// 切换代理节点
 #[tauri::command]
 pub async fn change_proxy(group: String, proxy: String, port: u16) -> Result<(), String> {
-    let token = get_api_token();
-    let url = format!(
-        "http://{}:{}/proxies/{}?token={}",
-        network_config::DEFAULT_CLASH_API_ADDRESS,
-        port,
-        group,
-        token
-    );
-
-    // 创建禁用代理的HTTP客户端
-    let client = Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-
-    // 请求体
-    let payload = json!({
+    let url = format!("http://127.0.0.1:{}/proxies/{}", port, group);
+    let data = json!({
         "name": proxy
     });
 
-    // 发送请求并获取响应
-    let response = client
-        .put(&url)
-        .header("Accept", "application/json")
-        .header("Content-Type", "application/json")
-        .json(&payload)
+    let client = http_client::get_client();
+    match client.put(&url)
+        .json(&data)
+        .timeout(Duration::from_secs(5))
         .send()
         .await
-        .map_err(|e| format!("切换代理失败: {}", e))?;
-
-    // 检查响应状态
-    if !response.status().is_success() {
-        return Err(format!("服务器返回错误: {}", response.status()));
+    {
+        Ok(response) => {
+            if response.status().is_success() {
+                info!("代理节点已切换: {} -> {}", group, proxy);
+                Ok(())
+            } else {
+                let error_msg = format!("切换代理节点失败，HTTP状态码: {}", response.status());
+                error!("{}", error_msg);
+                Err(error_msg)
+            }
+        }
+        Err(e) => {
+            let error_msg = format!("切换代理节点请求失败: {}", e);
+            error!("{}", error_msg);
+            Err(error_msg)
+        }
     }
-
-    Ok(())
 }
 
-/// 测试节点组延迟
+// 测试代理组延迟
 #[tauri::command]
 pub async fn test_group_delay<R: Runtime>(
     window: tauri::Window<R>,
@@ -288,148 +271,80 @@ pub async fn test_group_delay<R: Runtime>(
     server: Option<String>,
     port: u16
 ) -> Result<(), String> {
-    // 使用默认测试URL或指定的URL
     let test_url = server.unwrap_or_else(|| "http://cp.cloudflare.com".to_string());
-    let token = get_api_token();
+    let url = format!("http://127.0.0.1:{}/group/{}/delay", port, group);
+    let data = json!({
+        "url": test_url,
+        "timeout": 5000
+    });
 
-    // 构建请求URL
-    let url = format!(
-        "http://{}:{}/group/{}/delay?url={}&timeout=2000&token={}",
-        network_config::DEFAULT_CLASH_API_ADDRESS,
-        port,
-        urlencoding::encode(&group),
-        urlencoding::encode(&test_url),
-        token
-    );
-
-    // 创建禁用代理的HTTP客户端
-    let client = Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-
-    // 发送请求并获取结果
-    match client
-        .get(&url)
-        .header("Accept", "application/json")
-        .header("Content-Type", "application/json")
+    let client = http_client::get_client();
+    match client.post(&url)
+        .json(&data)
+        .timeout(Duration::from_secs(10))
         .send()
         .await
     {
         Ok(response) => {
-            match response.json::<Value>().await {
-                Ok(data) => {
-                    // 发送测试结果事件
-                    let _ = window.emit(
-                        "test-group-result",
-                        json!({
-                            "group": group,
-                            "results": data,
-                            "success": true
-                        }),
-                    );
+            if response.status().is_success() {
+                match response.json::<Value>().await {
+                    Ok(result) => {
+                        // 发送结果到前端
+                        if let Err(e) = window.emit("proxy-group-delay-result", &result) {
+                            warn!("发送延迟测试结果失败: {}", e);
+                        }
+                        info!("代理组 {} 延迟测试完成", group);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        let error_msg = format!("解析延迟测试结果失败: {}", e);
+                        error!("{}", error_msg);
+                        Err(error_msg)
+                    }
                 }
-                Err(e) => {
-                    // 发送测试失败事件
-                    let _ = window.emit(
-                        "test-group-result",
-                        json!({
-                            "group": group,
-                            "success": false,
-                            "error": format!("解析结果失败: {}", e)
-                        }),
-                    );
-                }
+            } else {
+                let error_msg = format!("延迟测试失败，HTTP状态码: {}", response.status());
+                error!("{}", error_msg);
+                Err(error_msg)
             }
         }
         Err(e) => {
-            // 发送测试失败事件
-            let _ = window.emit(
-                "test-group-result",
-                json!({
-                    "group": group,
-                    "success": false,
-                    "error": format!("请求失败: {}", e)
-                }),
-            );
+            let error_msg = format!("延迟测试请求失败: {}", e);
+            error!("{}", error_msg);
+            Err(error_msg)
         }
     }
-
-    Ok(())
 }
 
-/// 获取内核版本信息
+// 获取版本信息
 #[tauri::command]
 pub async fn get_version_info(port: u16) -> Result<Value, String> {
-    let token = get_api_token();
-    let url = format!(
-        "http://{}:{}/version?token={}",
-        network_config::DEFAULT_CLASH_API_ADDRESS,
-        port,
-        token
-    );
-
-    // 创建禁用代理的HTTP客户端
-    let client = Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-
-    // 发送请求并获取响应
-    let response = client
-        .get(&url)
-        .header("Accept", "application/json")
-        .header("Content-Type", "application/json")
-        .send()
-        .await
-        .map_err(|e| format!("获取版本信息失败: {}", e))?;
-
-    // 解析响应为JSON
-    let json = response
-        .json::<Value>()
-        .await
-        .map_err(|e| format!("解析版本信息失败: {}", e))?;
-
-    Ok(json)
+    let url = format!("http://127.0.0.1:{}/version", port);
+    
+    match http_client::get_json::<Value>(&url).await {
+        Ok(data) => Ok(data),
+        Err(e) => {
+            error!("获取版本信息失败: {}", e);
+            Err(format!("获取版本信息失败: {}", e))
+        }
+    }
 }
 
-/// 获取规则列表
+// 获取规则信息
 #[tauri::command]
 pub async fn get_rules(port: u16) -> Result<Value, String> {
-    let token = get_api_token();
-    let url = format!(
-        "http://{}:{}/rules?token={}",
-        network_config::DEFAULT_CLASH_API_ADDRESS,
-        port,
-        token
-    );
-
-    // 创建禁用代理的HTTP客户端
-    let client = Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-
-    info!("获取规则列表{}", url);
-    // 发送请求并获取响应
-    let response = client
-        .get(&url)
-        .header("Accept", "application/json")
-        .header("Content-Type", "application/json")
-        .send()
-        .await
-        .map_err(|e| format!("获取规则列表失败: {}", e))?;
-
-    // 解析响应为JSON
-    let json = response
-        .json::<Value>()
-        .await
-        .map_err(|e| format!("解析规则列表失败: {}", e))?;
-
-    Ok(json)
+    let url = format!("http://127.0.0.1:{}/rules", port);
+    
+    match http_client::get_json::<Value>(&url).await {
+        Ok(data) => Ok(data),
+        Err(e) => {
+            error!("获取规则信息失败: {}", e);
+            Err(format!("获取规则信息失败: {}", e))
+        }
+    }
 }
 
-/// 测试单个节点延迟
+// 测试单个节点延迟
 #[tauri::command]
 pub async fn test_node_delay<R: Runtime>(
     window: tauri::Window<R>,
@@ -437,74 +352,55 @@ pub async fn test_node_delay<R: Runtime>(
     server: Option<String>,
     port: u16,
 ) -> Result<(), String> {
-    // 使用默认测试URL或指定的URL
     let test_url = server.unwrap_or_else(|| "http://cp.cloudflare.com".to_string());
-    let token = get_api_token();
+    let url = format!("http://127.0.0.1:{}/proxies/{}/delay", port, proxy);
+    let data = json!({
+        "url": test_url,
+        "timeout": 5000
+    });
 
-    // 构建请求URL
-    let url = format!(
-        "http://{}:{}/proxies/{}/delay?url={}&timeout=5000&token={}",
-        network_config::DEFAULT_CLASH_API_ADDRESS,
-        port,
-        urlencoding::encode(&proxy),
-        urlencoding::encode(&test_url),
-        token
-    );
-
-    // 创建禁用代理的HTTP客户端
-    let client = Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-
-    // 发送请求并获取结果
-    match client
-        .get(&url)
-        .header("Accept", "application/json")
-        .header("Content-Type", "application/json")
+    let client = http_client::get_client();
+    match client.post(&url)
+        .json(&data)
+        .timeout(Duration::from_secs(8))
         .send()
         .await
     {
         Ok(response) => {
-            match response.json::<Value>().await {
-                Ok(data) => {
-                    let delay = data.get("delay").and_then(|d| d.as_u64()).unwrap_or(0);
-
-                    // 发送测试结果事件
-                    let _ = window.emit(
-                        "test-node-result",
-                        json!({
+            if response.status().is_success() {
+                match response.json::<Value>().await {
+                    Ok(data) => {
+                        let delay = data.get("delay").and_then(|d| d.as_u64()).unwrap_or(0);
+                        
+                        let result = json!({
                             "proxy": proxy,
-                            "delay": delay,
-                            "success": true
-                        }),
-                    );
+                            "delay": delay
+                        });
+                        
+                        // 发送结果到前端
+                        if let Err(e) = window.emit("proxy-delay-result", &result) {
+                            warn!("发送延迟测试结果失败: {}", e);
+                        }
+                        
+                        info!("节点 {} 延迟测试完成: {}ms", proxy, delay);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        let error_msg = format!("解析延迟测试结果失败: {}", e);
+                        error!("{}", error_msg);
+                        Err(error_msg)
+                    }
                 }
-                Err(e) => {
-                    // 发送测试失败事件
-                    let _ = window.emit(
-                        "test-node-result",
-                        json!({
-                            "proxy": proxy,
-                            "success": false,
-                            "error": format!("解析结果失败: {}", e)
-                        }),
-                    );
-                }
+            } else {
+                let error_msg = format!("节点延迟测试失败，HTTP状态码: {}", response.status());
+                error!("{}", error_msg);
+                Err(error_msg)
             }
         }
         Err(e) => {
-            // 发送测试失败事件
-            let _ = window.emit(
-                "test-node-result",
-                json!({
-                    "proxy": proxy,
-                    "success": false,
-                    "error": format!("请求失败: {}", e)
-                }),
-            );
+            let error_msg = format!("节点延迟测试请求失败: {}", e);
+            error!("{}", error_msg);
+            Err(error_msg)
         }
     }
-
-    Ok(())
 }
