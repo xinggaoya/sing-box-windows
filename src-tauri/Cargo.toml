@@ -26,7 +26,7 @@ base64 = "0.13.0"
 sha2 = "0.10"
 semver = "1.0"
 
-tauri = { version = "2", features = ["tray-icon", "unstable"] }
+tauri = { version = "2", features = ["tray-icon", "unstable", "devtools"] }
 reqwest = { version = "0", features = ["json", "stream", "rustls-tls"] }
 dirs = "5.0.1"
 tokio = { version = "1", features = ["full"] }

@@ -176,6 +176,14 @@ export const tauriApi = {
     restartAsAdmin: () => invoke<void>('restart_as_admin'),
     // 退出应用程序
     exitApplication: () => invoke<void>('exit_application'),
+    // 切换开发者工具
+    toggleDevtools: () => invoke<void>('toggle_devtools'),
+    // 打开开发者工具
+    openDevtools: () => invoke<void>('open_devtools'),
+    // 关闭开发者工具
+    closeDevtools: () => invoke<void>('close_devtools'),
+    // 检查开发者工具是否已打开
+    isDevtoolsOpen: () => invoke<boolean>('is_devtools_open'),
   },
 
   // 更新相关 API

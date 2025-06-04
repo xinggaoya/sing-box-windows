@@ -72,6 +72,10 @@ pub fn run() {
             // System - System service commands
             crate::app::system::system_service::check_admin,
             crate::app::system::system_service::restart_as_admin,
+            crate::app::system::system_service::toggle_devtools,
+            crate::app::system::system_service::open_devtools,
+            crate::app::system::system_service::close_devtools,
+            crate::app::system::system_service::is_devtools_open,
             // System - Update service commands
             crate::app::system::update_service::check_update,
             crate::app::system::update_service::download_and_install_update,

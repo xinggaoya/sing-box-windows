@@ -373,6 +373,17 @@ export default {
       license: 'License',
       website: 'Website',
     },
+    developer: {
+      title: 'Developer Tools',
+      openDevtools: 'Open Developer Tools',
+      closeDevtools: 'Close Developer Tools',
+      toggleDevtools: 'Toggle Developer Tools',
+      description: 'Open browser developer tools for debugging and inspecting frontend code',
+      opened: 'Developer tools opened',
+      closed: 'Developer tools closed',
+      warning:
+        'Developer tools are mainly for development and debugging, not needed for normal use',
+    },
     error: {
       appDataDir: 'Failed to get app data directory',
     },

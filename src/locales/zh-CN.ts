@@ -335,6 +335,16 @@ export default {
       license: '许可证',
       website: '官方网站',
     },
+    developer: {
+      title: '开发者工具',
+      openDevtools: '打开开发者工具',
+      closeDevtools: '关闭开发者工具',
+      toggleDevtools: '切换开发者工具',
+      description: '打开浏览器开发者工具用于调试和检查前端代码',
+      opened: '开发者工具已打开',
+      closed: '开发者工具已关闭',
+      warning: '开发者工具主要用于开发和调试，正常使用无需开启',
+    },
     error: {
       appDataDir: '获取应用数据目录失败',
     },

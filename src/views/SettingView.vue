@@ -251,6 +251,46 @@
           </div>
         </div>
 
+        <!-- 开发者工具卡片 -->
+        <div class="setting-card">
+          <div class="card-header">
+            <div class="header-left">
+              <div class="card-icon developer-icon">
+                <n-icon size="24"><code-outline /></n-icon>
+              </div>
+              <div class="header-info">
+                <h3 class="card-title">{{ t('setting.developer.title') }}</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-content">
+            <div class="setting-list">
+              <div class="setting-item">
+                <div class="setting-info">
+                  <div class="setting-name">{{ t('setting.developer.openDevtools') }}</div>
+                  <div class="setting-description">
+                    {{ t('setting.developer.description') }}
+                  </div>
+                </div>
+                <n-button
+                  type="primary"
+                  size="large"
+                  @click="handleOpenDevtools"
+                  :loading="devtoolsLoading"
+                  class="action-btn"
+                >
+                  {{ t('setting.developer.openDevtools') }}
+                </n-button>
+              </div>
+            </div>
+
+            <n-alert type="warning" :show-icon="true" class="status-alert" style="margin-top: 12px">
+              {{ t('setting.developer.warning') }}
+            </n-alert>
+          </div>
+        </div>
+
         <!-- 关于信息卡片 -->
         <div class="setting-card about-card">
           <div class="card-header">
@@ -392,6 +432,7 @@ import {
   GlobeOutline,
   RefreshOutline,
   ChevronUpOutline,
+  CodeOutline,
 } from '@vicons/ionicons5'
 import { listen } from '@tauri-apps/api/event'
 import { tauriApi } from '@/services/tauri-api'
@@ -731,6 +772,21 @@ const savePortSettings = async () => {
   }
 }
 
+// 打开开发者工具
+const devtoolsLoading = ref(false)
+
+const handleOpenDevtools = async () => {
+  try {
+    devtoolsLoading.value = true
+    await tauriApi.system.openDevtools()
+    message.success(t('setting.developer.opened'))
+  } catch (error) {
+    message.error(`${t('common.error')}: ${error}`)
+  } finally {
+    devtoolsLoading.value = false
+  }
+}
+
 onMounted(() => {
   // 添加窗口大小改变监听器
   window.addEventListener('resize', updateMobileStatus)
@@ -884,6 +940,11 @@ onUnmounted(() => {
 .about-icon {
   background: linear-gradient(135deg, #ff7d00 0%, #d66600 100%);
   box-shadow: 0 8px 24px rgba(255, 125, 0, 0.3);
+}
+
+.developer-icon {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
 }
 
 .header-info {
