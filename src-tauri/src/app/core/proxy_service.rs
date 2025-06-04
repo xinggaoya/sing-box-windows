@@ -8,15 +8,14 @@ use std::error::Error;
 use std::path::Path;
 use std::time::Duration;
 use tauri::{Emitter, Runtime};
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 // 修改代理模式为系统代理
 #[tauri::command]
 pub fn set_system_proxy(port: u16) -> Result<(), String> {
     let config_path = paths::get_config_path();
-    let config_path_str = config_path.to_str()
-        .ok_or("配置文件路径包含无效字符")?;
-        
+    let config_path_str = config_path.to_str().ok_or("配置文件路径包含无效字符")?;
+
     let json_util = ConfigUtil::new(config_path_str)
         .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
 
@@ -37,8 +36,7 @@ pub fn set_system_proxy(port: u16) -> Result<(), String> {
 
     json_util.update_key(
         target_keys.clone(),
-        serde_json::to_value(new_structs)
-            .map_err(|e| format!("序列化配置失败: {}", e))?,
+        serde_json::to_value(new_structs).map_err(|e| format!("序列化配置失败: {}", e))?,
     );
     match json_util.save_to_file() {
         Ok(_) => {
@@ -53,9 +51,8 @@ pub fn set_system_proxy(port: u16) -> Result<(), String> {
 #[tauri::command]
 pub fn set_manual_proxy(port: u16) -> Result<(), String> {
     let config_path = paths::get_config_path();
-    let config_path_str = config_path.to_str()
-        .ok_or("配置文件路径包含无效字符")?;
-        
+    let config_path_str = config_path.to_str().ok_or("配置文件路径包含无效字符")?;
+
     let json_util = ConfigUtil::new(config_path_str)
         .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
 
@@ -76,8 +73,7 @@ pub fn set_manual_proxy(port: u16) -> Result<(), String> {
 
     json_util.update_key(
         target_keys.clone(),
-        serde_json::to_value(new_structs)
-            .map_err(|e| format!("序列化配置失败: {}", e))?,
+        serde_json::to_value(new_structs).map_err(|e| format!("序列化配置失败: {}", e))?,
     );
     match json_util.save_to_file() {
         Ok(_) => {
@@ -97,8 +93,7 @@ pub fn set_tun_proxy(port: u16) -> Result<(), String> {
 fn set_tun_proxy_impl(port: u16) -> Result<(), Box<dyn Error>> {
     let work_dir = get_work_dir();
     let path = Path::new(&work_dir).join("sing-box/config.json");
-    let path_str = path.to_str()
-        .ok_or("配置文件路径包含无效字符")?;
+    let path_str = path.to_str().ok_or("配置文件路径包含无效字符")?;
     let mut json_util = ConfigUtil::new(path_str)?;
 
     let target_keys = vec!["inbounds"]; // 修改为你的属性路径
@@ -220,7 +215,7 @@ pub fn get_api_token() -> String {
 #[tauri::command]
 pub async fn get_proxies(port: u16) -> Result<Value, String> {
     let url = format!("http://127.0.0.1:{}/proxies", port);
-    
+
     match http_client::get_json::<Value>(&url).await {
         Ok(data) => Ok(data),
         Err(e) => {
@@ -239,7 +234,8 @@ pub async fn change_proxy(group: String, proxy: String, port: u16) -> Result<(),
     });
 
     let client = http_client::get_client();
-    match client.put(&url)
+    match client
+        .put(&url)
         .json(&data)
         .timeout(Duration::from_secs(5))
         .send()
@@ -269,7 +265,7 @@ pub async fn test_group_delay<R: Runtime>(
     window: tauri::Window<R>,
     group: String,
     server: Option<String>,
-    port: u16
+    port: u16,
 ) -> Result<(), String> {
     let test_url = server.unwrap_or_else(|| "http://cp.cloudflare.com".to_string());
     let url = format!("http://127.0.0.1:{}/group/{}/delay", port, group);
@@ -279,7 +275,8 @@ pub async fn test_group_delay<R: Runtime>(
     });
 
     let client = http_client::get_client();
-    match client.post(&url)
+    match client
+        .post(&url)
         .json(&data)
         .timeout(Duration::from_secs(10))
         .send()
@@ -320,7 +317,7 @@ pub async fn test_group_delay<R: Runtime>(
 #[tauri::command]
 pub async fn get_version_info(port: u16) -> Result<Value, String> {
     let url = format!("http://127.0.0.1:{}/version", port);
-    
+
     match http_client::get_json::<Value>(&url).await {
         Ok(data) => Ok(data),
         Err(e) => {
@@ -334,7 +331,7 @@ pub async fn get_version_info(port: u16) -> Result<Value, String> {
 #[tauri::command]
 pub async fn get_rules(port: u16) -> Result<Value, String> {
     let url = format!("http://127.0.0.1:{}/rules", port);
-    
+
     match http_client::get_json::<Value>(&url).await {
         Ok(data) => Ok(data),
         Err(e) => {
@@ -360,7 +357,8 @@ pub async fn test_node_delay<R: Runtime>(
     });
 
     let client = http_client::get_client();
-    match client.post(&url)
+    match client
+        .post(&url)
         .json(&data)
         .timeout(Duration::from_secs(8))
         .send()
@@ -371,17 +369,17 @@ pub async fn test_node_delay<R: Runtime>(
                 match response.json::<Value>().await {
                     Ok(data) => {
                         let delay = data.get("delay").and_then(|d| d.as_u64()).unwrap_or(0);
-                        
+
                         let result = json!({
                             "proxy": proxy,
                             "delay": delay
                         });
-                        
+
                         // 发送结果到前端
                         if let Err(e) = window.emit("proxy-delay-result", &result) {
                             warn!("发送延迟测试结果失败: {}", e);
                         }
-                        
+
                         info!("节点 {} 延迟测试完成: {}ms", proxy, delay);
                         Ok(())
                     }

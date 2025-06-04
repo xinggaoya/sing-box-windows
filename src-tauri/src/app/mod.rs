@@ -14,18 +14,18 @@ pub mod network {
 
 // System services
 pub mod system {
+    pub mod config_service;
     pub mod system_service;
     pub mod update_service;
-    pub mod config_service;
 }
 
 // Re-exports for backward compatibility
 pub use core::kernel_service;
 pub use core::proxy_service;
 pub use network::subscription_service;
+pub use system::config_service;
 pub use system::system_service;
 pub use system::update_service;
-pub use system::config_service;
 
 // Re-export constants for backward compatibility
 pub use constants::common::log;

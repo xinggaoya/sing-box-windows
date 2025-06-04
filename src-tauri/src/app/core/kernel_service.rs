@@ -8,8 +8,8 @@ use serde_json::json;
 use serde_json::Value;
 use std::os::windows::process::CommandExt;
 use std::path::Path;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tauri::Emitter;
 use tauri::{Runtime, Window};
@@ -111,9 +111,12 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
 
 // 启动内核
 #[tauri::command]
-pub async fn start_kernel(_proxy_mode: Option<String>, api_port: Option<u16>) -> Result<(), String> {
+pub async fn start_kernel(
+    _proxy_mode: Option<String>,
+    api_port: Option<u16>,
+) -> Result<(), String> {
     let port = api_port.unwrap_or(12081); // 默认API端口
-    
+
     // 检查是否已经在运行
     if PROCESS_MANAGER.is_running().await {
         return Err("内核已在运行中".to_string());
@@ -128,10 +131,7 @@ pub async fn start_kernel(_proxy_mode: Option<String>, api_port: Option<u16>) ->
 
     // 检查配置文件是否存在
     if !config_path.exists() {
-        return Err(format!(
-            "配置文件不存在: {}",
-            config_path.to_string_lossy()
-        ));
+        return Err(format!("配置文件不存在: {}", config_path.to_string_lossy()));
     }
 
     // 检查配置文件有效性
@@ -170,7 +170,7 @@ pub async fn start_kernel(_proxy_mode: Option<String>, api_port: Option<u16>) ->
             } else {
                 error_string
             };
-            
+
             error!("内核启动失败: {}", shortened_error);
             Err(shortened_error)
         }
@@ -184,10 +184,10 @@ async fn check_admin_requirement(config_path: &Path) -> Result<(), String> {
         Ok(content) => {
             match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(config) => {
-                    // 检查是否配置了TUN模式的入站或设置了系统代理
+                    // 只检查是否配置了TUN模式的入站
+                    // 移除对set_system_proxy的检查，因为设置系统代理通过注册表操作通常不需要管理员权限
                     let mut has_tun = false;
-                    let mut has_system_proxy = false;
-                    
+
                     if let Some(inbounds) = config.get("inbounds").and_then(|v| v.as_array()) {
                         for inbound in inbounds {
                             if let Some(type_str) = inbound.get("type").and_then(|v| v.as_str()) {
@@ -196,18 +196,11 @@ async fn check_admin_requirement(config_path: &Path) -> Result<(), String> {
                                     break;
                                 }
                             }
-                            
-                            // 检查是否设置了系统代理
-                            if let Some(set_system_proxy) = inbound.get("set_system_proxy").and_then(|v| v.as_bool()) {
-                                if set_system_proxy {
-                                    has_system_proxy = true;
-                                }
-                            }
                         }
                     }
-                    
-                    // 只有在TUN模式或设置了系统代理时才可能需要管理员权限
-                    has_tun || has_system_proxy
+
+                    // 只有在TUN模式时才需要管理员权限
+                    has_tun
                 }
                 Err(e) => {
                     warn!("解析配置文件失败，但继续尝试启动: {}", e);
@@ -220,37 +213,44 @@ async fn check_admin_requirement(config_path: &Path) -> Result<(), String> {
             false // 读取失败时不强制要求管理员权限
         }
     };
-    
+
     if needs_admin {
         // 仅在确实需要时才检查管理员权限
         if !crate::app::system::system_service::check_admin() {
-            return Err("当前配置需要管理员权限才能启动内核（TUN模式或系统代理需要管理员权限）".to_string());
+            return Err(
+                "当前配置需要管理员权限才能启动内核（TUN模式需要管理员权限）".to_string(),
+            );
         }
     } else {
         info!("当前配置不需要管理员权限，继续启动");
     }
-    
+
     Ok(())
 }
 
 // 等待内核准备就绪（改进的非轮询机制）
 async fn wait_for_kernel_ready(api_port: u16) -> Result<(), String> {
     let url = format!("http://127.0.0.1:{}/version?token=", api_port);
-    
+
     // 启动后台任务检查API状态
     let ready_notify = KERNEL_READY_NOTIFY.clone();
     let ready_notify_clone = ready_notify.clone();
     let check_url = url.clone();
-    
+
     tokio::spawn(async move {
         let client = http_client::get_client();
-        
+
         // 给内核一些启动时间
         tokio::time::sleep(Duration::from_millis(1000)).await;
-        
+
         // 进行多次快速检查
         for i in 0..20 {
-            match client.get(&check_url).timeout(Duration::from_secs(2)).send().await {
+            match client
+                .get(&check_url)
+                .timeout(Duration::from_secs(2))
+                .send()
+                .await
+            {
                 Ok(response) if response.status().is_success() => {
                     info!("内核API服务在第{}次检查时就绪", i + 1);
                     ready_notify_clone.notify_one();
@@ -271,7 +271,7 @@ async fn wait_for_kernel_ready(api_port: u16) -> Result<(), String> {
             }
         }
     });
-    
+
     // 等待通知或超时
     tokio::select! {
         _ = ready_notify.notified() => Ok(()),
@@ -286,10 +286,10 @@ async fn wait_for_kernel_ready(api_port: u16) -> Result<(), String> {
 pub async fn stop_kernel() -> Result<(), String> {
     // 设置停止标志
     SHOULD_STOP_WS.store(true, Ordering::Relaxed);
-    
+
     // 清理所有WebSocket任务
     cleanup_websocket_tasks().await;
-    
+
     // 先尝试关闭系统代理，无论如何都继续执行后续操作
     if let Err(e) = crate::utils::proxy_util::disable_system_proxy() {
         warn!("关闭系统代理失败: {}", e);
@@ -304,19 +304,19 @@ pub async fn stop_kernel() -> Result<(), String> {
 // 清理WebSocket任务
 async fn cleanup_websocket_tasks() {
     info!("正在清理WebSocket任务...");
-    
+
     let mut tasks = WEBSOCKET_TASKS.lock().await;
-    
+
     // 中止所有任务
     for task in tasks.iter() {
         task.abort();
     }
-    
+
     // 等待所有任务完成或中止
     for task in tasks.drain(..) {
         let _ = task.await;
     }
-    
+
     info!("WebSocket任务清理完成");
 }
 
@@ -511,15 +511,18 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
 
 /// 启动WebSocket中继服务
 #[tauri::command]
-pub async fn start_websocket_relay<R: Runtime>(window: Window<R>, api_port: Option<u16>) -> Result<(), String> {
+pub async fn start_websocket_relay<R: Runtime>(
+    window: Window<R>,
+    api_port: Option<u16>,
+) -> Result<(), String> {
     let port = api_port.unwrap_or(12081); // 默认API端口
-    
+
     // 重置停止标志
     SHOULD_STOP_WS.store(false, Ordering::Relaxed);
-    
+
     // 清理旧任务
     cleanup_websocket_tasks().await;
-    
+
     // 启动四个不同类型的WebSocket中继
     start_traffic_relay(window.clone(), port).await?;
     start_memory_relay(window.clone(), port).await?;
@@ -540,8 +543,7 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Re
     let ws_task = task::spawn(async move {
         let url = Url::parse(&format!(
             "ws://127.0.0.1:{}/traffic?token={}",
-            api_port,
-            token
+            api_port, token
         ))
         .unwrap();
 
@@ -581,12 +583,13 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Re
                                 } else {
                                     let _ = tx.send(data).await;
                                 }
-                                
+
                                 // 定期重置计数器，防止溢出
                                 if message_count >= MAX_MESSAGES_PER_BATCH {
                                     message_count = 0;
                                     // 短暂休眠，给其他任务执行机会
-                                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(10))
+                                        .await;
                                 }
                             }
                         }
@@ -664,8 +667,7 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Res
     let _handle = task::spawn(async move {
         let url = Url::parse(&format!(
             "ws://127.0.0.1:{}/memory?token={}",
-            api_port,
-            token
+            api_port, token
         ))
         .unwrap();
 
@@ -750,12 +752,7 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Resul
 
     // 启动WebSocket连接和数据处理任务
     let _handle = task::spawn(async move {
-        let url = Url::parse(&format!(
-            "ws://127.0.0.1:{}/logs?token={}",
-            api_port,
-            token
-        ))
-        .unwrap();
+        let url = Url::parse(&format!("ws://127.0.0.1:{}/logs?token={}", api_port, token)).unwrap();
 
         match connect_async(url).await {
             Ok((ws_stream, _)) => {
@@ -830,7 +827,10 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Resul
 }
 
 /// 启动连接数据中继
-async fn start_connections_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Result<(), String> {
+async fn start_connections_relay<R: Runtime>(
+    window: Window<R>,
+    api_port: u16,
+) -> Result<(), String> {
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
@@ -840,8 +840,7 @@ async fn start_connections_relay<R: Runtime>(window: Window<R>, api_port: u16) -
     let _handle = task::spawn(async move {
         let url = Url::parse(&format!(
             "ws://127.0.0.1:{}/connections?token={}",
-            api_port,
-            token
+            api_port, token
         ))
         .unwrap();
 
@@ -926,12 +925,11 @@ pub async fn is_kernel_running() -> Result<bool, String> {
         .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("检查内核进程失败: {}", e))?;
-    
+
     // 检查输出中是否包含sing-box.exe
     let stdout = String::from_utf8_lossy(&output.stdout);
     let is_running = stdout.contains("sing-box.exe");
-    
+
     info!("内核运行状态检查: {}", is_running);
     Ok(is_running)
 }
-

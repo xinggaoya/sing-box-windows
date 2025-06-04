@@ -509,18 +509,31 @@ const runKernel = async () => {
     appState.setProxyMode(currentProxyMode.value)
 
     // 检查TUN模式下是否需要管理员权限
-    if (currentProxyMode.value === 'tun' && !isAdmin.value) {
-      dialog.warning({
-        title: t('notification.adminRequired'),
-        content: t('notification.tunModeAdminRequired'),
-        positiveText: t('common.restart'),
-        negativeText: t('common.cancel'),
-        onPositiveClick: async () => {
-          await restartAsAdmin()
-        },
-      })
-      isStarting.value = false
-      return
+    if (currentProxyMode.value === 'tun') {
+      // 每次启动TUN模式时都重新检查管理员权限
+      const currentIsAdmin = await tauriApi.system.checkAdmin()
+      console.log('启动TUN模式 - 当前管理员权限状态:', currentIsAdmin)
+
+      if (!currentIsAdmin) {
+        dialog.warning({
+          title: t('notification.adminRequired'),
+          content: t('notification.tunModeAdminRequired'),
+          positiveText: t('common.restart'),
+          negativeText: t('common.cancel'),
+          onPositiveClick: async () => {
+            try {
+              // 先设置模式到应用状态，以便重启后保持选择
+              appState.setProxyMode('tun')
+              currentProxyMode.value = 'tun'
+              await restartAsAdmin()
+            } catch (error) {
+              message.error(`${t('notification.restartFailed')}: ${error}`)
+            }
+          },
+        })
+        isStarting.value = false
+        return
+      }
     }
 
     // 显示启动中提示
@@ -641,22 +654,34 @@ const onModeChange = async (value: string) => {
     isSwitching.value = true
 
     // 检查如果切换到TUN模式且不是管理员权限，则先提示
-    if (value === 'tun' && !isAdmin.value) {
-      dialog.warning({
-        title: t('notification.adminRequired'),
-        content: t('notification.tunModeAdminRequired'),
-        positiveText: t('common.restart'),
-        negativeText: t('common.cancel'),
-        onPositiveClick: async () => {
-          await restartAsAdmin()
-        },
-        onNegativeClick: () => {
-          // 取消操作，恢复之前的选择
-          currentProxyMode.value = appState.proxyMode
-          isSwitching.value = false
-        },
-      })
-      return
+    if (value === 'tun') {
+      // 每次切换TUN模式时都重新检查管理员权限
+      const currentIsAdmin = await tauriApi.system.checkAdmin()
+      console.log('当前管理员权限状态:', currentIsAdmin)
+
+      if (!currentIsAdmin) {
+        dialog.warning({
+          title: t('notification.adminRequired'),
+          content: t('notification.tunModeAdminRequired'),
+          positiveText: t('common.restart'),
+          negativeText: t('common.cancel'),
+          onPositiveClick: async () => {
+            try {
+              // 先设置模式到应用状态，以便重启后保持选择
+              appState.setProxyMode('tun')
+              currentProxyMode.value = 'tun'
+              await restartAsAdmin()
+            } catch (error) {
+              message.error(`${t('notification.restartFailed')}: ${error}`)
+            }
+          },
+          onNegativeClick: () => {
+            // 取消操作，恢复之前的选择
+            currentProxyMode.value = appState.proxyMode
+          },
+        })
+        return // 直接返回，不继续执行切换操作
+      }
     }
 
     // 切换模式
@@ -674,6 +699,8 @@ const onModeChange = async (value: string) => {
         showMessage('success', t('notification.systemProxyEnabled'))
       } else if (value === 'manual') {
         showMessage('info', t('notification.manualProxyEnabled'))
+      } else if (value === 'tun') {
+        showMessage('success', t('notification.tunModeEnabled'))
       }
     }
 

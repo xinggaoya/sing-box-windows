@@ -1,11 +1,11 @@
 use crate::app::constants::{api, messages};
+use crate::app::network_config;
 use crate::utils::app_util::get_work_dir;
+use semver::Version;
 use serde_json::json;
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use tauri::Emitter;
-use crate::app::network_config;
-use semver::Version;
 
 // 更新信息结构体
 #[derive(serde::Serialize, Debug)]
@@ -21,9 +21,17 @@ pub struct UpdateInfo {
 // 版本比较函数
 fn compare_versions(current: &str, latest: &str) -> bool {
     // 清理版本号，移除 'v' 前缀和其他非版本信息
-    let clean_current = current.trim_start_matches('v').split_whitespace().next().unwrap_or(current);
-    let clean_latest = latest.trim_start_matches('v').split_whitespace().next().unwrap_or(latest);
-    
+    let clean_current = current
+        .trim_start_matches('v')
+        .split_whitespace()
+        .next()
+        .unwrap_or(current);
+    let clean_latest = latest
+        .trim_start_matches('v')
+        .split_whitespace()
+        .next()
+        .unwrap_or(latest);
+
     // 尝试使用 semver 进行比较
     match (Version::parse(clean_current), Version::parse(clean_latest)) {
         (Ok(curr), Ok(lat)) => lat > curr,
@@ -78,7 +86,7 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
     // 查找Windows安装程序
     let mut download_url = String::new();
     let mut file_size: Option<u64> = None;
-    
+
     for asset in assets {
         let name = asset["name"].as_str().unwrap_or("");
         if name.ends_with(".msi") || name.ends_with(".exe") {
@@ -199,7 +207,7 @@ pub async fn download_and_install_update(
                     "message": "安装程序已启动，请按照提示完成安装"
                 }),
             );
-    Ok(())
+            Ok(())
         }
         Err(e) => {
             let error_msg = format!("启动安装程序失败: {}", e);

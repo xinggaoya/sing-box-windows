@@ -8,7 +8,7 @@ pub mod network_config {
     pub const DEFAULT_LISTEN_ADDRESS: &str = "0.0.0.0";
     /// 默认 Clash API 地址
     pub const DEFAULT_CLASH_API_ADDRESS: &str = "127.0.0.1";
-    
+
     /// 默认 API Token
     pub const DEFAULT_API_TOKEN: &str = "";
 

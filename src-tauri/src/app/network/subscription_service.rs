@@ -24,10 +24,16 @@ pub async fn download_subscription(
 ) -> Result<(), String> {
     let app_handle = window.app_handle();
 
-    download_and_process_subscription(url, use_original_config, app_handle.clone(), proxy_port, api_port)
-        .await
-        .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
-    
+    download_and_process_subscription(
+        url,
+        use_original_config,
+        app_handle.clone(),
+        proxy_port,
+        api_port,
+    )
+    .await
+    .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
+
     // 使用传入的代理端口
     if let Some(port) = proxy_port {
         if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port) {
@@ -48,9 +54,15 @@ pub async fn add_manual_subscription(
 ) -> Result<(), String> {
     let app_handle = window.app_handle();
 
-    process_subscription_content(content, use_original_config, app_handle.clone(), proxy_port, api_port)
-        .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
-    
+    process_subscription_content(
+        content,
+        use_original_config,
+        app_handle.clone(),
+        proxy_port,
+        api_port,
+    )
+    .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
+
     // 使用传入的代理端口
     if let Some(port) = proxy_port {
         if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port) {
@@ -109,10 +121,13 @@ pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
 }
 
 // 修改配置文件中的default_mode
-fn modify_default_mode(config_path: &Path, mode: String, api_port: Option<u16>) -> Result<(), Box<dyn Error>> {
+fn modify_default_mode(
+    config_path: &Path,
+    mode: String,
+    api_port: Option<u16>,
+) -> Result<(), Box<dyn Error>> {
     // 读取现有配置
-    let config_path_str = config_path.to_str()
-        .ok_or("配置文件路径包含无效字符")?;
+    let config_path_str = config_path.to_str().ok_or("配置文件路径包含无效字符")?;
     let mut json_util = ConfigUtil::new(config_path_str)?;
 
     // 而是直接创建新的配置并修改
@@ -171,11 +186,12 @@ async fn download_and_process_subscription(
     }
 
     info!("开始下载订阅: {}", url);
-    
+
     // 使用全局HTTP客户端
-    let response_text = http_client::get_text(url.trim()).await
+    let response_text = http_client::get_text(url.trim())
+        .await
         .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
-    
+
     info!("订阅下载成功，内容长度: {} 字节", response_text.len());
 
     // 如果使用原始配置，直接处理原始内容
@@ -1271,17 +1287,17 @@ fn process_original_config(
         } else {
             // 如果不存在experimental字段，添加它，使用传入的端口
             config_obj.insert(
-                "experimental".to_string(), 
+                "experimental".to_string(),
                 json!({
                     "clash_api": {
                         "external_controller": format!("127.0.0.1:{}", api_port),
                         "external_ui": "metacubexd",
                         "default_mode": "rule"
                     }
-                })
+                }),
             );
         }
-        
+
         // 修改入站端口（如果有inbounds）
         if let Some(inbounds) = config_obj.get_mut("inbounds") {
             if let Some(inbounds_array) = inbounds.as_array_mut() {

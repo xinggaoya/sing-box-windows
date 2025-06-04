@@ -87,11 +87,11 @@ impl ProcessManager {
         // 启动新进程
         let child = Command::new(kernel_path)
             .args(&[
-                "run", 
-                "-D", 
+                "run",
+                "-D",
                 kernel_work_dir.to_str().ok_or_else(|| {
                     ProcessError::StartFailed("工作目录路径包含无效字符".to_string())
-                })?
+                })?,
             ])
             .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
             .spawn()
@@ -105,7 +105,7 @@ impl ProcessManager {
 
         // 等待一段时间确保内核启动
         sleep(Duration::from_secs(1)).await;
-        
+
         // 检查内核是否成功启动
         if !self.is_running().await {
             return Err(ProcessError::StartFailed("内核启动失败".to_string()));
@@ -118,7 +118,7 @@ impl ProcessManager {
     // 检查并终止系统中已存在的sing-box进程
     async fn kill_existing_processes(&self) -> std::io::Result<()> {
         info!("检查系统中是否有sing-box进程在运行");
-        
+
         #[cfg(windows)]
         {
             // 使用异步进程命令
@@ -127,34 +127,34 @@ impl ProcessManager {
                 .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
                 .output()
                 .await?;
-            
+
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             // 检查输出中是否包含sing-box.exe
             if stdout.contains("sing-box.exe") {
                 info!("发现已有sing-box.exe进程，正在终止");
-                
+
                 // 使用异步进程命令终止所有sing-box.exe进程
                 let kill_output = tokio::process::Command::new("taskkill")
                     .args(&["/F", "/IM", "sing-box.exe"])
                     .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
                     .output()
                     .await?;
-                
+
                 if kill_output.status.success() {
                     info!("成功终止所有sing-box.exe进程");
                 } else {
                     let error = String::from_utf8_lossy(&kill_output.stderr);
                     warn!("终止sing-box.exe进程可能失败: {}", error);
                 }
-                
+
                 // 等待一段时间确保进程完全终止
                 sleep(Duration::from_millis(500)).await;
             } else {
                 info!("未发现已有sing-box.exe进程");
             }
         }
-        
+
         Ok(())
     }
 
@@ -192,7 +192,10 @@ impl ProcessManager {
                         let pid = child.id();
                         if let Err(e) = kill_process_by_pid(pid) {
                             error!("强制终止进程失败: {}", e);
-                            return Err(ProcessError::StopFailed(format!("强制终止进程失败: {}", e)));
+                            return Err(ProcessError::StopFailed(format!(
+                                "强制终止进程失败: {}",
+                                e
+                            )));
                         }
                     }
                 }
@@ -222,7 +225,7 @@ impl ProcessManager {
     // 验证配置文件
     async fn validate_config(&self) -> Result<()> {
         let config_path = paths::get_config_path();
-        
+
         if !config_path.exists() {
             return Err(ProcessError::ConfigError(format!(
                 "配置文件不存在: {}",
@@ -244,17 +247,17 @@ impl ProcessManager {
     // 检查进程是否运行（使用读锁，提升并发性能）
     pub async fn is_running(&self) -> bool {
         let process_guard = self.process.read().await;
-        
+
         if let Some(ref _proc) = *process_guard {
             // 这里我们不能直接调用 try_wait，因为它需要可变引用
             // 我们需要在写锁中进行状态检查
             drop(process_guard);
-            
+
             // 获取写锁进行状态检查
             let mut process_guard = self.process.write().await;
             if let Some(ref mut proc) = *process_guard {
                 match proc.try_wait() {
-                    Ok(None) => true,  // 进程还在运行
+                    Ok(None) => true, // 进程还在运行
                     Ok(Some(_)) => {
                         // 进程已退出，清理状态
                         *process_guard = None;
@@ -280,12 +283,12 @@ fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
     #[cfg(windows)]
     {
         use std::process::Command;
-        
+
         let output = Command::new("taskkill")
             .args(&["/F", "/PID", &pid.to_string()])
             .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
             .output()?;
-        
+
         if output.status.success() {
             info!("成功使用PID {}强制终止进程", pid);
         } else {
@@ -293,6 +296,6 @@ fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
             warn!("使用PID {}强制终止进程失败: {}", pid, error);
         }
     }
-    
+
     Ok(())
 }

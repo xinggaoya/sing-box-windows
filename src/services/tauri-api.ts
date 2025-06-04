@@ -68,7 +68,10 @@ export const proxyApi = {
   },
 
   // 设置TUN代理
-  setTunProxy: () => invoke<void>('set_tun_proxy'),
+  setTunProxy: () => {
+    const appStore = useAppStore()
+    return invoke<void>('set_tun_proxy', { port: appStore.proxyPort })
+  },
 
   // 切换IP版本偏好
   toggleIpVersion: (preferIpv6: boolean) => invoke<void>('toggle_ip_version', { preferIpv6 }),

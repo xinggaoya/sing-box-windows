@@ -5,7 +5,6 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 pub mod app;
 pub mod entity;
-pub mod error;
 pub mod process;
 pub mod utils;
 
@@ -73,10 +72,6 @@ pub fn run() {
             // System - System service commands
             crate::app::system::system_service::check_admin,
             crate::app::system::system_service::restart_as_admin,
-            crate::app::system::system_service::exit_application,
-            crate::app::system::system_service::install_service,
-            crate::app::system::system_service::uninstall_service,
-            crate::app::system::system_service::check_service_status,
             // System - Update service commands
             crate::app::system::update_service::check_update,
             crate::app::system::update_service::download_and_install_update,

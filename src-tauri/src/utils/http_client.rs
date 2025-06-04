@@ -49,7 +49,11 @@ impl HttpClientManager {
     }
 
     /// 下载文件到指定路径
-    pub async fn download_file(&self, url: &str, file_path: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn download_file(
+        &self,
+        url: &str,
+        file_path: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         use futures_util::StreamExt;
         use tokio::fs::File;
         use tokio::io::AsyncWriteExt;
@@ -86,9 +90,13 @@ impl HttpClientManager {
     }
 
     /// 测试URL连通性（用于代理测试）
-    pub async fn test_connectivity(&self, url: &str, proxy_url: Option<&str>) -> Result<Duration, reqwest::Error> {
+    pub async fn test_connectivity(
+        &self,
+        url: &str,
+        proxy_url: Option<&str>,
+    ) -> Result<Duration, reqwest::Error> {
         let start = std::time::Instant::now();
-        
+
         let client = if let Some(proxy) = proxy_url {
             // 创建带代理的临时客户端
             Client::builder()
@@ -102,7 +110,7 @@ impl HttpClientManager {
 
         let response = client.get(url).send().await?;
         response.error_for_status()?;
-        
+
         Ok(start.elapsed())
     }
 }
@@ -124,7 +132,10 @@ pub fn get_proxy_client() -> &'static Client {
 }
 
 /// 便捷方法：下载文件
-pub async fn download_file(url: &str, file_path: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn download_file(
+    url: &str,
+    file_path: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     HTTP_CLIENT_MANAGER.download_file(url, file_path).await
 }
 
@@ -142,6 +153,9 @@ pub async fn get_text(url: &str) -> Result<String, reqwest::Error> {
 }
 
 /// 便捷方法：测试连通性
-pub async fn test_connectivity(url: &str, proxy_url: Option<&str>) -> Result<Duration, reqwest::Error> {
+pub async fn test_connectivity(
+    url: &str,
+    proxy_url: Option<&str>,
+) -> Result<Duration, reqwest::Error> {
     HTTP_CLIENT_MANAGER.test_connectivity(url, proxy_url).await
-} 
+}
