@@ -7,6 +7,16 @@ import mitt from '@/utils/mitt'
 // 代理模式声明
 import { ProxyMode } from '@/stores'
 
+// 导入ProxyData类型
+interface ProxyData {
+  type: string
+  name: string
+  now: string
+  all: string[]
+  history: Array<{ time: string; delay: number }>
+  udp: boolean
+}
+
 export const useProxyStore = defineStore('proxy', () => {
   const appStore = useAppStore()
 
@@ -16,7 +26,7 @@ export const useProxyStore = defineStore('proxy', () => {
   const nodeDelays = ref<Record<string, number>>({})
 
   // 更新代理数据
-  const updateProxies = (data: { proxies?: Record<string, any> }) => {
+  const updateProxies = (data: { proxies?: Record<string, ProxyData> }) => {
     // 实现更新代理数据的逻辑
     console.log('更新代理数据', data)
   }
@@ -79,7 +89,7 @@ export const useProxyStore = defineStore('proxy', () => {
   // 检查管理员权限
   const checkAdmin = async () => {
     try {
-      return await tauriApi.proxy.checkAdmin()
+      return await tauriApi.system.checkAdmin()
     } catch (error) {
       console.error('检查管理员权限失败:', error)
       return false
@@ -89,7 +99,7 @@ export const useProxyStore = defineStore('proxy', () => {
   // 以管理员身份重启
   const restartAsAdmin = async () => {
     try {
-      await tauriApi.proxy.restartAsAdmin()
+      await tauriApi.system.restartAsAdmin()
       return true
     } catch (error) {
       console.error('以管理员身份重启失败:', error)

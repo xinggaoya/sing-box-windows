@@ -692,7 +692,7 @@ const savePortSettings = async () => {
     }
 
     // 更新端口设置
-    await tauriApi.config.updatePortConfig(tempProxyPort.value, tempApiPort.value)
+    await tauriApi.config.updateSingboxPorts(tempProxyPort.value, tempApiPort.value)
 
     // 更新应用状态
     appStore.updatePorts(tempProxyPort.value, tempApiPort.value)

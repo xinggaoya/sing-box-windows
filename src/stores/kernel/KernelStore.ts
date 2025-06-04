@@ -335,7 +335,7 @@ export const useKernelStore = defineStore(
     const setupWebsocketConnection = async () => {
       try {
         // 启动WebSocket数据中继
-        await tauriApi.kernel.startWebsocketRelay()
+        await tauriApi.kernel.startWebSocketRelay()
 
         // 设置WebSocket连接检查
         const wsService = WebSocketService.getInstance()
