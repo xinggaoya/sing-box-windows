@@ -18,12 +18,6 @@ pub struct AppState {
 pub fn run() {
     fmt().with_env_filter(EnvFilter::from_default_env()).init();
 
-    // 初始化配置服务
-    if let Err(e) = crate::app::system::config_service::init_config_service() {
-        tracing::error!("初始化配置服务失败: {}", e);
-        // 继续执行，使用默认端口配置
-    }
-
     let state = AppState {
         token: Mutex::new(String::new()),
     };
@@ -87,8 +81,7 @@ pub fn run() {
             crate::app::system::update_service::check_update,
             crate::app::system::update_service::download_and_install_update,
             // System - Config service commands
-            crate::app::system::config_service::get_port_config,
-            crate::app::system::config_service::update_port_config,
+            crate::app::system::config_service::update_singbox_ports,
             // Core - Proxy service commands
             crate::app::core::proxy_service::set_system_proxy,
             crate::app::core::proxy_service::set_manual_proxy,

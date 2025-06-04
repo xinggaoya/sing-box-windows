@@ -279,6 +279,40 @@ async fn download_and_process_subscription(
     // 将模板内容解析为JSON对象
     let mut config: Value = serde_json::from_str(&template_content)?;
 
+    // 根据传入的端口参数修改模板配置
+    if let Some(config_obj) = config.as_object_mut() {
+        // 修改代理端口（如果有inbounds）
+        if let Some(inbounds) = config_obj.get_mut("inbounds") {
+            if let Some(inbounds_array) = inbounds.as_array_mut() {
+                for inbound in inbounds_array {
+                    if let Some(inbound_obj) = inbound.as_object_mut() {
+                        if inbound_obj.get("tag").and_then(|t| t.as_str()) == Some("mixed-in") {
+                            if let Some(port) = proxy_port {
+                                inbound_obj.insert("listen_port".to_string(), json!(port));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 修改API端口 - experimental.clash_api.external_controller
+        if let Some(experimental) = config_obj.get_mut("experimental") {
+            if let Some(exp_obj) = experimental.as_object_mut() {
+                if let Some(clash_api) = exp_obj.get_mut("clash_api") {
+                    if let Some(clash_api_obj) = clash_api.as_object_mut() {
+                        if let Some(port) = api_port {
+                            clash_api_obj.insert(
+                                "external_controller".to_string(),
+                                json!(format!("127.0.0.1:{}", port)),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {
         if let Some(outbounds) = config_obj.get_mut("outbounds") {
@@ -1036,6 +1070,40 @@ fn process_subscription_content(
     // 将模板内容解析为JSON对象
     let mut config: Value = serde_json::from_str(&template_content)?;
 
+    // 根据传入的端口参数修改模板配置
+    if let Some(config_obj) = config.as_object_mut() {
+        // 修改代理端口（如果有inbounds）
+        if let Some(inbounds) = config_obj.get_mut("inbounds") {
+            if let Some(inbounds_array) = inbounds.as_array_mut() {
+                for inbound in inbounds_array {
+                    if let Some(inbound_obj) = inbound.as_object_mut() {
+                        if inbound_obj.get("tag").and_then(|t| t.as_str()) == Some("mixed-in") {
+                            if let Some(port) = proxy_port {
+                                inbound_obj.insert("listen_port".to_string(), json!(port));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 修改API端口 - experimental.clash_api.external_controller
+        if let Some(experimental) = config_obj.get_mut("experimental") {
+            if let Some(exp_obj) = experimental.as_object_mut() {
+                if let Some(clash_api) = exp_obj.get_mut("clash_api") {
+                    if let Some(clash_api_obj) = clash_api.as_object_mut() {
+                        if let Some(port) = api_port {
+                            clash_api_obj.insert(
+                                "external_controller".to_string(),
+                                json!(format!("127.0.0.1:{}", port)),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {
         if let Some(outbounds) = config_obj.get_mut("outbounds") {
@@ -1139,9 +1207,9 @@ fn process_original_config(
 ) -> Result<(), Box<dyn Error>> {
     info!("处理原始订阅配置...");
 
-    // 获取端口
-    let proxy_port = proxy_port.unwrap_or_else(|| crate::app::system::config_service::get_proxy_port());
-    let api_port = api_port.unwrap_or_else(|| crate::app::system::config_service::get_api_port());
+    // 获取端口，如果没有传递则使用默认值
+    let proxy_port = proxy_port.unwrap_or(12080);
+    let api_port = api_port.unwrap_or(12081);
 
     // 解析内容为JSON
     let content_cleaned = clean_json_content(content);

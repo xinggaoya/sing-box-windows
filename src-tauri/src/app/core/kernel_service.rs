@@ -109,34 +109,64 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
     Ok(())
 }
 
-// 运行内核
+// 启动内核
 #[tauri::command]
-pub async fn start_kernel(_proxy_mode: Option<String>) -> Result<(), String> {
+pub async fn start_kernel(_proxy_mode: Option<String>, api_port: Option<u16>) -> Result<(), String> {
+    let port = api_port.unwrap_or(12081); // 默认API端口
+    
+    // 检查是否已经在运行
+    if PROCESS_MANAGER.is_running().await {
+        return Err("内核已在运行中".to_string());
+    }
+
+    // 清理可能残留的停止标志
+    SHOULD_STOP_WS.store(false, Ordering::Relaxed);
+
+    // 获取内核配置文件路径
+    let work_dir = get_work_dir();
+    let config_path = Path::new(&work_dir).join("sing-box/config.json");
+
+    // 检查配置文件是否存在
+    if !config_path.exists() {
+        return Err(format!(
+            "配置文件不存在: {}",
+            config_path.to_string_lossy()
+        ));
+    }
+
+    // 检查配置文件有效性
+    if let Err(e) = check_config_validity(config_path.to_string_lossy().to_string()).await {
+        return Err(format!("配置文件无效: {}", e));
+    }
+
+    // 智能权限检查：仅在真正需要时才要求管理员权限
+    if let Err(e) = check_admin_requirement(&config_path).await {
+        return Err(e);
+    }
+
     // 启动内核进程
     match PROCESS_MANAGER.start().await {
-        Ok(_) => {
-            info!("内核进程启动成功，正在验证API服务状态");
+        Ok(()) => {
+            info!("内核进程启动成功");
 
-            // 使用更高效的启动检查机制
-            match wait_for_kernel_ready().await {
-                Ok(_) => {
-                    info!("内核API服务已就绪");
+            // 等待内核准备就绪
+            match wait_for_kernel_ready(port).await {
+                Ok(()) => {
+                    info!("内核启动完成并已就绪");
                     Ok(())
                 }
                 Err(e) => {
-                    warn!("内核API服务检查失败: {}", e);
-                    // 即使API检查失败也返回成功，交由前端通过WebSocket确认最终状态
-                    info!("内核进程已启动，将通过WebSocket确认最终状态");
-                    Ok(())
+                    error!("等待内核就绪失败: {}", e);
+                    // 如果等待失败，停止进程
+                    let _ = PROCESS_MANAGER.stop().await;
+                    Err(e)
                 }
             }
-        },
+        }
         Err(e) => {
-            // 从错误中提取关键信息
             let error_string = e.to_string();
-            let shortened_error = if error_string.len() > 300 {
-                // 提取前300个字符
-                format!("{}...(错误信息过长)", &error_string[..300])
+            let shortened_error = if error_string.len() > 200 {
+                format!("{}...", &error_string[..197])
             } else {
                 error_string
             };
@@ -147,9 +177,64 @@ pub async fn start_kernel(_proxy_mode: Option<String>) -> Result<(), String> {
     }
 }
 
+// 智能检查是否需要管理员权限
+async fn check_admin_requirement(config_path: &Path) -> Result<(), String> {
+    // 首先尝试读取配置文件内容来判断是否需要管理员权限
+    let needs_admin = match std::fs::read_to_string(config_path) {
+        Ok(content) => {
+            match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(config) => {
+                    // 检查是否配置了TUN模式的入站或设置了系统代理
+                    let mut has_tun = false;
+                    let mut has_system_proxy = false;
+                    
+                    if let Some(inbounds) = config.get("inbounds").and_then(|v| v.as_array()) {
+                        for inbound in inbounds {
+                            if let Some(type_str) = inbound.get("type").and_then(|v| v.as_str()) {
+                                if type_str == "tun" {
+                                    has_tun = true;
+                                    break;
+                                }
+                            }
+                            
+                            // 检查是否设置了系统代理
+                            if let Some(set_system_proxy) = inbound.get("set_system_proxy").and_then(|v| v.as_bool()) {
+                                if set_system_proxy {
+                                    has_system_proxy = true;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 只有在TUN模式或设置了系统代理时才可能需要管理员权限
+                    has_tun || has_system_proxy
+                }
+                Err(e) => {
+                    warn!("解析配置文件失败，但继续尝试启动: {}", e);
+                    false // 解析失败时不强制要求管理员权限
+                }
+            }
+        }
+        Err(e) => {
+            warn!("读取配置文件失败，但继续尝试启动: {}", e);
+            false // 读取失败时不强制要求管理员权限
+        }
+    };
+    
+    if needs_admin {
+        // 仅在确实需要时才检查管理员权限
+        if !crate::app::system::system_service::check_admin() {
+            return Err("当前配置需要管理员权限才能启动内核（TUN模式或系统代理需要管理员权限）".to_string());
+        }
+    } else {
+        info!("当前配置不需要管理员权限，继续启动");
+    }
+    
+    Ok(())
+}
+
 // 等待内核准备就绪（改进的非轮询机制）
-async fn wait_for_kernel_ready() -> Result<(), String> {
-    let api_port = crate::app::system::config_service::get_api_port();
+async fn wait_for_kernel_ready(api_port: u16) -> Result<(), String> {
     let url = format!("http://127.0.0.1:{}/version?token=", api_port);
     
     // 启动后台任务检查API状态
@@ -241,7 +326,7 @@ pub async fn restart_kernel() -> Result<(), String> {
     info!("正在重启内核");
     stop_kernel().await?;
     tokio::time::sleep(Duration::from_millis(1500)).await;
-    start_kernel(None).await?;
+    start_kernel(None, None).await?;
     info!("内核重启完成");
     Ok(())
 }
@@ -426,7 +511,9 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
 
 /// 启动WebSocket中继服务
 #[tauri::command]
-pub async fn start_websocket_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+pub async fn start_websocket_relay<R: Runtime>(window: Window<R>, api_port: Option<u16>) -> Result<(), String> {
+    let port = api_port.unwrap_or(12081); // 默认API端口
+    
     // 重置停止标志
     SHOULD_STOP_WS.store(false, Ordering::Relaxed);
     
@@ -434,20 +521,19 @@ pub async fn start_websocket_relay<R: Runtime>(window: Window<R>) -> Result<(), 
     cleanup_websocket_tasks().await;
     
     // 启动四个不同类型的WebSocket中继
-    start_traffic_relay(window.clone()).await?;
-    start_memory_relay(window.clone()).await?;
-    start_logs_relay(window.clone()).await?;
-    start_connections_relay(window.clone()).await?;
+    start_traffic_relay(window.clone(), port).await?;
+    start_memory_relay(window.clone(), port).await?;
+    start_logs_relay(window.clone(), port).await?;
+    start_connections_relay(window.clone(), port).await?;
 
     Ok(())
 }
 
 /// 启动流量数据中继
-async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+async fn start_traffic_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Result<(), String> {
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
-    let api_port = crate::app::system::config_service::get_api_port();
     let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
@@ -568,11 +654,10 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>) -> Result<(), String
 }
 
 /// 启动内存数据中继
-async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+async fn start_memory_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Result<(), String> {
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
-    let api_port = crate::app::system::config_service::get_api_port();
     let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
@@ -657,11 +742,10 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>) -> Result<(), String>
 }
 
 /// 启动日志数据中继
-async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+async fn start_logs_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Result<(), String> {
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
-    let api_port = crate::app::system::config_service::get_api_port();
     let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
@@ -746,11 +830,10 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
 }
 
 /// 启动连接数据中继
-async fn start_connections_relay<R: Runtime>(window: Window<R>) -> Result<(), String> {
+async fn start_connections_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Result<(), String> {
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
-    let api_port = crate::app::system::config_service::get_api_port();
     let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务

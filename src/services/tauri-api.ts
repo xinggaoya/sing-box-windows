@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { useAppStore } from '../stores/app/AppStore'
+import { useAppStore } from '@/stores/app/AppStore'
 
 // 定义接口类型
 interface ProxyData {
@@ -29,10 +29,13 @@ interface VersionInfo {
   cgo?: string
 }
 
-// 内核管理相关接口
+// 内核相关接口
 export const kernelApi = {
   // 启动内核
-  startKernel: (proxyMode?: string) => invoke<void>('start_kernel', { proxyMode }),
+  startKernel: (proxyMode?: string) => {
+    const appStore = useAppStore()
+    return invoke<void>('start_kernel', { proxyMode, apiPort: appStore.apiPort })
+  },
 
   // 停止内核
   stopKernel: () => invoke<void>('stop_kernel'),
@@ -43,34 +46,31 @@ export const kernelApi = {
   // 检查内核版本
   checkKernelVersion: () => invoke<string>('check_kernel_version'),
 
-  // 启动WebSocket数据中继
-  startWebsocketRelay: () => invoke<void>('start_websocket_relay'),
+  // 下载最新内核
+  downloadLatestKernel: () => invoke<void>('download_latest_kernel'),
 
-  // 检查内核是否运行中
+  // 启动WebSocket中继
+  startWebSocketRelay: () => {
+    const appStore = useAppStore()
+    return invoke<void>('start_websocket_relay', { apiPort: appStore.apiPort })
+  },
+
+  // 检查内核是否运行
   isKernelRunning: () => invoke<boolean>('is_kernel_running'),
 }
 
-// 代理模式相关接口
+// 代理相关接口
 export const proxyApi = {
-  // 设置系统代理模式
+  // 设置系统代理
   setSystemProxy: () => {
     const appStore = useAppStore()
     return invoke<void>('set_system_proxy', { port: appStore.proxyPort })
   },
 
-  // 设置 TUN 代理模式
-  setTunProxy: () => {
-    const appStore = useAppStore()
-    return invoke<void>('set_tun_proxy', { port: appStore.proxyPort })
-  },
+  // 设置TUN代理
+  setTunProxy: () => invoke<void>('set_tun_proxy'),
 
-  // 检查管理员权限
-  checkAdmin: () => invoke<boolean>('check_admin'),
-
-  // 以管理员权限重启
-  restartAsAdmin: () => invoke<void>('restart_as_admin'),
-
-  // 切换 IP 版本
+  // 切换IP版本偏好
   toggleIpVersion: (preferIpv6: boolean) => invoke<void>('toggle_ip_version', { preferIpv6 }),
 
   // 切换代理模式（global, rule, tun）
@@ -121,22 +121,24 @@ export const proxyApi = {
 
 // 配置服务
 export const config = {
-  // 获取当前端口配置
-  getCurrentPortConfig: async () => {
-    return await invoke<{ proxyPort: number; apiPort: number }>('get_port_config')
-  },
-
-  // 更新端口配置
-  updatePortConfig: async (proxyPort: number, apiPort: number) => {
-    return await invoke<boolean>('update_port_config', { proxyPort, apiPort })
+  // 更新sing-box配置文件中的端口设置
+  updateSingboxPorts: async (proxyPort: number, apiPort: number) => {
+    return await invoke<boolean>('update_singbox_ports', { proxyPort, apiPort })
   },
 }
 
 // 订阅相关接口
 export const subscriptionApi = {
   // 下载订阅
-  downloadSubscription: (url: string, useOriginalConfig: boolean = false) =>
-    invoke<void>('download_subscription', { url, useOriginalConfig }),
+  downloadSubscription: (url: string, useOriginalConfig: boolean = false) => {
+    const appStore = useAppStore()
+    return invoke<void>('download_subscription', {
+      url,
+      useOriginalConfig,
+      proxyPort: appStore.proxyPort,
+      apiPort: appStore.apiPort,
+    })
+  },
 
   // 下载最新内核
   downloadLatestKernel: () => invoke<void>('download_latest_kernel'),
@@ -145,8 +147,15 @@ export const subscriptionApi = {
   getCurrentConfig: () => invoke<string>('get_current_config'),
 
   // 添加手动配置
-  addManualSubscription: (content: string, useOriginalConfig: boolean = false) =>
-    invoke<void>('add_manual_subscription', { content, useOriginalConfig }),
+  addManualSubscription: (content: string, useOriginalConfig: boolean = false) => {
+    const appStore = useAppStore()
+    return invoke<void>('add_manual_subscription', {
+      content,
+      useOriginalConfig,
+      proxyPort: appStore.proxyPort,
+      apiPort: appStore.apiPort,
+    })
+  },
 }
 
 // 统一导出所有 API

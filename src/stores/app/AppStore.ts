@@ -248,6 +248,21 @@ export const useAppStore = defineStore(
       apiPort.value = newApiPort
     }
 
+    // 同步端口配置到sing-box配置文件
+    const syncPortsToSingbox = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        await invoke('update_singbox_ports', {
+          proxyPort: proxyPort.value,
+          apiPort: apiPort.value,
+        })
+        console.log('端口配置已同步到sing-box配置文件')
+      } catch (error) {
+        console.error('同步端口配置到sing-box失败:', error)
+        throw error
+      }
+    }
+
     return {
       isRunning,
       wsConnected,
@@ -271,6 +286,7 @@ export const useAppStore = defineStore(
       showWarningMessage,
       showInfoMessage,
       updatePorts,
+      syncPortsToSingbox,
     }
   },
   {

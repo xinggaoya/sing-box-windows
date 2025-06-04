@@ -79,14 +79,78 @@ pub fn restart_as_admin(app_handle: tauri::AppHandle) -> Result<(), String> {
 // 检查是否有管理员权限 - 使用Windows API的方式
 #[tauri::command]
 pub fn check_admin() -> bool {
-    // 尝试执行一个需要管理员权限的操作，例如查询系统会话
-    let result = std::process::Command::new("net")
+    // 方法1: 尝试创建一个需要管理员权限的注册表项
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        
+        // 尝试向需要管理员权限的注册表位置写入测试值
+        let result = Command::new("reg")
+            .args(&[
+                "add", 
+                "HKLM\\SOFTWARE\\sing-box-windows-temp-test", 
+                "/f"
+            ])
+            .creation_flags(process::CREATE_NO_WINDOW)
+            .output();
+        
+        match result {
+            Ok(output) => {
+                if output.status.success() {
+                    // 如果成功创建，立即删除测试项
+                    let _ = Command::new("reg")
+                        .args(&[
+                            "delete", 
+                            "HKLM\\SOFTWARE\\sing-box-windows-temp-test", 
+                            "/f"
+                        ])
+                        .creation_flags(process::CREATE_NO_WINDOW)
+                        .output();
+                    true
+                } else {
+                    // 如果失败，尝试备用方法
+                    check_admin_fallback()
+                }
+            }
+            Err(_) => {
+                // 如果命令执行失败，尝试备用方法
+                check_admin_fallback()
+            }
+        }
+    }
+    
+    #[cfg(not(windows))]
+    false
+}
+
+// 备用的管理员权限检查方法
+fn check_admin_fallback() -> bool {
+    use std::process::Command;
+    
+    // 尝试执行需要管理员权限的系统命令
+    let result = Command::new("net")
         .arg("session")
         .creation_flags(process::CREATE_NO_WINDOW)
         .output();
 
     match result {
-        Ok(output) => output.status.success(),
+        Ok(output) => {
+            // 检查命令是否成功执行
+            if output.status.success() {
+                true
+            } else {
+                // 尝试另一种方法：检查是否能查询系统服务
+                let service_result = Command::new("sc")
+                    .args(&["query", "state=", "all"])
+                    .creation_flags(process::CREATE_NO_WINDOW)
+                    .output();
+                
+                match service_result {
+                    Ok(service_output) => service_output.status.success(),
+                    Err(_) => false,
+                }
+            }
+        }
         Err(_) => false,
     }
 }
