@@ -268,16 +268,14 @@ pub async fn test_group_delay<R: Runtime>(
     port: u16,
 ) -> Result<(), String> {
     let test_url = server.unwrap_or_else(|| "http://cp.cloudflare.com".to_string());
-    let url = format!("http://127.0.0.1:{}/group/{}/delay", port, group);
-    let data = json!({
-        "url": test_url,
-        "timeout": 5000
-    });
+    let url = format!(
+        "http://127.0.0.1:{}/group/{}/delay?timeout=5000&url={}",
+        port, group, test_url
+    );
 
     let client = http_client::get_client();
     match client
-        .post(&url)
-        .json(&data)
+        .get(&url) // 改为GET方法
         .timeout(Duration::from_secs(10))
         .send()
         .await
@@ -350,16 +348,14 @@ pub async fn test_node_delay<R: Runtime>(
     port: u16,
 ) -> Result<(), String> {
     let test_url = server.unwrap_or_else(|| "http://cp.cloudflare.com".to_string());
-    let url = format!("http://127.0.0.1:{}/proxies/{}/delay", port, proxy);
-    let data = json!({
-        "url": test_url,
-        "timeout": 5000
-    });
+    let url = format!(
+        "http://127.0.0.1:{}/proxies/{}/delay?timeout=5000&url={}",
+        port, proxy, test_url
+    );
 
     let client = http_client::get_client();
     match client
-        .post(&url)
-        .json(&data)
+        .get(&url) // 改为GET方法
         .timeout(Duration::from_secs(8))
         .send()
         .await

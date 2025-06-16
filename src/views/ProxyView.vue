@@ -219,17 +219,12 @@ interface Proxies {
 
 // 添加类型定义
 interface TestGroupResult {
-  group: string
-  results: Record<string, number>
-  success: boolean
-  error?: string
+  [proxyName: string]: number
 }
 
 interface TestNodeResult {
   proxy: string
-  delay?: number
-  success: boolean
-  error?: string
+  delay: number
 }
 
 // 状态定义
@@ -293,14 +288,19 @@ const setupEventListeners = async () => {
     console.log(t('proxy.testProgress'), data)
   })
 
-  unlistenTestResult = await listen('test-group-result', (event) => {
+  unlistenTestResult = await listen('proxy-group-delay-result', (event) => {
     const data = event.payload as TestGroupResult
-    if (data.success) {
-      // 更新测试结果
-      Object.assign(testResults, data.results)
+    console.log('收到组延迟测试结果:', data)
+
+    if (data && typeof data === 'object') {
+      Object.entries(data).forEach(([proxyName, delay]) => {
+        if (typeof delay === 'number') {
+          testResults[proxyName] = delay
+        }
+      })
       message.success(t('proxy.groupTestComplete'))
     } else {
-      message.error(`${t('proxy.testFailed')}: ${data.error}`)
+      message.error(`${t('proxy.testFailed')}: ${JSON.stringify(data)}`)
     }
     testingGroup.value = ''
   })
@@ -309,26 +309,25 @@ const setupEventListeners = async () => {
     message.success(t('proxy.batchTestComplete'))
   })
 
-  // 添加节点测试结果监听
-  unlistenNodeResult = await listen('test-node-result', (event) => {
+  unlistenNodeResult = await listen('proxy-delay-result', (event) => {
     const data = event.payload as TestNodeResult
-    const { proxy, success, delay, error } = data
+    console.log('收到节点延迟测试结果:', data)
 
-    // 取消该节点的加载状态
-    testingNodes[proxy] = false
+    if (data && data.proxy) {
+      const { proxy, delay } = data
 
-    if (success) {
-      if (delay !== undefined) {
-        // 更新节点延迟
+      testingNodes[proxy] = false
+
+      if (delay !== undefined && delay > 0) {
         testResults[proxy] = delay
-        // 清除可能存在的错误
         delete nodeErrors[proxy]
-        message.success(`${t('proxy.nodeTestComplete')}: ${proxy}`)
+        message.success(`${t('proxy.nodeTestComplete')}: ${proxy} (${delay}ms)`)
+      } else {
+        nodeErrors[proxy] = t('proxy.timeout')
+        message.warning(`${proxy}: ${t('proxy.timeout')}`)
       }
     } else {
-      // 记录错误信息
-      nodeErrors[proxy] = error || t('proxy.unknownError')
-      message.error(`${t('proxy.nodeTestFailed')}: ${proxy}`)
+      message.error(`${t('proxy.nodeTestFailed')}: ${JSON.stringify(data)}`)
     }
   })
 }
@@ -443,16 +442,30 @@ const testSingleNode = async (proxy: string) => {
     // 清除之前的错误信息
     delete nodeErrors[proxy]
 
-    // 调用后端API测试节点
+    console.log(`开始测试节点延迟: ${proxy}, API端口: ${appStore.apiPort}`)
+
+    // 调用后端API测试节点，使用proxyApi的接口
     await tauriApi.proxy.testNodeDelay(proxy)
 
     // 注意：此时不设置 testingNodes[proxy] = false
     // 因为这将由事件监听器在收到结果时设置
   } catch (error) {
-    console.error(t('proxy.testFailed'), error)
-    message.error(t('proxy.testErrorMessage'))
+    console.error(`测试节点 ${proxy} 失败:`, error)
+    message.error(`${t('proxy.testErrorMessage')}: ${proxy}`)
     testingNodes[proxy] = false
     nodeErrors[proxy] = String(error)
+
+    // 手动发送失败事件，确保UI状态更新
+    const failureResult = {
+      proxy: proxy,
+      delay: 0,
+      error: String(error),
+    }
+    console.log('手动发送失败结果:', failureResult)
+
+    // 清除加载状态并显示错误
+    testingNodes[proxy] = false
+    nodeErrors[proxy] = t('proxy.timeout')
   }
 }
 
@@ -465,10 +478,15 @@ const testNodeDelay = async (group: string) => {
 
   testingGroup.value = group
   try {
+    console.log(`开始测试组延迟: ${group}, API端口: ${appStore.apiPort}`)
+
+    // 调用后端API测试组延迟，使用proxyApi的接口
     await tauriApi.proxy.testGroupDelay(group, appStore.apiPort)
+
+    console.log(`组延迟测试请求已发送: ${group}`)
   } catch (error) {
-    console.error(t('proxy.testFailed'), error)
-    message.error(t('proxy.testErrorMessage'))
+    console.error(`测试组 ${group} 失败:`, error)
+    message.error(`${t('proxy.testErrorMessage')}: ${group}`)
     testingGroup.value = ''
   }
 }

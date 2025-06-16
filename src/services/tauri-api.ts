@@ -212,13 +212,13 @@ export const proxy = {
   // 获取代理列表
   getProxies: async () => {
     const appStore = useAppStore()
-    return await invoke<unknown>('get_proxies', { apiPort: appStore.apiPort })
+    return await invoke<unknown>('get_proxies', { port: appStore.apiPort })
   },
 
   // 切换代理
   changeProxy: async (group: string, proxy: string) => {
     const appStore = useAppStore()
-    return await invoke<void>('change_proxy', { group, proxy, apiPort: appStore.apiPort })
+    return await invoke<void>('change_proxy', { group, proxy, port: appStore.apiPort })
   },
 
   // 测试节点延迟
@@ -230,7 +230,7 @@ export const proxy = {
   // 测试节点组延迟
   testGroupDelay: async (group: string, server?: string) => {
     const appStore = useAppStore()
-    return await invoke<void>('test_group_delay', { group, server, apiPort: appStore.apiPort })
+    return await invoke<void>('test_group_delay', { group, server, port: appStore.apiPort })
   },
 
   // 获取API Token
