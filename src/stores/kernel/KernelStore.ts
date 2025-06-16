@@ -39,11 +39,26 @@ export const useKernelStore = defineStore(
     const uptime = ref(0)
     let uptimeInterval: NodeJS.Timeout | null = null
 
+    // 下载检查定时器
+    let downloadCheckInterval: NodeJS.Timeout | null = null
+
+    // 启动过程定时器
+    let startupTimer: NodeJS.Timeout | null = null
+
     // 清理所有定时器
     const clearTimers = () => {
       if (uptimeInterval) {
         clearInterval(uptimeInterval)
         uptimeInterval = null
+      }
+      if (downloadCheckInterval) {
+        clearInterval(downloadCheckInterval)
+        downloadCheckInterval = null
+      }
+      // 清理启动过程中的临时定时器
+      if (startupTimer) {
+        clearInterval(startupTimer)
+        startupTimer = null
       }
     }
 

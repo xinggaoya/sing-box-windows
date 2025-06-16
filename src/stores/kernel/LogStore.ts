@@ -16,7 +16,7 @@ export interface LogEntry {
 
 export const useLogStore = defineStore('log', () => {
   // 减少最大日志数量以减轻内存压力
-  const MAX_LOGS = 500
+  const MAX_LOGS = 200
 
   // 日志信息
   const logs = ref<LogEntry[]>([])
@@ -29,6 +29,9 @@ export const useLogStore = defineStore('log', () => {
 
   // 是否已经设置了mitt监听器
   let mittListenerSet = false
+
+  // 日志清理定时器
+  let logCleanupInterval: number | null = null
 
   // 初始化日志监听
   const setupLogListener = async () => {
@@ -46,6 +49,9 @@ export const useLogStore = defineStore('log', () => {
         mitt.on('log-data', handleMittLogData)
         mittListenerSet = true
       }
+
+      // 启动定期清理机制
+      startPeriodicCleanup()
 
       return true
     } catch (error) {
@@ -138,6 +144,12 @@ export const useLogStore = defineStore('log', () => {
       mitt.off('log-data', handleMittLogData)
       mittListenerSet = false
     }
+
+    // 清理定期清理定时器
+    if (logCleanupInterval) {
+      clearInterval(logCleanupInterval)
+      logCleanupInterval = null
+    }
   }
 
   // 监听内存清理请求
@@ -167,6 +179,25 @@ export const useLogStore = defineStore('log', () => {
     // 注释掉自动设置，由调用者决定是否调用setupLogListener
     // setupLogListener()
   })
+
+  // 启动定期清理机制
+  const startPeriodicCleanup = () => {
+    if (logCleanupInterval) {
+      clearInterval(logCleanupInterval)
+    }
+
+    // 每5分钟检查一次日志数量
+    logCleanupInterval = window.setInterval(
+      () => {
+        if (logs.value.length > MAX_LOGS / 2) {
+          // 只保留一半的日志
+          logs.value = logs.value.slice(0, MAX_LOGS / 2)
+          console.log('🧹 定期清理旧日志，当前保留', logs.value.length, '条')
+        }
+      },
+      5 * 60 * 1000,
+    ) // 5分钟
+  }
 
   return {
     logs,

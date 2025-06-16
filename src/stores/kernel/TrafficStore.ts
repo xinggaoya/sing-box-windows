@@ -107,6 +107,15 @@ export const useTrafficStore = defineStore('traffic', () => {
 
     // 清空缓冲区
     dataBuffer = []
+
+    // 强制进行垃圾回收（如果可能）
+    if (traffic.value.totalUp > 10 * 1024 * 1024 * 1024) {
+      // 超过10GB时重置
+      traffic.value.totalUp = 0
+      traffic.value.totalDown = 0
+      traffic.value.total = 0
+      console.log('🧹 自动重置大流量统计数据以释放内存')
+    }
   }
 
   // 初始化流量监听

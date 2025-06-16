@@ -903,6 +903,15 @@ onUnmounted(() => {
 
   // 清理连接监听器
   connectionStore.cleanupListeners()
+
+  // 清理加载状态计时器（如果有的话）
+  isTrafficLoading.value = false
+  isConnectionLoading.value = false
+
+  // 强制触发一次内存清理
+  mitt.emit('memory-cleanup-requested')
+
+  console.log('🧹 HomeView组件已卸载，完成清理')
 })
 </script>
 

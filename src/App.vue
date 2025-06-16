@@ -27,6 +27,7 @@ import type { Router } from 'vue-router'
 
 // 导入性能优化工具
 import { eventListenerManager, memoryMonitor } from '@/utils/performance'
+import { memoryMonitor as realTimeMemoryMonitor } from '@/utils/memory-monitor'
 import { storeManager, type StoreType } from '@/stores/StoreManager'
 
 // 直接导入需要的Store
@@ -137,6 +138,9 @@ onMounted(async () => {
 
     // 启动初始化逻辑
     await initializeApp()
+
+    // 启动实时内存监控
+    realTimeMemoryMonitor.startMonitoring(20000) // 每20秒检查一次
   } catch (error) {
     console.error('应用初始化失败:', error)
   }
@@ -290,22 +294,15 @@ async function handleAutoStartKernel() {
   }
 }
 
-onUnmounted(async () => {
-  // 使用事件监听器管理器清理所有事件
+onUnmounted(() => {
+  // 停止内存监控
+  realTimeMemoryMonitor.stopMonitoring()
+
+  // 清理事件监听器
   eventListenerManager.cleanup()
 
-  // 销毁托盘
-  try {
-    const trayStore = storeManager.getLoadedStore<TrayStore>('tray')
-    await trayStore?.destroyTray()
-  } catch (error) {
-    console.error('销毁托盘失败:', error)
-  }
-
-  // 在开发环境强制垃圾回收
-  if (import.meta.env.DEV) {
-    memoryMonitor.forceGC()
-  }
+  // 清理Store管理器
+  storeManager.cleanup()
 })
 
 // 使事件监听器在组件卸载时自动清理

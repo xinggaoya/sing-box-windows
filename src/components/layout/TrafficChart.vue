@@ -378,12 +378,27 @@ onMounted(() => {
 
 // 组件卸载时清理
 onUnmounted(() => {
+  // 清理更新定时器
   if (updateTimer !== null) {
     clearInterval(updateTimer)
     updateTimer = null
   }
 
+  // 清理窗口事件监听器
   window.removeEventListener('resize', handleResize)
+
+  // 清理所有画布引用，帮助垃圾回收
+  if (chartCanvas.value) {
+    const ctx = chartCanvas.value.getContext('2d')
+    if (ctx) {
+      ctx.clearRect(0, 0, chartCanvas.value.width, chartCanvas.value.height)
+    }
+  }
+
+  // 清空数据数组
+  uploadData.value = []
+  downloadData.value = []
+  timeLabels.value = []
 })
 
 // 监听主题变化
