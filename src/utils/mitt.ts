@@ -45,6 +45,8 @@ export type Events = {
   'window-hide': void
   'window-show': void
   'window-restore': void
+  'window-maximize': void
+  'window-unmaximize': void
 
   // 应用初始化事件
   'message-instance-ready': unknown

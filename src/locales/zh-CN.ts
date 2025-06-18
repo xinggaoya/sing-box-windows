@@ -22,6 +22,8 @@ export default {
     darkMode: '深色模式',
     fullscreen: '全屏',
     exitFullscreen: '退出全屏',
+    maximize: '最大化',
+    restore: '还原',
     later: '稍后',
   },
   nav: {

@@ -22,6 +22,8 @@ export default {
     darkMode: 'Темный режим',
     fullscreen: 'Полный экран',
     exitFullscreen: 'Выйти из полного экрана',
+    maximize: 'Развернуть',
+    restore: 'Восстановить',
     later: 'Позже',
   },
   nav: {

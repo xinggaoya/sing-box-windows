@@ -28,6 +28,7 @@ import type { Router } from 'vue-router'
 // 导入性能优化工具
 import { eventListenerManager, memoryMonitor } from '@/utils/performance'
 import { memoryMonitor as realTimeMemoryMonitor } from '@/utils/memory-monitor'
+import { memoryOptimizer } from '@/utils/memory-optimization'
 import { storeManager, type StoreType } from '@/stores/StoreManager'
 
 // 直接导入需要的Store
@@ -138,6 +139,9 @@ onMounted(async () => {
 
     // 启动初始化逻辑
     await initializeApp()
+
+    // 初始化内存优化器
+    memoryOptimizer.initialize()
 
     // 启动实时内存监控
     realTimeMemoryMonitor.startMonitoring(20000) // 每20秒检查一次
@@ -297,6 +301,9 @@ async function handleAutoStartKernel() {
 onUnmounted(() => {
   // 停止内存监控
   realTimeMemoryMonitor.stopMonitoring()
+
+  // 清理内存优化器
+  memoryOptimizer.cleanup()
 
   // 清理事件监听器
   eventListenerManager.cleanup()

@@ -52,6 +52,18 @@
 
             <n-tooltip trigger="hover" :delay="800">
               <template #trigger>
+                <button class="header-btn maximize-btn" @click="onToggleMaximize">
+                  <n-icon size="16">
+                    <crop-outline v-if="windowStore.windowState.isMaximized" />
+                    <square-outline v-else />
+                  </n-icon>
+                </button>
+              </template>
+              {{ windowStore.windowState.isMaximized ? t('common.restore') : t('common.maximize') }}
+            </n-tooltip>
+
+            <n-tooltip trigger="hover" :delay="800">
+              <template #trigger>
                 <button class="header-btn fullscreen-btn" @click="onToggleFullScreen">
                   <n-icon size="16">
                     <expand-outline v-if="!windowStore.windowState.isFullscreen" />
@@ -157,6 +169,8 @@ import {
   CloseOutline,
   FilterOutline,
   LinkOutline,
+  CropOutline,
+  SquareOutline,
 } from '@vicons/ionicons5'
 import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app/AppStore'
@@ -204,6 +218,10 @@ const toggleTheme = () => {
 
 const onToggleFullScreen = async () => {
   await windowStore.toggleFullScreen()
+}
+
+const onToggleMaximize = async () => {
+  await windowStore.toggleMaximize()
 }
 
 const menuOptions = computed<MenuOption[]>(() => [
@@ -548,6 +566,12 @@ onBeforeUnmount(() => {
 /* 主题切换按钮 */
 .theme-btn:hover {
   color: var(--n-warning-color);
+  transform: translateY(-1px);
+}
+
+/* 最大化按钮 */
+.maximize-btn:hover {
+  color: var(--n-success-color);
   transform: translateY(-1px);
 }
 

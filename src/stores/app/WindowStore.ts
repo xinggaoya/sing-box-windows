@@ -3,11 +3,13 @@ import { ref } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import type { Router } from 'vue-router'
 import mitt from '@/utils/mitt'
+import { memoryOptimizer } from '@/utils/memory-optimization'
 
 // 窗口状态类型
 export interface WindowState {
   isVisible: boolean
   isFullscreen: boolean
+  isMaximized: boolean
   lastVisiblePath: string
 }
 
@@ -18,6 +20,7 @@ export const useWindowStore = defineStore(
     const windowState = ref<WindowState>({
       isVisible: true,
       isFullscreen: false,
+      isMaximized: false,
       lastVisiblePath: '/',
     })
 
@@ -77,6 +80,54 @@ export const useWindowStore = defineStore(
       windowState.value.isFullscreen = !isFullscreen
     }
 
+    // 最大化窗口
+    const maximizeWindow = async () => {
+      const appWindow = getAppWindow()
+      await appWindow.maximize()
+      windowState.value.isMaximized = true
+      // 触发最大化事件
+      mitt.emit('window-maximize')
+    }
+
+    // 还原窗口
+    const unmaximizeWindow = async () => {
+      const appWindow = getAppWindow()
+      await appWindow.unmaximize()
+      windowState.value.isMaximized = false
+      // 触发还原事件
+      mitt.emit('window-unmaximize')
+    }
+
+    // 切换最大化状态
+    const toggleMaximize = async () => {
+      const appWindow = getAppWindow()
+      const isMaximized = await appWindow.isMaximized()
+
+      if (isMaximized) {
+        await unmaximizeWindow()
+      } else {
+        await maximizeWindow()
+      }
+    }
+
+    // 检查窗口状态
+    const updateWindowState = async () => {
+      const appWindow = getAppWindow()
+      try {
+        const [isVisible, isFullscreen, isMaximized] = await Promise.all([
+          appWindow.isVisible(),
+          appWindow.isFullscreen(),
+          appWindow.isMaximized(),
+        ])
+
+        windowState.value.isVisible = isVisible
+        windowState.value.isFullscreen = isFullscreen
+        windowState.value.isMaximized = isMaximized
+      } catch (error) {
+        console.error('更新窗口状态失败:', error)
+      }
+    }
+
     // 保存路由状态并切换到空白页
     const saveRouteAndGoBlank = (router: Router) => {
       windowState.value.lastVisiblePath = router.currentRoute.value.path
@@ -97,16 +148,27 @@ export const useWindowStore = defineStore(
 
     // 设置窗口事件处理器
     const setupWindowEventHandlers = (router: Router) => {
-      // 窗口隐藏时切换到空白页
+      // 窗口隐藏时切换到空白页并触发内存清理
       mitt.on('window-hide', () => {
         console.log(`保存当前路径并切换到空白页: ${router.currentRoute.value.path}`)
         saveRouteAndGoBlank(router)
+
+        // 延迟触发内存清理，给页面切换一些时间
+        setTimeout(() => {
+          console.log('🧹 窗口隐藏，触发内存清理')
+          mitt.emit('memory-cleanup-requested')
+        }, 1000)
       })
 
-      // 窗口显示时恢复路由
+      // 窗口显示时恢复路由并恢复图片资源
       mitt.on('window-show', () => {
         console.log('接收到窗口显示事件，准备恢复路由')
         restoreFromBlank(router)
+
+        // 恢复图片资源
+        setTimeout(() => {
+          memoryOptimizer.restoreImageResources()
+        }, 500)
       })
 
       // 窗口恢复时恢复路由
@@ -115,15 +177,24 @@ export const useWindowStore = defineStore(
         restoreFromBlank(router)
       })
 
+      // 窗口最大化事件
+      mitt.on('window-maximize', () => {
+        console.log('窗口已最大化')
+        updateWindowState()
+      })
+
+      // 窗口还原事件
+      mitt.on('window-unmaximize', () => {
+        console.log('窗口已还原')
+        updateWindowState()
+      })
+
       // 检查当前窗口状态
-      getAppWindow()
-        .isVisible()
-        .then((visible) => {
-          windowState.value.isVisible = visible
-          if (visible) {
-            restoreFromBlank(router)
-          }
-        })
+      updateWindowState().then(() => {
+        if (windowState.value.isVisible) {
+          restoreFromBlank(router)
+        }
+      })
     }
 
     // 清理窗口事件监听
@@ -132,12 +203,18 @@ export const useWindowStore = defineStore(
       mitt.off('window-hide')
       mitt.off('window-show')
       mitt.off('window-restore')
+      mitt.off('window-maximize')
+      mitt.off('window-unmaximize')
     }
 
     return {
       windowState,
       getAppWindow,
       minimizeWindow,
+      maximizeWindow,
+      unmaximizeWindow,
+      toggleMaximize,
+      updateWindowState,
       hideWindow,
       showWindow,
       setWindowAlwaysOnTop,
@@ -151,5 +228,5 @@ export const useWindowStore = defineStore(
   },
   {
     persist: true,
-  }
+  },
 )

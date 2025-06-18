@@ -22,6 +22,8 @@ export default {
     darkMode: 'ダークモード',
     fullscreen: 'フルスクリーン',
     exitFullscreen: 'フルスクリーン終了',
+    maximize: '最大化',
+    restore: '復元',
     later: '後で',
   },
   nav: {
