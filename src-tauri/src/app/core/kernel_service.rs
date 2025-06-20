@@ -217,9 +217,7 @@ async fn check_admin_requirement(config_path: &Path) -> Result<(), String> {
     if needs_admin {
         // 仅在确实需要时才检查管理员权限
         if !crate::app::system::system_service::check_admin() {
-            return Err(
-                "当前配置需要管理员权限才能启动内核（TUN模式需要管理员权限）".to_string(),
-            );
+            return Err("当前配置需要管理员权限才能启动内核（TUN模式需要管理员权限）".to_string());
         }
     } else {
         info!("当前配置不需要管理员权限，继续启动");
@@ -284,9 +282,6 @@ async fn wait_for_kernel_ready(api_port: u16) -> Result<(), String> {
 // 停止内核
 #[tauri::command]
 pub async fn stop_kernel() -> Result<(), String> {
-    // 设置停止标志
-    SHOULD_STOP_WS.store(true, Ordering::Relaxed);
-
     // 清理所有WebSocket任务
     cleanup_websocket_tasks().await;
 
@@ -301,23 +296,42 @@ pub async fn stop_kernel() -> Result<(), String> {
     PROCESS_MANAGER.stop().await.map_err(|e| e.to_string())
 }
 
-// 清理WebSocket任务
+/// 清理WebSocket任务
 async fn cleanup_websocket_tasks() {
-    info!("正在清理WebSocket任务...");
+    info!("开始清理WebSocket任务");
 
-    let mut tasks = WEBSOCKET_TASKS.lock().await;
+    // 设置停止标志
+    SHOULD_STOP_WS.store(true, Ordering::Relaxed);
 
-    // 中止所有任务
-    for task in tasks.iter() {
-        task.abort();
+    // 等待一小段时间让任务自然退出
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // 获取所有任务句柄并强制中止
+    let tasks = {
+        let mut task_list = WEBSOCKET_TASKS.lock().await;
+        let tasks: Vec<_> = task_list.drain(..).collect();
+        tasks
+    };
+
+    if !tasks.is_empty() {
+        info!("正在中止 {} 个WebSocket任务", tasks.len());
+
+        // 强制中止所有任务
+        for (index, task) in tasks.into_iter().enumerate() {
+            task.abort();
+            info!("已中止WebSocket任务 {}", index + 1);
+        }
+
+        // 等待一段时间确保任务完全清理
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        info!("所有WebSocket任务已清理完成");
+    } else {
+        info!("没有需要清理的WebSocket任务");
     }
 
-    // 等待所有任务完成或中止
-    for task in tasks.drain(..) {
-        let _ = task.await;
-    }
-
-    info!("WebSocket任务清理完成");
+    // 重置停止标志为下次使用做准备
+    SHOULD_STOP_WS.store(false, Ordering::Relaxed);
 }
 
 // 重启内核
@@ -751,7 +765,7 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Resul
     let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
-    let _handle = task::spawn(async move {
+    let ws_handle = task::spawn(async move {
         let url = Url::parse(&format!("ws://127.0.0.1:{}/logs?token={}", api_port, token)).unwrap();
 
         match connect_async(url).await {
@@ -768,10 +782,18 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Resul
 
                 // 持续读取WebSocket消息
                 while let Some(message) = read.next().await {
+                    // 检查是否应该停止
+                    if SHOULD_STOP_WS.load(Ordering::Relaxed) {
+                        info!("收到停止信号，退出日志数据中继");
+                        break;
+                    }
+
                     match message {
                         Ok(Message::Text(text)) => {
                             if let Ok(data) = serde_json::from_str::<Value>(&text) {
-                                let _ = tx.send(data).await;
+                                if let Err(_) = tx.try_send(data) {
+                                    warn!("日志数据发送队列已满，跳过数据");
+                                }
                             }
                         }
                         Ok(Message::Close(_)) => {
@@ -817,11 +839,22 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Resul
     });
 
     // 启动事件发送任务
-    task::spawn(async move {
+    let emit_handle = task::spawn(async move {
         while let Some(data) = rx.recv().await {
+            // 检查是否应该停止
+            if SHOULD_STOP_WS.load(Ordering::Relaxed) {
+                break;
+            }
             let _ = window_clone.emit("log-data", data);
         }
     });
+
+    // 将任务添加到管理器
+    {
+        let mut tasks = WEBSOCKET_TASKS.lock().await;
+        tasks.push(ws_handle);
+        tasks.push(emit_handle);
+    }
 
     Ok(())
 }
@@ -837,7 +870,7 @@ async fn start_connections_relay<R: Runtime>(
     let token = crate::app::core::proxy_service::get_api_token();
 
     // 启动WebSocket连接和数据处理任务
-    let _handle = task::spawn(async move {
+    let ws_handle = task::spawn(async move {
         let url = Url::parse(&format!(
             "ws://127.0.0.1:{}/connections?token={}",
             api_port, token
@@ -858,10 +891,18 @@ async fn start_connections_relay<R: Runtime>(
 
                 // 持续读取WebSocket消息
                 while let Some(message) = read.next().await {
+                    // 检查是否应该停止
+                    if SHOULD_STOP_WS.load(Ordering::Relaxed) {
+                        info!("收到停止信号，退出连接数据中继");
+                        break;
+                    }
+
                     match message {
                         Ok(Message::Text(text)) => {
                             if let Ok(data) = serde_json::from_str::<Value>(&text) {
-                                let _ = tx.send(data).await;
+                                if let Err(_) = tx.try_send(data) {
+                                    warn!("连接数据发送队列已满，跳过数据");
+                                }
                             }
                         }
                         Ok(Message::Close(_)) => {
@@ -907,11 +948,22 @@ async fn start_connections_relay<R: Runtime>(
     });
 
     // 启动事件发送任务
-    task::spawn(async move {
+    let emit_handle = task::spawn(async move {
         while let Some(data) = rx.recv().await {
+            // 检查是否应该停止
+            if SHOULD_STOP_WS.load(Ordering::Relaxed) {
+                break;
+            }
             let _ = window_clone.emit("connections-data", data);
         }
     });
+
+    // 将任务添加到管理器
+    {
+        let mut tasks = WEBSOCKET_TASKS.lock().await;
+        tasks.push(ws_handle);
+        tasks.push(emit_handle);
+    }
 
     Ok(())
 }

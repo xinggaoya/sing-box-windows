@@ -1,12 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type {
-  KernelVersion,
-  ProxyNode,
-  ProxyGroup,
-  TrafficStats,
-  ApiResponse,
-  Rule,
-} from '@/types/api'
+import type { KernelVersion, ProxyNode, ProxyGroup, TrafficStats, Rule } from '@/types/api'
 
 // API基础类
 class ApiBase {
