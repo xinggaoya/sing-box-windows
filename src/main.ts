@@ -33,8 +33,16 @@ const isDev = import.meta.env.DEV
 memoryLeakDetector.startMonitoring(isDev ? 15000 : 30000) // 开发环境15秒，生产环境30秒
 
 // 设置应用关闭时的清理逻辑
-window.addEventListener('beforeunload', () => {
+window.addEventListener('beforeunload', async () => {
   console.log('🧹 应用关闭，执行清理...')
+
+  // 销毁WebSocketService实例
+  try {
+    const { WebSocketService } = await import('@/services/websocket-service')
+    WebSocketService.destroyInstance()
+  } catch (error) {
+    console.error('WebSocketService清理失败:', error)
+  }
 
   // 停止内存监控
   memoryLeakDetector.stopMonitoring()
@@ -44,6 +52,14 @@ window.addEventListener('beforeunload', () => {
 
   // 清理所有Store
   StoreCleaner.cleanupAll()
+
+  // 清理内存优化器
+  try {
+    const { MemoryOptimizer } = await import('@/utils/memory-optimization')
+    MemoryOptimizer.getInstance().cleanup()
+  } catch (error) {
+    console.error('内存优化器清理失败:', error)
+  }
 
   // 清理性能优化工具资源
   if (isDev) {

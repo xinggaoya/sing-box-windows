@@ -60,7 +60,19 @@ export class WebSocketService {
     rules: null,
   }
 
-  private constructor() {}
+  // 是否已被销毁
+  private isDestroyed: boolean = false
+
+  // API端口
+  private apiPort: number = 12081
+
+  private constructor() {
+    // 监听内存清理请求，执行WebSocket清理
+    mitt.on('memory-cleanup-requested', this.handleMemoryCleanup.bind(this))
+
+    // 监听WebSocket重连请求
+    mitt.on('websocket-reconnect', this.handleReconnectRequest.bind(this))
+  }
 
   /**
    * 获取 WebSocketService 实例
@@ -73,6 +85,93 @@ export class WebSocketService {
   }
 
   /**
+   * 销毁实例并清理资源
+   */
+  public static destroyInstance() {
+    if (WebSocketService.instance) {
+      WebSocketService.instance.destroy()
+      WebSocketService.instance = null!
+    }
+  }
+
+  /**
+   * 销毁实例
+   */
+  public destroy() {
+    this.isDestroyed = true
+
+    // 清理所有连接
+    this.disconnectAll().catch(console.error)
+
+    // 清理所有定时器
+    Object.keys(this.reconnectTimers).forEach((key) => {
+      this.clearReconnectTimer(key)
+    })
+
+    // 移除事件监听器
+    mitt.off('memory-cleanup-requested', this.handleMemoryCleanup.bind(this))
+    mitt.off('websocket-reconnect', this.handleReconnectRequest.bind(this))
+
+    console.log('🧹 WebSocketService 实例已销毁')
+  }
+
+  /**
+   * 处理内存清理请求
+   */
+  private handleMemoryCleanup() {
+    console.log('🧹 WebSocketService 响应内存清理请求')
+
+    // 清理所有重连定时器
+    Object.keys(this.reconnectTimers).forEach((key) => {
+      this.clearReconnectTimer(key)
+    })
+
+    // 如果连接过多，考虑重新建立连接以释放内存
+    const activeConnections = this.getActiveConnectionCount()
+    if (activeConnections > 3) {
+      console.log('🧹 重新建立WebSocket连接以释放内存')
+      this.reconnectAllConnections()
+    }
+  }
+
+  /**
+   * 获取活跃连接数量
+   */
+  private getActiveConnectionCount(): number {
+    let count = 0
+    if (this.connectionWs) count++
+    if (this.trafficWs) count++
+    if (this.logWs) count++
+    if (this.memoryWs) count++
+    if (this.proxyWs) count++
+    if (this.rulesWs) count++
+    return count
+  }
+
+  /**
+   * 重新建立所有连接
+   */
+  private async reconnectAllConnections() {
+    const activeTypes: string[] = []
+    if (this.connectionWs) activeTypes.push('connections')
+    if (this.trafficWs) activeTypes.push('traffic')
+    if (this.logWs) activeTypes.push('logs')
+    if (this.memoryWs) activeTypes.push('memory')
+    if (this.proxyWs) activeTypes.push('proxy')
+    if (this.rulesWs) activeTypes.push('rules')
+
+    // 先断开所有连接
+    await this.disconnectAll()
+
+    // 延迟重新连接
+    setTimeout(() => {
+      activeTypes.forEach((type) => {
+        this.connect(type).catch(console.error)
+      })
+    }, 1000)
+  }
+
+  /**
    * 设置 API Token
    */
   public setToken(token: string) {
@@ -80,11 +179,17 @@ export class WebSocketService {
   }
 
   /**
+   * 设置 API 端口
+   */
+  public setApiPort(port: number) {
+    this.apiPort = port
+  }
+
+  /**
    * 获取当前 API 端口
    */
   private getApiPort(): number {
-    const appStore = useAppStore()
-    return appStore.apiPort
+    return this.apiPort
   }
 
   /**
@@ -102,6 +207,9 @@ export class WebSocketService {
    * @param isConnected 是否已连接
    */
   private updateConnectionStatus(isConnected: boolean) {
+    // 如果已被销毁，不发送事件
+    if (this.isDestroyed) return
+
     // 如果状态发生变化，才发送事件
     if (this.hasActiveConnection !== isConnected) {
       this.hasActiveConnection = isConnected
@@ -122,6 +230,8 @@ export class WebSocketService {
    * 如果任意一个WebSocket连接正常，则认为是连接状态
    */
   private checkConnectionStatus() {
+    if (this.isDestroyed) return
+
     const isConnected =
       this.connectionWs !== null ||
       this.trafficWs !== null ||
@@ -149,11 +259,16 @@ export class WebSocketService {
    * 设置重连计时器
    */
   private scheduleReconnect(type: string, delay: number = 3000) {
+    // 如果已被销毁，不设置重连
+    if (this.isDestroyed) return
+
     // 先清除可能存在的旧计时器
     this.clearReconnectTimer(type)
 
     // 设置新的重连计时器
     this.reconnectTimers[type] = window.setTimeout(() => {
+      if (this.isDestroyed) return
+
       this.connect(type).catch((err) => {
         // 重连失败时，再次调度重连，延迟时间增加
         this.scheduleReconnect(type, Math.min(delay * 1.5, 30000))
@@ -168,6 +283,9 @@ export class WebSocketService {
    */
   public async connect(type: string): Promise<boolean> {
     try {
+      // 如果已被销毁，直接返回失败
+      if (this.isDestroyed) return false
+
       // 如果正在关闭连接，等待一下
       if (this.isClosing(type)) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -180,24 +298,19 @@ export class WebSocketService {
 
       switch (type) {
         case 'connections':
-          const connectionStore = useConnectionStore()
-          result = await this.setupConnectionsListener(connectionStore)
+          result = await this.setupConnectionsListener()
           break
         case 'traffic':
-          const trafficStore = useTrafficStore()
-          result = await this.setupTrafficListener(trafficStore)
+          result = await this.setupTrafficListener()
           break
         case 'logs':
-          const logStore = useLogStore()
-          result = await this.setupLogListener(logStore)
+          result = await this.setupLogListener()
           break
         case 'memory':
-          const memoryStore = useConnectionStore()
-          result = await this.setupMemoryListener(memoryStore)
+          result = await this.setupMemoryListener()
           break
         case 'proxy':
-          const proxyStore = useProxyStore()
-          result = await this.setupProxyListener(proxyStore)
+          result = await this.setupProxyListener()
           break
         case 'rules':
           result = await this.setupRulesListener()
@@ -428,11 +541,11 @@ export class WebSocketService {
 
       // 并行建立所有连接
       const results = await Promise.allSettled([
-        this.setupConnectionsListener(connectionStore),
-        this.setupTrafficListener(trafficStore),
-        this.setupLogListener(logStore),
-        this.setupMemoryListener(connectionStore),
-        this.setupProxyListener(proxyStore),
+        this.setupConnectionsListener(),
+        this.setupTrafficListener(),
+        this.setupLogListener(),
+        this.setupMemoryListener(),
+        this.setupProxyListener(),
         this.setupRulesListener(),
       ])
 
@@ -564,9 +677,7 @@ export class WebSocketService {
   /**
    * 建立连接监听器
    */
-  private async setupConnectionsListener(
-    connectionStore: ReturnType<typeof useConnectionStore>,
-  ): Promise<boolean> {
+  private async setupConnectionsListener(): Promise<boolean> {
     try {
       // 清除可能存在的旧监听器
       this.cleanupListener('connections')
@@ -590,8 +701,8 @@ export class WebSocketService {
       // 添加消息监听器
       const removeListener = this.connectionWs.addListener((message) => {
         try {
-          // 在处理消息前检查WebSocket状态
-          if (!this.connectionWs || this.connectionIsClosing) {
+          // 在处理消息前检查WebSocket状态和销毁状态
+          if (!this.connectionWs || this.connectionIsClosing || this.isDestroyed) {
             return
           }
 
@@ -606,8 +717,8 @@ export class WebSocketService {
             data = JSON.parse(JSON.stringify(message.data))
           }
 
-          // 更新连接数据
-          connectionStore.updateConnections(data)
+          // 通过事件总线发送数据，避免直接引用Store
+          mitt.emit('connections-data', data)
         } catch (error) {
           // 忽略错误
         }
@@ -629,9 +740,7 @@ export class WebSocketService {
   /**
    * 建立流量监听器
    */
-  private async setupTrafficListener(
-    trafficStore: ReturnType<typeof useTrafficStore>,
-  ): Promise<boolean> {
+  private async setupTrafficListener(): Promise<boolean> {
     try {
       // 清除可能存在的旧监听器
       this.cleanupListener('traffic')
@@ -655,8 +764,8 @@ export class WebSocketService {
       // 添加消息监听器
       const removeListener = this.trafficWs.addListener((message) => {
         try {
-          // 在处理消息前检查WebSocket状态
-          if (!this.trafficWs || this.trafficIsClosing) {
+          // 在处理消息前检查WebSocket状态和销毁状态
+          if (!this.trafficWs || this.trafficIsClosing || this.isDestroyed) {
             return
           }
 
@@ -671,8 +780,8 @@ export class WebSocketService {
             data = JSON.parse(JSON.stringify(message.data))
           }
 
-          // 更新流量数据
-          trafficStore.updateTrafficStats(data)
+          // 通过事件总线发送数据，避免直接引用Store
+          mitt.emit('traffic-data', data)
         } catch (error) {
           // 忽略错误
         }
@@ -694,7 +803,7 @@ export class WebSocketService {
   /**
    * 建立日志监听器
    */
-  private async setupLogListener(logStore: ReturnType<typeof useLogStore>): Promise<boolean> {
+  private async setupLogListener(): Promise<boolean> {
     try {
       // 清除可能存在的旧监听器
       this.cleanupListener('logs')
@@ -722,7 +831,7 @@ export class WebSocketService {
             return
           }
 
-          if (!this.logWs || this.logIsClosing) {
+          if (!this.logWs || this.logIsClosing || this.isDestroyed) {
             return
           }
 
@@ -745,16 +854,11 @@ export class WebSocketService {
             return
           }
 
-          // 发送到日志存储
-          logStore.addLog(data.type, data.payload)
-
-          // 同时触发Tauri事件，确保LogStore中的监听器也能收到数据
+          // 只使用mitt发出日志事件，避免直接调用Store方法
           const eventPayload = {
             type: data.type,
             payload: data.payload,
           }
-
-          // 使用mitt发出日志事件，确保事件总线也能收到
           mitt.emit('log-data', eventPayload)
         } catch (error) {
           // 忽略错误
@@ -766,7 +870,12 @@ export class WebSocketService {
 
       // 测试发送一条日志，确认监听器正常工作
       setTimeout(() => {
-        logStore.addLog('info', '日志WebSocket连接已建立，等待内核数据...')
+        if (!this.isDestroyed) {
+          mitt.emit('log-data', {
+            type: 'info',
+            payload: '日志WebSocket连接已建立，等待内核数据...',
+          })
+        }
       }, 500)
 
       // 连接成功，更新状态
@@ -778,6 +887,7 @@ export class WebSocketService {
 
       // 即使WebSocket连接失败，也添加一条本地日志
       setTimeout(() => {
+        const logStore = useLogStore()
         logStore.addLog('error', `日志连接失败: ${error}`)
       }, 500)
 
@@ -788,9 +898,7 @@ export class WebSocketService {
   /**
    * 建立内存监听器
    */
-  private async setupMemoryListener(
-    connectionStore: ReturnType<typeof useConnectionStore>,
-  ): Promise<boolean> {
+  private async setupMemoryListener(): Promise<boolean> {
     try {
       // 清除可能存在的旧监听器
       this.cleanupListener('memory')
@@ -811,11 +919,11 @@ export class WebSocketService {
       // 建立新连接，使用动态端口
       this.memoryWs = await WebSocket.connect(this.buildWsUrl('memory'))
 
-      // 添加消息监听器
+      // 添加消息监听器 - 内存监听器
       const removeListener = this.memoryWs.addListener((message) => {
         try {
-          // 在处理消息前检查WebSocket状态
-          if (!this.memoryWs || this.memoryIsClosing) {
+          // 在处理消息前检查WebSocket状态和销毁状态
+          if (!this.memoryWs || this.memoryIsClosing || this.isDestroyed) {
             return
           }
 
@@ -830,8 +938,8 @@ export class WebSocketService {
             data = JSON.parse(JSON.stringify(message.data))
           }
 
-          // 更新内存数据
-          connectionStore.updateMemory(data)
+          // 通过事件总线发送数据，避免直接引用Store
+          mitt.emit('memory-data', data)
         } catch (error) {
           // 忽略错误
         }
@@ -853,7 +961,7 @@ export class WebSocketService {
   /**
    * 建立代理数据监听器
    */
-  private async setupProxyListener(proxyStore: ReturnType<typeof useProxyStore>): Promise<boolean> {
+  private async setupProxyListener(): Promise<boolean> {
     try {
       // 清除可能存在的旧监听器
       this.cleanupListener('proxy')
@@ -874,11 +982,11 @@ export class WebSocketService {
       // 建立新连接，使用动态端口
       this.proxyWs = await WebSocket.connect(this.buildWsUrl('proxies'))
 
-      // 添加消息监听器
+      // 添加消息监听器 - 代理监听器
       const removeListener = this.proxyWs.addListener((message) => {
         try {
-          // 在处理消息前检查WebSocket状态
-          if (!this.proxyWs || this.proxyIsClosing) {
+          // 在处理消息前检查WebSocket状态和销毁状态
+          if (!this.proxyWs || this.proxyIsClosing || this.isDestroyed) {
             return
           }
 
@@ -893,8 +1001,8 @@ export class WebSocketService {
             data = JSON.parse(JSON.stringify(message.data))
           }
 
-          // 更新代理数据
-          proxyStore.updateProxies(data)
+          // 通过事件总线发送数据，避免直接引用Store
+          mitt.emit('proxy-data', data)
         } catch (error) {
           // 忽略错误
         }
@@ -940,8 +1048,8 @@ export class WebSocketService {
       // 添加消息监听器
       const removeListener = this.rulesWs.addListener((message) => {
         try {
-          // 在处理消息前检查WebSocket状态
-          if (!this.rulesWs || this.rulesIsClosing) {
+          // 在处理消息前检查WebSocket状态和销毁状态
+          if (!this.rulesWs || this.rulesIsClosing || this.isDestroyed) {
             return
           }
 
@@ -974,5 +1082,25 @@ export class WebSocketService {
       this.removeListenerFuncs['rules'] = null
       return false
     }
+  }
+
+  /**
+   * 处理重连请求
+   */
+  private handleReconnectRequest(type: string) {
+    console.log(`🔄 WebSocketService 收到重连请求: ${type}`)
+
+    if (this.isDestroyed) return
+
+    // 先断开连接，然后重新连接
+    this.disconnect(type)
+      .then(() => {
+        setTimeout(() => {
+          if (!this.isDestroyed) {
+            this.connect(type).catch(console.error)
+          }
+        }, 1000)
+      })
+      .catch(console.error)
   }
 }

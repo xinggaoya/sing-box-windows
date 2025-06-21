@@ -77,11 +77,15 @@ export type Events = {
   'ws-connected': void // 添加WebSocket连接成功事件
   'ws-disconnected': void // 添加WebSocket连接断开事件
 
+  // WebSocket 重连事件
+  'websocket-reconnect': string
+
   // WebSocket 数据事件
   'traffic-data': Record<string, unknown>
   'memory-data': Record<string, unknown>
   'connections-data': Record<string, unknown>
   'log-data': { type: string; payload: string }
+  'proxy-data': Record<string, unknown>
   'rules-data': RulesData
 }
 
