@@ -4,7 +4,6 @@
 
 import type { App } from 'vue'
 import { createPinia } from 'pinia'
-import { eventListenerManager } from '@/utils/performance'
 
 // Store类型定义
 export type StoreType =
@@ -137,10 +136,7 @@ export class StoreManager {
     // 预加载核心Store
     await this.loadCoreStores()
 
-    // 设置清理事件
-    eventListenerManager.add(() => {
-      this.cleanup()
-    })
+    // 清理事件会在应用卸载时被调用
   }
 
   /**

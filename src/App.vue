@@ -5,9 +5,14 @@
       <n-modal-provider>
         <n-notification-provider>
           <n-message-provider>
-            <message-consumer />
-            <update-notification />
+            <!-- 消息消费组件 -->
+            <MessageConsumer />
+
+            <!-- 主路由视图 -->
             <router-view />
+
+            <!-- 更新通知组件 -->
+            <UpdateNotification />
           </n-message-provider>
         </n-notification-provider>
       </n-modal-provider>
@@ -16,19 +21,17 @@
 </template>
 
 <script setup lang="ts">
-import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
-import { onMounted, onUnmounted, watch, defineComponent } from 'vue'
+import { defineComponent, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
-import { useI18n } from 'vue-i18n'
 import { useMessage } from 'naive-ui'
 import type { Router } from 'vue-router'
 
-// 导入性能优化工具
-import { eventListenerManager, memoryMonitor } from '@/utils/performance'
-import { memoryMonitor as realTimeMemoryMonitor } from '@/utils/memory-monitor'
-import { memoryOptimizer } from '@/utils/memory-optimization'
+// 导入主题配置
+import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
+
 import { storeManager, type StoreType } from '@/stores/StoreManager'
 
 // 直接导入需要的Store
@@ -100,6 +103,9 @@ let appStore: AppStore | null = null
 let localeStore: LocaleStore | null = null
 let windowStore: WindowStore | null = null
 
+// 清理函数数组
+const cleanupFunctions: (() => void)[] = []
+
 onMounted(async () => {
   try {
     // 初始化Store管理器
@@ -115,7 +121,7 @@ onMounted(async () => {
       appStore?.setMessageInstance(message as ReturnType<typeof useMessage>)
     }
     mitt.on('message-instance-ready', handleMessageReady)
-    eventListenerManager.add(() => {
+    cleanupFunctions.push(() => {
       mitt.off('message-instance-ready', handleMessageReady)
     })
 
@@ -129,84 +135,59 @@ onMounted(async () => {
       },
       { immediate: true },
     )
-    eventListenerManager.add(stopWatchingLocale)
+    cleanupFunctions.push(stopWatchingLocale)
 
-    // 设置窗口事件处理器
-    await setupWindowEventHandlers()
+    // 检查初始窗口状态和自启动情况
+    await checkInitialWindowState()
 
     // 按需加载其他Store
     await loadRequiredStores()
 
     // 启动初始化逻辑
     await initializeApp()
-
-    // 初始化内存优化器
-    memoryOptimizer.initialize()
-
-    // 启动实时内存监控
-    realTimeMemoryMonitor.startMonitoring(20000) // 每20秒检查一次
   } catch (error) {
     console.error('应用初始化失败:', error)
   }
 })
 
-// 设置窗口事件处理器
-async function setupWindowEventHandlers() {
-  const handleWindowHide = () => {
-    if (windowStore) {
-      windowStore.windowState.lastVisiblePath = router.currentRoute.value.path
-      if (windowStore.windowState.lastVisiblePath !== '/blank') {
-        router.push('/blank')
-      }
-    }
-  }
+// 检查初始窗口状态和自启动情况
+async function checkInitialWindowState() {
+  if (!windowStore) return
 
-  const handleWindowShow = () => {
-    if (
-      windowStore &&
-      router.currentRoute.value.path === '/blank' &&
-      windowStore.windowState.lastVisiblePath
-    ) {
-      router.push(windowStore.windowState.lastVisiblePath)
-    }
-  }
-
-  const handleWindowRestore = () => {
-    if (
-      windowStore &&
-      router.currentRoute.value.path === '/blank' &&
-      windowStore.windowState.lastVisiblePath
-    ) {
-      router.push(windowStore.windowState.lastVisiblePath)
-    }
-  }
-
-  mitt.on('window-hide', handleWindowHide)
-  mitt.on('window-show', handleWindowShow)
-  mitt.on('window-restore', handleWindowRestore)
-
-  eventListenerManager.add(() => {
-    mitt.off('window-hide', handleWindowHide)
-    mitt.off('window-show', handleWindowShow)
-    mitt.off('window-restore', handleWindowRestore)
-  })
-
-  // 检查当前窗口状态
   const appWindow = Window.getCurrent()
   try {
-    const visible = await appWindow.isVisible()
-    if (windowStore) {
-      windowStore.windowState.isVisible = visible
-      if (
-        visible &&
-        router.currentRoute.value.path === '/blank' &&
-        windowStore.windowState.lastVisiblePath
-      ) {
-        router.push(windowStore.windowState.lastVisiblePath)
+    // 获取窗口状态
+    const [visible, minimized] = await Promise.all([appWindow.isVisible(), appWindow.isMinimized()])
+
+    windowStore.windowState.isVisible = visible
+
+    console.log(`🔍 初始窗口状态检查: visible=${visible}, minimized=${minimized}`)
+
+    // 如果窗口不可见或已最小化，说明可能是自启动到托盘
+    if (!visible || minimized) {
+      console.log('📱 检测到托盘模式启动，切换到空白页面')
+      // 保存当前路径（如果不是空白页）并切换到空白页
+      if (router.currentRoute.value.path !== '/blank') {
+        windowStore.windowState.lastVisiblePath = router.currentRoute.value.path
+        await router.push('/blank')
       }
+
+      // 延迟触发内存清理
+      setTimeout(() => {
+        console.log('🧹 自启动模式下触发内存清理')
+        mitt.emit('memory-cleanup-requested')
+      }, 1000)
+    } else if (
+      visible &&
+      router.currentRoute.value.path === '/blank' &&
+      windowStore.windowState.lastVisiblePath
+    ) {
+      // 如果窗口可见但当前在空白页，恢复到上次的页面
+      console.log(`🔄 窗口可见，从空白页恢复到: ${windowStore.windowState.lastVisiblePath}`)
+      await router.push(windowStore.windowState.lastVisiblePath)
     }
   } catch (error) {
-    console.error('检查窗口状态失败:', error)
+    console.error('检查初始窗口状态失败:', error)
   }
 }
 
@@ -225,95 +206,34 @@ async function loadRequiredStores() {
 // 应用初始化逻辑
 async function initializeApp() {
   try {
-    // 重置订阅加载状态
-    const subStore = await storeManager.loadStore<SubStore>('subscription')
-    subStore?.resetLoadingState()
-
-    // 初始化托盘图标
+    // 初始化托盘
     const trayStore = await storeManager.loadStore<TrayStore>('tray')
-    await trayStore?.initTray()
+    await trayStore.initTray()
 
-    // 禁用右键菜单（非开发环境）
-    if (!import.meta.env.DEV) {
-      document.oncontextmenu = () => false
-    }
-
-    // 自动启动内核
+    // 如果启用了自动启动，启动内核
     if (appStore?.autoStartKernel) {
-      await handleAutoStartKernel()
-    }
-
-    // 如果内核正在运行，初始化事件监听器
-    if (appStore?.isRunning) {
       const kernelStore = await storeManager.loadStore<KernelStore>('kernel')
-      kernelStore?.initEventListeners()
+      kernelStore.initEventListeners()
+      await kernelStore.startKernel()
     }
-
-    // 延迟执行自动更新检查（避免阻塞启动）
-    setTimeout(async () => {
-      await handleAutoUpdateCheck()
-    }, 5000) // 5秒后检查更新
   } catch (error) {
     console.error('应用初始化过程中出错:', error)
   }
 }
 
-// 处理自动更新检查
-async function handleAutoUpdateCheck() {
-  try {
-    interface UpdateStore {
-      autoCheckUpdate: boolean
-      fetchAppVersion: () => Promise<string>
-      checkUpdate: (silent: boolean) => Promise<unknown>
-    }
-
-    const updateStore = await storeManager.loadStore<UpdateStore>('update')
-    if (updateStore?.autoCheckUpdate) {
-      await updateStore.fetchAppVersion()
-      await updateStore.checkUpdate(true) // 静默检查
-    }
-  } catch (error) {
-    console.error('自动检查更新失败:', error)
-  }
+// 清理所有监听器
+function cleanup() {
+  cleanupFunctions.forEach((fn) => fn())
+  cleanupFunctions.length = 0
 }
 
-// 处理自动启动内核
-async function handleAutoStartKernel() {
-  if (appStore?.proxyMode === 'tun') {
-    await appStore.switchProxyMode('system')
-  }
-
-  try {
-    const kernelStore = await storeManager.loadStore<KernelStore>('kernel')
-    await kernelStore?.startKernel()
-    appStore?.setRunningState(true)
-
-    // 判断当前是否需要隐藏窗口
-    const appWindow = Window.getCurrent()
-    if (!(await appWindow.isVisible()) && windowStore) {
-      windowStore.saveRouteAndGoBlank(router)
-    }
-  } catch (error) {
-    console.error('自动启动内核失败:', error)
-  }
-}
-
-onUnmounted(() => {
-  // 停止内存监控
-  realTimeMemoryMonitor.stopMonitoring()
-
-  // 清理内存优化器
-  memoryOptimizer.cleanup()
-
-  // 清理事件监听器
-  eventListenerManager.cleanup()
-
-  // 清理Store管理器
-  storeManager.cleanup()
+// 组件卸载时清理
+onBeforeUnmount(() => {
+  cleanup()
 })
 
-// 使事件监听器在组件卸载时自动清理
-eventListenerManager.autoCleanup()
+// 应用关闭前清理
+window.addEventListener('beforeunload', cleanup)
 </script>
 
 <style>

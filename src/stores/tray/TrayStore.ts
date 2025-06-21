@@ -10,6 +10,7 @@ import { Submenu } from '@tauri-apps/api/menu/submenu'
 import { useAppStore } from '@/stores'
 import { useSubStore } from '@/stores'
 import { useKernelStore } from '@/stores'
+import { useWindowStore } from '@/stores/app/WindowStore'
 import { ProxyService } from '@/services/proxy-service'
 import mitt from '@/utils/mitt'
 import i18n from '@/locales'
@@ -33,6 +34,7 @@ export const useTrayStore = defineStore('tray', () => {
   const subStore = useSubStore()
   const router = useRouter()
   const kernelStore = useKernelStore()
+  const windowStore = useWindowStore()
   const proxyService = ProxyService.getInstance()
 
   // 添加一个内部状态，记录上次菜单刷新时的代理模式
@@ -43,6 +45,34 @@ export const useTrayStore = defineStore('tray', () => {
 
   // 获取翻译函数
   const t = i18n.global.t
+
+  /**
+   * 处理路由恢复（直接方法，不依赖事件系统）
+   */
+  const handleRouteRestore = async () => {
+    try {
+      const currentPath = router.currentRoute.value.path
+
+      // 如果当前在空白页面，尝试恢复
+      if (currentPath === '/blank') {
+        const savedPath = windowStore.windowState.lastVisiblePath
+
+        if (savedPath && savedPath !== '/blank') {
+          await router.push(savedPath)
+        } else {
+          await router.push('/')
+        }
+      }
+    } catch (error) {
+      console.error('路由恢复失败:', error)
+      // 如果恢复失败，至少回到首页
+      try {
+        await router.push('/')
+      } catch (fallbackError) {
+        console.error('恢复到首页失败:', fallbackError)
+      }
+    }
+  }
 
   /**
    * 更新托盘提示信息
@@ -108,8 +138,9 @@ export const useTrayStore = defineStore('tray', () => {
           const appWindow = Window.getCurrent()
           await appWindow.show()
           await appWindow.setFocus()
-          // 添加触发窗口显示事件，确保路由能够正确恢复
-          mitt.emit('window-show')
+
+          // 直接处理路由恢复，不依赖事件系统
+          await handleRouteRestore()
         },
       })
 
@@ -323,11 +354,11 @@ export const useTrayStore = defineStore('tray', () => {
               // 如果点击的是左键，则显示界面
               if (event.button === 'Left') {
                 const appWindow = Window.getCurrent()
-                // 移除router.back()调用，改用显示窗口的标准流程
                 await appWindow.show()
                 await appWindow.setFocus()
-                // 触发窗口显示事件，让WindowStore处理路由恢复
-                mitt.emit('window-show')
+
+                // 直接处理路由恢复，不依赖事件系统
+                await handleRouteRestore()
               }
               break
           }

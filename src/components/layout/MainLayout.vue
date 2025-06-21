@@ -87,7 +87,7 @@
               </n-icon>
             </button>
 
-            <button class="header-btn close-btn" @click="windowStore.hideWindow">
+            <button class="header-btn close-btn" @click="() => windowStore.hideWindow(router)">
               <n-icon size="16">
                 <close-outline />
               </n-icon>
@@ -341,29 +341,15 @@ onMounted(async () => {
   // 监听全局更新弹窗事件
   mitt.on('show-update-modal', handleShowUpdateModal)
 
-  // 确保设置窗口事件处理器
-  windowStore.setupWindowEventHandlers(router)
-
-  // 监听窗口显示
-  await appWindow.listen('tauri://show', () => {
-    mitt.emit('window-show')
-  })
-
-  // 监听窗口恢复
-  await appWindow.listen('tauri://restore', () => {
-    mitt.emit('window-restore')
-  })
-
-  // 监听窗口隐藏
+  // 监听窗口隐藏/关闭请求
   await appWindow.listen('tauri://close-requested', async () => {
-    // 改为使用 hide 代替默认关闭行为
-    windowStore.hideWindow()
+    // 隐藏窗口并保存路由状态
+    await windowStore.hideWindow(router)
   })
 })
 
 // 清理事件监听
 onBeforeUnmount(() => {
-  windowStore.cleanupWindowEvents()
   mitt.off('show-update-modal', handleShowUpdateModal)
 })
 </script>

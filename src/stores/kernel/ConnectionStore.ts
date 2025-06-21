@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
-import { StoreCleaner } from '@/utils/memory-leak-fix'
+
 import { WebSocketService, ConnectionState } from '@/services/websocket-service'
 
 // 定义连接数据接口
@@ -99,7 +99,6 @@ export const useConnectionStore = defineStore(
           connectionsState.value.connected &&
           (!lastConnection || Date.now() - new Date(lastConnection.start).getTime() > 15000)
         ) {
-          console.log('连接数据超过15秒未更新，尝试重新连接...')
           reconnectConnectionsWebSocket()
         }
       }, 5000)
@@ -116,7 +115,6 @@ export const useConnectionStore = defineStore(
       memoryHealthCheck = window.setInterval(() => {
         // 如果超过10秒没有更新数据且状态为已连接，尝试重新连接
         if (memoryState.value.connected && Date.now() - memory.value.lastUpdated > 10000) {
-          console.log('内存数据超过10秒未更新，尝试重新连接...')
           reconnectMemoryWebSocket()
         }
       }, 5000)
@@ -186,7 +184,6 @@ export const useConnectionStore = defineStore(
       })
 
       mittListenersRegistered = true
-      console.log('🔗 ConnectionStore Mitt监听器已注册')
     }
 
     // 清理Mitt监听器
@@ -199,7 +196,6 @@ export const useConnectionStore = defineStore(
       mitt.off('ws-disconnected')
 
       mittListenersRegistered = false
-      console.log('🧹 ConnectionStore Mitt监听器已清理')
     }
 
     // 重置连接数据
@@ -262,8 +258,6 @@ export const useConnectionStore = defineStore(
         clearInterval(memoryHealthCheck)
         memoryHealthCheck = null
       }
-
-      console.log('🧹 ConnectionStore 监听器已清理')
     }
 
     // 更新连接数据
@@ -317,26 +311,6 @@ export const useConnectionStore = defineStore(
       }
     }
 
-    // 监听内存清理请求
-    mitt.on('memory-cleanup-requested', () => {
-      console.log('🧹 响应内存清理请求 - Connection Store')
-
-      // 清理旧连接数据
-      if (connections.value.length > 100) {
-        connections.value = connections.value.slice(0, 50)
-        console.log('🧹 清理了过多的连接数据')
-      }
-
-      // 重置计数器
-      connectionsTotal.value = { upload: 0, download: 0 }
-    })
-
-    // 注册清理函数
-    StoreCleaner.registerCleanup(() => {
-      cleanupListeners()
-      resetData()
-    })
-
     // 组件挂载时初始化
     onMounted(() => {
       setupMittListeners()
@@ -356,6 +330,8 @@ export const useConnectionStore = defineStore(
       updateConnections,
       updateMemory,
       setupMittListeners,
+      setupConnectionsListener: setupMittListeners, // 为兼容性添加别名
+      setupMemoryListener: setupMittListeners, // 为兼容性添加别名
       cleanupMittListeners,
       cleanupListeners,
       resetData,

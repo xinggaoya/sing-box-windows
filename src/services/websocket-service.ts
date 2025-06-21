@@ -111,16 +111,12 @@ export class WebSocketService {
     // 移除事件监听器
     mitt.off('memory-cleanup-requested', this.handleMemoryCleanup.bind(this))
     mitt.off('websocket-reconnect', this.handleReconnectRequest.bind(this))
-
-    console.log('🧹 WebSocketService 实例已销毁')
   }
 
   /**
    * 处理内存清理请求
    */
   private handleMemoryCleanup() {
-    console.log('🧹 WebSocketService 响应内存清理请求')
-
     // 清理所有重连定时器
     Object.keys(this.reconnectTimers).forEach((key) => {
       this.clearReconnectTimer(key)
@@ -781,6 +777,7 @@ export class WebSocketService {
           }
 
           // 通过事件总线发送数据，避免直接引用Store
+
           mitt.emit('traffic-data', data)
         } catch (error) {
           // 忽略错误
@@ -1088,8 +1085,6 @@ export class WebSocketService {
    * 处理重连请求
    */
   private handleReconnectRequest(type: string) {
-    console.log(`🔄 WebSocketService 收到重连请求: ${type}`)
-
     if (this.isDestroyed) return
 
     // 先断开连接，然后重新连接

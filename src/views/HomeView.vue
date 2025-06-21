@@ -414,23 +414,23 @@ const nodeProxyModes = [
 
 // 格式化流量数据的computed属性
 const formattedUploadSpeed = computed(() => {
-  if (!isRouteActive.value) return '0 B/s'
-  return formatBandwidth(Number(trafficStore.traffic.up) || 0)
+  const value = Number(trafficStore.traffic.up) || 0
+  return formatBandwidth(value)
 })
 
 const formattedDownloadSpeed = computed(() => {
-  if (!isRouteActive.value) return '0 B/s'
-  return formatBandwidth(Number(trafficStore.traffic.down) || 0)
+  const value = Number(trafficStore.traffic.down) || 0
+  return formatBandwidth(value)
 })
 
 const formattedTotalUpload = computed(() => {
-  if (!isRouteActive.value) return '0 B'
-  return formatBandwidth(Number(trafficStore.traffic.totalUp) || 0)
+  const value = Number(trafficStore.traffic.totalUp) || 0
+  return formatBandwidth(value)
 })
 
 const formattedTotalDownload = computed(() => {
-  if (!isRouteActive.value) return '0 B'
-  return formatBandwidth(Number(trafficStore.traffic.totalDown) || 0)
+  const value = Number(trafficStore.traffic.totalDown) || 0
+  return formatBandwidth(value)
 })
 
 const formattedMemory = computed(() => {
@@ -473,7 +473,9 @@ const getStatusSubtitle = () => {
 
 // 监听路由可见性变化
 const route = useRoute()
-const isRouteActive = computed(() => route.path === '/')
+const isRouteActive = computed(() => {
+  return route.path === '/'
+})
 
 // 添加加载状态
 const isTrafficLoading = ref(false)
@@ -512,7 +514,6 @@ const runKernel = async () => {
     if (currentProxyMode.value === 'tun') {
       // 每次启动TUN模式时都重新检查管理员权限
       const currentIsAdmin = await tauriApi.system.checkAdmin()
-      console.log('启动TUN模式 - 当前管理员权限状态:', currentIsAdmin)
 
       if (!currentIsAdmin) {
         dialog.warning({
@@ -657,7 +658,6 @@ const onModeChange = async (value: string) => {
     if (value === 'tun') {
       // 每次切换TUN模式时都重新检查管理员权限
       const currentIsAdmin = await tauriApi.system.checkAdmin()
-      console.log('当前管理员权限状态:', currentIsAdmin)
 
       if (!currentIsAdmin) {
         dialog.warning({
@@ -750,6 +750,7 @@ const setupListeners = async () => {
         connectionStore.setupConnectionsListener(),
         connectionStore.setupMemoryListener(),
       ]).catch((e) => {
+        console.error('设置监听器失败，尝试重试', e)
         // 尝试重试一次
         return new Promise((resolve) => {
           setTimeout(async () => {
@@ -759,7 +760,7 @@ const setupListeners = async () => {
               await connectionStore.setupMemoryListener()
               resolve(true)
             } catch (retryError) {
-              console.error('HomeView: 重试设置监听器失败', retryError)
+              console.error('重试设置监听器失败', retryError)
               resolve(false)
             }
           }, 1000)
@@ -770,7 +771,7 @@ const setupListeners = async () => {
       isConnectionLoading.value = false
     }
   } catch (error) {
-    console.error('HomeView: 设置监听器失败:', error)
+    console.error('设置监听器失败:', error)
     isTrafficLoading.value = false
     isConnectionLoading.value = false
   }
@@ -907,11 +908,6 @@ onUnmounted(() => {
   // 清理加载状态计时器（如果有的话）
   isTrafficLoading.value = false
   isConnectionLoading.value = false
-
-  // 强制触发一次内存清理
-  mitt.emit('memory-cleanup-requested')
-
-  console.log('🧹 HomeView组件已卸载，完成清理')
 })
 </script>
 

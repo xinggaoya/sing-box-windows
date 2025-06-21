@@ -22,7 +22,31 @@
 
 <script setup lang="ts" generic="T">
 import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue'
-import { throttle } from '@/utils/performance'
+// 简单的throttle函数
+const throttle = (func: (...args: unknown[]) => void, delay: number) => {
+  let timeoutId: number | null = null
+  let lastExecTime = 0
+  return function (...args: unknown[]) {
+    const currentTime = Date.now()
+
+    if (currentTime - lastExecTime > delay) {
+      func(...args)
+      lastExecTime = currentTime
+    } else {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+      }
+      timeoutId = window.setTimeout(
+        () => {
+          func(...args)
+          lastExecTime = Date.now()
+          timeoutId = null
+        },
+        delay - (currentTime - lastExecTime),
+      )
+    }
+  }
+}
 
 interface Props {
   items: T[]

@@ -3,7 +3,6 @@ import type { App } from 'vue'
 import { Store } from '@tauri-apps/plugin-store'
 import { type PiniaPluginContext } from 'pinia'
 import { storeManager } from './StoreManager'
-import { memoryMonitor } from '@/utils/performance'
 
 // 导出应用相关Store
 export * from './app/AppStore'
@@ -34,6 +33,9 @@ interface PersistOptions {
   key?: string
   paths?: string[]
   excludeKeys?: string[]
+  excludeHighFrequencyKeys?: string[] // 排除高频更新的键
+  highFrequency?: boolean // 标记为高频更新store
+  debounceDelay?: number // 自定义防抖延迟时间（毫秒）
 }
 
 // 扩展Pinia选项类型
@@ -62,6 +64,52 @@ async function getStore(storeName: string): Promise<Store> {
   return storeCache.get(storeName)!
 }
 
+// 保存任务队列管理
+class SaveTaskManager {
+  private saveTimers = new Map<string, NodeJS.Timeout>()
+  private saveQueues = new Map<string, () => Promise<void>>()
+  private readonly DEBOUNCE_DELAY = 1000 // 1秒防抖延迟
+
+  // 防抖保存
+  debounceSave(storeKey: string, saveTask: () => Promise<void>) {
+    // 清除之前的定时器
+    if (this.saveTimers.has(storeKey)) {
+      clearTimeout(this.saveTimers.get(storeKey)!)
+    }
+
+    // 更新保存任务
+    this.saveQueues.set(storeKey, saveTask)
+
+    // 设置新的防抖定时器
+    const timer = setTimeout(async () => {
+      const task = this.saveQueues.get(storeKey)
+      if (task) {
+        try {
+          await task()
+        } catch (error) {
+          console.error(`防抖保存失败 (${storeKey}):`, error)
+        } finally {
+          this.saveQueues.delete(storeKey)
+          this.saveTimers.delete(storeKey)
+        }
+      }
+    }, this.DEBOUNCE_DELAY)
+
+    this.saveTimers.set(storeKey, timer)
+  }
+
+  // 立即执行所有待保存的任务（用于应用关闭时）
+  async flushAll() {
+    const tasks = Array.from(this.saveQueues.values())
+    this.saveTimers.clear()
+    this.saveQueues.clear()
+
+    await Promise.allSettled(tasks.map((task) => task()))
+  }
+}
+
+const saveTaskManager = new SaveTaskManager()
+
 // 创建 Tauri 持久化 Pinia 插件
 function piniaTauriPersist(context: PiniaPluginContext) {
   const { store, options } = context
@@ -75,6 +123,14 @@ function piniaTauriPersist(context: PiniaPluginContext) {
   // 确定存储的key
   const storeKey =
     typeof persistOptions === 'object' && persistOptions.key ? persistOptions.key : store.$id
+
+  // 获取配置选项
+  const isHighFrequency =
+    typeof persistOptions === 'object' && persistOptions.highFrequency === true
+  const debounceDelay =
+    typeof persistOptions === 'object' && persistOptions.debounceDelay
+      ? persistOptions.debounceDelay
+      : 1000
 
   // 初始化时从 Tauri Store 恢复状态
   getStore(storeKey).then(async (tauriStore) => {
@@ -114,8 +170,8 @@ function piniaTauriPersist(context: PiniaPluginContext) {
     }
   })
 
-  // 监听状态变化，保存到 Tauri Store
-  store.$subscribe(async (mutation, state) => {
+  // 创建保存函数
+  const createSaveTask = (state: Record<string, unknown>) => async () => {
     try {
       const tauriStore = await getStore(storeKey)
 
@@ -123,7 +179,7 @@ function piniaTauriPersist(context: PiniaPluginContext) {
       let stateToStore: Record<string, unknown> = {}
 
       if (typeof persistOptions === 'object') {
-        const { paths, excludeKeys } = persistOptions
+        const { paths, excludeKeys, excludeHighFrequencyKeys } = persistOptions
 
         if (paths && paths.length > 0) {
           // 仅保存指定路径
@@ -141,6 +197,13 @@ function piniaTauriPersist(context: PiniaPluginContext) {
         } else {
           stateToStore = JSON.parse(JSON.stringify(state))
         }
+
+        // 排除高频更新的键（如实时流量数据）
+        if (excludeHighFrequencyKeys && excludeHighFrequencyKeys.length > 0) {
+          excludeHighFrequencyKeys.forEach((key) => {
+            delete stateToStore[key]
+          })
+        }
       } else {
         stateToStore = JSON.parse(JSON.stringify(state))
       }
@@ -149,6 +212,21 @@ function piniaTauriPersist(context: PiniaPluginContext) {
       await tauriStore.save()
     } catch (error) {
       console.error(`保存状态到 Tauri Store 失败:`, error)
+    }
+  }
+
+  // 监听状态变化，使用防抖保存到 Tauri Store
+  store.$subscribe(async (mutation, state) => {
+    // 对于高频更新的store使用防抖保存
+    if (isHighFrequency) {
+      saveTaskManager.debounceSave(storeKey, createSaveTask(state))
+    } else {
+      // 普通store直接保存
+      try {
+        await createSaveTask(state)()
+      } catch (error) {
+        console.error(`保存状态失败:`, error)
+      }
     }
   })
 }
@@ -196,4 +274,9 @@ export function usePinia(app: App) {
   storeManager.initialize().catch((error) => {
     console.error('Store管理器初始化失败:', error)
   })
+}
+
+// 导出保存管理器，用于应用关闭时强制保存所有待保存数据
+export async function flushAllPendingSaves() {
+  await saveTaskManager.flushAll()
 }

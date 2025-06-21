@@ -25,6 +25,7 @@ export default {
     maximize: 'Развернуть',
     restore: 'Восстановить',
     later: 'Позже',
+    minimizedToTray: 'Свернуто в трей',
   },
   nav: {
     home: 'Главная',

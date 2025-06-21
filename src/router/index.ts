@@ -1,11 +1,21 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import Layout from '@/components/layout/MainLayout.vue'
 import { storeManager, routeStoreMap } from '@/stores/StoreManager'
-import { componentPreloader } from '@/utils/performance'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
+    // 空白页面 - 独立路由，用于托盘模式下减少内存占用
+    {
+      path: '/blank',
+      name: 'Blank',
+      component: () => import('@/views/BlankView.vue'),
+      meta: {
+        preloadStores: [], // 不预加载任何Store
+        isBlankPage: true, // 标记为空白页面
+      },
+    },
+    // 主应用布局 - 包含所有功能页面
     {
       path: '/',
       name: 'index',
@@ -70,14 +80,6 @@ const router = createRouter({
             preloadStores: ['connection', 'traffic'],
           },
         },
-        {
-          path: '/blank',
-          name: 'Blank',
-          component: () => import('@/views/BlankView.vue'),
-          meta: {
-            preloadStores: [],
-          },
-        },
       ],
     },
   ],
@@ -93,16 +95,6 @@ router.beforeEach(async (to, from, next) => {
     } catch (error) {
       console.error('预加载Store失败:', error)
     }
-  }
-
-  // 预加载指定的组件
-  const preloadComponents = (to.meta?.preloadComponents as string[]) || []
-  if (preloadComponents.length > 0) {
-    Promise.allSettled(
-      preloadComponents.map((componentName) => componentPreloader.preloadComponent(componentName)),
-    ).catch((error) => {
-      console.error('预加载组件失败:', error)
-    })
   }
 
   next()

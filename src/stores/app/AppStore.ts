@@ -6,6 +6,7 @@ import { WebSocketService } from '@/services/websocket-service'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useMessage } from 'naive-ui'
+import { config } from '@/services/tauri-api'
 
 // 代理模式类型
 export type ProxyMode = 'system' | 'tun' | 'manual'
@@ -204,11 +205,7 @@ export const useAppStore = defineStore(
     // 同步端口配置到sing-box配置文件
     const syncPortsToSingbox = async () => {
       try {
-        const { invoke } = await import('@tauri-apps/api/core')
-        await invoke('update_singbox_ports', {
-          proxyPort: proxyPort.value,
-          apiPort: apiPort.value,
-        })
+        await config.updateSingboxPorts(proxyPort.value, apiPort.value)
         console.log('端口配置已同步到sing-box配置文件')
       } catch (error) {
         console.error('同步端口配置到sing-box失败:', error)
