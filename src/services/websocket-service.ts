@@ -1,9 +1,4 @@
 import WebSocket from '@tauri-apps/plugin-websocket'
-import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
-import { useTrafficStore } from '@/stores/kernel/TrafficStore'
-import { useLogStore } from '@/stores/kernel/LogStore'
-import { useAppStore } from '@/stores/app/AppStore'
-import { useProxyStore } from '@/stores/kernel/ProxyStore'
 import mitt from '@/utils/mitt'
 
 /**
@@ -523,12 +518,6 @@ export class WebSocketService {
    */
   public async checkAllConnections(): Promise<boolean> {
     try {
-      // 初始化所有连接
-      const connectionStore = useConnectionStore()
-      const trafficStore = useTrafficStore()
-      const logStore = useLogStore()
-      const proxyStore = useProxyStore()
-
       // 增加日志输出
       console.log('开始初始化WebSocket连接...')
 
@@ -882,10 +871,12 @@ export class WebSocketService {
       this.logWs = null
       this.removeListenerFuncs['logs'] = null
 
-      // 即使WebSocket连接失败，也添加一条本地日志
+      // 即使WebSocket连接失败，也通过事件发送日志
       setTimeout(() => {
-        const logStore = useLogStore()
-        logStore.addLog('error', `日志连接失败: ${error}`)
+        mitt.emit('log-data', {
+          type: 'error',
+          payload: `日志连接失败: ${error}`,
+        })
       }, 500)
 
       return false

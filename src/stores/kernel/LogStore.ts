@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
 import { StoreCleaner } from '@/utils/memory-leak-fix'
@@ -169,16 +169,16 @@ export const useLogStore = defineStore('log', () => {
     logs.value = []
   })
 
-  // 组件卸载时清理监听器
-  onUnmounted(() => {
-    cleanupListeners()
-  })
+  // Store初始化方法
+  const initializeStore = () => {
+    // 可以在这里进行Store的初始化逻辑
+    // setupLogListener() // 由调用者决定是否调用
+  }
 
-  // 组件挂载时设置监听器（如果需要）
-  onMounted(() => {
-    // 注释掉自动设置，由调用者决定是否调用setupLogListener
-    // setupLogListener()
-  })
+  // Store清理方法
+  const cleanupStore = () => {
+    cleanupListeners()
+  }
 
   // 启动定期清理机制
   const startPeriodicCleanup = () => {
@@ -207,5 +207,7 @@ export const useLogStore = defineStore('log', () => {
     showMessage,
     setupLogListener,
     cleanupListeners,
+    initializeStore,
+    cleanupStore,
   }
 })

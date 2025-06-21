@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
 
@@ -311,15 +311,15 @@ export const useConnectionStore = defineStore(
       }
     }
 
-    // 组件挂载时初始化
-    onMounted(() => {
+    // Store初始化方法
+    const initializeStore = () => {
       setupMittListeners()
-    })
+    }
 
-    // 组件卸载时清理
-    onUnmounted(() => {
+    // Store清理方法
+    const cleanupStore = () => {
       cleanupListeners()
-    })
+    }
 
     return {
       connections,
@@ -337,6 +337,8 @@ export const useConnectionStore = defineStore(
       resetData,
       reconnectConnectionsWebSocket,
       reconnectMemoryWebSocket,
+      initializeStore,
+      cleanupStore,
     }
   },
   {

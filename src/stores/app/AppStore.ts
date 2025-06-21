@@ -1,10 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import mitt from '@/utils/mitt'
-import { WebSocketService } from '@/services/websocket-service'
-import { useTrafficStore } from '@/stores/kernel/TrafficStore'
-import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useMessage } from 'naive-ui'
 import { config } from '@/services/tauri-api'
 
@@ -77,7 +74,8 @@ export const useAppStore = defineStore(
     const proxyPort = ref(12080) // 代理端口
     const apiPort = ref(12081) // API端口
 
-    onMounted(async () => {
+    // Store初始化方法
+    const initializeStore = async () => {
       autoStartApp.value = await isEnabled()
 
       // 添加对WebSocket连接状态的监听
@@ -108,7 +106,17 @@ export const useAppStore = defineStore(
           }, 5000) // 5秒后再检查
         }
       })
-    })
+    }
+
+    // Store清理方法
+    const cleanupStore = () => {
+      mitt.off('ws-connected')
+      mitt.off('ws-disconnected')
+      if (connectionCheckTimeout) {
+        clearTimeout(connectionCheckTimeout)
+        connectionCheckTimeout = null
+      }
+    }
 
     // 应用运行状态变更
     const setRunningState = (state: boolean) => {
@@ -140,6 +148,8 @@ export const useAppStore = defineStore(
     // 启动WebSocket连接检查
     const startWebSocketCheck = async (): Promise<boolean> => {
       try {
+        // 动态导入WebSocketService避免循环依赖
+        const { WebSocketService } = await import('@/services/websocket-service')
         const wsService = WebSocketService.getInstance()
 
         // 设置API端口
@@ -237,6 +247,8 @@ export const useAppStore = defineStore(
       showInfoMessage,
       updatePorts,
       syncPortsToSingbox,
+      initializeStore,
+      cleanupStore,
     }
   },
   {

@@ -31,6 +31,12 @@ function registerStoreInitializers() {
     const { useAppStore } = await import('./app/AppStore')
     const store = useAppStore()
     storeInstances.set('app', store)
+    // 延迟初始化Store，避免循环依赖
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore().catch(console.error)
+      }
+    }, 0)
     return store
   })
 
@@ -81,6 +87,12 @@ function registerStoreInitializers() {
     const { useConnectionStore } = await import('./kernel/ConnectionStore')
     const store = useConnectionStore()
     storeInstances.set('connection', store)
+    // 延迟初始化Store，避免循环依赖
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore()
+      }
+    }, 0)
     return store
   })
 
@@ -95,6 +107,12 @@ function registerStoreInitializers() {
     const { useLogStore } = await import('./kernel/LogStore')
     const store = useLogStore()
     storeInstances.set('log', store)
+    // 延迟初始化Store，避免循环依赖
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore()
+      }
+    }, 0)
     return store
   })
 
@@ -198,10 +216,40 @@ export class StoreManager {
     // 保留核心Store，清理其他Store
     for (const [storeType] of storeInstances) {
       if (!this.coreStores.has(storeType)) {
+        // 调用Store的清理方法
+        const store = storeInstances.get(storeType)
+        if (
+          store &&
+          typeof store === 'object' &&
+          'cleanupStore' in store &&
+          typeof store.cleanupStore === 'function'
+        ) {
+          store.cleanupStore()
+        }
         storeInstances.delete(storeType)
         this.loadedStores.delete(storeType)
       }
     }
+  }
+
+  /**
+   * 清理所有Store（应用卸载时使用）
+   */
+  cleanupAll() {
+    for (const [storeType] of storeInstances) {
+      // 调用Store的清理方法
+      const store = storeInstances.get(storeType)
+      if (
+        store &&
+        typeof store === 'object' &&
+        'cleanupStore' in store &&
+        typeof store.cleanupStore === 'function'
+      ) {
+        store.cleanupStore()
+      }
+    }
+    storeInstances.clear()
+    this.loadedStores.clear()
   }
 
   /**
