@@ -1,44 +1,28 @@
 <template>
-  <div class="home-container">
-    <!-- 主状态面板 -->
-    <div class="main-status-panel">
-      <!-- 核心状态卡片 -->
-      <n-card class="status-card" :bordered="false">
-        <div class="status-content">
-          <!-- 状态指示器 -->
-          <div class="status-indicator">
-            <div
-              :class="[
-                'status-pulse',
-                {
-                  'status-running': appState.isRunning && appState.wsConnected,
-                  'status-connecting': appState.isConnecting || isStarting,
-                  'status-stopped': !appState.isRunning,
-                  'status-error': appState.isRunning && !appState.wsConnected,
-                },
-              ]"
-            >
-              <n-icon size="24">
-                <power-outline v-if="!appState.isRunning" />
-                <checkmark-circle-outline v-else-if="appState.wsConnected" />
-                <time-outline v-else-if="appState.isConnecting || isStarting" />
-                <close-circle-outline v-else />
+  <div class="modern-home">
+    <!-- 状态总览区域 -->
+    <div class="status-overview">
+      <!-- 主状态卡片 -->
+      <div class="hero-status-card">
+        <div class="status-visual">
+          <div class="status-ring" :class="statusRingClass">
+            <div class="status-inner">
+              <n-icon :size="48" :class="statusIconClass">
+                <PowerOutline v-if="!appState.isRunning" />
+                <CheckmarkCircleOutline v-else-if="appState.wsConnected" />
+                <TimeOutline v-else-if="isStarting || appState.isConnecting" />
+                <CloseCircleOutline v-else />
               </n-icon>
             </div>
           </div>
+        </div>
 
-          <!-- 状态信息 -->
-          <div class="status-info">
-            <h2 class="status-title">
-              {{ getStatusTitle() }}
-            </h2>
-            <p class="status-subtitle">
-              {{ getStatusSubtitle() }}
-            </p>
-          </div>
+        <div class="status-content">
+          <h1 class="status-title">{{ getStatusTitle() }}</h1>
+          <p class="status-description">{{ getStatusSubtitle() }}</p>
 
-          <!-- 控制按钮组 -->
-          <div class="control-buttons">
+          <!-- 控制按钮 -->
+          <div class="control-section">
             <n-button
               v-if="!appState.isRunning"
               type="primary"
@@ -46,10 +30,10 @@
               round
               :loading="isStarting"
               @click="runKernel"
-              class="control-btn start-btn"
+              class="primary-action-btn"
             >
               <template #icon>
-                <n-icon><power-outline /></n-icon>
+                <n-icon><PowerOutline /></n-icon>
               </template>
               {{ t('home.start') }}
             </n-button>
@@ -61,10 +45,10 @@
               round
               :loading="isStopping"
               @click="stopKernel"
-              class="control-btn stop-btn"
+              class="primary-action-btn"
             >
               <template #icon>
-                <n-icon><power-outline /></n-icon>
+                <n-icon><PowerOutline /></n-icon>
               </template>
               {{ t('home.stop') }}
             </n-button>
@@ -72,234 +56,183 @@
             <n-button
               v-if="appState.isRunning && !isAdmin && (currentProxyMode === 'tun' || isSwitching)"
               type="warning"
-              size="large"
+              size="medium"
               round
               :loading="isRestarting"
               @click="restartAsAdmin"
-              class="control-btn admin-btn"
+              class="secondary-action-btn"
             >
               <template #icon>
-                <n-icon><shield-outline /></n-icon>
+                <n-icon><ShieldOutline /></n-icon>
               </template>
               {{ t('home.restartAsAdmin') }}
             </n-button>
           </div>
         </div>
-      </n-card>
+      </div>
 
-      <!-- 快速统计网格 -->
-      <div class="quick-stats-grid">
-        <div class="stat-item">
-          <div class="stat-icon upload">
-            <n-icon size="20">
-              <arrow-up-outline />
-            </n-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ formattedUploadSpeed }}</div>
-            <div class="stat-label">{{ t('home.traffic.uploadSpeed') }}</div>
-          </div>
-        </div>
-
-        <div class="stat-item">
-          <div class="stat-icon download">
-            <n-icon size="20">
-              <arrow-down-outline />
-            </n-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ formattedDownloadSpeed }}</div>
-            <div class="stat-label">{{ t('home.traffic.downloadSpeed') }}</div>
-          </div>
-        </div>
-
-        <div class="stat-item">
-          <div class="stat-icon total-upload">
-            <n-icon size="20">
-              <cloud-upload-outline />
-            </n-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ formattedTotalUpload }}</div>
-            <div class="stat-label">{{ t('home.traffic.uploadTotal') }}</div>
-          </div>
-        </div>
-
-        <div class="stat-item">
-          <div class="stat-icon total-download">
-            <n-icon size="20">
-              <cloud-download-outline />
-            </n-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ formattedTotalDownload }}</div>
-            <div class="stat-label">{{ t('home.traffic.downloadTotal') }}</div>
-          </div>
-        </div>
-
-        <div class="stat-item">
-          <div class="stat-icon memory">
-            <n-icon size="20">
-              <hardware-chip-outline />
-            </n-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ formattedMemory }}</div>
-            <div class="stat-label">{{ t('home.traffic.memory') }}</div>
-          </div>
-        </div>
-
-        <div class="stat-item">
-          <div class="stat-icon connections">
-            <n-icon size="20">
-              <git-network-outline />
-            </n-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ activeConnectionsCount }}</div>
-            <div class="stat-label">{{ t('home.traffic.connectionsLabel') }}</div>
+      <!-- 快速统计卡片 -->
+      <div class="quick-stats">
+        <div class="stats-grid">
+          <div class="stat-card" v-for="stat in statsData" :key="stat.key">
+            <div class="stat-icon" :class="`stat-${stat.type}`">
+              <n-icon :size="20" :component="stat.icon" />
+            </div>
+            <div class="stat-info">
+              <div class="stat-value">{{ stat.value }}</div>
+              <div class="stat-label">{{ stat.label }}</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 配置面板 -->
-    <div class="config-panels">
-      <!-- 代理模式配置 -->
-      <n-card class="config-card proxy-config" :bordered="false">
+    <!-- 配置和图表区域 -->
+    <div class="content-grid">
+      <!-- 代理配置卡片 -->
+      <n-card class="config-card" :bordered="false">
         <template #header>
-          <div class="config-header">
-            <n-icon size="18" class="header-icon">
-              <layers-outline />
-            </n-icon>
-            <span>{{ t('home.proxyHeader.flowMode') }}</span>
+          <div class="card-header">
+            <div class="header-info">
+              <n-icon size="20" class="header-icon">
+                <LayersOutline />
+              </n-icon>
+              <span class="header-title">{{ t('home.proxyHeader.flowMode') }}</span>
+            </div>
           </div>
         </template>
-        <div class="mode-selector">
-          <n-button-group size="medium" class="mode-buttons">
-            <n-button
+
+        <div class="config-content">
+          <div class="mode-tabs">
+            <div
               v-for="mode in proxyModes"
               :key="mode.value"
-              :type="currentProxyMode === mode.value ? 'primary' : 'default'"
-              :disabled="isSwitching || isStarting || isStopping"
-              @click="onModeChange(mode.value)"
-              class="mode-btn"
+              class="mode-tab"
+              :class="{
+                active: currentProxyMode === mode.value,
+                disabled: isSwitching || isStarting || isStopping,
+              }"
+              @click="!isSwitching && !isStarting && !isStopping && onModeChange(mode.value)"
             >
-              <template #icon>
-                <n-icon>
-                  <component :is="mode.icon" />
-                </n-icon>
-              </template>
-              {{ t(mode.nameKey) }}
-            </n-button>
-          </n-button-group>
-          <div class="mode-description">
-            {{ t(`home.proxyMode.${currentProxyMode}Tip`) }}
+              <div class="tab-icon">
+                <n-icon :size="18" :component="mode.icon" />
+              </div>
+              <div class="tab-content">
+                <div class="tab-title">{{ t(mode.nameKey) }}</div>
+                <div class="tab-desc">{{ t(mode.tipKey) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </n-card>
 
-      <!-- 节点模式配置 -->
-      <n-card class="config-card node-config" :bordered="false">
+      <!-- 节点配置卡片 -->
+      <n-card class="config-card" :bordered="false">
         <template #header>
-          <div class="config-header">
-            <n-icon size="18" class="header-icon">
-              <git-network-outline />
-            </n-icon>
-            <span>{{ t('home.proxyHeader.nodeMode') }}</span>
+          <div class="card-header">
+            <div class="header-info">
+              <n-icon size="20" class="header-icon">
+                <GitNetworkOutline />
+              </n-icon>
+              <span class="header-title">{{ t('home.proxyHeader.nodeMode') }}</span>
+            </div>
           </div>
         </template>
-        <div class="mode-selector">
-          <n-button-group size="medium" class="mode-buttons">
-            <n-button
+
+        <div class="config-content">
+          <div class="mode-tabs">
+            <div
               v-for="mode in nodeProxyModes"
               :key="mode.value"
-              :type="currentNodeProxyMode === mode.value ? 'primary' : 'default'"
-              :disabled="!appState.isRunning || isSwitching || isStarting || isStopping"
-              @click="handleNodeProxyModeChange(mode.value)"
-              class="mode-btn"
+              class="mode-tab"
+              :class="{
+                active: currentNodeProxyMode === mode.value,
+                disabled: !appState.isRunning || isSwitching || isStarting || isStopping,
+              }"
+              @click="
+                appState.isRunning &&
+                !isSwitching &&
+                !isStarting &&
+                !isStopping &&
+                handleNodeProxyModeChange(mode.value)
+              "
             >
-              <template #icon>
-                <n-icon>
-                  <component :is="mode.icon" />
-                </n-icon>
-              </template>
-              {{ mode.label }}
-            </n-button>
-          </n-button-group>
-          <div class="mode-description">
-            {{ t(`proxy.mode.${currentNodeProxyMode}Description`) }}
+              <div class="tab-icon">
+                <n-icon :size="18" :component="mode.icon" />
+              </div>
+              <div class="tab-content">
+                <div class="tab-title">{{ mode.label }}</div>
+                <div class="tab-desc">{{ t(`proxy.mode.${mode.value}Description`) }}</div>
+              </div>
+            </div>
           </div>
+        </div>
+      </n-card>
+
+      <!-- 流量图表卡片 -->
+      <n-card class="chart-card" :bordered="false">
+        <template #header>
+          <div class="card-header">
+            <div class="header-info">
+              <n-icon size="20" class="header-icon">
+                <AnalyticsOutline />
+              </n-icon>
+              <span class="header-title">{{ t('home.traffic.title') }}</span>
+            </div>
+            <div class="header-stats">
+              <div class="header-stat">
+                <n-icon size="14" class="stat-icon upload">
+                  <CloudUploadOutline />
+                </n-icon>
+                <span>{{ formattedTotalUpload }}</span>
+              </div>
+              <div class="header-stat">
+                <n-icon size="14" class="stat-icon download">
+                  <CloudDownloadOutline />
+                </n-icon>
+                <span>{{ formattedTotalDownload }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <div class="chart-content">
+          <TrafficChart
+            :upload-speed="trafficStore.traffic.up"
+            :download-speed="trafficStore.traffic.down"
+          />
         </div>
       </n-card>
     </div>
-
-    <!-- 流量图表 -->
-    <n-card class="chart-card" :bordered="false">
-      <template #header>
-        <div class="chart-header">
-          <div class="header-left">
-            <n-icon size="18" class="header-icon">
-              <analytics-outline />
-            </n-icon>
-            <span>{{ t('home.traffic.title') }}</span>
-          </div>
-          <div class="total-stats">
-            <div class="total-item">
-              <n-icon size="14" class="total-icon">
-                <cloud-upload-outline />
-              </n-icon>
-              <span>{{ formattedTotalUpload }}</span>
-            </div>
-            <div class="total-item">
-              <n-icon size="14" class="total-icon">
-                <cloud-download-outline />
-              </n-icon>
-              <span>{{ formattedTotalDownload }}</span>
-            </div>
-          </div>
-        </div>
-      </template>
-      <div class="chart-container">
-        <TrafficChart
-          :upload-speed="trafficStore.traffic.up"
-          :download-speed="trafficStore.traffic.down"
-        />
-      </div>
-    </n-card>
 
     <!-- 节点模式切换确认对话框 -->
     <n-modal
       v-model:show="showNodeModeChangeModal"
       preset="dialog"
-      :title="`${t('proxy.switchTo')}${targetNodeProxyMode ? getNodeProxyModeText(targetNodeProxyMode) : ''}`"
-      class="node-mode-modal"
+      :title="t('proxy.confirmSwitch')"
+      class="mode-change-modal"
     >
-      <template #header>
-        <div class="modal-header">
-          <n-icon size="22" class="modal-icon">
-            <information-circle-outline />
+      <div class="modal-content">
+        <div class="modal-icon">
+          <n-icon size="24" color="#f0a020">
+            <InformationCircleOutline />
           </n-icon>
-          <span
-            >{{ t('proxy.switchTo')
-            }}{{ targetNodeProxyMode ? getNodeProxyModeText(targetNodeProxyMode) : '' }}</span
-          >
         </div>
-      </template>
-      <div class="modal-content">{{ t('proxy.switchModeConfirm') }}</div>
+        <div class="modal-text">
+          {{ t('proxy.switchModeConfirm') }}
+        </div>
+      </div>
       <template #action>
-        <div class="modal-footer">
-          <n-space justify="end">
-            <n-button @click="showNodeModeChangeModal = false">{{ t('common.cancel') }}</n-button>
-            <n-button
-              type="primary"
-              :loading="isChangingNodeMode"
-              @click="confirmNodeProxyModeChange"
-            >
-              {{ t('proxy.confirmSwitch') }}
-            </n-button>
-          </n-space>
-        </div>
+        <n-space justify="end">
+          <n-button @click="showNodeModeChangeModal = false">{{ t('common.cancel') }}</n-button>
+          <n-button
+            type="primary"
+            :loading="isChangingNodeMode"
+            @click="confirmNodeProxyModeChange"
+          >
+            {{ t('proxy.confirmSwitch') }}
+          </n-button>
+        </n-space>
       </template>
     </n-modal>
   </div>
@@ -307,15 +240,13 @@
 
 <script setup lang="ts">
 import { useMessage, useDialog } from 'naive-ui'
-import { computed, ref, onMounted, onUnmounted, watch, h } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
-import type { Component as ComponentType } from 'vue'
 import mitt from '@/utils/mitt'
 import {
   PowerOutline,
-  RepeatOutline,
   ArrowUpOutline,
   ArrowDownOutline,
   HardwareChipOutline,
@@ -326,18 +257,15 @@ import {
   CloudDownloadOutline,
   TimeOutline,
   GitNetworkOutline,
-  ShieldCheckmarkOutline,
   ShieldOutline,
-  WifiOutline,
   CloseCircleOutline,
   SettingsOutline,
   InformationCircleOutline,
-  ChevronDownOutline,
   LayersOutline,
-  RefreshOutline,
   CheckmarkCircleOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores/app/AppStore'
+import { useThemeStore } from '@/stores/app/ThemeStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
@@ -346,35 +274,29 @@ import { ProxyService } from '@/services/proxy-service'
 import { useI18n } from 'vue-i18n'
 import { tauriApi } from '@/services/tauri-api'
 
-// 导入新拆分的组件
-import StatusCard from '@/components/home/StatusCard.vue'
-import ProxyModeCard from '@/components/home/ProxyModeCard.vue'
-import TrafficStatsCard from '@/components/home/TrafficStatsCard.vue'
-
 const message = useMessage()
 const dialog = useDialog()
 const appState = useAppStore()
+const themeStore = useThemeStore()
 const kernelStore = useKernelStore()
 const trafficStore = useTrafficStore()
 const connectionStore = useConnectionStore()
 const proxyService = ProxyService.getInstance()
+const { t } = useI18n()
+
+// 状态变量
 const isStarting = ref(false)
 const isStopping = ref(false)
 const isSwitching = ref(false)
 const isRestarting = ref(false)
-const { t } = useI18n()
 const isAdmin = ref(false)
-
-// 代理模式选择
 const currentProxyMode = ref(appState.proxyMode || 'system')
-
-// 节点代理模式选择
 const currentNodeProxyMode = ref('rule')
 const targetNodeProxyMode = ref('')
 const showNodeModeChangeModal = ref(false)
 const isChangingNodeMode = ref(false)
 
-// 定义代理模式数据
+// 代理模式配置
 const proxyModes = [
   {
     value: 'system',
@@ -396,114 +318,107 @@ const proxyModes = [
   },
 ]
 
-// 定义节点代理模式选项
 const nodeProxyModes = [
   {
     label: t('proxy.mode.global'),
     value: 'global',
     icon: GlobeOutline,
-    nameKey: 'proxy.mode.global',
   },
   {
     label: t('proxy.mode.rule'),
     value: 'rule',
     icon: LayersOutline,
-    nameKey: 'proxy.mode.rule',
   },
 ]
 
-// 格式化流量数据的computed属性
-const formattedUploadSpeed = computed(() => {
-  const value = Number(trafficStore.traffic.up) || 0
-  return formatBandwidth(value)
+// 计算属性
+const route = useRoute()
+const isRouteActive = computed(() => route.path === '/')
+
+const statusRingClass = computed(() => {
+  if (isStarting.value || appState.isConnecting) return 'status-connecting'
+  if (appState.isRunning && appState.wsConnected) return 'status-running'
+  if (appState.isRunning && !appState.wsConnected) return 'status-error'
+  return 'status-stopped'
 })
 
-const formattedDownloadSpeed = computed(() => {
-  const value = Number(trafficStore.traffic.down) || 0
-  return formatBandwidth(value)
+const statusIconClass = computed(() => {
+  if (isStarting.value || appState.isConnecting) return 'icon-connecting'
+  if (appState.isRunning && appState.wsConnected) return 'icon-running'
+  if (appState.isRunning && !appState.wsConnected) return 'icon-error'
+  return 'icon-stopped'
 })
 
-const formattedTotalUpload = computed(() => {
-  const value = Number(trafficStore.traffic.totalUp) || 0
-  return formatBandwidth(value)
-})
-
-const formattedTotalDownload = computed(() => {
-  const value = Number(trafficStore.traffic.totalDown) || 0
-  return formatBandwidth(value)
-})
-
+// 格式化数据
+const formattedUploadSpeed = computed(() => formatBandwidth(Number(trafficStore.traffic.up) || 0))
+const formattedDownloadSpeed = computed(() =>
+  formatBandwidth(Number(trafficStore.traffic.down) || 0),
+)
+const formattedTotalUpload = computed(() =>
+  formatBandwidth(Number(trafficStore.traffic.totalUp) || 0),
+)
+const formattedTotalDownload = computed(() =>
+  formatBandwidth(Number(trafficStore.traffic.totalDown) || 0),
+)
 const formattedMemory = computed(() => {
   if (!isRouteActive.value) return '0 B'
   return formatBandwidth(connectionStore.memory?.inuse || 0)
 })
-
-// 状态相关方法
-const getStatusTitle = () => {
-  if (isStarting.value || appState.isConnecting) {
-    return t('home.status.starting')
-  }
-  if (isStopping.value) {
-    return t('home.status.stopping')
-  }
-  if (appState.isRunning && appState.wsConnected) {
-    return t('home.status.running')
-  }
-  if (appState.isRunning && !appState.wsConnected) {
-    return t('home.status.disconnected')
-  }
-  return t('home.status.stopped')
-}
-
-const getStatusSubtitle = () => {
-  if (isStarting.value || appState.isConnecting) {
-    return t('home.status.startingDesc')
-  }
-  if (isStopping.value) {
-    return t('home.status.stoppingDesc')
-  }
-  if (appState.isRunning && appState.wsConnected) {
-    return t('home.status.runningDesc')
-  }
-  if (appState.isRunning && !appState.wsConnected) {
-    return t('home.status.disconnectedDesc')
-  }
-  return t('home.status.stoppedDesc')
-}
-
-// 监听路由可见性变化
-const route = useRoute()
-const isRouteActive = computed(() => {
-  return route.path === '/'
-})
-
-// 添加加载状态
-const isTrafficLoading = ref(false)
-const isConnectionLoading = ref(false)
-
-// 保留计算属性的可见性检查，但简化逻辑
 const activeConnectionsCount = computed(() => {
   if (!isRouteActive.value) return '0'
   return connectionStore.connections.length.toString()
 })
 
-// 监听appStore中代理模式变化，更新当前选中状态
-watch(
-  () => appState.proxyMode,
-  (newMode) => {
-    if (newMode !== currentProxyMode.value) {
-      currentProxyMode.value = newMode
-    }
+// 统计数据
+const statsData = computed(() => [
+  {
+    key: 'upload',
+    type: 'upload',
+    icon: ArrowUpOutline,
+    value: formattedUploadSpeed.value,
+    label: t('home.traffic.uploadSpeed'),
   },
-)
+  {
+    key: 'download',
+    type: 'download',
+    icon: ArrowDownOutline,
+    value: formattedDownloadSpeed.value,
+    label: t('home.traffic.downloadSpeed'),
+  },
+  {
+    key: 'memory',
+    type: 'memory',
+    icon: HardwareChipOutline,
+    value: formattedMemory.value,
+    label: t('home.traffic.memory'),
+  },
+  {
+    key: 'connections',
+    type: 'connections',
+    icon: GitNetworkOutline,
+    value: activeConnectionsCount.value,
+    label: t('home.traffic.connectionsLabel'),
+  },
+])
 
-// 为节点代理模式添加监听
-watch(currentNodeProxyMode, (newMode, oldMode) => {
-  if (newMode !== oldMode && oldMode) {
-    handleNodeProxyModeChange(newMode)
-  }
-})
+// 状态相关方法
+const getStatusTitle = () => {
+  if (isStarting.value || appState.isConnecting) return t('home.status.starting')
+  if (isStopping.value) return t('home.status.stopping')
+  if (appState.isRunning && appState.wsConnected) return t('home.status.running')
+  if (appState.isRunning && !appState.wsConnected) return t('home.status.disconnected')
+  return t('home.status.stopped')
+}
 
+const getStatusSubtitle = () => {
+  if (isStarting.value || appState.isConnecting) return t('home.status.startingDesc')
+  if (isStopping.value) return t('home.status.stoppingDesc')
+  if (appState.isRunning && appState.wsConnected) return t('home.status.runningDesc')
+  if (appState.isRunning && !appState.wsConnected) return t('home.status.disconnectedDesc')
+  return t('home.status.stoppedDesc')
+}
+
+// 核心操作方法 - 补充完整的功能逻辑
 const runKernel = async () => {
   try {
     isStarting.value = true
@@ -732,6 +647,17 @@ const checkAdminStatus = async () => {
   }
 }
 
+// 以管理员权限重启应用
+const restartAsAdmin = async () => {
+  isRestarting.value = true
+  try {
+    await tauriApi.system.restartAsAdmin()
+  } catch (error) {
+    message.error(`${t('notification.restartFailed')}: ${error}`)
+    isRestarting.value = false
+  }
+}
+
 // 在路由可见时重新设置监听
 const setupListeners = async () => {
   try {
@@ -741,6 +667,9 @@ const setupListeners = async () => {
       connectionStore.cleanupListeners()
 
       // 设置监听器，添加等待确保setup完成
+      const isTrafficLoading = ref(false)
+      const isConnectionLoading = ref(false)
+
       isTrafficLoading.value = true
       isConnectionLoading.value = true
 
@@ -772,8 +701,6 @@ const setupListeners = async () => {
     }
   } catch (error) {
     console.error('设置监听器失败:', error)
-    isTrafficLoading.value = false
-    isConnectionLoading.value = false
   }
 }
 
@@ -801,9 +728,6 @@ const getNodeProxyModeText = (mode: string): string => {
   return modeMap[mode] || t('proxy.mode.unknown')
 }
 
-/**
- * 处理节点代理模式变更
- */
 const handleNodeProxyModeChange = (key: string) => {
   if (key === currentNodeProxyMode.value) return
 
@@ -823,9 +747,6 @@ const handleNodeProxyModeChange = (key: string) => {
   })
 }
 
-/**
- * 确认切换节点代理模式
- */
 const confirmNodeProxyModeChange = async () => {
   if (!targetNodeProxyMode.value) return
 
@@ -845,19 +766,17 @@ const confirmNodeProxyModeChange = async () => {
   }
 }
 
-/**
- * 以管理员权限重启应用
- */
-const restartAsAdmin = async () => {
-  isRestarting.value = true
-  try {
-    await tauriApi.system.restartAsAdmin()
-  } catch (error) {
-    message.error(`${t('notification.restartFailed')}: ${error}`)
-    isRestarting.value = false
-  }
-}
+// 监听器
+watch(
+  () => appState.proxyMode,
+  (newMode) => {
+    if (newMode !== currentProxyMode.value) {
+      currentProxyMode.value = newMode
+    }
+  },
+)
 
+// 生命周期
 onMounted(async () => {
   // 更新当前代理模式
   currentProxyMode.value = appState.proxyMode
@@ -904,581 +823,544 @@ onUnmounted(() => {
 
   // 清理连接监听器
   connectionStore.cleanupListeners()
-
-  // 清理加载状态计时器（如果有的话）
-  isTrafficLoading.value = false
-  isConnectionLoading.value = false
 })
 </script>
 
 <style scoped>
-.home-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+.modern-home {
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 24px;
-  animation: fade-in 0.5s ease-out;
+  min-height: 100%;
+  overflow-x: hidden;
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* 状态总览区域 */
+.status-overview {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 28px;
+  margin-bottom: 8px;
+  align-items: start;
 }
 
-/* 主状态面板 */
-.main-status-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.status-card {
+/* 主状态卡片 */
+.hero-status-card {
+  background: var(--n-card-color);
   border-radius: 20px;
-  background: linear-gradient(
-    135deg,
-    var(--card-color) 0%,
-    rgba(var(--primary-color-rgb), 0.02) 100%
-  );
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(16px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-}
-
-.status-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
-}
-
-.status-content {
+  padding: 32px;
   display: flex;
   align-items: center;
-  padding: 32px;
   gap: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--n-border-color);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.status-indicator {
-  position: relative;
+.hero-status-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.status-visual {
   flex-shrink: 0;
 }
 
-.status-pulse {
-  width: 80px;
-  height: 80px;
+.status-ring {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.status-ring.status-running {
+  background: conic-gradient(from 0deg, #10b981, #059669, #10b981);
+  animation: rotate 3s linear infinite;
+}
+
+.status-ring.status-connecting {
+  background: conic-gradient(from 0deg, #f59e0b, #d97706, #f59e0b);
+  animation: rotate 2s linear infinite;
+}
+
+.status-ring.status-error {
+  background: conic-gradient(from 0deg, #ef4444, #dc2626, #ef4444);
+}
+
+.status-ring.status-stopped {
+  background: v-bind('themeStore.isDark ? "rgba(75, 85, 99, 0.3)" : "rgba(156, 163, 175, 0.3)"');
+}
+
+.status-inner {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  background: var(--n-card-color);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(8px);
-  color: white;
-  font-weight: 600;
 }
 
-.status-pulse::before {
-  content: '';
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  opacity: 0;
-  transition: all 0.4s ease;
+.icon-running {
+  color: #10b981;
+}
+.icon-connecting {
+  color: #f59e0b;
+}
+.icon-error {
+  color: #ef4444;
+}
+.icon-stopped {
+  color: v-bind('themeStore.isDark ? "#9CA3AF" : "#6B7280"');
 }
 
-.status-running {
-  background: linear-gradient(135deg, #18a058, #36ad6a);
-  box-shadow: 0 8px 24px rgba(24, 160, 88, 0.3);
-}
-
-.status-running::before {
-  background: linear-gradient(135deg, #18a058, #36ad6a);
-  opacity: 0.2;
-  animation: pulse 2s infinite;
-}
-
-.status-connecting {
-  background: linear-gradient(135deg, #f0a020, #faad14);
-  box-shadow: 0 8px 24px rgba(240, 160, 32, 0.3);
-}
-
-.status-connecting::before {
-  background: linear-gradient(135deg, #f0a020, #faad14);
-  opacity: 0.2;
-  animation: pulse 1.5s infinite;
-}
-
-.status-stopped {
-  background: linear-gradient(135deg, #666, #888);
-  box-shadow: 0 8px 24px rgba(102, 102, 102, 0.2);
-}
-
-.status-error {
-  background: linear-gradient(135deg, #d03050, #e84749);
-  box-shadow: 0 8px 24px rgba(208, 48, 80, 0.3);
-}
-
-.status-error::before {
-  background: linear-gradient(135deg, #d03050, #e84749);
-  opacity: 0.2;
-  animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.2;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.1;
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-.status-info {
+.status-content {
   flex: 1;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .status-title {
   font-size: 28px;
   font-weight: 700;
-  margin: 0 0 8px 0;
-  color: var(--text-color);
-  letter-spacing: -0.5px;
-}
-
-.status-subtitle {
-  font-size: 16px;
-  color: var(--text-color-2);
   margin: 0;
-  opacity: 0.8;
+  color: var(--n-text-color);
+  line-height: 1.2;
 }
 
-.control-buttons {
+.status-description {
+  font-size: 16px;
+  color: var(--n-text-color-2);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.control-section {
   display: flex;
   gap: 12px;
-  flex-wrap: wrap;
+  align-items: center;
 }
 
-.control-btn {
-  min-width: 140px;
-  height: 48px;
-  border-radius: 24px;
-  font-weight: 600;
-  font-size: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  border: none !important;
+.primary-action-btn {
+  min-width: 120px;
+  height: 44px;
 }
 
-.control-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+.secondary-action-btn {
+  height: 36px;
 }
 
-.start-btn {
-  background: linear-gradient(135deg, #4080ff, #2266dd) !important;
-  color: white !important;
+/* 快速统计 - 优化布局 */
+.quick-stats {
+  flex-shrink: 0;
+  width: 320px;
 }
 
-.start-btn :deep(.n-button__content) {
-  color: white !important;
-}
-
-.start-btn :deep(.n-icon) {
-  color: white !important;
-}
-
-.stop-btn {
-  background: linear-gradient(135deg, #f53f3f, #cb2a2a) !important;
-  color: white !important;
-}
-
-.stop-btn :deep(.n-button__content) {
-  color: white !important;
-}
-
-.stop-btn :deep(.n-icon) {
-  color: white !important;
-}
-
-.admin-btn {
-  background: linear-gradient(135deg, #ff7d00, #d66600) !important;
-  color: white !important;
-}
-
-.admin-btn :deep(.n-button__content) {
-  color: white !important;
-}
-
-.admin-btn :deep(.n-icon) {
-  color: white !important;
-}
-
-/* 快速统计网格 */
-.quick-stats-grid {
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
-@media (min-width: 1200px) {
-  .quick-stats-grid {
-    grid-template-columns: repeat(6, 1fr);
-  }
-}
-
-@media (min-width: 900px) and (max-width: 1199px) {
-  .quick-stats-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-.stat-item {
-  background: var(--card-color);
+.stat-card {
+  background: var(--n-card-color);
   border-radius: 16px;
-  padding: 20px;
+  padding: 18px 16px;
+  border: 1px solid var(--n-border-color);
   display: flex;
   align-items: center;
-  gap: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-  min-width: 0;
+  gap: 14px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 72px;
 }
 
-.stat-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  border-color: rgba(var(--primary-color-rgb), 0.2);
+.stat-card:hover {
+  border-color: var(--n-primary-color);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .stat-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  position: relative;
-  overflow: hidden;
 }
 
-.stat-icon::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: inherit;
-  opacity: 0.1;
-  border-radius: inherit;
+/* 改进统计图标配色 - 增强对比度 */
+.stat-upload {
+  background: v-bind('themeStore.isDark ? "rgba(248, 113, 113, 0.2)" : "rgba(239, 68, 68, 0.1)"');
+  color: v-bind('themeStore.isDark ? "#F87171" : "#DC2626"');
 }
 
-.upload {
-  background: linear-gradient(135deg, #f53f3f, #cb2a2a);
-  color: white;
+.stat-download {
+  background: v-bind('themeStore.isDark ? "rgba(96, 165, 250, 0.2)" : "rgba(59, 130, 246, 0.1)"');
+  color: v-bind('themeStore.isDark ? "#60A5FA" : "#2563EB"');
 }
 
-.download {
-  background: linear-gradient(135deg, #4080ff, #2266dd);
-  color: white;
+.stat-memory {
+  background: v-bind('themeStore.isDark ? "rgba(196, 181, 253, 0.2)" : "rgba(168, 85, 247, 0.1)"');
+  color: v-bind('themeStore.isDark ? "#C4B5FD" : "#7C3AED"');
 }
 
-.total-upload {
-  background: linear-gradient(135deg, #ff7d00, #d66600);
-  color: white;
+.stat-connections {
+  background: v-bind('themeStore.isDark ? "rgba(74, 222, 128, 0.2)" : "rgba(34, 197, 94, 0.1)"');
+  color: v-bind('themeStore.isDark ? "#4ADE80" : "#16A34A"');
 }
 
-.total-download {
-  background: linear-gradient(135deg, #00b42a, #009a1a);
-  color: white;
-}
-
-.memory {
-  background: linear-gradient(135deg, #909399, #7b7e83);
-  color: white;
-}
-
-.connections {
-  background: linear-gradient(135deg, #ff7d00, #d66600);
-  color: white;
-}
-
-.stat-content {
+.stat-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-color);
-  margin-bottom: 4px;
-  letter-spacing: -0.3px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--n-text-color);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-label {
-  font-size: 13px;
-  color: var(--text-color-2);
-  opacity: 0.8;
-  font-weight: 500;
+  font-size: 11px;
+  color: var(--n-text-color-3);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
-/* 配置面板 */
-.config-panels {
+/* 内容网格 */
+.content-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
 }
 
-.config-card {
-  border-radius: 16px;
-  background: var(--card-color);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-}
-
-.config-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
-
-.config-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--text-color);
-}
-
-.header-icon {
-  color: var(--primary-color);
-  opacity: 0.8;
-}
-
-.mode-selector {
-  padding: 0;
-}
-
-.mode-buttons {
-  width: 100%;
-  margin-bottom: 16px;
-}
-
-.mode-buttons :deep(.n-button-group) {
-  width: 100%;
-}
-
-.mode-btn {
-  flex: 1;
-  border-radius: 8px !important;
-  font-weight: 500;
-  height: 40px;
-  transition: all 0.2s ease;
-}
-
-.mode-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.mode-description {
-  font-size: 13px;
-  color: var(--text-color-2);
-  line-height: 1.5;
-  opacity: 0.8;
-  padding: 12px 16px;
-  background: rgba(var(--primary-color-rgb), 0.04);
-  border-radius: 8px;
-  margin-top: 8px;
-}
-
-/* 图表卡片 */
 .chart-card {
-  border-radius: 16px;
-  background: var(--card-color);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
+  grid-column: span 2;
 }
 
-.chart-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+/* 卡片样式 */
+.config-card,
+.chart-card {
+  border-radius: 16px !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid var(--n-border-color) !important;
 }
 
-.chart-header {
+.card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-.header-left {
+.header-info {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-weight: 600;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.header-icon {
+  color: var(--n-primary-color);
+  flex-shrink: 0;
+}
+
+.header-title {
   font-size: 16px;
-  color: var(--text-color);
+  font-weight: 600;
+  color: var(--n-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.total-stats {
+.header-stats {
   display: flex;
-  gap: 20px;
+  gap: 16px;
+  flex-shrink: 0;
 }
 
-.total-item {
+.header-stat {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: var(--text-color-2);
-  font-weight: 500;
+  color: var(--n-text-color-2);
 }
 
-.total-icon {
-  opacity: 0.7;
+.header-stat .stat-icon.upload {
+  color: v-bind('themeStore.isDark ? "#F87171" : "#DC2626"');
 }
 
-.chart-container {
-  height: 200px;
-  margin-top: 16px;
+.header-stat .stat-icon.download {
+  color: v-bind('themeStore.isDark ? "#60A5FA" : "#2563EB"');
 }
 
-/* 确认对话框 */
-.node-mode-modal {
-  max-width: 95vw;
-  border-radius: 16px;
+/* 配置内容 - 改进配色 */
+.config-content {
+  padding: 8px 0;
 }
 
-.modal-header {
+.mode-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mode-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  color: var(--n-text-color);
+  min-width: 0;
+}
+
+.mode-tab:hover:not(.disabled) {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)"');
+  border-color: var(--n-border-color);
+}
+
+.mode-tab.active {
+  background: v-bind('themeStore.isDark ? "rgba(100, 108, 255, 0.2)" : "rgba(100, 108, 255, 0.1)"');
+  border-color: var(--n-primary-color);
+  color: var(--n-primary-color);
+}
+
+.mode-tab.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tab-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.06)"');
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mode-tab.active .tab-icon {
+  background: var(--n-primary-color);
+  color: white;
+  box-shadow: 0 2px 8px rgba(100, 108, 255, 0.3);
+}
+
+.mode-tab.active .tab-icon .n-icon {
+  color: white !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.tab-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.tab-title {
+  font-size: 14px;
   font-weight: 600;
+  margin-bottom: 4px;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-desc {
+  font-size: 12px;
+  color: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 0, 0, 0.6)"');
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* 图表内容 */
+.chart-content {
+  height: 280px;
+  padding: 16px 0;
+}
+
+/* 模态框样式 */
+.modal-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
 }
 
 .modal-icon {
-  color: var(--primary-color);
+  flex-shrink: 0;
 }
 
-.modal-content {
-  margin: 16px 0;
+.modal-text {
+  color: var(--n-text-color-2);
   line-height: 1.6;
-  color: var(--text-color-2);
 }
-
-.modal-footer {
-  margin-top: 8px;
-}
-
-/* 深色模式样式会通过CSS变量自动应用，删除手动适配代码 */
 
 /* 响应式设计 */
-@media (max-width: 768px) {
-  .home-container {
-    padding: 16px 12px;
-    gap: 20px;
-  }
-
-  .status-content {
-    flex-direction: column;
-    text-align: center;
-    padding: 24px 20px;
-    gap: 20px;
-  }
-
-  .quick-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-
-  .stat-item {
-    padding: 16px;
-    flex-direction: column;
-    text-align: center;
-    gap: 12px;
-  }
-
-  .config-panels {
+@media (max-width: 1200px) {
+  .content-grid {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 20px;
   }
 
-  .control-buttons {
-    width: 100%;
-    justify-content: center;
+  .chart-card {
+    grid-column: span 1;
   }
 
-  .control-btn {
-    min-width: 120px;
-    height: 44px;
-    font-size: 14px;
-  }
-
-  .status-title {
-    font-size: 24px;
-  }
-
-  .status-subtitle {
-    font-size: 14px;
-  }
-
-  .chart-container {
-    height: 160px;
+  .config-card {
+    min-width: 0;
   }
 }
 
-@media (max-width: 640px) {
-  .quick-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 1024px) {
+  .quick-stats {
+    width: 300px;
+  }
+
+  .stats-grid {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 896px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .header-stats {
+    gap: 12px;
+    font-size: 12px;
+  }
+
+  .mode-tab {
+    padding: 14px;
     gap: 10px;
   }
 
-  .stat-item {
-    padding: 12px;
+  .tab-icon {
+    width: 32px;
+    height: 32px;
   }
 
-  .stat-icon {
-    width: 40px;
-    height: 40px;
+  .tab-title {
+    font-size: 13px;
   }
 
-  .stat-value {
-    font-size: 16px;
-  }
-
-  .stat-label {
-    font-size: 12px;
+  .tab-desc {
+    font-size: 11px;
+    -webkit-line-clamp: 1;
   }
 }
 
-@media (max-width: 480px) {
-  .quick-stats-grid {
+@media (max-width: 768px) {
+  .status-overview {
     grid-template-columns: 1fr;
+    gap: 20px;
   }
 
-  .total-stats {
+  .quick-stats {
+    width: 100%;
+  }
+
+  .hero-status-card {
     flex-direction: column;
+    text-align: center;
+    gap: 24px;
+    padding: 24px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  .stat-card {
+    flex-direction: column;
+    padding: 14px 10px;
+    text-align: center;
+    min-height: 80px;
     gap: 8px;
-    align-items: flex-end;
+  }
+
+  .stat-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .stat-value {
+    font-size: 14px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+  }
+
+  .config-card,
+  .chart-card {
+    margin: 0 -8px;
+    border-radius: 12px !important;
+  }
+
+  .mode-tab {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .tab-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .tab-title {
+    font-size: 12px;
+  }
+
+  .tab-desc {
+    font-size: 10px;
+  }
+
+  .header-title {
+    font-size: 14px;
   }
 }
 </style>

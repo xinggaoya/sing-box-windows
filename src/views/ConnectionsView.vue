@@ -1,21 +1,25 @@
 <template>
   <div class="connections-view">
-    <!-- 主要内容区 -->
-    <div class="page-container">
-      <!-- 页面标题栏 -->
-      <div class="page-header">
-        <div class="header-content">
-          <div class="title-section">
-            <h1 class="page-title">{{ t('connections.title') }}</h1>
-            <div class="title-divider"></div>
-          </div>
+    <!-- 英雄式页面头部 -->
+    <div class="hero-header">
+      <div class="hero-content">
+        <div class="hero-icon">
+          <n-icon size="48">
+            <link-outline />
+          </n-icon>
+        </div>
+        <div class="hero-text">
+          <h1 class="hero-title">{{ t('connections.title') }}</h1>
+          <p class="hero-subtitle">{{ t('connections.subtitle') }}</p>
+        </div>
+        <div class="hero-action">
           <n-button
             type="primary"
             @click="refreshConnections"
             :loading="loading"
-            class="refresh-btn"
             size="large"
             round
+            class="hero-btn"
           >
             <template #icon>
               <n-icon><refresh-outline /></n-icon>
@@ -24,127 +28,156 @@
           </n-button>
         </div>
       </div>
+    </div>
 
-      <!-- 统计卡片区 -->
-      <div class="stats-section">
-        <div class="stat-card active-connections">
-          <div class="stat-icon">
-            <n-icon size="28"><link-outline /></n-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-label">{{ t('connections.activeConnections') }}</div>
-            <div class="stat-value">
-              <n-number-animation ref="activeCountRef" :from="0" :to="connections.length" />
-            </div>
-          </div>
+    <!-- 统计卡片网格 -->
+    <div class="stats-grid">
+      <div class="stat-card active-connections">
+        <div class="stat-icon">
+          <n-icon size="24"><link-outline /></n-icon>
         </div>
-
-        <div class="stat-card upload-stats">
-          <div class="stat-icon">
-            <n-icon size="28"><arrow-up-outline /></n-icon>
+        <div class="stat-content">
+          <div class="stat-value">
+            <n-number-animation ref="activeCountRef" :from="0" :to="connections.length" />
           </div>
-          <div class="stat-content">
-            <div class="stat-label">{{ t('connections.uploadTotal') }}</div>
-            <div class="stat-value">{{ formatBytes(connectionsTotal.upload) }}</div>
-          </div>
-        </div>
-
-        <div class="stat-card download-stats">
-          <div class="stat-icon">
-            <n-icon size="28"><arrow-down-outline /></n-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-label">{{ t('connections.downloadTotal') }}</div>
-            <div class="stat-value">{{ formatBytes(connectionsTotal.download) }}</div>
-          </div>
+          <div class="stat-label">{{ t('connections.activeConnections') }}</div>
         </div>
       </div>
 
-      <!-- 搜索筛选区 -->
-      <div class="filter-section">
-        <div class="filter-card">
-          <div class="filter-row">
-            <n-input
-              v-model:value="searchQuery"
-              placeholder="搜索连接..."
-              clearable
-              class="search-input"
-              size="large"
-            >
-              <template #prefix>
-                <n-icon><search-outline /></n-icon>
-              </template>
-            </n-input>
-
-            <n-select
-              v-model:value="networkFilter"
-              :options="networkOptions"
-              placeholder="网络类型"
-              clearable
-              class="filter-select"
-              size="large"
-            />
-
-            <n-select
-              v-model:value="ruleFilter"
-              :options="ruleOptions"
-              placeholder="规则筛选"
-              clearable
-              class="filter-select"
-              size="large"
-            />
-          </div>
-
-          <!-- 筛选统计 -->
-          <div class="filter-stats">
-            <n-tag type="default" size="small" class="stat-tag">
-              总计: {{ connections.length }}
-            </n-tag>
-            <n-tag
-              v-if="searchQuery || networkFilter || ruleFilter"
-              type="primary"
-              size="small"
-              class="stat-tag"
-            >
-              匹配: {{ filteredConnections.length }}
-            </n-tag>
-          </div>
+      <div class="stat-card upload-stats">
+        <div class="stat-icon">
+          <n-icon size="24"><arrow-up-outline /></n-icon>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ formatBytes(connectionsTotal.upload) }}</div>
+          <div class="stat-label">{{ t('connections.uploadTotal') }}</div>
         </div>
       </div>
 
-      <!-- 连接列表区 -->
-      <div class="connections-section">
-        <n-spin :show="loading" class="table-container">
-          <div v-if="filteredConnections.length > 0" class="table-wrapper">
-            <n-data-table
-              :columns="columns"
-              :data="filteredConnections"
-              :pagination="pagination"
-              :bordered="false"
-              :max-height="500"
-              striped
-              class="connections-table"
-            />
-          </div>
-          <div v-else class="empty-state">
-            <div class="empty-content">
-              <n-icon size="48" class="empty-icon">
-                <link-outline />
-              </n-icon>
-              <h3 class="empty-title">
-                {{ searchQuery || networkFilter || ruleFilter ? '无匹配连接' : '暂无连接' }}
-              </h3>
-              <p class="empty-description">
-                {{
-                  searchQuery || networkFilter || ruleFilter
-                    ? '尝试调整筛选条件'
-                    : '当前没有活跃的网络连接'
-                }}
-              </p>
-            </div>
-          </div>
-        </n-spin>
+      <div class="stat-card download-stats">
+        <div class="stat-icon">
+          <n-icon size="24"><arrow-down-outline /></n-icon>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ formatBytes(connectionsTotal.download) }}</div>
+          <div class="stat-label">{{ t('connections.downloadTotal') }}</div>
+        </div>
       </div>
+
+      <div class="stat-card memory-stats">
+        <div class="stat-icon">
+          <n-icon size="24"><hardware-chip-outline /></n-icon>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ filteredConnections.length }}</div>
+          <div class="stat-label">{{ t('connections.matchedConnections') }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 搜索筛选卡片 -->
+    <div class="filter-card">
+      <div class="filter-header">
+        <h3 class="filter-title">{{ t('connections.searchAndFilter') }}</h3>
+        <div class="filter-stats">
+          <n-tag type="info" size="small" round>
+            {{ t('connections.totalCount', { count: connections.length }) }}
+          </n-tag>
+          <n-tag
+            v-if="searchQuery || networkFilter || ruleFilter"
+            type="success"
+            size="small"
+            round
+          >
+            {{ t('connections.matchingCount', { count: filteredConnections.length }) }}
+          </n-tag>
+        </div>
+      </div>
+
+      <div class="filter-controls">
+        <n-input
+          v-model:value="searchQuery"
+          :placeholder="t('connections.searchPlaceholder')"
+          clearable
+          size="large"
+          class="search-input"
+        >
+          <template #prefix>
+            <n-icon><search-outline /></n-icon>
+          </template>
+        </n-input>
+
+        <div class="filter-selects">
+          <n-select
+            v-model:value="networkFilter"
+            :options="networkOptions"
+            :placeholder="t('connections.networkTypeFilter')"
+            clearable
+            size="large"
+            class="filter-select"
+          />
+
+          <n-select
+            v-model:value="ruleFilter"
+            :options="ruleOptions"
+            :placeholder="t('connections.ruleFilter')"
+            clearable
+            size="large"
+            class="filter-select"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- 连接表格卡片 -->
+    <div class="table-card">
+      <n-spin :show="loading">
+        <div v-if="filteredConnections.length > 0" class="table-container">
+          <n-data-table
+            :columns="columns"
+            :data="filteredConnections"
+            :pagination="pagination"
+            :bordered="false"
+            :max-height="500"
+            striped
+            class="connections-table"
+          />
+        </div>
+        <div v-else class="empty-state">
+          <div class="empty-icon">
+            <n-icon size="64">
+              <link-outline />
+            </n-icon>
+          </div>
+          <h3 class="empty-title">
+            {{
+              searchQuery || networkFilter || ruleFilter
+                ? t('connections.noMatchingConnections2')
+                : t('connections.noActiveConnections')
+            }}
+          </h3>
+          <p class="empty-description">
+            {{
+              searchQuery || networkFilter || ruleFilter
+                ? t('connections.adjustSearchOrFilters')
+                : t('connections.noActiveNetworkConnections')
+            }}
+          </p>
+          <n-button
+            v-if="!searchQuery && !networkFilter && !ruleFilter"
+            @click="refreshConnections"
+            type="primary"
+            size="large"
+            round
+            class="empty-action"
+          >
+            <template #icon>
+              <n-icon><refresh-outline /></n-icon>
+            </template>
+            {{ t('connections.refreshConnections') }}
+          </n-button>
+        </div>
+      </n-spin>
     </div>
   </div>
 </template>
@@ -158,6 +191,7 @@ import {
   LinkOutline,
   ArrowUpOutline,
   ArrowDownOutline,
+  HardwareChipOutline,
 } from '@vicons/ionicons5'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useI18n } from 'vue-i18n'
@@ -666,91 +700,113 @@ onUnmounted(() => {
 .connections-view {
   min-height: 100vh;
   background: var(--n-color-embedded);
-  padding: 0;
-}
-
-.page-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 16px 20px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-/* 页面标题栏 */
-.page-header {
+/* 英雄式头部 */
+.hero-header {
   background: var(--n-card-color);
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  padding: 16px 24px;
+  border-radius: 20px;
+  padding: 24px 32px;
   box-shadow: var(--n-box-shadow-2);
   border: 1px solid var(--n-border-color);
+  position: relative;
+  overflow: hidden;
 }
 
-.header-content {
+.hero-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #00b42a 0%, #4080ff 50%, #2266dd 100%);
+  border-radius: 20px 20px 0 0;
+}
+
+.hero-content {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 24px;
 }
 
-.title-section {
+.hero-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 12px 32px rgba(0, 180, 42, 0.3);
 }
 
-.page-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0;
-  background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
+.hero-text {
+  flex: 1;
+}
+
+.hero-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0 0 8px 0;
+  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  line-height: 1.2;
 }
 
-.title-divider {
-  width: 3px;
-  height: 24px;
-  background: linear-gradient(135deg, #4080ff 0%, #2266dd 50%, #009a1a 100%);
-  border-radius: 2px;
+.hero-subtitle {
+  font-size: 1.1rem;
+  color: var(--n-text-color-3);
+  margin: 0;
+  font-weight: 500;
 }
 
-.refresh-btn {
+.hero-action {
+  flex-shrink: 0;
+}
+
+.hero-btn {
+  height: 48px;
+  padding: 0 24px;
+  font-size: 1rem;
   font-weight: 600;
-  padding: 0 20px;
-  height: 40px;
+  border-radius: 24px;
   box-shadow:
-    0 6px 24px rgba(64, 128, 255, 0.25),
-    0 1px 3px rgba(0, 0, 0, 0.1);
+    0 8px 32px rgba(0, 180, 42, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.refresh-btn:hover {
-  transform: translateY(-2px);
+.hero-btn:hover {
+  transform: translateY(-3px);
   box-shadow:
-    0 12px 40px rgba(64, 128, 255, 0.4),
-    0 4px 8px rgba(0, 0, 0, 0.15);
+    0 16px 48px rgba(0, 180, 42, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* 统计卡片区 */
-.stats-section {
+/* 统计卡片网格 */
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
 }
 
 .stat-card {
   background: var(--n-card-color);
-  backdrop-filter: blur(20px);
-  border-radius: 14px;
-  padding: 16px;
+  border-radius: 16px;
+  padding: 20px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   box-shadow: var(--n-box-shadow-1);
   border: 1px solid var(--n-border-color);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -778,6 +834,10 @@ onUnmounted(() => {
 
 .stat-card.download-stats::before {
   background: linear-gradient(90deg, #4080ff 0%, #2266dd 100%);
+}
+
+.stat-card.memory-stats::before {
+  background: linear-gradient(90deg, #f53f3f 0%, #cb2a2a 100%);
 }
 
 .stat-card:hover {
@@ -816,6 +876,12 @@ onUnmounted(() => {
   box-shadow: 0 8px 24px rgba(64, 128, 255, 0.3);
 }
 
+.memory-stats .stat-icon {
+  background: linear-gradient(135deg, #f53f3f 0%, #cb2a2a 100%);
+  color: white;
+  box-shadow: 0 8px 24px rgba(245, 63, 63, 0.3);
+}
+
 .stat-content {
   flex: 1;
 }
@@ -836,22 +902,36 @@ onUnmounted(() => {
   line-height: 1.2;
 }
 
-/* 筛选区 */
-.filter-section {
-  margin: 0;
-}
-
+/* 筛选卡片 */
 .filter-card {
   background: var(--n-card-color);
-  backdrop-filter: blur(20px);
-  border-radius: 14px;
-  padding: 16px;
+  border-radius: 16px;
+  padding: 24px;
   box-shadow: var(--n-box-shadow-1);
   border: 1px solid var(--n-border-color);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.filter-row {
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.filter-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.filter-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-controls {
   display: flex;
   gap: 12px;
   align-items: stretch;
@@ -862,6 +942,13 @@ onUnmounted(() => {
 .search-input {
   flex: 1;
   min-width: 300px;
+}
+
+.filter-selects {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex-wrap: wrap;
 }
 
 .filter-select {
@@ -898,34 +985,18 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
 }
 
-.filter-stats {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.stat-tag {
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 8px;
-}
-
-/* 连接列表区 */
-.connections-section {
+/* 表格卡片 */
+.table-card {
   background: var(--n-card-color);
-  backdrop-filter: blur(20px);
-  border-radius: 14px;
+  border-radius: 16px;
   box-shadow: var(--n-box-shadow-1);
   border: 1px solid var(--n-border-color);
   overflow: hidden;
 }
 
 .table-container {
-  min-height: 300px;
-}
-
-.table-wrapper {
-  padding: 0;
+  min-height: 400px;
+  padding: 16px;
 }
 
 .connections-table :deep(.n-data-table) {
@@ -952,34 +1023,36 @@ onUnmounted(() => {
 /* 空状态 */
 .empty-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
+  min-height: 350px;
   padding: 48px 24px;
-}
-
-.empty-content {
   text-align: center;
-  max-width: 400px;
 }
 
 .empty-icon {
-  color: rgba(156, 163, 175, 0.6);
+  color: var(--n-text-color-disabled);
   margin-bottom: 24px;
 }
 
 .empty-title {
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.5rem;
+  font-weight: 700;
   color: var(--n-text-color-1);
   margin: 0 0 12px 0;
 }
 
 .empty-description {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: var(--n-text-color-3);
-  margin: 0;
-  line-height: 1.5;
+  margin: 0 0 24px 0;
+  line-height: 1.6;
+  max-width: 400px;
+}
+
+.empty-action {
+  margin-top: 24px;
 }
 
 /* 深色模式样式会通过CSS变量自动应用 */
@@ -987,39 +1060,66 @@ onUnmounted(() => {
 /* 文本颜色会通过CSS变量自动适配暗色模式 */
 
 /* 响应式设计 */
+@media (max-width: 1024px) {
+  .connections-view {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
-  .page-container {
-    padding: 12px 8px;
-    gap: 12px;
+  .connections-view {
+    padding: 12px;
+    gap: 16px;
   }
 
-  .page-header {
-    padding: 12px 16px;
-    border-radius: 12px;
+  .hero-header {
+    padding: 20px;
+    border-radius: 16px;
   }
 
-  .header-content {
+  .hero-content {
     flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .page-title {
-    font-size: 1.25rem;
     text-align: center;
+    gap: 16px;
   }
 
-  .stats-section {
+  .hero-icon {
+    width: 64px;
+    height: 64px;
+  }
+
+  .hero-title {
+    font-size: 1.75rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+
+  .stats-grid {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 12px;
   }
 
   .stat-card {
-    padding: 12px;
-    border-radius: 12px;
+    padding: 16px;
   }
 
-  .filter-row {
+  .filter-card {
+    padding: 20px;
+  }
+
+  .filter-controls {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .filter-selects {
     flex-direction: column;
     gap: 8px;
   }
@@ -1032,36 +1132,49 @@ onUnmounted(() => {
     min-width: unset;
   }
 
-  .connections-section {
-    border-radius: 12px;
+  .table-card {
+    border-radius: 14px;
   }
 
   .connections-table :deep(.n-data-table) {
-    font-size: 0.8rem;
+    font-size: 0.875rem;
   }
 
   .connections-table :deep(.n-data-table-th),
   .connections-table :deep(.n-data-table-td) {
-    padding: 6px 4px;
+    padding: 8px 6px;
   }
 }
 
 @media (max-width: 480px) {
-  .page-container {
-    padding: 12px 8px;
+  .connections-view {
+    padding: 8px;
   }
 
-  .stat-card {
+  .hero-header {
     padding: 16px;
   }
 
-  .stat-icon {
-    width: 48px;
-    height: 48px;
+  .hero-title {
+    font-size: 1.5rem;
   }
 
-  .stat-value {
-    font-size: 1.5rem;
+  .hero-btn {
+    height: 44px;
+    padding: 0 20px;
+    font-size: 0.875rem;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .filter-card {
+    padding: 16px;
+  }
+
+  .table-container {
+    padding: 12px;
   }
 }
 </style>

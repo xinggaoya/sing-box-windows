@@ -40,7 +40,9 @@ export interface RulesData {
 
 // 定义事件类型
 export type Events = {
-  // 窗口相关事件（保留最大化/还原事件，因为还在使用）
+  // 窗口相关事件
+  'window-minimize': void
+  'window-show': void
   'window-maximize': void
   'window-unmaximize': void
 
