@@ -319,7 +319,6 @@ This project is licensed under the [MIT License](LICENSE) - see the LICENSE file
 
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/xinggaoya/sing-box-windows/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/xinggaoya/sing-box-windows/discussions)
-- 📧 **Email**: [Contact the maintainer](mailto:your-email@example.com)
 - 📘 **Documentation**: [Development Docs](./docs/development.md)
 
 ## 🙏 Acknowledgements
