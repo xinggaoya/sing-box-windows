@@ -226,55 +226,135 @@ async fn check_admin_requirement(config_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-// 等待内核准备就绪（改进的非轮询机制）
+// 等待内核完全就绪（API + WebSocket服务）
 async fn wait_for_kernel_ready(api_port: u16) -> Result<(), String> {
-    let url = format!("http://127.0.0.1:{}/version?token=", api_port);
+    let client = http_client::get_client();
+    let api_url = format!("http://127.0.0.1:{}/version?token=", api_port);
+    let token = crate::app::core::proxy_service::get_api_token();
 
-    // 启动后台任务检查API状态
-    let ready_notify = KERNEL_READY_NOTIFY.clone();
-    let ready_notify_clone = ready_notify.clone();
-    let check_url = url.clone();
+    info!("🔄 开始检查内核服务就绪状态...");
 
-    tokio::spawn(async move {
-        let client = http_client::get_client();
+    // 给内核启动时间
+    tokio::time::sleep(Duration::from_millis(2000)).await;
 
-        // 给内核一些启动时间
-        tokio::time::sleep(Duration::from_millis(1000)).await;
+    // 最多检查30次，每次间隔1秒
+    for i in 1..=30 {
+        info!("📡 第 {}/30 次检查内核服务状态...", i);
 
-        // 进行多次快速检查
-        for i in 0..20 {
-            match client
-                .get(&check_url)
-                .timeout(Duration::from_secs(2))
-                .send()
-                .await
-            {
-                Ok(response) if response.status().is_success() => {
-                    info!("内核API服务在第{}次检查时就绪", i + 1);
-                    ready_notify_clone.notify_one();
-                    return;
-                }
-                Ok(response) => {
-                    warn!("内核API响应状态码: {}", response.status());
-                }
-                Err(e) => {
-                    if i < 19 {
-                        // 使用指数退避算法，减少系统负载
-                        let delay = std::cmp::min(100 * (1 << (i / 5)), 1000);
-                        tokio::time::sleep(Duration::from_millis(delay)).await;
-                    } else {
-                        warn!("内核API最终检查失败: {}", e);
-                    }
-                }
+        // 1. 首先检查HTTP API是否可用
+        let api_ready = match client
+            .get(&api_url)
+            .timeout(Duration::from_secs(3))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => {
+                info!("✅ HTTP API 已就绪");
+                true
+            }
+            Ok(response) => {
+                info!("⚠️ HTTP API 响应异常: {}", response.status());
+                false
+            }
+            Err(e) => {
+                info!("❌ HTTP API 检查失败: {}", e);
+                false
+            }
+        };
+
+        if api_ready {
+            // 2. API就绪后，检查关键WebSocket端点是否可用
+            info!("🔌 检查WebSocket服务可用性...");
+
+            let ws_endpoints_ready = check_websocket_endpoints_ready(api_port, &token).await;
+
+            if ws_endpoints_ready {
+                info!("🎉 内核服务完全就绪 (API + WebSocket)");
+                return Ok(());
+            } else {
+                info!("⏳ WebSocket服务尚未就绪，继续等待...");
             }
         }
-    });
 
-    // 等待通知或超时
-    tokio::select! {
-        _ = ready_notify.notified() => Ok(()),
-        _ = tokio::time::sleep(Duration::from_secs(15)) => {
-            Err("内核启动超时".to_string())
+        // 等待1秒后继续检查
+        if i < 30 {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+        }
+    }
+
+    // 超时后进行最后检查
+    info!("⚠️ 达到最大检查次数，进行最后验证...");
+
+    // 最后再试一次API
+    match client
+        .get(&api_url)
+        .timeout(Duration::from_secs(5))
+        .send()
+        .await
+    {
+        Ok(response) if response.status().is_success() => {
+            info!("✅ 最终验证：HTTP API可用，内核启动成功（WebSocket可能稍后可用）");
+            Ok(())
+        }
+        _ => {
+            error!("❌ 内核启动失败：API服务不可用");
+            Err("内核启动超时，API服务不可用".to_string())
+        }
+    }
+}
+
+// 检查WebSocket端点是否就绪
+async fn check_websocket_endpoints_ready(api_port: u16, token: &str) -> bool {
+    // 检查关键的WebSocket端点
+    let endpoints = vec![
+        format!("ws://127.0.0.1:{}/traffic?token={}", api_port, token),
+        format!("ws://127.0.0.1:{}/connections?token={}", api_port, token),
+    ];
+
+    let mut ready_count = 0;
+
+    for endpoint in endpoints {
+        match check_single_websocket_endpoint(&endpoint).await {
+            Ok(true) => {
+                ready_count += 1;
+            }
+            Ok(false) => {
+                info!("🔌 WebSocket端点暂未就绪: {}", endpoint);
+            }
+            Err(e) => {
+                info!("❌ WebSocket端点检查出错: {} - {}", endpoint, e);
+            }
+        }
+    }
+
+    // 如果至少有一个WebSocket端点可用，认为WebSocket服务就绪
+    let is_ready = ready_count > 0;
+    info!("📊 WebSocket就绪状态: {}/{} 个端点可用", ready_count, 2);
+
+    is_ready
+}
+
+// 检查单个WebSocket端点
+async fn check_single_websocket_endpoint(
+    url: &str,
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    // 尝试连接WebSocket，使用简单的连接方式
+    match tokio::time::timeout(
+        Duration::from_millis(2000), // 2秒超时
+        tokio_tungstenite::connect_async(url),
+    )
+    .await
+    {
+        Ok(Ok((ws_stream, _))) => {
+            // 连接成功，立即关闭
+            drop(ws_stream);
+            Ok(true)
+        }
+        Ok(Err(_)) => {
+            Ok(false) // 连接失败
+        }
+        Err(_) => {
+            Ok(false) // 超时
         }
     }
 }
@@ -984,4 +1064,44 @@ pub async fn is_kernel_running() -> Result<bool, String> {
 
     info!("内核运行状态检查: {}", is_running);
     Ok(is_running)
+}
+
+// 检查内核完整状态（进程 + API）
+#[tauri::command]
+pub async fn check_kernel_status() -> Result<serde_json::Value, String> {
+    let process_running = is_kernel_running().await.unwrap_or(false);
+
+    let mut status = serde_json::json!({
+        "process_running": process_running,
+        "api_ready": false,
+        "websocket_ready": false
+    });
+
+    if process_running {
+        // 检查API是否可用
+        let client = http_client::get_client();
+        let api_url = "http://127.0.0.1:12081/version?token=";
+
+        let api_ready = match client
+            .get(api_url)
+            .timeout(Duration::from_secs(2))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => true,
+            _ => false,
+        };
+
+        status["api_ready"] = serde_json::Value::Bool(api_ready);
+
+        // 如果API可用，检查WebSocket
+        if api_ready {
+            let token = crate::app::core::proxy_service::get_api_token();
+            let ws_ready = check_websocket_endpoints_ready(12081, &token).await;
+            status["websocket_ready"] = serde_json::Value::Bool(ws_ready);
+        }
+    }
+
+    info!("内核完整状态: {}", status);
+    Ok(status)
 }

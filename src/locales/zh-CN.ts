@@ -550,5 +550,6 @@ export default {
     tryingToConnectWebSocket: '正在尝试连接WebSocket服务',
     webSocketConnected: 'WebSocket连接成功',
     webSocketConnectionFailed: 'WebSocket连接失败，但内核仍在运行中',
+    autoStartFailed: '自动启动内核失败，请手动启动或检查配置',
   },
 }

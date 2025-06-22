@@ -8,11 +8,15 @@ import { usePinia } from '@/stores'
 import i18n from './locales'
 import { storeManager } from './stores/StoreManager'
 import { webSocketCleaner } from '@/utils/memory-leak-fix'
+import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 const app = createApp(App)
 
 // 设置Pinia状态管理
 usePinia(app)
+
+// 启动临时Store全局内存监控
+temporaryStoreManager.startGlobalMemoryMonitoring()
 
 // 设置路由
 app.use(router)
@@ -46,6 +50,9 @@ window.addEventListener('beforeunload', async () => {
 
   // 清理所有WebSocket连接和定时器
   webSocketCleaner.cleanupAll()
+
+  temporaryStoreManager.stopGlobalMemoryMonitoring()
+  temporaryStoreManager.cleanupAllStores()
 })
 
 // 应用挂载

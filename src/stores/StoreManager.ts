@@ -100,6 +100,12 @@ function registerStoreInitializers() {
     const { useTrafficStore } = await import('./kernel/TrafficStore')
     const store = useTrafficStore()
     storeInstances.set('traffic', store)
+    // 延迟初始化Store，避免循环依赖
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore()
+      }
+    }, 0)
     return store
   })
 

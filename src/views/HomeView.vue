@@ -470,41 +470,29 @@ const runKernel = async () => {
     }
     mitt.on('connecting-status-changed', onConnectionChange)
 
-    // 尝试启动内核
+    // 启动内核（简化版本，依赖后端检查）
     try {
       await kernelStore.startKernel()
       message.success(t('notification.kernelStarted'))
-      return // 成功启动则直接返回
+      return // 后端确认启动成功
     } catch (startError) {
-      // 启动失败，检查内核是否已经在运行
+      // 启动失败，但检查内核进程是否实际在运行
       const isKernelRunning = await tauriApi.kernel.isKernelRunning().catch(() => false)
 
       if (isKernelRunning) {
-        // 内核已经在运行，但可能WebSocket连接有问题
-        message.info(t('notification.kernelAlreadyRunning'))
-
-        // 设置内核运行状态为true
+        // 内核进程存在，设置为运行状态
+        message.warning('内核进程已在运行，但可能需要重新连接')
         appState.setRunningState(true)
 
-        // 尝试一次WebSocket连接
-        if (!appState.wsConnected) {
-          message.info(t('notification.tryingToConnectWebSocket'))
+        // 后台尝试WebSocket连接
+        kernelStore.initializeWebSocketConnectionsAsync().catch(() => {
+          console.warn('后台WebSocket连接失败')
+        })
 
-          // 禁用WebSocket重试，避免循环
-          const wsConnected = await kernelStore.setupWebsocketConnection().catch(() => false)
-
-          if (wsConnected) {
-            message.success(t('notification.webSocketConnected'))
-          } else {
-            message.warning(t('notification.webSocketConnectionFailed'))
-            // 即使WebSocket连接失败，仍然保持内核运行状态
-          }
-        }
-
-        return // 内核运行状态已设置，直接返回
+        return
       }
 
-      // 如果内核不在运行，继续抛出错误让catch处理
+      // 内核确实没有运行，抛出错误
       throw startError
     }
   } catch (error) {
@@ -789,6 +777,8 @@ onMounted(async () => {
 
   // 检查管理员权限
   await checkAdminStatus()
+
+  // 自动启动失败会在控制台中显示详细信息，供调试使用
 
   // 监听路由变化，当返回到主页时重新设置监听器
   watch(isRouteActive, (isActive) => {

@@ -9,7 +9,9 @@
             <MessageConsumer />
 
             <!-- 主路由视图 -->
-            <router-view />
+            <div @contextmenu="handleContextMenu" class="app-container">
+              <router-view />
+            </div>
 
             <!-- 更新通知组件 -->
             <UpdateNotification />
@@ -97,6 +99,15 @@ const { locale } = useI18n()
 
 // 直接使用主题Store（保证与MainLayout.vue使用同一个实例）
 const themeStore = useThemeStore()
+
+// 生产环境下禁用右键菜单
+const handleContextMenu = (event: MouseEvent) => {
+  // 只在生产环境中禁用右键菜单
+  if (import.meta.env.PROD) {
+    event.preventDefault()
+    return false
+  }
+}
 
 // 核心Store（按需懒加载）
 let appStore: AppStore | null = null
@@ -197,7 +208,9 @@ async function loadRequiredStores() {
   const requiredStores: StoreType[] = ['tray'] // 托盘是必需的
 
   if (appStore?.autoStartKernel) {
-    requiredStores.push('kernel')
+    // 自动启动时需要加载更多Store以确保数据流正常
+    requiredStores.push('kernel', 'connection', 'traffic', 'log')
+    console.log('🔄 自动启动模式：预加载数据相关Store')
   }
 
   await storeManager.preloadStores(requiredStores)
@@ -210,14 +223,47 @@ async function initializeApp() {
     const trayStore = await storeManager.loadStore<TrayStore>('tray')
     await trayStore.initTray()
 
-    // 如果启用了自动启动，启动内核
+    // 如果启用了自动启动，启动内核（使用改进的启动逻辑）
     if (appStore?.autoStartKernel) {
-      const kernelStore = await storeManager.loadStore<KernelStore>('kernel')
-      kernelStore.initEventListeners()
-      await kernelStore.startKernel()
+      console.log('🚀 检测到自动启动内核设置，准备启动内核...')
+      await startKernelWithRetry()
     }
   } catch (error) {
     console.error('应用初始化过程中出错:', error)
+  }
+}
+
+// 简化的内核自动启动函数
+async function startKernelWithRetry() {
+  console.log('🚀 检测到自动启动内核设置，开始启动...')
+
+  try {
+    // 等待应用完全初始化
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+
+    // 加载内核Store
+    const kernelStore = await storeManager.loadStore<KernelStore>('kernel')
+
+    // 初始化事件监听器
+    console.log('🎧 初始化事件监听器...')
+    await kernelStore.initEventListeners()
+
+    // 启动内核（后端已包含完整检查）
+    console.log('🚀 启动内核，后端将进行完整就绪检查...')
+    await kernelStore.startKernel()
+
+    console.log('✅ 内核自动启动成功！')
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('❌ 内核自动启动失败:', errorMessage)
+
+    // 设置应用状态为未运行
+    if (appStore) {
+      appStore.setRunningState(false)
+    }
+
+    // 提示用户可以手动启动
+    console.log('💡 提示：您可以在主页手动启动内核')
   }
 }
 
@@ -239,5 +285,26 @@ window.addEventListener('beforeunload', cleanup)
 <style>
 #app {
   height: 100vh;
+}
+
+.app-container {
+  height: 100%;
+  width: 100%;
+}
+
+/* 生产环境下禁用文本选择 */
+@media (not (hover: hover)) {
+  .app-container {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+}
+
+/* 在生产环境下的额外安全措施 */
+.app-container {
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 </style>

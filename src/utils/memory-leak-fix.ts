@@ -276,6 +276,168 @@ export class StoreCleaner {
   }
 }
 
+// 定义临时Store接口
+interface TemporaryStore {
+  cleanupStore?: () => void
+  smartCleanup?: () => void
+  smartConnectionCleanup?: () => void
+  smartLogCleanup?: () => void
+}
+
+/**
+ * 非持久化Store内存管理器
+ * 专门用于管理流量、日志、连接等临时数据store的内存
+ */
+export class TemporaryStoreManager {
+  private static instance: TemporaryStoreManager
+  private stores: Map<string, TemporaryStore> = new Map()
+  private cleanupTimers: Map<string, number> = new Map()
+  private memoryMonitorTimer: number | null = null
+
+  static getInstance(): TemporaryStoreManager {
+    if (!TemporaryStoreManager.instance) {
+      TemporaryStoreManager.instance = new TemporaryStoreManager()
+    }
+    return TemporaryStoreManager.instance
+  }
+
+  /**
+   * 注册临时store
+   */
+  registerStore(name: string, store: TemporaryStore) {
+    this.stores.set(name, store)
+    console.log(`📊 注册临时Store: ${name}`)
+  }
+
+  /**
+   * 注销临时store
+   */
+  unregisterStore(name: string) {
+    if (this.stores.has(name)) {
+      const store = this.stores.get(name)
+
+      // 调用store的清理方法
+      if (store && typeof store.cleanupStore === 'function') {
+        store.cleanupStore()
+      }
+
+      // 清理相关定时器
+      this.clearStoreTimer(name)
+
+      this.stores.delete(name)
+      console.log(`🗑️ 注销临时Store: ${name}`)
+    }
+  }
+
+  /**
+   * 启动全局内存监控
+   */
+  startGlobalMemoryMonitoring() {
+    if (this.memoryMonitorTimer) {
+      clearInterval(this.memoryMonitorTimer)
+    }
+
+    this.memoryMonitorTimer = window.setInterval(() => {
+      this.performGlobalCleanup()
+    }, 60 * 1000) // 每分钟检查一次
+
+    console.log('🔍 启动全局临时Store内存监控')
+  }
+
+  /**
+   * 停止全局内存监控
+   */
+  stopGlobalMemoryMonitoring() {
+    if (this.memoryMonitorTimer) {
+      clearInterval(this.memoryMonitorTimer)
+      this.memoryMonitorTimer = null
+      console.log('⏹️ 停止全局临时Store内存监控')
+    }
+  }
+
+  /**
+   * 执行全局清理
+   */
+  private performGlobalCleanup() {
+    console.log('🧹 执行临时Store全局内存清理')
+
+    for (const [name, store] of this.stores) {
+      try {
+        // 调用智能清理方法
+        if (store && typeof store.smartCleanup === 'function') {
+          store.smartCleanup()
+        } else if (store && typeof store.smartConnectionCleanup === 'function') {
+          store.smartConnectionCleanup()
+        } else if (store && typeof store.smartLogCleanup === 'function') {
+          store.smartLogCleanup()
+        }
+      } catch (error) {
+        console.error(`Store ${name} 清理失败:`, error)
+      }
+    }
+  }
+
+  /**
+   * 立即清理所有临时store
+   */
+  cleanupAllStores() {
+    console.log('🧹 立即清理所有临时Store')
+
+    for (const [name, store] of this.stores) {
+      try {
+        if (store && typeof store.cleanupStore === 'function') {
+          store.cleanupStore()
+        }
+      } catch (error) {
+        console.error(`Store ${name} 清理失败:`, error)
+      }
+    }
+
+    // 清理所有定时器
+    for (const [name] of this.cleanupTimers) {
+      this.clearStoreTimer(name)
+    }
+
+    this.stores.clear()
+  }
+
+  /**
+   * 为特定store设置清理定时器
+   */
+  setStoreCleanupTimer(name: string, callback: () => void, interval: number) {
+    this.clearStoreTimer(name)
+
+    const timerId = window.setInterval(callback, interval)
+    this.cleanupTimers.set(name, timerId)
+  }
+
+  /**
+   * 清理store定时器
+   */
+  private clearStoreTimer(name: string) {
+    const timerId = this.cleanupTimers.get(name)
+    if (timerId) {
+      clearInterval(timerId)
+      this.cleanupTimers.delete(name)
+    }
+  }
+
+  /**
+   * 获取内存使用统计
+   */
+  getMemoryStats() {
+    const stats = {
+      registeredStores: this.stores.size,
+      activeTimers: this.cleanupTimers.size,
+      storeNames: Array.from(this.stores.keys()),
+    }
+
+    console.log('📊 临时Store内存统计:', stats)
+    return stats
+  }
+}
+
 // 导出单例实例
 export const memoryLeakDetector = MemoryLeakDetector.getInstance()
 export const webSocketCleaner = WebSocketCleaner.getInstance()
+export const temporaryStoreManager = TemporaryStoreManager.getInstance()

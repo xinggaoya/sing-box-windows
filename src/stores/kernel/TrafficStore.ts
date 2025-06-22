@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import mitt from '@/utils/mitt'
+import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 // 声明traffic-data事件的类型
 interface TrafficData {
@@ -35,6 +36,9 @@ export const useTrafficStore = defineStore(
 
     // 事件监听器状态
     let mittListenerRegistered = false
+
+    // 内存清理定时器
+    let memoryCleanupTimer: number | null = null
 
     // 更新流量统计数据
     const updateTrafficStats = (data: TrafficData) => {
@@ -135,6 +139,65 @@ export const useTrafficStore = defineStore(
       cleanupMittListeners()
     }
 
+    // Store初始化方法
+    const initializeStore = () => {
+      setupMittListeners()
+      startMemoryOptimization()
+
+      // 注册到临时Store管理器
+      const storeInstance = {
+        cleanupStore,
+        smartCleanup: () => {
+          // 如果累计流量超过500MB，重置计数器
+          const RESET_THRESHOLD = 500 * 1024 * 1024 // 500MB
+          if (
+            traffic.value.totalUp > RESET_THRESHOLD ||
+            traffic.value.totalDown > RESET_THRESHOLD
+          ) {
+            traffic.value.totalUp = 0
+            traffic.value.totalDown = 0
+            console.log('🧹 流量Store智能清理 - 重置累计数据')
+          }
+        },
+      }
+      temporaryStoreManager.registerStore('traffic', storeInstance)
+    }
+
+    // 内存优化：定期清理无用数据
+    const startMemoryOptimization = () => {
+      if (memoryCleanupTimer) {
+        clearInterval(memoryCleanupTimer)
+      }
+
+      // 每30秒检查一次，重置累计流量如果数值过大
+      memoryCleanupTimer = window.setInterval(() => {
+        // 如果累计流量超过1GB，重置计数器防止数值溢出
+        const MAX_TRAFFIC = 1024 * 1024 * 1024 // 1GB
+        if (traffic.value.totalUp > MAX_TRAFFIC || traffic.value.totalDown > MAX_TRAFFIC) {
+          traffic.value.totalUp = 0
+          traffic.value.totalDown = 0
+        }
+      }, 30 * 1000) // 30秒
+    }
+
+    // 停止内存优化
+    const stopMemoryOptimization = () => {
+      if (memoryCleanupTimer) {
+        clearInterval(memoryCleanupTimer)
+        memoryCleanupTimer = null
+      }
+    }
+
+    // Store清理方法
+    const cleanupStore = () => {
+      cleanupListeners()
+      stopMemoryOptimization()
+      resetStats()
+
+      // 从临时Store管理器注销
+      temporaryStoreManager.unregisterStore('traffic')
+    }
+
     return {
       traffic,
       connectionState,
@@ -145,14 +208,14 @@ export const useTrafficStore = defineStore(
       resetStats,
       updateTrafficStats,
       reconnectWebSocket,
+      startMemoryOptimization,
+      stopMemoryOptimization,
+      initializeStore,
+      cleanupStore,
     }
   },
   {
-    // 恢复持久化配置 - 针对高频更新优化
-    persist: {
-      highFrequency: true, // 启用防抖保存
-      debounceDelay: 3000, // 3秒防抖延迟
-      excludeKeys: ['connectionState'], // 排除连接状态
-    },
+    // 流量数据不需要持久化存储 - 实时数据应在应用重启时重置
+    persist: false,
   },
 )

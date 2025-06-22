@@ -317,8 +317,8 @@ const init = async () => {
       // 排除特殊组和直连
       if (key === 'GLOBAL' || key === 'direct') return
 
-      // 如果是Selector或URLTest类型，添加到代理组
-      if (item.type === 'Selector' || item.type === 'URLTest') {
+      // 只显示Selector类型的代理组
+      if (item.type === 'Selector') {
         groups.push(item)
       }
     })
@@ -408,7 +408,7 @@ const testNodeDelay = async (group: string) => {
  */
 const changeProxy = async (group: string, proxy: string) => {
   try {
-    await tauriApi.proxy.changeProxy(group, proxy)
+    await tauriApi.proxy.changeProxy(group, proxy, appStore.apiPort)
     message.success(t('proxy.switchSuccess', { group: group, proxy: proxy }))
     // 重新加载数据
     await init()

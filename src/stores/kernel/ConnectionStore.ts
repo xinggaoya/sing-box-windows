@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
+import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 import { WebSocketService, ConnectionState } from '@/services/websocket-service'
 
@@ -42,6 +43,11 @@ export const useConnectionStore = defineStore(
     // WebSocket 服务实例
     const wsService = WebSocketService.getInstance()
 
+    // 连接数据配置
+    const MAX_CONNECTIONS = 500 // 最大保存连接数
+    const CONNECTION_CLEANUP_THRESHOLD = 400 // 清理阈值
+    const CONNECTION_RETAIN_COUNT = 200 // 清理后保留的连接数
+
     // 连接状态
     const connectionsState = ref<ConnectionState>({
       connected: false,
@@ -72,6 +78,9 @@ export const useConnectionStore = defineStore(
     // 健康检查定时器
     let connectionsHealthCheck: number | null = null
     let memoryHealthCheck: number | null = null
+
+    // 内存清理定时器
+    let memoryCleanupTimer: number | null = null
 
     // 存储事件监听器清理函数
     let unlistenConnectionsStateFn: (() => void) | null = null
@@ -260,88 +269,140 @@ export const useConnectionStore = defineStore(
       }
     }
 
-    // 更新连接数据
-    const updateConnections = (data: ConnectionsData) => {
-      if (data && 'connections' in data) {
-        try {
-          // 更新连接列表
-          connections.value = data.connections || []
+    // 智能连接数据清理
+    const smartConnectionCleanup = () => {
+      if (connections.value.length <= CONNECTION_CLEANUP_THRESHOLD) {
+        return // 未达到清理阈值
+      }
 
-          // 更新统计数据，确保是数值
-          connectionsTotal.value = {
-            upload: Number(data.uploadTotal) || 0,
-            download: Number(data.downloadTotal) || 0,
-          }
+      // 按时间排序，保留最新的连接
+      const sortedConnections = [...connections.value].sort(
+        (a, b) => new Date(b.start).getTime() - new Date(a.start).getTime(),
+      )
 
-          // 如果数据接收正常，但当前状态不是连接状态，更新状态
-          if (!connectionsState.value.connected) {
-            connectionsState.value.connected = true
-            connectionsState.value.connecting = false
-            connectionsState.value.error = null
-          }
-        } catch (error) {
-          console.error('处理连接数据时出错:', error, data)
+      connections.value = sortedConnections.slice(0, CONNECTION_RETAIN_COUNT)
+      console.log(`🧹 清理连接数据，保留 ${connections.value.length} 条最新连接`)
+    }
+
+    // 启动内存监控
+    const startMemoryMonitoring = () => {
+      if (memoryCleanupTimer) {
+        clearInterval(memoryCleanupTimer)
+      }
+
+      memoryCleanupTimer = window.setInterval(() => {
+        // 检查连接数量并进行清理
+        if (connections.value.length >= CONNECTION_CLEANUP_THRESHOLD) {
+          smartConnectionCleanup()
         }
+
+        // 检查内存数据时效性
+        const now = Date.now()
+        if (now - memory.value.lastUpdated > 60000) {
+          // 1分钟无更新
+          // 可能需要重新连接内存监控
+          if (memoryState.value.connected) {
+            console.log('🔄 内存数据长时间未更新，尝试重新连接')
+            reconnectMemoryWebSocket()
+          }
+        }
+      }, 30 * 1000) // 30秒检查一次
+    }
+
+    // 停止内存监控
+    const stopMemoryMonitoring = () => {
+      if (memoryCleanupTimer) {
+        clearInterval(memoryCleanupTimer)
+        memoryCleanupTimer = null
       }
     }
 
-    // 更新内存数据
-    const updateMemory = (data: { inuse: number; oslimit: number }) => {
-      if ('inuse' in data && 'oslimit' in data) {
-        try {
-          // 确保数据是数值类型
-          const inuse = Number(data.inuse) || 0
-          const oslimit = Number(data.oslimit) || 0
+    // 更新连接数据（优化版本）
+    const updateConnections = (data: ConnectionsData) => {
+      try {
+        if (data?.connections && Array.isArray(data.connections)) {
+          // 限制连接数量以防止内存溢出
+          const newConnections = data.connections.slice(0, MAX_CONNECTIONS)
+          connections.value = newConnections
 
-          memory.value = {
-            inuse,
-            oslimit,
-            lastUpdated: Date.now(), // 更新时间戳
+          connectionsTotal.value = {
+            upload: data.uploadTotal || 0,
+            download: data.downloadTotal || 0,
           }
-
-          // 如果数据接收正常，但当前状态不是连接状态，更新状态
-          if (!memoryState.value.connected) {
-            memoryState.value.connected = true
-            memoryState.value.connecting = false
-            memoryState.value.error = null
-          }
-        } catch (error) {
-          console.error('处理内存数据时出错:', error, data)
         }
+      } catch (error) {
+        console.error('更新连接数据失败:', error)
+      }
+    }
+
+    // 更新内存数据（优化版本）
+    const updateMemory = (data: { inuse: number; oslimit: number }) => {
+      try {
+        if (data && typeof data.inuse === 'number' && typeof data.oslimit === 'number') {
+          memory.value = {
+            inuse: data.inuse,
+            oslimit: data.oslimit,
+            lastUpdated: Date.now(),
+          }
+        }
+      } catch (error) {
+        console.error('更新内存数据失败:', error)
       }
     }
 
     // Store初始化方法
     const initializeStore = () => {
       setupMittListeners()
+      startMemoryMonitoring()
+      startConnectionsHealthCheck()
+      startMemoryHealthCheck()
+
+      // 注册到临时Store管理器
+      const storeInstance = {
+        cleanupStore,
+        smartConnectionCleanup,
+      }
+      temporaryStoreManager.registerStore('connection', storeInstance)
     }
 
     // Store清理方法
     const cleanupStore = () => {
       cleanupListeners()
+      stopMemoryMonitoring()
+      resetData()
+
+      // 从临时Store管理器注销
+      temporaryStoreManager.unregisterStore('connection')
     }
 
     return {
+      // 状态
+      connectionsState,
+      memoryState,
+
+      // 数据
       connections,
       connectionsTotal,
       memory,
-      connectionsState,
-      memoryState,
-      updateConnections,
-      updateMemory,
+
+      // 方法
       setupMittListeners,
-      setupConnectionsListener: setupMittListeners, // 为兼容性添加别名
-      setupMemoryListener: setupMittListeners, // 为兼容性添加别名
       cleanupMittListeners,
       cleanupListeners,
       resetData,
       reconnectConnectionsWebSocket,
       reconnectMemoryWebSocket,
+      updateConnections,
+      updateMemory,
+      smartConnectionCleanup,
+      startMemoryMonitoring,
+      stopMemoryMonitoring,
       initializeStore,
       cleanupStore,
     }
   },
   {
-    persist: false, // 不持久化，避免内存泄漏
+    // 连接数据不需要持久化存储 - 实时数据应在应用重启时重置
+    persist: false,
   },
 )

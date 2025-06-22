@@ -57,6 +57,14 @@ export const kernelApi = {
 
   // 检查内核是否运行
   isKernelRunning: () => invoke<boolean>('is_kernel_running'),
+
+  // 检查内核完整状态
+  checkKernelStatus: () =>
+    invoke<{
+      process_running: boolean
+      api_ready: boolean
+      websocket_ready: boolean
+    }>('check_kernel_status'),
 }
 
 // 代理相关接口
@@ -86,7 +94,8 @@ export const proxyApi = {
   getProxies: (port: number) => invoke<ProxiesData>('get_proxies', { port }),
 
   // 切换代理
-  changeProxy: (group: string, proxy: string) => invoke<void>('change_proxy', { group, proxy }),
+  changeProxy: (group: string, proxy: string, port: number) =>
+    invoke<void>('change_proxy', { group, proxy, port }),
 
   // 测试节点组延迟
   testGroupDelay: (group: string, port: number) =>
