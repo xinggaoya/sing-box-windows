@@ -27,6 +27,19 @@ app.use(i18n)
 // 初始化Store管理器
 storeManager.initialize()
 
+// 初始化简化版WebSocket服务
+import { webSocketService } from '@/services/websocket-service'
+// WebSocket服务会自动初始化事件监听器
+console.log('🔧 WebSocket 服务已导入并初始化')
+
+// 添加一些调试信息
+setTimeout(() => {
+  console.log('📡 WebSocket 服务初始化状态检查:', {
+    isConnected: webSocketService.isWebSocketConnected(),
+    serviceInstance: !!webSocketService,
+  })
+}, 1000)
+
 // 设置应用关闭时的清理逻辑
 window.addEventListener('beforeunload', async () => {
   console.log('应用关闭，执行清理...')

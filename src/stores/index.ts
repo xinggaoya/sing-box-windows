@@ -165,9 +165,33 @@ function piniaTauriPersist(context: PiniaPluginContext) {
           // 恢复全部状态
           store.$patch(storedState as any)
         }
+
+        console.log(`📋 Store "${storeKey}" 数据恢复完成`)
+      } else {
+        console.log(`📋 Store "${storeKey}" 无需恢复数据（首次启动或无保存数据）`)
+      }
+
+      // 特殊处理：如果是AppStore，需要通知数据恢复完成
+      if (
+        storeKey === 'app' &&
+        'markDataRestored' in store &&
+        typeof store.markDataRestored === 'function'
+      ) {
+        // 使用 nextTick 确保所有状态更新完成后再标记
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        store.markDataRestored()
       }
     } catch (error) {
       console.error(`从 Tauri Store 恢复状态失败:`, error)
+
+      // 即使恢复失败，也要通知AppStore标记为已恢复（使用默认值）
+      if (
+        storeKey === 'app' &&
+        'markDataRestored' in store &&
+        typeof store.markDataRestored === 'function'
+      ) {
+        store.markDataRestored()
+      }
     }
   })
 

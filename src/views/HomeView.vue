@@ -484,10 +484,8 @@ const runKernel = async () => {
         message.warning('内核进程已在运行，但可能需要重新连接')
         appState.setRunningState(true)
 
-        // 后台尝试WebSocket连接
-        kernelStore.initializeWebSocketConnectionsAsync().catch(() => {
-          console.warn('后台WebSocket连接失败')
-        })
+        // WebSocket 连接现在由后端自动管理
+        console.log('内核进程在运行，WebSocket 连接应该会自动建立')
 
         return
       }
@@ -661,20 +659,18 @@ const setupListeners = async () => {
       isTrafficLoading.value = true
       isConnectionLoading.value = true
 
-      // 使用Promise.all同时设置两个监听器
+      // 使用Promise.all同时设置监听器
       await Promise.all([
-        trafficStore.setupTrafficListener(),
-        connectionStore.setupConnectionsListener(),
-        connectionStore.setupMemoryListener(),
+        trafficStore.setupMittListeners(),
+        connectionStore.setupMittListeners(),
       ]).catch((e) => {
         console.error('设置监听器失败，尝试重试', e)
         // 尝试重试一次
         return new Promise((resolve) => {
           setTimeout(async () => {
             try {
-              await trafficStore.setupTrafficListener()
-              await connectionStore.setupConnectionsListener()
-              await connectionStore.setupMemoryListener()
+              await trafficStore.setupMittListeners()
+              await connectionStore.setupMittListeners()
               resolve(true)
             } catch (retryError) {
               console.error('重试设置监听器失败', retryError)

@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tauri::{Runtime, Window};
 use tokio::sync::mpsc;
 use tokio::sync::Notify;
@@ -112,10 +112,12 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
 // 启动内核
 #[tauri::command]
 pub async fn start_kernel(
+    app_handle: tauri::AppHandle,
     _proxy_mode: Option<String>,
     api_port: Option<u16>,
 ) -> Result<(), String> {
-    let port = api_port.unwrap_or(12081); // 默认API端口
+    // 要求前端必须传递API端口，不使用硬编码默认值
+    let port = api_port.ok_or("API端口参数是必需的，请从前端传递正确的端口配置")?;
 
     // 检查是否已经在运行
     if PROCESS_MANAGER.is_running().await {
@@ -153,6 +155,12 @@ pub async fn start_kernel(
             match wait_for_kernel_ready(port).await {
                 Ok(()) => {
                     info!("内核启动完成并已就绪");
+
+                    // 发送内核就绪事件，让前端处理 WebSocket 连接
+                    if let Err(e) = app_handle.emit_to("main", "kernel-ready", port) {
+                        warn!("发送内核就绪事件失败: {}", e);
+                    }
+
                     Ok(())
                 }
                 Err(e) => {
@@ -416,11 +424,14 @@ async fn cleanup_websocket_tasks() {
 
 // 重启内核
 #[tauri::command]
-pub async fn restart_kernel() -> Result<(), String> {
+pub async fn restart_kernel(
+    app_handle: tauri::AppHandle,
+    api_port: Option<u16>,
+) -> Result<(), String> {
     info!("正在重启内核");
     stop_kernel().await?;
     tokio::time::sleep(Duration::from_millis(1500)).await;
-    start_kernel(None, None).await?;
+    start_kernel(app_handle, None, api_port).await?;
     info!("内核重启完成");
     Ok(())
 }
@@ -609,7 +620,8 @@ pub async fn start_websocket_relay<R: Runtime>(
     window: Window<R>,
     api_port: Option<u16>,
 ) -> Result<(), String> {
-    let port = api_port.unwrap_or(12081); // 默认API端口
+    // 要求前端必须传递API端口，不使用硬编码默认值
+    let port = api_port.ok_or("API端口参数是必需的，请从前端传递正确的端口配置")?;
 
     // 重置停止标志
     SHOULD_STOP_WS.store(false, Ordering::Relaxed);
@@ -617,19 +629,91 @@ pub async fn start_websocket_relay<R: Runtime>(
     // 清理旧任务
     cleanup_websocket_tasks().await;
 
-    // 启动四个不同类型的WebSocket中继
-    start_traffic_relay(window.clone(), port).await?;
-    start_memory_relay(window.clone(), port).await?;
-    start_logs_relay(window.clone(), port).await?;
-    start_connections_relay(window.clone(), port).await?;
+    info!("🔌 开始启动 WebSocket 中继服务，端口: {}", port);
+
+    // 等待一段时间确保内核的 WebSocket 服务完全就绪
+    tokio::time::sleep(Duration::from_millis(2000)).await;
+
+    // 启动WebSocket中继，带重试机制
+    let window_clone = window.clone();
+    task::spawn(async move {
+        start_websocket_relay_with_retry(window_clone, port).await;
+    });
 
     Ok(())
 }
 
-/// 启动流量数据中继
-async fn start_traffic_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Result<(), String> {
+/// 测试WebSocket连接是否可用
+async fn test_websocket_connection(api_port: u16, endpoint: &str) -> Result<(), String> {
+    let token = crate::app::core::proxy_service::get_api_token();
+    let url = Url::parse(&format!(
+        "ws://127.0.0.1:{}/{}?token={}",
+        api_port, endpoint, token
+    ))
+    .map_err(|e| format!("URL解析失败: {}", e))?;
+
+    match tokio::time::timeout(Duration::from_secs(5), connect_async(url)).await {
+        Ok(Ok((ws_stream, _))) => {
+            // 连接成功，立即关闭
+            drop(ws_stream);
+            info!("✅ {} 端点连接测试成功", endpoint);
+            Ok(())
+        }
+        Ok(Err(e)) => Err(format!("{} 连接失败: {}", endpoint, e)),
+        Err(_) => Err(format!("{} 连接超时", endpoint)),
+    }
+}
+
+/// 带重试机制的WebSocket中继启动
+async fn start_websocket_relay_with_retry<R: Runtime>(window: Window<R>, api_port: u16) {
+    let endpoints = ["traffic", "memory", "logs", "connections"];
+
+    for endpoint in &endpoints {
+        for attempt in 1..=5 {
+            info!("尝试连接 {} 端点 (第 {}/5 次)", endpoint, attempt);
+
+            match test_websocket_connection(api_port, endpoint).await {
+                Ok(_) => {
+                    // 连接测试成功，启动对应的中继
+                    match *endpoint {
+                        "traffic" => {
+                            let _ = start_traffic_relay_internal(window.clone(), api_port).await;
+                        }
+                        "memory" => {
+                            let _ = start_memory_relay_internal(window.clone(), api_port).await;
+                        }
+                        "logs" => {
+                            let _ = start_logs_relay_internal(window.clone(), api_port).await;
+                        }
+                        "connections" => {
+                            let _ =
+                                start_connections_relay_internal(window.clone(), api_port).await;
+                        }
+                        _ => {}
+                    }
+                    info!("✅ {} 数据中继启动成功", endpoint);
+                    break; // 成功后跳出重试循环
+                }
+                Err(e) => {
+                    warn!("{} 连接失败 (第 {} 次): {}", endpoint, attempt, e);
+                    if attempt < 5 {
+                        tokio::time::sleep(Duration::from_millis(2000 * attempt as u64)).await;
+                    } else {
+                        error!("❌ {} 数据中继启动最终失败", endpoint);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 启动流量数据中继 (内部版本，不做连接测试)
+async fn start_traffic_relay_internal<R: Runtime>(
+    window: Window<R>,
+    api_port: u16,
+) -> Result<(), String> {
     let window_clone = window.clone();
-    let window_for_error = window.clone(); // 用于错误处理的窗口克隆
+    let window_for_error = window.clone();
     let (tx, mut rx) = mpsc::channel(32);
     let token = crate::app::core::proxy_service::get_api_token();
 
@@ -725,6 +809,7 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Re
                         "error": format!("连接失败: {}", e)
                     }),
                 );
+                return; // 连接失败，退出任务
             }
         }
     });
@@ -750,8 +835,11 @@ async fn start_traffic_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Re
     Ok(())
 }
 
-/// 启动内存数据中继
-async fn start_memory_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Result<(), String> {
+/// 启动内存数据中继 (内部版本)
+async fn start_memory_relay_internal<R: Runtime>(
+    window: Window<R>,
+    api_port: u16,
+) -> Result<(), String> {
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
@@ -837,8 +925,11 @@ async fn start_memory_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Res
     Ok(())
 }
 
-/// 启动日志数据中继
-async fn start_logs_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Result<(), String> {
+/// 启动日志数据中继 (内部版本)
+async fn start_logs_relay_internal<R: Runtime>(
+    window: Window<R>,
+    api_port: u16,
+) -> Result<(), String> {
     let window_clone = window.clone();
     let window_for_error = window.clone(); // 用于错误处理的窗口克隆
     let (tx, mut rx) = mpsc::channel(32);
@@ -939,8 +1030,8 @@ async fn start_logs_relay<R: Runtime>(window: Window<R>, api_port: u16) -> Resul
     Ok(())
 }
 
-/// 启动连接数据中继
-async fn start_connections_relay<R: Runtime>(
+/// 启动连接数据中继 (内部版本)
+async fn start_connections_relay_internal<R: Runtime>(
     window: Window<R>,
     api_port: u16,
 ) -> Result<(), String> {
@@ -1068,7 +1159,10 @@ pub async fn is_kernel_running() -> Result<bool, String> {
 
 // 检查内核完整状态（进程 + API）
 #[tauri::command]
-pub async fn check_kernel_status() -> Result<serde_json::Value, String> {
+pub async fn check_kernel_status(api_port: Option<u16>) -> Result<serde_json::Value, String> {
+    // 要求前端必须传递API端口，不使用硬编码默认值
+    let port = api_port.ok_or("API端口参数是必需的，请从前端传递正确的端口配置")?;
+
     let process_running = is_kernel_running().await.unwrap_or(false);
 
     let mut status = serde_json::json!({
@@ -1080,10 +1174,10 @@ pub async fn check_kernel_status() -> Result<serde_json::Value, String> {
     if process_running {
         // 检查API是否可用
         let client = http_client::get_client();
-        let api_url = "http://127.0.0.1:12081/version?token=";
+        let api_url = format!("http://127.0.0.1:{}/version?token=", port);
 
         let api_ready = match client
-            .get(api_url)
+            .get(&api_url)
             .timeout(Duration::from_secs(2))
             .send()
             .await
@@ -1097,7 +1191,7 @@ pub async fn check_kernel_status() -> Result<serde_json::Value, String> {
         // 如果API可用，检查WebSocket
         if api_ready {
             let token = crate::app::core::proxy_service::get_api_token();
-            let ws_ready = check_websocket_endpoints_ready(12081, &token).await;
+            let ws_ready = check_websocket_endpoints_ready(port, &token).await;
             status["websocket_ready"] = serde_json::Value::Bool(ws_ready);
         }
     }

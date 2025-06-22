@@ -7,7 +7,6 @@ import { useConnectionStore } from './ConnectionStore'
 import { useTrafficStore } from './TrafficStore'
 import { useLogStore } from './LogStore'
 import { useKernelRuntimeStore } from './KernelRuntimeStore'
-import { WebSocketService } from '@/services/websocket-service'
 
 // 定义版本信息接口
 export interface VersionInfo {
@@ -84,7 +83,7 @@ export const useKernelStore = defineStore(
       }
     }
 
-    // 启动内核（简化版本，主要依赖后端检查）
+    // 启动内核（简化版本，后端会自动启动 WebSocket 中继）
     const startKernel = async () => {
       console.log('🚀 开始启动内核...')
 
@@ -96,16 +95,16 @@ export const useKernelStore = defineStore(
         appStore.setConnectingState(true)
         console.log('📡 正在启动内核进程...')
 
-        // 启动内核 - 后端会进行完整的就绪检查
-        await tauriApi.kernel.startKernel(proxyMode)
-        console.log('✅ 后端确认内核启动成功')
+        // 确保数据Store已初始化，准备接收数据
+        await ensureDataStoresInitialized()
 
-        // 后端检查通过，设置运行状态
+        // 启动内核 - 后端会自动启动 WebSocket 中继
+        await tauriApi.kernel.startKernel(proxyMode)
+        console.log('✅ 内核启动成功，WebSocket 中继已自动启动')
+
+        // 设置运行状态
         appStore.setRunningState(true)
         appStore.setConnectingState(false)
-
-        // 后台初始化WebSocket连接（非阻塞）
-        initializeWebSocketConnectionsAsync()
 
         // 通知内核状态变更
         mitt.emit('kernel-started')
@@ -138,124 +137,7 @@ export const useKernelStore = defineStore(
       }
     }
 
-    // 定时检查WebSocket连接状态
-    const checkWebSocketConnections = async (wsService: WebSocketService) => {
-      // 连接检查配置 - 针对自动启动进行优化
-      const maxCheckTime = 45000 // 增加到45秒最大检查时间
-      const initialDelay = 3000 // 初始等待时间，给WebSocket服务更多启动时间
-      const checkInterval = 2000 // 增加检查间隔到2秒
-      const maxChecks = Math.floor((maxCheckTime - initialDelay) / checkInterval)
-
-      console.log(`🔌 开始WebSocket连接检查，等待${initialDelay}ms后开始尝试连接...`)
-
-      // 初始延迟，给内核的WebSocket服务更多启动时间
-      await new Promise((resolve) => setTimeout(resolve, initialDelay))
-
-      // 每次检查前清理可能存在的连接
-      await wsService.disconnectAll().catch(() => {})
-
-      // 开始定时检查
-      let isConnected = false
-      let lastError: Error | null = null
-
-      for (let i = 0; i < maxChecks; i++) {
-        console.log(`🔍 检查WebSocket连接状态 (第${i + 1}/${maxChecks}次)...`)
-
-        try {
-          // 尝试建立连接
-          isConnected = await wsService.checkAllConnections()
-
-          if (isConnected) {
-            console.log(`✅ WebSocket连接成功 (第${i + 1}次检查)`)
-            break
-          } else {
-            console.log(`⏳ WebSocket连接尚未就绪，${checkInterval}毫秒后重试...`)
-
-            // 等待指定时间后重试
-            await new Promise((resolve) => setTimeout(resolve, checkInterval))
-          }
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error(String(error))
-          console.error(`❌ WebSocket连接检查出错 (第${i + 1}次): ${error}`)
-
-          // 等待后重试
-          await new Promise((resolve) => setTimeout(resolve, checkInterval))
-        }
-      }
-
-      if (!isConnected) {
-        // 检查内核进程是否真的在运行
-        console.log('🔍 WebSocket连接失败，检查内核进程状态...')
-
-        try {
-          const isKernelRunning = await tauriApi.kernel.isKernelRunning()
-          console.log(`📊 内核进程状态: ${isKernelRunning ? '运行中' : '未运行'}`)
-
-          if (isKernelRunning) {
-            // 内核在运行但WebSocket连接失败，采用兼容模式
-            console.warn('⚠️ 内核进程正在运行但WebSocket连接失败，启用兼容模式')
-
-            // 设置运行状态但不设置WebSocket连接状态
-            appStore.setRunningState(true)
-            appStore.setConnectingState(false)
-
-            // 安排后台重试WebSocket连接（仅重试一次，避免无限循环）
-            setTimeout(() => {
-              console.log('🔄 后台重试WebSocket连接（仅此一次）...')
-              wsService
-                .checkAllConnections()
-                .then((success) => {
-                  if (success) {
-                    console.log('✅ 后台WebSocket连接成功')
-                    mitt.emit('kernel-started')
-                  } else {
-                    console.log('⚠️ 后台WebSocket连接失败，但内核继续运行（不再重试）')
-                  }
-                })
-                .catch((error) => {
-                  console.error('❌ 后台WebSocket连接重试失败（不再重试）:', error)
-                })
-            }, 10000) // 延迟从5秒增加到10秒
-
-            // 返回成功，允许应用继续运行
-            mitt.emit('kernel-started')
-            return true
-          } else {
-            // 内核进程确实没有运行
-            throw new Error('内核进程启动失败')
-          }
-        } catch (checkError) {
-          console.error('❌ 检查内核进程状态失败:', checkError)
-          // 如果无法检查内核状态，还是抛出原始错误
-        }
-
-        // 所有检查都失败，尝试停止内核并报错
-        console.error(`❌ WebSocket连接在${maxCheckTime / 1000}秒内检查失败，内核可能未正常启动`)
-        console.error('最后一次错误:', lastError)
-
-        // 清理资源
-        clearTimers()
-        await wsService.disconnectAll().catch(() => {})
-        await tauriApi.kernel.stopKernel().catch(() => {})
-
-        // 重置连接状态
-        appStore.setConnectingState(false)
-
-        // 抛出错误
-        throw new Error(
-          `启动失败: WebSocket服务在${maxCheckTime / 1000}秒内未就绪，请检查配置或网络问题`,
-        )
-      }
-
-      // 成功建立WebSocket连接，设置运行状态
-      appStore.setRunningState(true)
-      appStore.setConnectingState(false)
-
-      // 通知内核状态变更
-      mitt.emit('kernel-started')
-
-      return true
-    }
+    // WebSocket 连接现在由后端自动处理
 
     // 停止内核
     const stopKernel = async () => {
@@ -264,11 +146,7 @@ export const useKernelStore = defineStore(
         clearTimers()
         cleanupEventListeners()
 
-        // 断开所有 WebSocket 连接
-        const wsService = WebSocketService.getInstance()
-        await wsService.disconnectAll()
-
-        // 停止内核
+        // 停止内核（后端会自动清理 WebSocket 连接）
         await tauriApi.kernel.stopKernel()
 
         // 设置运行状态
@@ -382,36 +260,7 @@ export const useKernelStore = defineStore(
       logStore.cleanupListeners()
     }
 
-    // 后台初始化WebSocket连接（非阻塞）
-    const initializeWebSocketConnectionsAsync = async () => {
-      console.log('🔌 后台初始化WebSocket连接...')
-
-      try {
-        // 获取API token
-        const token = await tauriApi.proxy.getApiToken()
-        const wsService = WebSocketService.getInstance()
-        wsService.setToken(token)
-
-        // 启动WebSocket数据中继
-        await tauriApi.kernel.startWebSocketRelay()
-
-        // 确保相关Store已初始化（自动启动时很重要）
-        console.log('📦 确保相关Store已初始化...')
-        await ensureDataStoresInitialized()
-
-        // 尝试建立WebSocket连接
-        const success = await wsService.checkAllConnections()
-
-        if (success) {
-          console.log('✅ WebSocket连接成功建立')
-        } else {
-          console.warn('⚠️ WebSocket连接建立失败，但内核继续运行')
-        }
-      } catch (error) {
-        console.error('❌ WebSocket连接初始化失败:', error)
-        // 不抛出错误，让内核继续运行
-      }
-    }
+    // WebSocket 连接现在由后端自动处理，这个函数已废弃
 
     // 确保数据相关的Store已初始化
     const ensureDataStoresInitialized = async () => {
@@ -463,20 +312,7 @@ export const useKernelStore = defineStore(
       }
     }
 
-    // 设置WebSocket连接
-    const setupWebsocketConnection = async () => {
-      try {
-        // 启动WebSocket数据中继
-        await tauriApi.kernel.startWebSocketRelay()
-
-        // 设置WebSocket连接检查
-        const wsService = WebSocketService.getInstance()
-        return await checkWebSocketConnections(wsService)
-      } catch (error) {
-        console.error('设置WebSocket连接失败:', error)
-        throw error
-      }
-    }
+    // WebSocket 连接现在由后端自动处理
 
     // 重置临时数据 (应用启动时调用) - 现在委托给运行时store
     const resetTemporaryData = () => {
@@ -520,8 +356,6 @@ export const useKernelStore = defineStore(
       startKernel,
       stopKernel,
       restartKernel,
-      setupWebsocketConnection,
-      initializeWebSocketConnectionsAsync,
       toggleIpVersion,
       initEventListeners,
       cleanupEventListeners,

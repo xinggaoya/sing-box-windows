@@ -32,8 +32,10 @@ interface VersionInfo {
 // 内核相关接口
 export const kernelApi = {
   // 启动内核
-  startKernel: (proxyMode?: string) => {
+  startKernel: async (proxyMode?: string) => {
     const appStore = useAppStore()
+    // 等待数据恢复完成，确保端口配置正确
+    await appStore.waitForDataRestore()
     return invoke<void>('start_kernel', { proxyMode, apiPort: appStore.apiPort })
   },
 
@@ -41,7 +43,12 @@ export const kernelApi = {
   stopKernel: () => invoke<void>('stop_kernel'),
 
   // 重启内核
-  restartKernel: () => invoke<void>('restart_kernel'),
+  restartKernel: async () => {
+    const appStore = useAppStore()
+    // 等待数据恢复完成，确保端口配置正确
+    await appStore.waitForDataRestore()
+    return invoke<void>('restart_kernel', { apiPort: appStore.apiPort })
+  },
 
   // 检查内核版本
   checkKernelVersion: () => invoke<string>('check_kernel_version'),
@@ -50,8 +57,10 @@ export const kernelApi = {
   downloadLatestKernel: () => invoke<void>('download_latest_kernel'),
 
   // 启动WebSocket中继
-  startWebSocketRelay: () => {
+  startWebSocketRelay: async () => {
     const appStore = useAppStore()
+    // 等待数据恢复完成，确保端口配置正确
+    await appStore.waitForDataRestore()
     return invoke<void>('start_websocket_relay', { apiPort: appStore.apiPort })
   },
 
@@ -59,12 +68,16 @@ export const kernelApi = {
   isKernelRunning: () => invoke<boolean>('is_kernel_running'),
 
   // 检查内核完整状态
-  checkKernelStatus: () =>
-    invoke<{
+  checkKernelStatus: async () => {
+    const appStore = useAppStore()
+    // 等待数据恢复完成，确保端口配置正确
+    await appStore.waitForDataRestore()
+    return invoke<{
       process_running: boolean
       api_ready: boolean
       websocket_ready: boolean
-    }>('check_kernel_status'),
+    }>('check_kernel_status', { apiPort: appStore.apiPort })
+  },
 }
 
 // 代理相关接口

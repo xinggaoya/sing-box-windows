@@ -54,6 +54,12 @@ export const useAppStore = defineStore(
     // 连接中状态（正在启动内核但尚未完成连接）
     const isConnecting = ref(false)
 
+    // 数据恢复完成标志 - 解决启动竞态条件
+    const isDataRestored = ref(false)
+    // 数据恢复Promise，用于等待恢复完成
+    let dataRestorePromise: Promise<void> | null = null
+    let dataRestoreResolve: (() => void) | null = null
+
     // 托盘实例ID - 由TrayStore使用
     const trayInstanceId = ref<string | null>(null)
 
@@ -74,8 +80,60 @@ export const useAppStore = defineStore(
     const proxyPort = ref(12080) // 代理端口
     const apiPort = ref(12081) // API端口
 
+    // 初始化数据恢复Promise
+    const initializeDataRestore = () => {
+      if (!dataRestorePromise) {
+        dataRestorePromise = new Promise<void>((resolve) => {
+          dataRestoreResolve = resolve
+        })
+      }
+    }
+
+    // 标记数据恢复完成
+    const markDataRestored = () => {
+      console.log('📋 AppStore 数据恢复完成，端口配置：', {
+        proxyPort: proxyPort.value,
+        apiPort: apiPort.value,
+      })
+      isDataRestored.value = true
+      if (dataRestoreResolve) {
+        dataRestoreResolve()
+        dataRestoreResolve = null
+      }
+    }
+
+    // 等待数据恢复完成
+    const waitForDataRestore = async (timeout = 5000): Promise<boolean> => {
+      if (isDataRestored.value) {
+        return true
+      }
+
+      if (!dataRestorePromise) {
+        console.warn('⚠️ 数据恢复Promise未初始化，可能存在时序问题')
+        return false
+      }
+
+      try {
+        await Promise.race([
+          dataRestorePromise,
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('数据恢复超时')), timeout)
+          }),
+        ])
+        return true
+      } catch (error) {
+        console.error('等待数据恢复失败:', error)
+        // 即使超时也标记为已恢复，使用当前值
+        markDataRestored()
+        return false
+      }
+    }
+
     // Store初始化方法
     const initializeStore = async () => {
+      // 初始化数据恢复Promise
+      initializeDataRestore()
+
       autoStartApp.value = await isEnabled()
 
       // 添加对WebSocket连接状态的监听
@@ -126,6 +184,24 @@ export const useAppStore = defineStore(
         // 如果设置为运行中，启动WebSocket连接检查
         if (state) {
           startWebSocketCheck()
+
+          // 添加延迟检查机制，确保 WebSocket 连接建立
+          setTimeout(async () => {
+            if (isRunning.value && !wsConnected.value) {
+              console.log('⚠️ 内核运行中但 WebSocket 未连接，尝试手动建立连接...')
+              try {
+                const { webSocketService } = await import('@/services/websocket-service')
+                const success = await webSocketService.ensureWebSocketConnection()
+                if (success) {
+                  console.log('✅ 手动 WebSocket 连接建立成功')
+                } else {
+                  console.warn('❌ 手动 WebSocket 连接建立失败')
+                }
+              } catch (error) {
+                console.error('手动建立 WebSocket 连接时出错:', error)
+              }
+            }
+          }, 3000) // 3秒后检查
         } else {
           // 如果设置为停止，清除WebSocket连接
           wsConnected.value = false
@@ -145,28 +221,20 @@ export const useAppStore = defineStore(
       mitt.emit('connecting-status-changed', state)
     }
 
-    // 启动WebSocket连接检查
+    // 启动WebSocket连接检查 - 简化版本，主要依赖事件系统
     const startWebSocketCheck = async (): Promise<boolean> => {
       try {
-        // 动态导入WebSocketService避免循环依赖
-        const { WebSocketService } = await import('@/services/websocket-service')
-        const wsService = WebSocketService.getInstance()
+        // 新的WebSocket服务是事件驱动的，由后端自动管理
+        // 这里只需要记录日志，实际连接状态通过事件更新
+        console.log('🔌 WebSocket 连接检查 - 依赖后端自动管理')
 
-        // 设置API端口
-        wsService.setApiPort(apiPort.value)
-
-        // 通过事件总线检查所有连接，而不是直接调用store方法
-        const success = await wsService.checkAllConnections()
-
-        if (success) {
-          wsConnected.value = true
-          console.log('WebSocket连接检查成功')
-        } else {
-          wsConnected.value = false
-          console.log('WebSocket连接检查失败')
+        // 如果当前状态是运行中，假设WebSocket会自动连接
+        if (isRunning.value) {
+          console.log('内核运行中，WebSocket 应该会自动连接')
+          return true
         }
 
-        return success
+        return false
       } catch (error) {
         console.error('WebSocket连接检查出错:', error)
         wsConnected.value = false
@@ -227,6 +295,7 @@ export const useAppStore = defineStore(
       isRunning,
       wsConnected,
       isConnecting,
+      isDataRestored,
       trayInstanceId,
       proxyMode,
       autoStartApp,
@@ -249,6 +318,8 @@ export const useAppStore = defineStore(
       syncPortsToSingbox,
       initializeStore,
       cleanupStore,
+      markDataRestored,
+      waitForDataRestore,
     }
   },
   {

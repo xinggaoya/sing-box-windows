@@ -128,7 +128,7 @@ export const useProxyStore = defineStore('proxy', () => {
     try {
       if (index >= 0 && index < nodeList.value.length) {
         const nodeName = nodeList.value[index]
-        await tauriApi.proxy.changeProxy('GLOBAL', nodeName)
+        await tauriApi.proxy.changeProxy('GLOBAL', nodeName, appStore.apiPort)
         selectedNodeIndex.value = index
         return true
       }

@@ -4,7 +4,12 @@ import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
 import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
-import { WebSocketService, ConnectionState } from '@/services/websocket-service'
+// 定义连接状态接口
+interface ConnectionState {
+  connected: boolean
+  connecting: boolean
+  error: Error | null
+}
 
 // 定义连接数据接口
 interface ConnectionMetadata {
@@ -40,13 +45,10 @@ interface ConnectionsData {
 export const useConnectionStore = defineStore(
   'connection',
   () => {
-    // WebSocket 服务实例
-    const wsService = WebSocketService.getInstance()
-
-    // 连接数据配置（更严格的限制）
-    const MAX_CONNECTIONS = 200 // 减少最大保存连接数，从500减少到200
-    const CONNECTION_CLEANUP_THRESHOLD = 150 // 减少清理阈值，从400减少到150
-    const CONNECTION_RETAIN_COUNT = 100 // 减少保留数量，从200减少到100
+    // 连接数据配置
+    const MAX_CONNECTIONS = 500 // 最大保存连接数
+    const CONNECTION_CLEANUP_THRESHOLD = 400 // 清理阈值
+    const CONNECTION_RETAIN_COUNT = 200 // 清理后保留的连接数
 
     // 连接状态
     const connectionsState = ref<ConnectionState>({
@@ -91,95 +93,59 @@ export const useConnectionStore = defineStore(
     // Mitt事件监听器状态
     let mittListenersRegistered = false
 
-    // 健康检查函数 - 连接数据（优化版本）
+    // 健康检查函数 - 连接数据
     const startConnectionsHealthCheck = () => {
       // 清除已有的定时器
       if (connectionsHealthCheck !== null) {
         clearInterval(connectionsHealthCheck)
       }
 
-      // 降低检查频率：每30秒检查一次，而不是5秒
+      // 设置新的定时器，每5秒检查一次
       connectionsHealthCheck = window.setInterval(() => {
-        // 只有在明确连接但长时间无数据时才重连
-        const shouldReconnect =
-          connectionsState.value.connected &&
-          connections.value.length === 0 && // 完全没有连接数据
-          Date.now() - memory.value.lastUpdated > 60000 // 超过1分钟没有任何数据更新
+        const lastConnection =
+          connections.value.length > 0 ? connections.value[connections.value.length - 1] : null
 
-        if (shouldReconnect) {
-          console.log('🔄 连接健康检查：长时间无数据，尝试重连')
+        // 如果超过15秒没有新数据且状态为已连接，尝试重新连接
+        if (
+          connectionsState.value.connected &&
+          (!lastConnection || Date.now() - new Date(lastConnection.start).getTime() > 15000)
+        ) {
           reconnectConnectionsWebSocket()
         }
-      }, 30000) // 30秒检查一次
+      }, 5000)
     }
 
-    // 健康检查函数 - 内存数据（优化版本）
+    // 健康检查函数 - 内存数据
     const startMemoryHealthCheck = () => {
       // 清除已有的定时器
       if (memoryHealthCheck !== null) {
         clearInterval(memoryHealthCheck)
       }
 
-      // 降低检查频率：每30秒检查一次
+      // 设置新的定时器，每5秒检查一次
       memoryHealthCheck = window.setInterval(() => {
-        // 只有在长时间没有内存数据更新时才重连
-        const shouldReconnect =
-          memoryState.value.connected && Date.now() - memory.value.lastUpdated > 120000 // 超过2分钟没有内存数据更新
-
-        if (shouldReconnect) {
-          console.log('🔄 内存健康检查：长时间无数据，尝试重连')
+        // 如果超过10秒没有更新数据且状态为已连接，尝试重新连接
+        if (memoryState.value.connected && Date.now() - memory.value.lastUpdated > 10000) {
           reconnectMemoryWebSocket()
         }
-      }, 30000) // 30秒检查一次
+      }, 5000)
     }
 
-    // 重新连接连接WebSocket（优化版本）
+    // 重新连接连接WebSocket (现在通过后端处理)
     const reconnectConnectionsWebSocket = async () => {
       try {
-        console.log('🔌 重新连接连接WebSocket...')
-
-        // 断开现有连接
-        await wsService.disconnect('connections')
-
-        // 增加延迟，避免频繁重连：3秒而不是1秒
-        setTimeout(async () => {
-          try {
-            const success = await wsService.connect('connections')
-            if (success) {
-              console.log('✅ 连接WebSocket重连成功')
-            } else {
-              console.log('❌ 连接WebSocket重连失败')
-            }
-          } catch (error) {
-            console.error('连接WebSocket重连异常:', error)
-          }
-        }, 3000)
+        // 通过WebSocket服务重新连接
+        mitt.emit('websocket-reconnect', 'connections')
       } catch (error) {
         console.error('重新连接连接WebSocket失败:', error)
       }
     }
 
-    // 重新连接内存WebSocket（优化版本）
+    // 重新连接内存WebSocket (现在通过后端处理)
     const reconnectMemoryWebSocket = async () => {
       try {
-        console.log('🧠 重新连接内存WebSocket...')
-
-        // 断开现有连接
-        await wsService.disconnect('memory')
-
-        // 增加延迟，避免频繁重连：3秒而不是1秒
-        setTimeout(async () => {
-          try {
-            const success = await wsService.connect('memory')
-            if (success) {
-              console.log('✅ 内存WebSocket重连成功')
-            } else {
-              console.log('❌ 内存WebSocket重连失败')
-            }
-          } catch (error) {
-            console.error('内存WebSocket重连异常:', error)
-          }
-        }, 3000)
+        // 通过WebSocket服务重新连接
+        mitt.emit('websocket-reconnect', 'memory')
       } catch (error) {
         console.error('重新连接内存WebSocket失败:', error)
       }
@@ -312,31 +278,29 @@ export const useConnectionStore = defineStore(
       console.log(`🧹 清理连接数据，保留 ${connections.value.length} 条最新连接`)
     }
 
-    // 启动内存监控（优化版本）
+    // 启动内存监控
     const startMemoryMonitoring = () => {
       if (memoryCleanupTimer) {
         clearInterval(memoryCleanupTimer)
       }
 
-      // 降低监控频率：从30秒改为60秒
       memoryCleanupTimer = window.setInterval(() => {
         // 检查连接数量并进行清理
         if (connections.value.length >= CONNECTION_CLEANUP_THRESHOLD) {
-          console.log(`🧹 连接数量达到 ${connections.value.length}，开始清理`)
           smartConnectionCleanup()
         }
 
-        // 检查内存数据时效性（放宽检查条件）
+        // 检查内存数据时效性
         const now = Date.now()
-        if (now - memory.value.lastUpdated > 300000) {
-          // 5分钟无更新，之前是1分钟
+        if (now - memory.value.lastUpdated > 60000) {
+          // 1分钟无更新
           // 可能需要重新连接内存监控
           if (memoryState.value.connected) {
             console.log('🔄 内存数据长时间未更新，尝试重新连接')
             reconnectMemoryWebSocket()
           }
         }
-      }, 60 * 1000) // 60秒检查一次，之前是30秒
+      }, 30 * 1000) // 30秒检查一次
     }
 
     // 停止内存监控
@@ -347,24 +311,14 @@ export const useConnectionStore = defineStore(
       }
     }
 
-    // 更新连接数据（优化版本，减少频繁更新）
+    // 更新连接数据（优化版本）
     const updateConnections = (data: ConnectionsData) => {
       try {
         if (data?.connections && Array.isArray(data.connections)) {
-          // 进一步限制连接数量以防止内存溢出
+          // 限制连接数量以防止内存溢出
           const newConnections = data.connections.slice(0, MAX_CONNECTIONS)
+          connections.value = newConnections
 
-          // 只有在连接数据有明显变化时才更新
-          const hasSignificantChange =
-            Math.abs(connections.value.length - newConnections.length) > 5 || // 连接数变化超过5个
-            connections.value.length === 0 // 或者当前没有连接数据
-
-          if (hasSignificantChange) {
-            connections.value = newConnections
-            console.log(`📊 更新连接数据：${newConnections.length} 个连接`)
-          }
-
-          // 总计数据总是更新
           connectionsTotal.value = {
             upload: data.uploadTotal || 0,
             download: data.downloadTotal || 0,
