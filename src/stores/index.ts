@@ -13,6 +13,7 @@ export * from './app/UpdateStore'
 
 // 导出内核相关Store
 export * from './kernel/KernelStore'
+export * from './kernel/KernelRuntimeStore'
 export * from './kernel/ProxyStore'
 export * from './kernel/ConnectionStore'
 export * from './kernel/TrafficStore'
@@ -217,6 +218,11 @@ function piniaTauriPersist(context: PiniaPluginContext) {
 
   // 监听状态变化，使用防抖保存到 Tauri Store
   store.$subscribe(async (mutation, state) => {
+    // 在开发环境下输出调试信息
+    if (import.meta.env.DEV) {
+      console.log(`📊 Store ${storeKey} 状态变化:`, mutation.type, mutation.storeId)
+    }
+
     // 对于高频更新的store使用防抖保存
     if (isHighFrequency) {
       saveTaskManager.debounceSave(storeKey, createSaveTask(state))
@@ -224,6 +230,11 @@ function piniaTauriPersist(context: PiniaPluginContext) {
       // 普通store直接保存
       try {
         await createSaveTask(state)()
+
+        // 在开发环境下输出保存信息
+        if (import.meta.env.DEV) {
+          console.log(`💾 已保存 ${storeKey}`)
+        }
       } catch (error) {
         console.error(`保存状态失败:`, error)
       }

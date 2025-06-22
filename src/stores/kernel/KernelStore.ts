@@ -6,6 +6,7 @@ import { useAppStore } from '../app/AppStore'
 import { useConnectionStore } from './ConnectionStore'
 import { useTrafficStore } from './TrafficStore'
 import { useLogStore } from './LogStore'
+import { useKernelRuntimeStore } from './KernelRuntimeStore'
 import { WebSocketService } from '@/services/websocket-service'
 
 // 定义版本信息接口
@@ -25,19 +26,9 @@ export const useKernelStore = defineStore(
     // 应用状态
     const appStore = useAppStore()
 
-    // 版本信息
+    // 版本信息 (需要持久化)
     const version = ref<VersionInfo>({ version: '', meta: true, premium: true })
     const newVersion = ref('')
-
-    // 内存使用信息
-    const memory = ref({
-      inuse: 0,
-      oslimit: 0,
-    })
-
-    // 程序运行时间（秒）
-    const uptime = ref(0)
-    let uptimeInterval: NodeJS.Timeout | null = null
 
     // 下载检查定时器
     let downloadCheckInterval: NodeJS.Timeout | null = null
@@ -47,10 +38,6 @@ export const useKernelStore = defineStore(
 
     // 清理所有定时器
     const clearTimers = () => {
-      if (uptimeInterval) {
-        clearInterval(uptimeInterval)
-        uptimeInterval = null
-      }
       if (downloadCheckInterval) {
         clearInterval(downloadCheckInterval)
         downloadCheckInterval = null
@@ -102,12 +89,6 @@ export const useKernelStore = defineStore(
       console.log('🚀 开始启动内核...')
 
       try {
-        // 初始化运行时间计数器
-        uptime.value = 0
-        uptimeInterval = setInterval(() => {
-          uptime.value += 1
-        }, 1000)
-
         // 获取当前代理模式
         const proxyMode = appStore.proxyMode || 'manual'
 
@@ -218,9 +199,9 @@ export const useKernelStore = defineStore(
             appStore.setRunningState(true)
             appStore.setConnectingState(false)
 
-            // 安排后台重试WebSocket连接
+            // 安排后台重试WebSocket连接（仅重试一次，避免无限循环）
             setTimeout(() => {
-              console.log('🔄 后台重试WebSocket连接...')
+              console.log('🔄 后台重试WebSocket连接（仅此一次）...')
               wsService
                 .checkAllConnections()
                 .then((success) => {
@@ -228,13 +209,13 @@ export const useKernelStore = defineStore(
                     console.log('✅ 后台WebSocket连接成功')
                     mitt.emit('kernel-started')
                   } else {
-                    console.log('⚠️ 后台WebSocket连接仍失败，但内核继续运行')
+                    console.log('⚠️ 后台WebSocket连接失败，但内核继续运行（不再重试）')
                   }
                 })
                 .catch((error) => {
-                  console.error('❌ 后台WebSocket连接重试失败:', error)
+                  console.error('❌ 后台WebSocket连接重试失败（不再重试）:', error)
                 })
-            }, 5000)
+            }, 10000) // 延迟从5秒增加到10秒
 
             // 返回成功，允许应用继续运行
             mitt.emit('kernel-started')
@@ -296,13 +277,12 @@ export const useKernelStore = defineStore(
         // 重置所有相关数据
         const connectionStore = useConnectionStore()
         const trafficStore = useTrafficStore()
-
-        // 重置内存使用信息
-        memory.value = { inuse: 0, oslimit: 0 }
+        const runtimeStore = useKernelRuntimeStore()
 
         // 重置数据
         connectionStore.resetData()
         trafficStore.resetStats()
+        runtimeStore.resetRuntimeData()
 
         // 通知内核状态变更
         mitt.emit('kernel-stopped')
@@ -365,22 +345,13 @@ export const useKernelStore = defineStore(
         // 检查是否有新版本
         await checkKernelVersion()
 
-        // 初始化运行时间计数器
-        if (appStore.isRunning && !uptimeInterval) {
-          uptime.value = 0
-          uptimeInterval = setInterval(() => {
-            uptime.value += 1
-          }, 1000)
-        }
-
         // 初始化连接监听器
         const connectionStore = useConnectionStore()
-        await connectionStore.setupConnectionsListener()
-        await connectionStore.setupMemoryListener()
+        connectionStore.setupMittListeners()
 
         // 初始化流量监听器
         const trafficStore = useTrafficStore()
-        await trafficStore.setupTrafficListener()
+        trafficStore.setupMittListeners()
 
         // 初始化日志监听器
         const logStore = useLogStore()
@@ -507,11 +478,43 @@ export const useKernelStore = defineStore(
       }
     }
 
+    // 重置临时数据 (应用启动时调用) - 现在委托给运行时store
+    const resetTemporaryData = () => {
+      // 获取运行时store并重置数据
+      const runtimeStore = useKernelRuntimeStore()
+      runtimeStore.resetRuntimeData()
+
+      // 清理可能存在的定时器
+      clearTimers()
+
+      console.log('🔄 临时数据已重置')
+    }
+
+    // Store初始化方法
+    const initializeStore = async () => {
+      try {
+        // 获取运行时store并初始化
+        const runtimeStore = useKernelRuntimeStore()
+        runtimeStore.initializeStore()
+
+        // 如果应用正在运行，恢复运行时间计数器
+        if (appStore.isRunning) {
+          runtimeStore.startUptimeCounter()
+          console.log('⏱️ 恢复运行时间计数器')
+        }
+
+        console.log('✅ KernelStore初始化完成')
+      } catch (error) {
+        console.error('❌ KernelStore初始化失败:', error)
+      }
+    }
+
     return {
+      // 持久化数据
       version,
       newVersion,
-      memory,
-      uptime,
+
+      // 方法
       updateVersion,
       checkKernelVersion,
       startKernel,
@@ -522,9 +525,16 @@ export const useKernelStore = defineStore(
       toggleIpVersion,
       initEventListeners,
       cleanupEventListeners,
+      resetTemporaryData: () => {
+        // 委托给运行时store处理
+        const runtimeStore = useKernelRuntimeStore()
+        runtimeStore.resetRuntimeData()
+      },
+      initializeStore,
     }
   },
   {
+    // 现在只包含版本信息，可以安全持久化
     persist: true,
   },
 )

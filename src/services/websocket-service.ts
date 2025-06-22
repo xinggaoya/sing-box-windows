@@ -1,5 +1,6 @@
 import WebSocket from '@tauri-apps/plugin-websocket'
 import mitt from '@/utils/mitt'
+import { wsMonitor } from '@/utils/websocket-monitor'
 
 /**
  * WebSocket 连接状态接口
@@ -109,18 +110,24 @@ export class WebSocketService {
   }
 
   /**
-   * 处理内存清理请求
+   * 处理内存清理请求（优化版本）
    */
   private handleMemoryCleanup() {
+    console.log('🧹 WebSocket服务接收到内存清理请求')
+
     // 清理所有重连定时器
     Object.keys(this.reconnectTimers).forEach((key) => {
       this.clearReconnectTimer(key)
     })
 
-    // 如果连接过多，考虑重新建立连接以释放内存
+    // 获取活跃连接数量
     const activeConnections = this.getActiveConnectionCount()
-    if (activeConnections > 3) {
-      console.log('🧹 重新建立WebSocket连接以释放内存')
+    console.log(`📊 当前活跃WebSocket连接数: ${activeConnections}`)
+
+    // 提高重建连接的阈值，避免不必要的重连
+    if (activeConnections > 4) {
+      // 从3增加到4
+      console.log('🔄 连接数过多，重新建立WebSocket连接以释放内存')
       this.reconnectAllConnections()
     }
   }
@@ -140,9 +147,11 @@ export class WebSocketService {
   }
 
   /**
-   * 重新建立所有连接
+   * 重新建立所有连接（优化版本）
    */
   private async reconnectAllConnections() {
+    console.log('🔄 开始重新建立所有WebSocket连接')
+
     const activeTypes: string[] = []
     if (this.connectionWs) activeTypes.push('connections')
     if (this.trafficWs) activeTypes.push('traffic')
@@ -151,15 +160,23 @@ export class WebSocketService {
     if (this.proxyWs) activeTypes.push('proxy')
     if (this.rulesWs) activeTypes.push('rules')
 
+    console.log(`📋 需要重连的WebSocket类型: ${activeTypes.join(', ')}`)
+
     // 先断开所有连接
     await this.disconnectAll()
 
-    // 延迟重新连接
+    // 增加延迟，避免立即重连：从1秒增加到3秒
     setTimeout(() => {
-      activeTypes.forEach((type) => {
-        this.connect(type).catch(console.error)
+      activeTypes.forEach((type, index) => {
+        // 为每个连接添加递增延迟，避免同时重连
+        setTimeout(() => {
+          console.log(`🔌 重连 ${type} WebSocket`)
+          this.connect(type).catch((error) => {
+            console.error(`重连 ${type} WebSocket失败:`, error)
+          })
+        }, index * 1000) // 每个连接间隔1秒
       })
-    }, 1000)
+    }, 3000) // 总体延迟3秒
   }
 
   /**
@@ -247,22 +264,27 @@ export class WebSocketService {
   }
 
   /**
-   * 设置重连计时器
+   * 设置重连计时器（优化版本）
    */
-  private scheduleReconnect(type: string, delay: number = 3000) {
+  private scheduleReconnect(type: string, delay: number = 5000) {
+    // 默认延迟从3秒增加到5秒
     // 如果已被销毁，不设置重连
     if (this.isDestroyed) return
 
     // 先清除可能存在的旧计时器
     this.clearReconnectTimer(type)
 
-    // 设置新的重连计时器
+    // 设置新的重连计时器，增加更长的延迟
     this.reconnectTimers[type] = window.setTimeout(() => {
       if (this.isDestroyed) return
 
+      console.log(`🔄 尝试重连 ${type} WebSocket`)
       this.connect(type).catch((err) => {
-        // 重连失败时，再次调度重连，延迟时间增加
-        this.scheduleReconnect(type, Math.min(delay * 1.5, 30000))
+        console.error(`重连 ${type} 失败:`, err)
+        // 重连失败时，再次调度重连，延迟时间显著增加
+        const nextDelay = Math.min(delay * 2, 60000) // 最大延迟增加到60秒
+        console.log(`⏰ ${type} 将在 ${nextDelay / 1000}秒 后重试`)
+        this.scheduleReconnect(type, nextDelay)
       })
     }, delay)
   }
@@ -274,6 +296,9 @@ export class WebSocketService {
    */
   public async connect(type: string): Promise<boolean> {
     try {
+      // 记录连接尝试
+      wsMonitor.logRequest('ws-connect', undefined, { type })
+
       // 如果已被销毁，直接返回失败
       if (this.isDestroyed) return false
 

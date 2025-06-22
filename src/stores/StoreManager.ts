@@ -13,6 +13,7 @@ export type StoreType =
   | 'window'
   | 'update'
   | 'kernel'
+  | 'kernel-runtime'
   | 'proxy'
   | 'connection'
   | 'traffic'
@@ -73,6 +74,29 @@ function registerStoreInitializers() {
     const { useKernelStore } = await import('./kernel/KernelStore')
     const store = useKernelStore()
     storeInstances.set('kernel', store)
+
+    // 延迟初始化Store，重置临时数据
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore().catch(console.error)
+      }
+    }, 0)
+
+    return store
+  })
+
+  storeInitializers.set('kernel-runtime', async () => {
+    const { useKernelRuntimeStore } = await import('./kernel/KernelRuntimeStore')
+    const store = useKernelRuntimeStore()
+    storeInstances.set('kernel-runtime', store)
+
+    // 延迟初始化Store
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore()
+      }
+    }, 0)
+
     return store
   })
 
