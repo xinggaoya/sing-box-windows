@@ -561,5 +561,8 @@ export default {
     tryingToConnectWebSocket: 'Trying to connect to WebSocket service',
     webSocketConnected: 'WebSocket connected successfully',
     webSocketConnectionFailed: 'WebSocket connection failed, but kernel is still running',
+    applyingTunMode: 'Applying TUN mode configuration...',
+    tunConfigApplied: 'TUN mode configuration applied',
+    tunModeApplyFailed: 'TUN mode application failed',
   },
 }

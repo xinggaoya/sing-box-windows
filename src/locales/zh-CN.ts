@@ -551,5 +551,8 @@ export default {
     webSocketConnected: 'WebSocket连接成功',
     webSocketConnectionFailed: 'WebSocket连接失败，但内核仍在运行中',
     autoStartFailed: '自动启动内核失败，请手动启动或检查配置',
+    applyingTunMode: '正在应用TUN模式配置...',
+    tunConfigApplied: 'TUN模式配置已应用',
+    tunModeApplyFailed: 'TUN模式应用失败',
   },
 }

@@ -561,5 +561,8 @@ export default {
     tryingToConnectWebSocket: 'WebSocketサービスに接続を試行中',
     webSocketConnected: 'WebSocket接続成功',
     webSocketConnectionFailed: 'WebSocket接続失敗、ただしカーネルは動作中です',
+    applyingTunMode: 'TUNモード設定を適用中...',
+    tunConfigApplied: 'TUNモード設定が適用されました',
+    tunModeApplyFailed: 'TUNモード適用に失敗しました',
   },
 }

@@ -565,5 +565,8 @@ export default {
     tryingToConnectWebSocket: 'Попытка подключения к сервису WebSocket',
     webSocketConnected: 'WebSocket подключение успешно',
     webSocketConnectionFailed: 'Ошибка подключения WebSocket, но ядро продолжает работать',
+    applyingTunMode: 'Применение конфигурации режима TUN...',
+    tunConfigApplied: 'Конфигурация режима TUN применена',
+    tunModeApplyFailed: 'Ошибка применения режима TUN',
   },
 }

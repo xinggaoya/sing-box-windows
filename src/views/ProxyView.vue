@@ -49,7 +49,7 @@
         </div>
 
         <div v-else class="proxy-groups">
-          <div v-for="group in proxyGroups" :key="group.name" class="group-section">
+          <div v-for="group in [...proxyGroups].reverse()" :key="group.name" class="group-section">
             <!-- 组头部信息 -->
             <div class="group-header">
               <div class="group-title-section">

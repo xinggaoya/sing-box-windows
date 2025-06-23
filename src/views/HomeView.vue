@@ -337,15 +337,47 @@ const isRouteActive = computed(() => route.path === '/')
 
 const statusRingClass = computed(() => {
   if (isStarting.value || appState.isConnecting) return 'status-connecting'
-  if (appState.isRunning && appState.wsConnected) return 'status-running'
-  if (appState.isRunning && !appState.wsConnected) return 'status-error'
+
+  // 改进状态判断逻辑
+  if (appState.isRunning) {
+    const hasTrafficData =
+      trafficStore.traffic.up > 0 ||
+      trafficStore.traffic.down > 0 ||
+      trafficStore.traffic.totalUp > 0 ||
+      trafficStore.traffic.totalDown > 0
+    const hasConnectionData =
+      connectionStore.connections.length > 0 || connectionStore.memory.inuse > 0
+
+    if (appState.wsConnected || hasTrafficData || hasConnectionData) {
+      return 'status-running'
+    } else {
+      return 'status-connecting' // 内核运行但正在建立连接
+    }
+  }
+
   return 'status-stopped'
 })
 
 const statusIconClass = computed(() => {
   if (isStarting.value || appState.isConnecting) return 'icon-connecting'
-  if (appState.isRunning && appState.wsConnected) return 'icon-running'
-  if (appState.isRunning && !appState.wsConnected) return 'icon-error'
+
+  // 改进状态判断逻辑
+  if (appState.isRunning) {
+    const hasTrafficData =
+      trafficStore.traffic.up > 0 ||
+      trafficStore.traffic.down > 0 ||
+      trafficStore.traffic.totalUp > 0 ||
+      trafficStore.traffic.totalDown > 0
+    const hasConnectionData =
+      connectionStore.connections.length > 0 || connectionStore.memory.inuse > 0
+
+    if (appState.wsConnected || hasTrafficData || hasConnectionData) {
+      return 'icon-running'
+    } else {
+      return 'icon-connecting' // 内核运行但正在建立连接
+    }
+  }
+
   return 'icon-stopped'
 })
 
@@ -405,16 +437,50 @@ const statsData = computed(() => [
 const getStatusTitle = () => {
   if (isStarting.value || appState.isConnecting) return t('home.status.starting')
   if (isStopping.value) return t('home.status.stopping')
-  if (appState.isRunning && appState.wsConnected) return t('home.status.running')
-  if (appState.isRunning && !appState.wsConnected) return t('home.status.disconnected')
+
+  // 改进状态判断逻辑：如果内核运行中，优先显示运行状态
+  if (appState.isRunning) {
+    // 如果有流量数据或连接数据，认为连接正常
+    const hasTrafficData =
+      trafficStore.traffic.up > 0 ||
+      trafficStore.traffic.down > 0 ||
+      trafficStore.traffic.totalUp > 0 ||
+      trafficStore.traffic.totalDown > 0
+    const hasConnectionData =
+      connectionStore.connections.length > 0 || connectionStore.memory.inuse > 0
+
+    if (appState.wsConnected || hasTrafficData || hasConnectionData) {
+      return t('home.status.running')
+    } else {
+      // 内核运行但暂无数据，可能正在连接中
+      return t('home.status.starting')
+    }
+  }
+
   return t('home.status.stopped')
 }
 
 const getStatusSubtitle = () => {
   if (isStarting.value || appState.isConnecting) return t('home.status.startingDesc')
   if (isStopping.value) return t('home.status.stoppingDesc')
-  if (appState.isRunning && appState.wsConnected) return t('home.status.runningDesc')
-  if (appState.isRunning && !appState.wsConnected) return t('home.status.disconnectedDesc')
+
+  // 改进状态判断逻辑
+  if (appState.isRunning) {
+    const hasTrafficData =
+      trafficStore.traffic.up > 0 ||
+      trafficStore.traffic.down > 0 ||
+      trafficStore.traffic.totalUp > 0 ||
+      trafficStore.traffic.totalDown > 0
+    const hasConnectionData =
+      connectionStore.connections.length > 0 || connectionStore.memory.inuse > 0
+
+    if (appState.wsConnected || hasTrafficData || hasConnectionData) {
+      return t('home.status.runningDesc')
+    } else {
+      return t('home.status.startingDesc') // 正在建立连接
+    }
+  }
+
   return t('home.status.stoppedDesc')
 }
 
@@ -438,9 +504,18 @@ const runKernel = async () => {
           negativeText: t('common.cancel'),
           onPositiveClick: async () => {
             try {
-              // 先设置模式到应用状态，以便重启后保持选择
+              // 先调用API修改配置为TUN模式
+              message.info(t('notification.applyingTunMode'))
+              await tauriApi.proxy.setTunProxy()
+
+              // 设置应用状态
               appState.setProxyMode('tun')
               currentProxyMode.value = 'tun'
+
+              // 设置挂起的TUN模式标记，重启后会应用（配置已经修改好了）
+              localStorage.setItem('pending-tun-mode', 'true')
+
+              message.success(t('notification.tunConfigApplied'))
               await restartAsAdmin()
             } catch (error) {
               message.error(`${t('notification.restartFailed')}: ${error}`)
@@ -568,9 +643,18 @@ const onModeChange = async (value: string) => {
           negativeText: t('common.cancel'),
           onPositiveClick: async () => {
             try {
-              // 先设置模式到应用状态，以便重启后保持选择
+              // 先调用API修改配置为TUN模式
+              message.info(t('notification.applyingTunMode'))
+              await tauriApi.proxy.setTunProxy()
+
+              // 设置应用状态
               appState.setProxyMode('tun')
               currentProxyMode.value = 'tun'
+
+              // 设置挂起的TUN模式标记，重启后会应用（配置已经修改好了）
+              localStorage.setItem('pending-tun-mode', 'true')
+
+              message.success(t('notification.tunConfigApplied'))
               await restartAsAdmin()
             } catch (error) {
               message.error(`${t('notification.restartFailed')}: ${error}`)
@@ -773,6 +857,25 @@ onMounted(async () => {
 
   // 检查管理员权限
   await checkAdminStatus()
+
+  // 检查是否有挂起的TUN模式切换（重启后需要应用）
+  const pendingTunMode = localStorage.getItem('pending-tun-mode')
+  if (pendingTunMode === 'true' && currentProxyMode.value === 'tun') {
+    localStorage.removeItem('pending-tun-mode')
+    console.log('检测到挂起的TUN模式切换，准备应用配置')
+
+    // 如果当前是管理员权限且内核未运行，则直接启动TUN模式
+    if (isAdmin.value && !appState.isRunning) {
+      setTimeout(async () => {
+        try {
+          message.info(t('notification.applyingTunMode'))
+          await runKernel()
+        } catch (error) {
+          message.error(`${t('notification.tunModeApplyFailed')}: ${error}`)
+        }
+      }, 1000) // 延迟1秒确保界面初始化完成
+    }
+  }
 
   // 自动启动失败会在控制台中显示详细信息，供调试使用
 
