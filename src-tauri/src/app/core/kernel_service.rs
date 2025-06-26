@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tauri::{Runtime, Window};
 use tokio::sync::mpsc;
 use tokio::sync::Notify;

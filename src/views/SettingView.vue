@@ -317,6 +317,67 @@
         </div>
       </section>
 
+      <!-- 更新设置区域 -->
+      <section class="settings-section">
+        <div class="section-header">
+          <div class="section-icon update-icon">
+            <n-icon size="24"><RefreshOutline /></n-icon>
+          </div>
+          <div class="section-info">
+            <h2 class="section-title">{{ t('setting.update.title') }}</h2>
+            <p class="section-description">{{ t('setting.update.subtitle') }}</p>
+          </div>
+        </div>
+
+        <div class="section-content">
+          <div class="settings-list">
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">{{ t('setting.update.autoCheck') }}</div>
+                <div class="setting-desc">{{ t('setting.update.autoCheckDesc') }}</div>
+              </div>
+              <n-switch
+                v-model:value="updateStore.autoCheckUpdate"
+                size="large"
+                class="setting-control"
+              >
+                <template #checked>{{ t('common.on') }}</template>
+                <template #unchecked>{{ t('common.off') }}</template>
+              </n-switch>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">{{ t('setting.update.acceptPrerelease') }}</div>
+                <div class="setting-desc">
+                  {{ t('setting.update.acceptPrereleaseDesc') }}
+                </div>
+              </div>
+              <n-switch
+                v-model:value="updateStore.acceptPrerelease"
+                size="large"
+                class="setting-control"
+                @update-value="onPrereleaseSettingChange"
+              >
+                <template #checked>{{ t('common.on') }}</template>
+                <template #unchecked>{{ t('common.off') }}</template>
+              </n-switch>
+            </div>
+          </div>
+
+          <n-alert
+            v-if="updateStore.acceptPrerelease"
+            type="warning"
+            :show-icon="true"
+            class="status-alert"
+            style="margin-top: 16px"
+          >
+            <template #header>{{ t('setting.update.prereleaseWarning') }}</template>
+            {{ t('setting.update.prereleaseWarningDesc') }}
+          </n-alert>
+        </div>
+      </section>
+
       <!-- 关于信息区域 -->
       <section class="settings-section">
         <div class="section-header">
@@ -832,6 +893,35 @@ const handleOpenDevtools = async () => {
   }
 }
 
+// 预发布版本设置变更处理
+const onPrereleaseSettingChange = (value: boolean) => {
+  if (value) {
+    dialog.warning({
+      title: t('setting.update.prereleaseConfirm'),
+      content: t('setting.update.prereleaseConfirmDesc'),
+      positiveText: t('common.confirm'),
+      negativeText: t('common.cancel'),
+      onPositiveClick: () => {
+        updateStore.acceptPrerelease = true
+        notification.success({
+          title: t('setting.update.prereleaseEnabled'),
+          content: t('setting.update.prereleaseEnabledDesc'),
+          duration: 3000,
+        })
+      },
+      onNegativeClick: () => {
+        updateStore.acceptPrerelease = false
+      },
+    })
+  } else {
+    notification.info({
+      title: t('setting.update.prereleaseDisabled'),
+      content: t('setting.update.prereleaseDisabledDesc'),
+      duration: 3000,
+    })
+  }
+}
+
 onMounted(() => {
   // 添加窗口大小改变监听器
   window.addEventListener('resize', updateMobileStatus)
@@ -1005,6 +1095,10 @@ onUnmounted(() => {
 
 .developer-icon {
   background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.update-icon {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
 }
 
 .about-icon {

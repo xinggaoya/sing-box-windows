@@ -53,8 +53,9 @@ const createNotificationContent = (updateInfo: {
   latest_version: string
   release_date?: string
   file_size?: number
+  is_prerelease?: boolean
 }) => {
-  const { latest_version, release_date, file_size } = updateInfo
+  const { latest_version, release_date, file_size, is_prerelease } = updateInfo
 
   return h(
     'div',
@@ -77,7 +78,33 @@ const createNotificationContent = (updateInfo: {
           },
         },
         [
-          h(NText, { strong: true }, () => `${t('setting.update.newVersion')}: ${latest_version}`),
+          h(
+            'div',
+            { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+            [
+              h(
+                NText,
+                { strong: true },
+                () => `${t('setting.update.newVersion')}: ${latest_version}`,
+              ),
+              is_prerelease
+                ? h(
+                    'span',
+                    {
+                      style: {
+                        padding: '2px 6px',
+                        backgroundColor: '#faad14',
+                        color: 'white',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                      },
+                    },
+                    t('setting.update.beta'),
+                  )
+                : null,
+            ].filter(Boolean),
+          ),
           h(
             NText,
             { depth: 3, style: { fontSize: '12px' } },
@@ -166,6 +193,7 @@ const handleUpdateAvailable = (updateInfo: {
   latest_version: string
   release_date?: string
   file_size?: number
+  is_prerelease?: boolean
 }) => {
   // 如果已经有通知显示，先销毁它
   if (activeNotification) {
@@ -173,8 +201,12 @@ const handleUpdateAvailable = (updateInfo: {
   }
 
   // 创建新的通知
+  const notificationTitle = updateInfo.is_prerelease
+    ? t('notification.prereleaseAvailable')
+    : t('notification.updateAvailable')
+
   activeNotification = notification.create({
-    title: t('notification.updateAvailable'),
+    title: notificationTitle,
     content: () => createNotificationContent(updateInfo),
     action: () =>
       h(NSpace, { size: 'small' }, () => [

@@ -211,7 +211,7 @@ export const tauriApi = {
   // 更新相关 API
   update: {
     // 检查更新
-    checkUpdate: async (currentVersion: string) => {
+    checkUpdate: async (currentVersion: string, includePrerelease?: boolean) => {
       return await invoke<{
         latest_version: string
         download_url: string
@@ -219,7 +219,8 @@ export const tauriApi = {
         release_notes?: string
         release_date?: string
         file_size?: number
-      }>('check_update', { currentVersion })
+        is_prerelease?: boolean
+      }>('check_update', { currentVersion, includePrerelease })
     },
 
     // 下载并安装更新

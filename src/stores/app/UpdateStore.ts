@@ -12,6 +12,7 @@ interface UpdateInfo {
   release_notes?: string
   release_date?: string
   file_size?: number
+  is_prerelease?: boolean
 }
 
 // 定义更新状态类型
@@ -51,6 +52,10 @@ export const useUpdateStore = defineStore(
     // 用户设置
     const autoCheckUpdate = ref(true)
     const skipVersion = ref('')
+    const acceptPrerelease = ref(false) // 是否接收预发布版本
+
+    // 当前版本信息
+    const isPrerelease = ref(false) // 当前检测到的版本是否为预发布版本
 
     // 获取应用版本
     const fetchAppVersion = async () => {
@@ -99,7 +104,10 @@ export const useUpdateStore = defineStore(
         updateState.value.error = null
         updateState.value.message = '正在检查更新...'
 
-        const updateInfo = await tauriApi.update.checkUpdate(appVersion.value)
+        const updateInfo = await tauriApi.update.checkUpdate(
+          appVersion.value,
+          acceptPrerelease.value,
+        )
 
         if (updateInfo && updateInfo.has_update) {
           hasUpdate.value = true
@@ -108,8 +116,10 @@ export const useUpdateStore = defineStore(
           releaseNotes.value = updateInfo.release_notes || ''
           releaseDate.value = updateInfo.release_date || ''
           fileSize.value = updateInfo.file_size || 0
+          isPrerelease.value = updateInfo.is_prerelease || false
 
-          updateState.value.message = `发现新版本 ${updateInfo.latest_version}`
+          const versionType = updateInfo.is_prerelease ? '测试版本' : '正式版本'
+          updateState.value.message = `发现新${versionType} ${updateInfo.latest_version}`
 
           // 在任何模式下都发送更新可用事件
           mitt.emit('update-available', updateInfo)
@@ -227,6 +237,8 @@ export const useUpdateStore = defineStore(
       updateState,
       autoCheckUpdate,
       skipVersion,
+      acceptPrerelease,
+      isPrerelease,
 
       // 方法
       fetchAppVersion,

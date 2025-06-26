@@ -16,6 +16,7 @@ pub struct UpdateInfo {
     pub release_notes: Option<String>,
     pub release_date: Option<String>,
     pub file_size: Option<u64>,
+    pub is_prerelease: bool,
 }
 
 // 版本比较函数
@@ -44,7 +45,10 @@ fn compare_versions(current: &str, latest: &str) -> bool {
 
 // 检查更新
 #[tauri::command]
-pub async fn check_update(current_version: String) -> Result<UpdateInfo, String> {
+pub async fn check_update(
+    current_version: String,
+    include_prerelease: Option<bool>,
+) -> Result<UpdateInfo, String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(
             network_config::HTTP_TIMEOUT_SECONDS,
@@ -53,18 +57,46 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
         .build()
         .map_err(|e| format!("{}: {}", messages::ERR_HTTP_CLIENT_FAILED, e))?;
 
-    // 获取最新版本信息
+    let include_prerelease = include_prerelease.unwrap_or(false);
+
+    // 根据是否包含预发布版本选择不同的API端点
+    let api_url = if include_prerelease {
+        // 获取所有版本（包括预发布版本），然后筛选最新的
+        "https://api.github.com/repos/xinggaoya/sing-box-windows/releases"
+    } else {
+        // 只获取最新的正式版本
+        api::GITHUB_API_URL
+    };
+
+    // 获取版本信息
     let response = client
-        .get(api::GITHUB_API_URL)
+        .get(api_url)
         .header("User-Agent", api::USER_AGENT)
         .send()
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_GET_VERSION_FAILED, e))?;
 
-    let release: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("{}: {}", messages::ERR_GET_VERSION_FAILED, e))?;
+    let release: serde_json::Value = if include_prerelease {
+        // 获取所有版本，取第一个（最新的）
+        let releases: Vec<serde_json::Value> = response
+            .json()
+            .await
+            .map_err(|e| format!("{}: {}", messages::ERR_GET_VERSION_FAILED, e))?;
+
+        if releases.is_empty() {
+            return Err(format!(
+                "{}: 无法获取版本列表",
+                messages::ERR_GET_VERSION_FAILED
+            ));
+        }
+
+        releases[0].clone()
+    } else {
+        response
+            .json()
+            .await
+            .map_err(|e| format!("{}: {}", messages::ERR_GET_VERSION_FAILED, e))?
+    };
 
     // 获取最新版本号
     let tag_name = release["tag_name"]
@@ -77,6 +109,9 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
 
     // 获取发布日期
     let release_date = release["published_at"].as_str().map(|s| s.to_string());
+
+    // 检查是否为预发布版本
+    let is_prerelease = release["prerelease"].as_bool().unwrap_or(false);
 
     // 获取下载链接和文件大小
     let assets = release["assets"]
@@ -116,6 +151,7 @@ pub async fn check_update(current_version: String) -> Result<UpdateInfo, String>
         release_notes,
         release_date,
         file_size,
+        is_prerelease,
     })
 }
 
