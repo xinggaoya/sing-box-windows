@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import mitt from '@/utils/mitt'
 import { useMessage } from 'naive-ui'
@@ -66,8 +66,6 @@ export const useAppStore = defineStore(
     // 代理模式
     const proxyMode = ref<ProxyMode>('system')
 
-    // 自动启动设置
-    const autoStartApp = ref(false)
     const autoStartKernel = ref(false)
 
     // IP版本设置
@@ -133,8 +131,6 @@ export const useAppStore = defineStore(
     const initializeStore = async () => {
       // 初始化数据恢复Promise
       initializeDataRestore()
-
-      autoStartApp.value = await isEnabled()
 
       // 添加对WebSocket连接状态的监听
       mitt.on('ws-connected', () => {
@@ -250,7 +246,6 @@ export const useAppStore = defineStore(
         } else {
           await disable()
         }
-        autoStartApp.value = enabled
       } catch (error) {
         console.error('切换自动启动失败:', error)
         throw error
@@ -298,7 +293,6 @@ export const useAppStore = defineStore(
       isDataRestored,
       trayInstanceId,
       proxyMode,
-      autoStartApp,
       autoStartKernel,
       preferIpv6,
       proxyPort,

@@ -171,14 +171,14 @@
                 <div class="setting-title">{{ t('setting.autoStart.app') }}</div>
                 <div class="setting-desc">
                   {{
-                    appStore.autoStartApp
+                    autoStart
                       ? t('setting.startup.bootTip')
                       : t('setting.startup.manualTip')
                   }}
                 </div>
               </div>
               <n-switch
-                v-model:value="appStore.autoStartApp"
+                v-model:value="autoStart"
                 @update-value="onAutoStartChange"
                 size="large"
                 class="setting-control"
@@ -556,6 +556,7 @@ const appStore = useAppStore()
 const kernelStore = useKernelStore()
 const updateStore = useUpdateStore()
 const localeStore = useLocaleStore()
+const autoStart = ref(false)
 const router = useRouter()
 const loading = ref(false)
 const downloading = ref(false)
@@ -570,6 +571,10 @@ const isMobile = ref(window.innerWidth < 768)
 const updateMobileStatus = () => {
   isMobile.value = window.innerWidth < 768
 }
+
+onMounted(async () => {
+  autoStart.value = await isEnabled()
+})
 
 // 检查更新状态
 const checkingUpdate = ref(false)
@@ -699,8 +704,6 @@ const onAutoStartChange = async (value: boolean) => {
     }
   } catch (error) {
     message.error(`${t('common.error')}: ${error}`)
-    // 恢复原来的设置
-    appStore.autoStartApp = !value
   }
 }
 
