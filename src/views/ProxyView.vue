@@ -105,10 +105,8 @@
                 >
                   <!-- 节点主要信息 -->
                   <div class="node-header">
-                    <div class="node-name">
-                      <n-ellipsis :tooltip="{ width: 'trigger' }">
-                        {{ proxy }}
-                      </n-ellipsis>
+                    <div class="node-name" :title="proxy">
+                      {{ proxy }}
                     </div>
                     <div v-if="group.now === proxy" class="active-badge">
                       <n-icon size="12"><CheckmarkCircleOutline /></n-icon>
@@ -620,11 +618,13 @@ const changeProxy = async (group: string, proxy: string) => {
   border: 1px solid var(--n-border-color);
   border-radius: 16px;
   padding: 20px;
+  height: 160px; /* 固定卡片高度 */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .node-card:hover {
@@ -650,6 +650,7 @@ const changeProxy = async (group: string, proxy: string) => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+  min-height: 40px; /* 确保头部有最小高度 */
 }
 
 .node-name {
@@ -658,6 +659,12 @@ const changeProxy = async (group: string, proxy: string) => {
   color: var(--n-text-color);
   line-height: 1.4;
   flex: 1;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; /* 限制最多显示2行 */
+  word-break: break-all; /* 允许在任意字符处换行 */
+  hyphens: auto; /* 启用连字符 */
 }
 
 .active-badge {
@@ -670,6 +677,7 @@ const changeProxy = async (group: string, proxy: string) => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 2px; /* 稍微向下偏移对齐 */
 }
 
 /* 延迟显示 */
@@ -679,6 +687,7 @@ const changeProxy = async (group: string, proxy: string) => {
   justify-content: space-between;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: auto 0; /* 垂直居中 */
 }
 
 .node-delay:hover {
@@ -839,6 +848,7 @@ const changeProxy = async (group: string, proxy: string) => {
 
   .node-card {
     padding: 16px;
+    height: 140px; /* 移动端适配高度 */
   }
 }
 
@@ -854,9 +864,14 @@ const changeProxy = async (group: string, proxy: string) => {
     text-align: center;
   }
 
+  .node-card {
+    height: 120px; /* 小屏幕更紧凑的高度 */
+  }
+
   .node-delay {
     flex-direction: column;
     gap: 8px;
+    margin: 8px 0; /* 调整垂直边距 */
   }
 
   .delay-display {

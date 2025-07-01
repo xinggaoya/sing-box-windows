@@ -31,7 +31,9 @@
               class="add-subscription-btn"
             >
               <template #icon>
-                <n-icon><AddOutline /></n-icon>
+                <n-icon>
+                  <AddOutline />
+                </n-icon>
               </template>
               {{ t('sub.add') }}
             </n-button>
@@ -61,9 +63,11 @@
                       <LinkOutline />
                     </n-icon>
                   </div>
-                  <div class="sub-name">{{ item.name }}</div>
+                  <div class="sub-name" :title="item.name">{{ item.name }}</div>
                   <div v-if="subStore.activeIndex === index" class="active-badge">
-                    <n-icon size="10"><CheckmarkCircleOutline /></n-icon>
+                    <n-icon size="10">
+                      <CheckmarkCircleOutline />
+                    </n-icon>
                     <span>{{ t('sub.inUse') }}</span>
                   </div>
                 </div>
@@ -88,7 +92,9 @@
                           circle
                           class="action-btn"
                         >
-                          <n-icon size="14"><CopyOutline /></n-icon>
+                          <n-icon size="14">
+                            <CopyOutline />
+                          </n-icon>
                         </n-button>
                       </template>
                       {{ t('sub.copyLink') }}
@@ -103,7 +109,9 @@
                           circle
                           class="action-btn"
                         >
-                          <n-icon size="14"><CreateOutline /></n-icon>
+                          <n-icon size="14">
+                            <CreateOutline />
+                          </n-icon>
                         </n-button>
                       </template>
                       {{ t('sub.edit') }}
@@ -122,7 +130,9 @@
                           circle
                           class="action-btn"
                         >
-                          <n-icon size="14"><CodeOutline /></n-icon>
+                          <n-icon size="14">
+                            <CodeOutline />
+                          </n-icon>
                         </n-button>
                       </template>
                       {{ t('sub.editConfig') }}
@@ -145,7 +155,9 @@
                               :disabled="subStore.activeIndex === index"
                               class="action-btn delete-btn"
                             >
-                              <n-icon size="14"><TrashOutline /></n-icon>
+                              <n-icon size="14">
+                                <TrashOutline />
+                              </n-icon>
                             </n-button>
                           </template>
                           {{ t('common.delete') }}
@@ -160,10 +172,8 @@
 
             <!-- URL 预览区 -->
             <div class="url-preview">
-              <div class="url-content">
-                <n-ellipsis :tooltip="{ width: 'trigger' }">
-                  {{ item.url || t('sub.manualContent') }}
-                </n-ellipsis>
+              <div class="url-content" :title="item.url || t('sub.manualContent')">
+                {{ item.url || t('sub.manualContent') }}
               </div>
             </div>
 
@@ -224,7 +234,9 @@
               class="empty-action-btn"
             >
               <template #icon>
-                <n-icon><AddOutline /></n-icon>
+                <n-icon>
+                  <AddOutline />
+                </n-icon>
               </template>
               {{ t('sub.add') }}
             </n-button>
@@ -292,9 +304,13 @@
         <n-form-item :label="t('sub.useOriginal')" label-placement="left" class="switch-item">
           <n-space align="center">
             <n-switch v-model:value="formValue.useOriginalConfig" size="medium" />
-            <n-text depth="3" style="font-size: 13px">{{
-              formValue.useOriginalConfig ? t('sub.useOriginalConfig') : t('sub.useExtractedNodes')
-            }}</n-text>
+            <n-text depth="3" style="font-size: 13px"
+              >{{
+                formValue.useOriginalConfig
+                  ? t('sub.useOriginalConfig')
+                  : t('sub.useExtractedNodes')
+              }}
+            </n-text>
           </n-space>
         </n-form-item>
       </n-form>
@@ -375,6 +391,7 @@ import type { FormInst, FormRules } from 'naive-ui'
 import { useWindowSize } from '@vueuse/core'
 import { tauriApi } from '@/services/tauri-api'
 import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores'
 
 interface Subscription {
   name: string
@@ -392,7 +409,7 @@ const showAddModal = ref(false)
 const editIndex = ref<number | null>(null)
 const formRef = ref<FormInst | null>(null)
 const isLoading = ref(false)
-const { width } = useWindowSize()
+const appStore = useAppStore()
 const activeTab = ref('url')
 const { t } = useI18n()
 
@@ -400,13 +417,6 @@ const { t } = useI18n()
 const showConfigModal = ref(false)
 const currentConfig = ref('')
 const isConfigLoading = ref(false)
-
-// 根据窗口宽度调整网格列数
-const gridCols = computed(() => {
-  if (width.value < 768) return 1
-  if (width.value < 1200) return 2
-  return 3
-})
 
 const formValue = ref<Subscription>({
   name: '',
@@ -578,6 +588,11 @@ const useSubscription = async (url: string, index: number) => {
     subStore.list[index].lastUpdate = Date.now()
     subStore.activeIndex = index
     message.success(t('sub.useSuccess'))
+
+    // 判断内核是否在运行 重启内核
+    if (appStore.isRunning) {
+      await tauriApi.kernel.restartKernel()
+    }
   } catch (error) {
     message.error(t('sub.useFailed') + error)
   } finally {
@@ -749,8 +764,8 @@ onMounted(() => {
 /* 订阅网格 */
 .subscriptions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 }
 
 /* 订阅卡片 */
@@ -758,14 +773,15 @@ onMounted(() => {
   position: relative;
   background: var(--n-card-color);
   border: 1px solid var(--n-border-color);
-  border-radius: 20px;
-  padding: 24px;
+  border-radius: 16px;
+  padding: 18px;
+  height: 160px; /* 固定卡片高度 */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-height: 180px;
+  gap: 12px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
 }
 
 .subscription-card:hover {
@@ -804,9 +820,9 @@ onMounted(() => {
 }
 
 .sub-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
   background: rgba(59, 130, 246, 0.1);
   color: #3b82f6;
   display: flex;
@@ -822,22 +838,27 @@ onMounted(() => {
 }
 
 .sub-name {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--n-text-color);
   flex: 1;
   line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1; /* 限制为1行 */
+  word-break: break-all;
 }
 
 .active-badge {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 3px;
+  padding: 2px 6px;
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
-  border-radius: 12px;
-  font-size: 11px;
+  border-radius: 8px;
+  font-size: 10px;
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -860,9 +881,9 @@ onMounted(() => {
 }
 
 .action-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -880,21 +901,23 @@ onMounted(() => {
 .url-preview {
   flex: 1;
   min-height: 0;
+  margin: 4px 0;
 }
 
 .url-content {
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: rgba(0, 0, 0, 0.02);
   border: 1px solid var(--n-border-color);
-  border-radius: 12px;
+  border-radius: 8px;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--n-text-color-2);
-  line-height: 1.5;
+  line-height: 1.4;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  min-height: 44px;
+  height: 32px;
   display: flex;
   align-items: center;
+  overflow: hidden;
 }
 
 .url-content:hover {
@@ -917,17 +940,21 @@ onMounted(() => {
 }
 
 .last-update {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--n-text-color-3);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .use-btn {
-  height: 36px;
-  min-width: 100px;
+  height: 32px;
+  min-width: 80px;
   font-weight: 600;
+  font-size: 12px;
   flex-shrink: 0;
 }
 
@@ -1099,7 +1126,8 @@ onMounted(() => {
   }
 
   .subscription-card {
-    padding: 20px;
+    padding: 16px;
+    height: 140px; /* 移动端调整高度 */
   }
 
   .title-row {
@@ -1146,12 +1174,18 @@ onMounted(() => {
   }
 
   .subscription-card {
-    padding: 16px;
-    gap: 12px;
+    padding: 14px;
+    gap: 10px;
+    height: 120px; /* 小屏幕更紧凑 */
   }
 
   .sub-name {
-    font-size: 15px;
+    font-size: 13px;
+  }
+
+  .use-btn {
+    height: 28px;
+    font-size: 11px;
   }
 }
 </style>

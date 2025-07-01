@@ -648,7 +648,7 @@ const onModeChange = async (value: string) => {
               await tauriApi.proxy.setTunProxy()
 
               // 设置应用状态
-              appState.setProxyMode('tun')
+              await appState.switchProxyMode('tun')
               currentProxyMode.value = 'tun'
 
               // 设置挂起的TUN模式标记，重启后会应用（配置已经修改好了）
@@ -876,8 +876,6 @@ onMounted(async () => {
       }, 1000) // 延迟1秒确保界面初始化完成
     }
   }
-
-  // 自动启动失败会在控制台中显示详细信息，供调试使用
 
   // 监听路由变化，当返回到主页时重新设置监听器
   watch(isRouteActive, (isActive) => {
