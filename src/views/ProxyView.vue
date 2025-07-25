@@ -49,108 +49,123 @@
         </div>
 
         <div v-else class="proxy-groups">
-          <div v-for="group in [...proxyGroups].reverse()" :key="group.name" class="group-section">
-            <!-- 组头部信息 -->
-            <div class="group-header">
-              <div class="group-title-section">
-                <h3 class="group-title">{{ group.name }}</h3>
-                <div class="group-meta">
-                  <n-tag size="small" round type="info">
-                    {{ group.all.length }} {{ t('proxy.nodeCount') }}
-                  </n-tag>
-                  <n-tag size="small" round type="default">
-                    {{ group.type }}
-                  </n-tag>
-                </div>
-              </div>
-
-              <div class="group-actions">
-                <div class="current-node-info">
-                  <span class="current-label">{{ t('proxy.currentLabel') }}</span>
-                  <n-tag type="success" size="small" round>
-                    <template #icon>
-                      <n-icon><CheckmarkCircleOutline /></n-icon>
-                    </template>
-                    {{ group.now }}
-                  </n-tag>
-                </div>
-
-                <n-button
-                  @click="testNodeDelay(group.name)"
-                  :loading="testingGroup === group.name"
-                  type="info"
-                  size="small"
-                  round
-                  class="test-group-btn"
-                >
-                  <template #icon>
-                    <n-icon><SpeedometerOutline /></n-icon>
-                  </template>
-                  {{ t('proxy.speedTest') }}
-                </n-button>
-              </div>
-            </div>
-
-            <!-- 节点网格 -->
-            <div class="nodes-container">
-              <div class="nodes-grid" :style="{ '--grid-columns': gridCols }">
-                <div
-                  v-for="(proxy, i) in group.all"
-                  :key="`${group.name}-${proxy}-${i}`"
-                  class="node-card"
-                  :class="{
-                    'node-active': group.now === proxy,
-                    'node-testing': testingNodes[proxy],
-                  }"
-                >
-                  <!-- 节点主要信息 -->
-                  <div class="node-header">
-                    <div class="node-name" :title="proxy">
-                      {{ proxy }}
-                    </div>
-                    <div v-if="group.now === proxy" class="active-badge">
-                      <n-icon size="12"><CheckmarkCircleOutline /></n-icon>
+          <!-- 使用折叠面板 -->
+          <n-collapse
+            class="proxy-collapse"
+            :default-expanded-names="[]"
+            accordion
+            arrow-placement="right"
+          >
+            <n-collapse-item
+              v-for="group in [...proxyGroups].reverse()"
+              :key="group.name"
+              :name="group.name"
+              class="group-collapse-item"
+            >
+              <!-- 自定义标题 -->
+              <template #header>
+                <div class="collapse-header">
+                  <div class="group-title-section">
+                    <h3 class="group-title">{{ group.name }}</h3>
+                    <div class="group-meta">
+                      <n-tag size="small" round type="info">
+                        {{ group.all.length }} {{ t('proxy.nodeCount') }}
+                      </n-tag>
+                      <n-tag size="small" round type="default">
+                        {{ group.type }}
+                      </n-tag>
                     </div>
                   </div>
 
-                  <!-- 延迟信息 -->
-                  <div class="node-delay" @click="testSingleNode(proxy)">
-                    <div class="delay-display" :class="getNodeStatusType(proxy)">
-                      <n-icon v-if="testingNodes[proxy]" size="14" class="loading-icon">
-                        <RefreshOutline />
-                      </n-icon>
-                      <span v-else class="delay-value">{{ getNodeStatusText(proxy) }}</span>
+                  <div class="group-actions">
+                    <div class="current-node-info">
+                      <span class="current-label">{{ t('proxy.currentLabel') }}</span>
+                      <n-tag type="success" size="small" round>
+                        <template #icon>
+                          <n-icon><CheckmarkCircleOutline /></n-icon>
+                        </template>
+                        {{ group.now }}
+                      </n-tag>
                     </div>
-                    <span class="delay-label">{{ t('proxy.delay') }}</span>
-                  </div>
 
-                  <!-- 操作按钮 -->
-                  <div class="node-footer">
                     <n-button
-                      @click="changeProxy(group.name, proxy)"
-                      :type="group.now === proxy ? 'success' : 'default'"
+                      @click.stop="testNodeDelay(group.name)"
+                      :loading="testingGroup === group.name"
+                      type="info"
                       size="small"
-                      :disabled="group.now === proxy"
-                      block
                       round
-                      class="switch-btn"
+                      class="test-group-btn"
                     >
                       <template #icon>
-                        <n-icon size="14">
-                          <CheckmarkCircleOutline v-if="group.now === proxy" />
-                          <SwapHorizontalOutline v-else />
-                        </n-icon>
+                        <n-icon><SpeedometerOutline /></n-icon>
                       </template>
-                      {{ group.now === proxy ? t('proxy.inUse') : t('proxy.switch') }}
+                      {{ t('proxy.speedTest') }}
                     </n-button>
                   </div>
+                </div>
+              </template>
 
-                  <!-- 活跃指示器 -->
-                  <div v-if="group.now === proxy" class="active-indicator"></div>
+              <!-- 节点网格内容 -->
+              <div class="nodes-container">
+                <div class="nodes-grid" :style="{ '--grid-columns': gridCols }">
+                  <div
+                    v-for="(proxy, i) in group.all"
+                    :key="`${group.name}-${proxy}-${i}`"
+                    class="node-card"
+                    :class="{
+                      'node-active': group.now === proxy,
+                      'node-testing': testingNodes[proxy],
+                    }"
+                  >
+                    <!-- 节点主要信息 -->
+                    <div class="node-header">
+                      <div class="node-name" :title="proxy">
+                        {{ proxy }}
+                      </div>
+                      <div v-if="group.now === proxy" class="active-badge">
+                        <n-icon size="12"><CheckmarkCircleOutline /></n-icon>
+                      </div>
+                    </div>
+
+                    <!-- 延迟信息 -->
+                    <div class="node-delay" @click="testSingleNode(proxy)">
+                      <div class="delay-display" :class="getNodeStatusType(proxy)">
+                        <n-icon v-if="testingNodes[proxy]" size="14" class="loading-icon">
+                          <RefreshOutline />
+                        </n-icon>
+                        <span v-else class="delay-value">{{ getNodeStatusText(proxy) }}</span>
+                      </div>
+                      <span class="delay-label">{{ t('proxy.delay') }}</span>
+                    </div>
+
+                    <!-- 操作按钮 -->
+                    <div class="node-footer">
+                      <n-button
+                        @click="changeProxy(group.name, proxy)"
+                        :type="group.now === proxy ? 'success' : 'default'"
+                        size="small"
+                        :disabled="group.now === proxy"
+                        block
+                        round
+                        class="switch-btn"
+                      >
+                        <template #icon>
+                          <n-icon size="14">
+                            <CheckmarkCircleOutline v-if="group.now === proxy" />
+                            <SwapHorizontalOutline v-else />
+                          </n-icon>
+                        </template>
+                        {{ group.now === proxy ? t('proxy.inUse') : t('proxy.switch') }}
+                      </n-button>
+                    </div>
+
+                    <!-- 活跃指示器 -->
+                    <div v-if="group.now === proxy" class="active-indicator"></div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </n-collapse-item>
+          </n-collapse>
         </div>
       </n-spin>
     </div>
@@ -534,30 +549,38 @@ const changeProxy = async (group: string, proxy: string) => {
 .proxy-groups {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 0;
 }
 
-.group-section {
-  background: var(--n-card-color);
+/* 折叠面板样式 */
+.proxy-collapse {
   border-radius: 20px;
-  border: 1px solid var(--n-border-color);
   overflow: hidden;
+  background: var(--n-card-color);
+  border: 1px solid var(--n-border-color);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.group-section:hover {
+.proxy-collapse:hover {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
-/* 组头部 */
-.group-header {
+/* 折叠项样式 */
+.group-collapse-item {
+  border-bottom: 1px solid var(--n-border-color);
+}
+
+.group-collapse-item:last-child {
+  border-bottom: none;
+}
+
+/* 自定义折叠头部样式 */
+.collapse-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 32px;
-  background: rgba(0, 0, 0, 0.02);
-  border-bottom: 1px solid var(--n-border-color);
+  width: 100%;
+  padding: 18px;
 }
 
 .group-title-section {
@@ -781,9 +804,6 @@ const changeProxy = async (group: string, proxy: string) => {
 }
 
 /* 深色模式适配 */
-[data-theme='dark'] .group-header {
-  background: rgba(255, 255, 255, 0.02);
-}
 
 [data-theme='dark'] .node-card.node-active {
   background: rgba(16, 185, 129, 0.1);
@@ -827,10 +847,10 @@ const changeProxy = async (group: string, proxy: string) => {
     text-align: center;
   }
 
-  .group-header {
+  .collapse-header {
     flex-direction: column;
     gap: 16px;
-    padding: 20px;
+    padding: 12px 0;
     text-align: center;
   }
 
