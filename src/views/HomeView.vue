@@ -240,7 +240,7 @@
 
 <script setup lang="ts">
 import { useMessage, useDialog } from 'naive-ui'
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { formatBandwidth } from '@/utils'
 import { Window } from '@tauri-apps/api/window'
@@ -295,6 +295,7 @@ const currentNodeProxyMode = ref('rule')
 const targetNodeProxyMode = ref('')
 const showNodeModeChangeModal = ref(false)
 const isChangingNodeMode = ref(false)
+const nodeProxyModeChangeSuccess = ref(false)
 
 // 代理模式配置
 const proxyModes = [
@@ -776,8 +777,11 @@ const getCurrentNodeProxyMode = async () => {
   try {
     // 调用后端API获取当前代理模式
     const mode = await tauriApi.proxy.getCurrentProxyMode()
+    console.log('从后端获取的代理模式:', mode)
     currentNodeProxyMode.value = mode
+    console.log('前端状态已更新为:', currentNodeProxyMode.value)
   } catch (error) {
+    console.error('获取代理模式失败:', error)
     // 出错时仍使用默认的规则模式
     currentNodeProxyMode.value = 'rule'
   }
@@ -802,15 +806,20 @@ const handleNodeProxyModeChange = (key: string) => {
   // 保存当前选中项，以便用户取消时恢复
   const prevMode = currentNodeProxyMode.value
   targetNodeProxyMode.value = key
+  nodeProxyModeChangeSuccess.value = false
 
   // 打开确认对话框
   showNodeModeChangeModal.value = true
 
   // 如果用户取消操作，恢复之前的选择
   const unwatch = watch(showNodeModeChangeModal, (isVisible) => {
-    if (!isVisible && !isChangingNodeMode.value) {
+    if (!isVisible && !isChangingNodeMode.value && !nodeProxyModeChangeSuccess.value) {
+      // 只有在用户取消时才恢复状态，成功操作时不恢复
       currentNodeProxyMode.value = prevMode
-      unwatch() // 取消监听
+      console.log('用户取消了代理模式切换，恢复到:', prevMode)
+    }
+    if (!isVisible) {
+      unwatch() // 无论什么情况下都要取消监听
     }
   })
 }
@@ -818,19 +827,45 @@ const handleNodeProxyModeChange = (key: string) => {
 const confirmNodeProxyModeChange = async () => {
   if (!targetNodeProxyMode.value) return
 
+  console.log('开始切换代理模式到:', targetNodeProxyMode.value)
   isChangingNodeMode.value = true
   try {
+    // 1. 先切换后端代理模式配置
+    console.log('正在调用后端API切换代理模式...')
     await tauriApi.proxy.toggleProxyMode(targetNodeProxyMode.value)
+
+    // 2. 重启内核以应用新配置
+    console.log('正在重启内核...')
     await kernelStore.restartKernel()
-    currentNodeProxyMode.value = targetNodeProxyMode.value
+
+    // 3. 内核重启后，从后端重新获取当前代理模式状态，确保前后端状态同步
+    console.log('正在同步代理模式状态...')
+    await getCurrentNodeProxyMode()
+
+    // 4. 标记操作成功，防止watch监听器恢复状态
+    nodeProxyModeChangeSuccess.value = true
+    console.log('代理模式切换成功，当前模式:', currentNodeProxyMode.value)
+
+    // 5. 使用nextTick确保DOM更新
+    await nextTick()
+
     message.success(
-      t('proxy.modeChangeSuccess', { mode: getNodeProxyModeText(targetNodeProxyMode.value) }),
+      t('proxy.modeChangeSuccess', { mode: getNodeProxyModeText(currentNodeProxyMode.value) }),
     )
   } catch (error) {
+    console.error('代理模式切换失败:', error)
     message.error(`${t('proxy.modeChangeError')}: ${error}`)
+    // 出错时也尝试获取当前状态，避免界面状态不一致
+    try {
+      await getCurrentNodeProxyMode()
+    } catch (syncError) {
+      console.error('同步代理模式状态失败:', syncError)
+    }
   } finally {
-    isChangingNodeMode.value = false
+    // 确保状态重置的顺序正确
     showNodeModeChangeModal.value = false
+    isChangingNodeMode.value = false
+    console.log('代理模式切换操作完成')
   }
 }
 

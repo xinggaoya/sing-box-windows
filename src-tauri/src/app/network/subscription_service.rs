@@ -1,7 +1,5 @@
 use crate::app::constants::{messages, network_config, paths};
-use crate::entity::config_model::{CacheFileConfig, ClashApiConfig, Config};
 use crate::utils::app_util::get_work_dir;
-use crate::utils::config_util::ConfigUtil;
 use crate::utils::http_client;
 use base64;
 use serde_json::{json, Value};
@@ -89,11 +87,11 @@ pub fn get_current_config() -> Result<String, String> {
     }
 }
 
-// 切换代理模式（global、rule或tun）
+// 切换代理模式（global、rule）
 #[tauri::command]
 pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
     // 验证模式参数
-    if !["global", "rule", "tun"].contains(&mode.as_str()) {
+    if !["global", "rule"].contains(&mode.as_str()) {
         return Err(format!("无效的代理模式: {}", mode));
     }
 
@@ -126,31 +124,69 @@ fn modify_default_mode(
     mode: String,
     api_port: Option<u16>,
 ) -> Result<(), Box<dyn Error>> {
-    // 读取现有配置
-    let config_path_str = config_path.to_str().ok_or("配置文件路径包含无效字符")?;
-    let mut json_util = ConfigUtil::new(config_path_str)?;
+    // 读取现有配置文件
+    let mut file = File::open(config_path)?;
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
 
-    // 而是直接创建新的配置并修改
-    let target_keys = vec!["experimental"];
+    // 解析JSON配置
+    let mut config: serde_json::Value = serde_json::from_str(&content)?;
 
-    // 使用传入的 api_port 或使用默认值
-    let port = api_port.unwrap_or(network_config::DEFAULT_API_PORT);
+    // 确保配置是一个对象
+    if let Some(config_obj) = config.as_object_mut() {
+        // 使用传入的 api_port 或使用默认值
+        let port = api_port.unwrap_or(network_config::DEFAULT_API_PORT);
 
-    // 创建新的配置，设置mode
-    let config = Config {
-        clash_api: ClashApiConfig {
-            external_controller: format!("127.0.0.1:{}", port),
-            external_ui: "metacubexd".to_string(),
-            external_ui_download_url: "".to_string(),
-            external_ui_download_detour: "手动切换".to_string(),
-            default_mode: mode, // 设置为传入的模式
-        },
-        cache_file: CacheFileConfig { enabled: true },
-    };
+        // 检查experimental字段是否存在
+        if let Some(experimental) = config_obj.get_mut("experimental") {
+            if let Some(exp_obj) = experimental.as_object_mut() {
+                // 检查clash_api字段是否存在
+                let clash_api = exp_obj.entry("clash_api").or_insert(json!({}));
 
-    // 更新配置
-    json_util.modify_property(&target_keys, serde_json::to_value(config)?);
-    json_util.save()?;
+                if let Some(clash_api_obj) = clash_api.as_object_mut() {
+                    // 更新default_mode
+                    clash_api_obj.insert("default_mode".to_string(), json!(mode));
+
+                    // 确保其他必要配置存在
+                    if !clash_api_obj.contains_key("external_controller") {
+                        clash_api_obj.insert(
+                            "external_controller".to_string(),
+                            json!(format!("127.0.0.1:{}", port)),
+                        );
+                    }
+                    if !clash_api_obj.contains_key("external_ui") {
+                        clash_api_obj.insert("external_ui".to_string(), json!("metacubexd"));
+                    }
+                }
+            }
+        } else {
+            // 如果experimental字段不存在，创建它
+            config_obj.insert(
+                "experimental".to_string(),
+                json!({
+                    "clash_api": {
+                        "external_controller": format!("127.0.0.1:{}", port),
+                        "external_ui": "metacubexd",
+                        "external_ui_download_url": "",
+                        "external_ui_download_detour": "手动切换",
+                        "default_mode": mode
+                    },
+                    "cache_file": {
+                        "enabled": true
+                    }
+                }),
+            );
+        }
+
+        // 保存修改后的配置
+        let updated_content = serde_json::to_string_pretty(&config)?;
+        let mut file = File::create(config_path)?;
+        file.write_all(updated_content.as_bytes())?;
+
+        info!("已成功更新代理模式为: {}", mode);
+    } else {
+        return Err("配置文件格式错误：根对象不是JSON对象".into());
+    }
 
     Ok(())
 }
