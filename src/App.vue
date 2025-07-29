@@ -30,6 +30,7 @@ import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
 import { useMessage } from 'naive-ui'
 import type { Router } from 'vue-router'
+import { tauriApi } from '@/services/tauri-api'
 
 // 导入主题配置
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
@@ -240,6 +241,29 @@ async function startKernelWithRetry() {
   try {
     // 等待应用完全初始化
     await new Promise((resolve) => setTimeout(resolve, 3000))
+
+    // 检查管理员权限和代理模式
+    const isAdmin = await tauriApi.system.checkAdmin()
+    const currentProxyMode = appStore?.proxyMode || 'system'
+
+    console.log(`🔍 自启动检查 - 管理员权限: ${isAdmin}, 当前代理模式: ${currentProxyMode}`)
+
+    // 如果不是管理员权限且当前模式是TUN，则切换为system模式
+    if (!isAdmin && currentProxyMode === 'tun') {
+      console.log('⚠️ 检测到非管理员权限运行且为TUN模式，自动切换为system模式')
+
+      try {
+        // 切换为system模式
+        await tauriApi.proxy.setSystemProxy()
+        if (appStore) {
+          await appStore.switchProxyMode('system')
+        }
+        console.log('✅ 已自动切换为system模式')
+      } catch (error) {
+        console.error('❌ 切换为system模式失败:', error)
+        // 即使切换失败也继续尝试启动内核
+      }
+    }
 
     // 加载内核Store
     const kernelStore = await storeManager.loadStore<KernelStore>('kernel')
