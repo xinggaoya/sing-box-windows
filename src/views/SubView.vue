@@ -1,247 +1,216 @@
 <template>
-  <!-- 单一根元素包装器，修复Transition警告 -->
-  <div class="sub-view-wrapper">
-    <div class="modern-sub">
-      <!-- 英雄式头部 -->
-      <div class="sub-hero">
-        <div class="hero-content">
-          <div class="hero-info">
-            <div class="hero-icon">
-              <n-icon size="28">
-                <LinkOutline />
-              </n-icon>
-            </div>
-            <div class="hero-text">
-              <h1 class="hero-title">{{ t('sub.title') }}</h1>
-              <p class="hero-subtitle">
-                {{ t('sub.subtitle') }}
-                <n-tag size="small" type="info" round class="count-tag">
-                  {{ subStore.list.length }} {{ t('sub.count') }}
-                </n-tag>
-              </p>
-            </div>
-          </div>
-
-          <div class="hero-actions">
-            <n-button
-              @click="showAddModal = true"
-              type="primary"
-              size="large"
-              round
-              class="add-subscription-btn"
-            >
-              <template #icon>
-                <n-icon>
-                  <AddOutline />
-                </n-icon>
-              </template>
-              {{ t('sub.add') }}
-            </n-button>
-          </div>
+  <div class="ultra-sub">
+    <!-- 紧凑工具栏 -->
+    <div class="sub-toolbar">
+      <div class="toolbar-left">
+        <div class="toolbar-icon">
+          <n-icon size="16">
+            <LinkOutline />
+          </n-icon>
+        </div>
+        <div class="toolbar-info">
+          <span class="toolbar-title">{{ t('sub.title') }}</span>
+          <span class="toolbar-stats">{{ subStore.list.length }} {{ t('sub.count') }}</span>
         </div>
       </div>
 
-      <!-- 订阅内容区 -->
-      <div class="sub-main">
-        <!-- 有订阅时显示网格 -->
-        <div v-if="subStore.list.length" class="subscriptions-grid">
-          <div
-            v-for="(item, index) in subStore.list"
-            :key="`sub-${index}`"
-            class="subscription-card"
-            :class="{
-              'card-active': subStore.activeIndex === index,
-              'card-loading': item.isLoading,
-            }"
-          >
-            <!-- 卡片头部 -->
-            <div class="card-header">
-              <div class="card-title-section">
-                <div class="title-row">
-                  <div class="sub-icon" :class="{ 'icon-active': subStore.activeIndex === index }">
-                    <n-icon size="16">
-                      <LinkOutline />
-                    </n-icon>
-                  </div>
-                  <div class="sub-name" :title="item.name">{{ item.name }}</div>
-                  <div v-if="subStore.activeIndex === index" class="active-badge">
+      <div class="toolbar-right">
+        <n-button
+          @click="showAddModal = true"
+          type="primary"
+          size="small"
+          class="add-btn"
+        >
+          <template #icon>
+            <n-icon size="12"><AddOutline /></n-icon>
+          </template>
+          {{ t('sub.add') }}
+        </n-button>
+      </div>
+    </div>
+
+    <!-- 订阅列表 -->
+    <div class="sub-content">
+      <!-- 有订阅时显示列表 -->
+      <div v-if="subStore.list.length" class="subscription-list">
+        <div
+          v-for="(item, index) in subStore.list"
+          :key="`sub-${index}`"
+          class="subscription-item"
+          :class="{
+            'item-active': subStore.activeIndex === index,
+            'item-loading': item.isLoading,
+          }"
+        >
+          <!-- 左侧信息 -->
+          <div class="item-info">
+            <div class="item-header">
+              <div class="item-icon" :class="{ 'icon-active': subStore.activeIndex === index }">
+                <n-icon size="14">
+                  <LinkOutline />
+                </n-icon>
+              </div>
+              <div class="item-title-section">
+                <div class="item-name" :title="item.name">{{ item.name }}</div>
+                <div class="item-meta">
+                  <n-tag v-if="item.isManual" size="tiny" type="warning" round>
+                    {{ t('sub.manual') }}
+                  </n-tag>
+                  <n-tag v-else size="tiny" type="info" round>
+                    {{ t('sub.urlSubscription') }}
+                  </n-tag>
+                  <div v-if="subStore.activeIndex === index" class="active-indicator">
                     <n-icon size="10">
                       <CheckmarkCircleOutline />
                     </n-icon>
                     <span>{{ t('sub.inUse') }}</span>
                   </div>
                 </div>
-
-                <div class="subtitle-row">
-                  <div class="sub-tags">
-                    <n-tag v-if="item.isManual" size="tiny" type="warning" round>
-                      {{ t('sub.manualConfig') }}
-                    </n-tag>
-                    <n-tag v-else size="tiny" type="info" round>
-                      {{ t('sub.urlSubscription') }}
-                    </n-tag>
-                  </div>
-
-                  <div class="card-actions">
-                    <n-tooltip trigger="hover" placement="top">
-                      <template #trigger>
-                        <n-button
-                          @click="copyUrl(item.url)"
-                          size="tiny"
-                          quaternary
-                          circle
-                          class="action-btn"
-                        >
-                          <n-icon size="14">
-                            <CopyOutline />
-                          </n-icon>
-                        </n-button>
-                      </template>
-                      {{ t('sub.copyLink') }}
-                    </n-tooltip>
-
-                    <n-tooltip trigger="hover" placement="top">
-                      <template #trigger>
-                        <n-button
-                          @click="handleEdit(index, item)"
-                          size="tiny"
-                          quaternary
-                          circle
-                          class="action-btn"
-                        >
-                          <n-icon size="14">
-                            <CreateOutline />
-                          </n-icon>
-                        </n-button>
-                      </template>
-                      {{ t('sub.edit') }}
-                    </n-tooltip>
-
-                    <n-tooltip
-                      v-if="subStore.activeIndex === index"
-                      trigger="hover"
-                      placement="top"
-                    >
-                      <template #trigger>
-                        <n-button
-                          @click="editCurrentConfig()"
-                          size="tiny"
-                          quaternary
-                          circle
-                          class="action-btn"
-                        >
-                          <n-icon size="14">
-                            <CodeOutline />
-                          </n-icon>
-                        </n-button>
-                      </template>
-                      {{ t('sub.editConfig') }}
-                    </n-tooltip>
-
-                    <n-popconfirm
-                      @positive-click="deleteSubscription(index)"
-                      :positive-text="t('common.delete')"
-                      :negative-text="t('common.cancel')"
-                      placement="top"
-                    >
-                      <template #trigger>
-                        <n-tooltip trigger="hover" placement="top">
-                          <template #trigger>
-                            <n-button
-                              size="tiny"
-                              quaternary
-                              circle
-                              type="error"
-                              :disabled="subStore.activeIndex === index"
-                              class="action-btn delete-btn"
-                            >
-                              <n-icon size="14">
-                                <TrashOutline />
-                              </n-icon>
-                            </n-button>
-                          </template>
-                          {{ t('common.delete') }}
-                        </n-tooltip>
-                      </template>
-                      {{ t('sub.deleteConfirm') }}
-                    </n-popconfirm>
-                  </div>
-                </div>
               </div>
             </div>
 
-            <!-- URL 预览区 -->
-            <div class="url-preview">
-              <div class="url-content" :title="item.url || t('sub.manualContent')">
+            <!-- URL/内容预览 -->
+            <div class="item-preview">
+              <div class="preview-text" :title="item.url || t('sub.manualContent')">
                 {{ item.url || t('sub.manualContent') }}
               </div>
-            </div>
-
-            <!-- 卡片底部 -->
-            <div class="card-footer">
-              <div class="status-info">
-                <div class="last-update">
-                  {{ item.lastUpdate ? formatTime(item.lastUpdate) : t('sub.neverUsed') }}
-                </div>
+              <div class="update-time">
+                {{ item.lastUpdate ? formatTime(item.lastUpdate) : t('sub.neverUsed') }}
               </div>
-
-              <n-button
-                @click="useSubscription(item.url, index)"
-                :loading="item.isLoading"
-                :type="subStore.activeIndex === index ? 'success' : 'primary'"
-                size="medium"
-                round
-                class="use-btn"
-              >
-                <template #icon>
-                  <n-icon size="16">
-                    <CheckmarkCircleOutline v-if="subStore.activeIndex === index" />
-                    <PlayCircleOutline v-else />
-                  </n-icon>
-                </template>
-                {{ subStore.activeIndex === index ? t('sub.useAgain') : t('sub.use') }}
-              </n-button>
-            </div>
-
-            <!-- 活跃指示器 -->
-            <div v-if="subStore.activeIndex === index" class="active-indicator"></div>
-
-            <!-- 加载遮罩 -->
-            <div v-if="item.isLoading" class="loading-overlay">
-              <n-spin size="small" />
             </div>
           </div>
-        </div>
 
-        <!-- 空状态 -->
-        <div v-else class="empty-state">
-          <div class="empty-container">
-            <div class="empty-icon">
-              <n-icon size="64">
-                <LinkOutline />
-              </n-icon>
+          <!-- 右侧操作 -->
+          <div class="item-actions">
+            <div class="action-group">
+              <n-tooltip trigger="hover" placement="top">
+                <template #trigger>
+                  <n-button
+                    @click="copyUrl(item.url)"
+                    size="tiny"
+                    quaternary
+                    circle
+                    class="action-btn"
+                  >
+                    <n-icon size="12">
+                      <CopyOutline />
+                    </n-icon>
+                  </n-button>
+                </template>
+                {{ t('sub.copyLink') }}
+              </n-tooltip>
+
+              <n-tooltip trigger="hover" placement="top">
+                <template #trigger>
+                  <n-button
+                    @click="handleEdit(index, item)"
+                    size="tiny"
+                    quaternary
+                    circle
+                    class="action-btn"
+                  >
+                    <n-icon size="12">
+                      <CreateOutline />
+                    </n-icon>
+                  </n-button>
+                </template>
+                {{ t('sub.edit') }}
+              </n-tooltip>
+
+              <n-tooltip
+                v-if="subStore.activeIndex === index"
+                trigger="hover"
+                placement="top"
+              >
+                <template #trigger>
+                  <n-button
+                    @click="editCurrentConfig()"
+                    size="tiny"
+                    quaternary
+                    circle
+                    class="action-btn"
+                  >
+                    <n-icon size="12">
+                      <CodeOutline />
+                    </n-icon>
+                  </n-button>
+                </template>
+                {{ t('sub.editConfig') }}
+              </n-tooltip>
+
+              <n-popconfirm
+                @positive-click="deleteSubscription(index)"
+                :positive-text="t('common.delete')"
+                :negative-text="t('common.cancel')"
+                placement="top"
+              >
+                <template #trigger>
+                  <n-tooltip trigger="hover" placement="top">
+                    <template #trigger>
+                      <n-button
+                        size="tiny"
+                        quaternary
+                        circle
+                        type="error"
+                        :disabled="subStore.activeIndex === index"
+                        class="action-btn delete-btn"
+                      >
+                        <n-icon size="12">
+                          <TrashOutline />
+                        </n-icon>
+                      </n-button>
+                    </template>
+                    {{ t('common.delete') }}
+                  </n-tooltip>
+                </template>
+                {{ t('sub.deleteConfirm') }}
+              </n-popconfirm>
             </div>
-            <h3 class="empty-title">{{ t('sub.noSubs') }}</h3>
-            <p class="empty-description">
-              {{ t('sub.noSubscriptionsYet') }}<br />
-              {{ t('sub.startAddingFirst') }}
-            </p>
+
             <n-button
-              @click="showAddModal = true"
-              type="primary"
-              size="large"
-              round
-              class="empty-action-btn"
+              @click="useSubscription(item.url, index)"
+              :loading="item.isLoading"
+              :type="subStore.activeIndex === index ? 'success' : 'primary'"
+              size="small"
+              class="use-btn"
             >
               <template #icon>
-                <n-icon>
-                  <AddOutline />
+                <n-icon size="12">
+                  <CheckmarkCircleOutline v-if="subStore.activeIndex === index" />
+                  <PlayCircleOutline v-else />
                 </n-icon>
               </template>
-              {{ t('sub.add') }}
+              {{ subStore.activeIndex === index ? t('sub.useAgain') : t('sub.use') }}
             </n-button>
           </div>
+
+          <!-- 加载遮罩 -->
+          <div v-if="item.isLoading" class="loading-overlay">
+            <n-spin size="small" />
+          </div>
         </div>
+      </div>
+
+      <!-- 空状态 -->
+      <div v-else class="empty-state">
+        <div class="empty-icon">
+          <n-icon size="40">
+            <LinkOutline />
+          </n-icon>
+        </div>
+        <div class="empty-title">{{ t('sub.noSubs') }}</div>
+        <div class="empty-desc">{{ t('sub.noSubscriptionsYet') }}</div>
+        <n-button
+          @click="showAddModal = true"
+          type="primary"
+          size="medium"
+          class="empty-btn"
+        >
+          <template #icon>
+            <n-icon size="14"><AddOutline /></n-icon>
+          </template>
+          {{ t('sub.noSubscriptionsYet') }}
+        </n-button>
       </div>
     </div>
 
@@ -252,17 +221,17 @@
       preset="dialog"
       :title="editIndex === null ? t('sub.add') : t('sub.edit')"
       :bordered="false"
-      style="width: 540px"
-      class="modern-modal"
+      style="width: 480px"
+      class="compact-modal"
     >
       <n-form
         ref="formRef"
         :model="formValue"
         :rules="rules"
         label-placement="left"
-        label-width="80"
+        label-width="60"
         require-mark-placement="right-hanging"
-        size="medium"
+        size="small"
         class="subscription-form"
       >
         <n-form-item :label="t('sub.name')" path="name">
@@ -274,40 +243,38 @@
           />
         </n-form-item>
 
-        <n-card size="small" class="tab-container">
-          <n-tabs type="segment" animated v-model:value="activeTab" class="sub-tabs" size="medium">
-            <n-tab-pane :name="'url'" :tab="t('sub.urlAdd')">
-              <n-form-item :label="t('sub.url')" path="url" class="tab-form-item">
-                <n-input
-                  v-model:value="formValue.url"
-                  type="textarea"
-                  :placeholder="t('sub.urlPlaceholder')"
-                  :autosize="{ minRows: 3, maxRows: 5 }"
-                  class="form-input"
-                />
-              </n-form-item>
-            </n-tab-pane>
-            <n-tab-pane :name="'manual'" :tab="t('sub.manualAdd')">
-              <n-form-item :label="t('sub.content')" path="manualContent" class="tab-form-item">
-                <n-input
-                  v-model:value="formValue.manualContent"
-                  type="textarea"
-                  :placeholder="t('sub.manualContentPlaceholder')"
-                  :autosize="{ minRows: 8, maxRows: 20 }"
-                  class="form-input code-input"
-                />
-              </n-form-item>
-            </n-tab-pane>
-          </n-tabs>
-        </n-card>
+        <n-tabs type="segment" animated v-model:value="activeTab" class="sub-tabs" size="small">
+          <n-tab-pane name="url" :tab="t('sub.urlSubscription')">
+            <n-form-item label="URL" path="url" class="tab-form-item">
+              <n-input
+                v-model:value="formValue.url"
+                type="textarea"
+                :placeholder="t('sub.urlPlaceholder')"
+                :autosize="{ minRows: 3, maxRows: 4 }"
+                class="form-input"
+              />
+            </n-form-item>
+          </n-tab-pane>
+          <n-tab-pane name="manual" :tab="t('sub.manualConfig')">
+            <n-form-item :label="t('sub.content')" path="manualContent" class="tab-form-item">
+              <n-input
+                v-model:value="formValue.manualContent"
+                type="textarea"
+                :placeholder="t('sub.manualContentPlaceholder')"
+                :autosize="{ minRows: 6, maxRows: 15 }"
+                class="form-input code-input"
+              />
+            </n-form-item>
+          </n-tab-pane>
+        </n-tabs>
 
-        <n-form-item :label="t('sub.useOriginal')" label-placement="left" class="switch-item">
+        <n-form-item :label="t('sub.useOriginalConfig')" label-placement="left" class="switch-item">
           <n-space align="center">
-            <n-switch v-model:value="formValue.useOriginalConfig" size="medium" />
-            <n-text depth="3" style="font-size: 13px"
-              >{{
+            <n-switch v-model:value="formValue.useOriginalConfig" size="small" />
+            <n-text depth="3" style="font-size: 12px">
+              {{
                 formValue.useOriginalConfig
-                  ? t('sub.useOriginalConfig')
+                  ? t('sub.useOriginal')
                   : t('sub.useExtractedNodes')
               }}
             </n-text>
@@ -316,16 +283,13 @@
       </n-form>
 
       <template #action>
-        <n-space justify="end" size="large">
-          <n-button size="medium" @click="handleCancel" class="modal-btn">
-            {{ t('common.cancel') }}
-          </n-button>
+        <n-space justify="end" size="medium">
+          <n-button size="small" @click="handleCancel">{{ t('common.cancel') }}</n-button>
           <n-button
-            size="medium"
+            size="small"
             type="primary"
             @click="handleConfirm"
             :loading="isLoading"
-            class="modal-btn"
           >
             {{ t('common.confirm') }}
           </n-button>
@@ -340,30 +304,27 @@
       preset="dialog"
       :title="t('sub.editCurrentConfig')"
       :bordered="false"
-      style="width: 720px"
-      class="modern-modal config-modal"
+      style="width: 640px"
+      class="compact-modal config-modal"
     >
       <div class="config-editor">
         <n-input
           v-model:value="currentConfig"
           type="textarea"
           :placeholder="t('sub.configContentPlaceholder')"
-          :autosize="{ minRows: 20, maxRows: 30 }"
+          :autosize="{ minRows: 15, maxRows: 25 }"
           class="config-input"
         />
       </div>
 
       <template #action>
-        <n-space justify="end" size="large">
-          <n-button size="medium" @click="showConfigModal = false" class="modal-btn">
-            {{ t('common.cancel') }}
-          </n-button>
+        <n-space justify="end" size="medium">
+          <n-button size="small" @click="showConfigModal = false">{{ t('common.cancel') }}</n-button>
           <n-button
-            size="medium"
+            size="small"
             type="primary"
             @click="saveCurrentConfig"
             :loading="isConfigLoading"
-            class="modal-btn"
           >
             {{ t('sub.saveAndApply') }}
           </n-button>
@@ -392,6 +353,7 @@ import { useWindowSize } from '@vueuse/core'
 import { tauriApi } from '@/services/tauri-api'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
+import { useThemeStore } from '@/stores/app/ThemeStore'
 
 interface Subscription {
   name: string
@@ -410,6 +372,7 @@ const editIndex = ref<number | null>(null)
 const formRef = ref<FormInst | null>(null)
 const isLoading = ref(false)
 const appStore = useAppStore()
+const themeStore = useThemeStore()
 const activeTab = ref('url')
 const { t } = useI18n()
 
@@ -668,223 +631,234 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 包装器样式，确保单一根元素用于Transition */
-.sub-view-wrapper {
-  width: 100%;
-  height: 100%;
-}
-
-.modern-sub {
+.ultra-sub {
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 12px;
   min-height: 100%;
-  padding: 0;
+  font-size: 13px;
 }
 
-/* 英雄式头部 */
-.sub-hero {
-  background: var(--n-card-color);
-  border-radius: 24px;
-  border: 1px solid var(--n-border-color);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.sub-hero:hover {
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
-}
-
-.hero-content {
+/* 紧凑工具栏 */
+.sub-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 32px 40px;
+  padding: 12px 16px;
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(12px);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  border-radius: 10px;
+  box-shadow: 0 2px 8px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
+  transition: all 0.2s var(--ease-out);
 }
 
-.hero-info {
+.sub-toolbar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(0, 0, 0, 0.08)"');
+}
+
+.toolbar-left {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 10px;
 }
 
-.hero-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 20px;
+.toolbar-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: linear-gradient(135deg, #10b981, #059669);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  flex-shrink: 0;
 }
 
-.hero-text {
+.toolbar-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
 }
 
-.hero-title {
-  font-size: 28px;
-  font-weight: 800;
-  margin: 0;
+.toolbar-title {
+  font-size: 14px;
+  font-weight: 600;
   color: var(--n-text-color);
-  line-height: 1.2;
 }
 
-.hero-subtitle {
-  font-size: 16px;
-  color: var(--n-text-color-2);
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.toolbar-stats {
+  font-size: 11px;
+  color: var(--n-text-color-3);
 }
 
-.count-tag {
-  font-weight: 600;
+.add-btn {
+  height: 28px;
+  min-width: 60px;
+  border-radius: 6px;
+  font-weight: 500;
 }
 
-.add-subscription-btn {
-  height: 48px;
-  min-width: 140px;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-/* 主要内容区 */
-.sub-main {
+/* 主内容区 */
+.sub-content {
   flex: 1;
 }
 
-/* 订阅网格 */
-.subscriptions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-}
-
-/* 订阅卡片 */
-.subscription-card {
-  position: relative;
-  background: var(--n-card-color);
-  border: 1px solid var(--n-border-color);
-  border-radius: 16px;
-  padding: 18px;
-  height: 160px; /* 固定卡片高度 */
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
-}
-
-.subscription-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
-  border-color: var(--n-primary-color);
-}
-
-.subscription-card.card-active {
-  background: rgba(16, 185, 129, 0.06);
-  border-color: #10b981;
-  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.2);
-}
-
-.subscription-card.card-loading {
-  pointer-events: none;
-}
-
-/* 卡片头部 */
-.card-header {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.card-title-section {
+/* 订阅列表 */
+.subscription-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.title-row {
+/* 订阅项 */
+.subscription-item {
+  position: relative;
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(12px);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  border-radius: 10px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
+  transition: all 0.2s var(--ease-out);
+  min-height: 72px;
 }
 
-.sub-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
+.subscription-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
+}
+
+.subscription-item.item-active {
+  background: v-bind('themeStore.isDark ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.1)"');
+  border-color: #10b981;
+}
+
+.subscription-item.item-loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* 项目信息 */
+.item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.item-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   background: rgba(59, 130, 246, 0.1);
   color: #3b82f6;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s var(--ease-out);
   flex-shrink: 0;
 }
 
-.sub-icon.icon-active {
+.item-icon.icon-active {
   background: rgba(16, 185, 129, 0.2);
   color: #10b981;
 }
 
-.sub-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--n-text-color);
+.item-title-section {
   flex: 1;
-  line-height: 1.4;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1; /* 限制为1行 */
-  word-break: break-all;
+  min-width: 0;
 }
 
-.active-badge {
+.item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--n-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.active-indicator {
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 6px;
+  padding: 1px 4px;
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
-  border-radius: 8px;
-  font-size: 10px;
+  border-radius: 4px;
+  font-size: 9px;
   font-weight: 600;
   flex-shrink: 0;
 }
 
-.subtitle-row {
+/* 预览信息 */
+.item-preview {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.sub-tags {
-  display: flex;
-  gap: 6px;
+.preview-text {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 10px;
+  color: var(--n-text-color-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
+  padding: 2px 6px;
+  border-radius: 4px;
+  max-width: 300px;
 }
 
-.card-actions {
+.update-time {
+  font-size: 9px;
+  color: var(--n-text-color-3);
+  font-weight: 500;
+}
+
+/* 项目操作 */
+.item-actions {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
+  flex-shrink: 0;
+}
+
+.action-group {
+  display: flex;
+  gap: 4px;
 }
 
 .action-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  transition: all 0.15s var(--ease-out);
 }
 
 .action-btn:hover {
@@ -892,82 +866,17 @@ onMounted(() => {
   background: rgba(59, 130, 246, 0.1);
 }
 
-.delete-btn:hover:not(:disabled) {
+.action-btn.delete-btn:hover:not(:disabled) {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
 }
 
-/* URL 预览 */
-.url-preview {
-  flex: 1;
-  min-height: 0;
-  margin: 4px 0;
-}
-
-.url-content {
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid var(--n-border-color);
-  border-radius: 8px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  font-size: 11px;
-  color: var(--n-text-color-2);
-  line-height: 1.4;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  height: 32px;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-}
-
-.url-content:hover {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: var(--n-primary-color);
-}
-
-/* 卡片底部 */
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: auto;
-}
-
-.status-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.last-update {
-  font-size: 10px;
-  color: var(--n-text-color-3);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 .use-btn {
-  height: 32px;
-  min-width: 80px;
-  font-weight: 600;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-/* 活跃指示器 */
-.active-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #10b981, #059669);
-  border-radius: 20px 20px 0 0;
-  animation: pulse 2s ease-in-out infinite;
+  height: 24px;
+  min-width: 50px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 /* 加载遮罩 */
@@ -977,9 +886,9 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.8);
+  background: v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.6)" : "rgba(255, 255, 255, 0.8)"');
   backdrop-filter: blur(2px);
-  border-radius: 20px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -988,204 +897,153 @@ onMounted(() => {
 /* 空状态 */
 .empty-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
   padding: 60px 20px;
-}
-
-.empty-container {
   text-align: center;
-  max-width: 360px;
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(12px);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  border-radius: 12px;
+  margin: 8px 0;
 }
 
 .empty-icon {
   color: var(--n-text-color-3);
-  margin-bottom: 24px;
-  opacity: 0.6;
+  margin-bottom: 12px;
+  opacity: 0.5;
 }
 
 .empty-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--n-text-color);
-  margin: 0 0 12px 0;
-}
-
-.empty-description {
-  font-size: 16px;
-  color: var(--n-text-color-2);
-  line-height: 1.6;
-  margin: 0 0 32px 0;
-}
-
-.empty-action-btn {
-  height: 48px;
-  min-width: 140px;
   font-size: 16px;
   font-weight: 600;
+  color: var(--n-text-color-2);
+  margin-bottom: 6px;
+}
+
+.empty-desc {
+  font-size: 12px;
+  color: var(--n-text-color-3);
+  margin-bottom: 16px;
+}
+
+.empty-btn {
+  height: 32px;
+  min-width: 100px;
+  border-radius: 6px;
+  font-weight: 500;
 }
 
 /* 对话框样式 */
-.modern-modal {
-  border-radius: 20px;
-}
-
-.subscription-form {
-  margin-top: 20px;
-}
-
-.tab-container {
-  margin: 16px 0;
+.compact-modal {
   border-radius: 12px;
 }
 
-.sub-tabs {
-  margin: 16px 0;
-}
-
-.tab-form-item {
+.subscription-form {
   margin-top: 16px;
 }
 
+.sub-tabs {
+  margin: 12px 0;
+}
+
+.tab-form-item {
+  margin-top: 12px;
+}
+
 .form-input {
-  border-radius: 10px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 13px;
 }
 
 .code-input {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  font-size: 13px;
-  background: rgba(0, 0, 0, 0.02);
+  font-size: 12px;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
 }
 
 .switch-item {
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid var(--n-border-color);
-}
-
-.modal-btn {
-  min-width: 80px;
-  border-radius: 10px;
-  font-weight: 600;
 }
 
 /* 配置编辑器 */
 .config-editor {
-  margin: 20px 0;
+  margin: 16px 0;
 }
 
 .config-input {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  font-size: 13px;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 12px;
-}
-
-/* 深色模式适配 */
-[data-theme='dark'] .url-content {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-[data-theme='dark'] .url-content:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-[data-theme='dark'] .code-input {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-[data-theme='dark'] .loading-overlay {
-  background: rgba(0, 0, 0, 0.6);
-}
-
-/* 动画 */
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
+  font-size: 12px;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
+  border-radius: 8px;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .hero-content {
-    flex-direction: column;
-    gap: 24px;
-    padding: 24px;
-    text-align: center;
+  .sub-toolbar {
+    padding: 10px 12px;
   }
 
-  .subscriptions-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
+  .subscription-item {
+    padding: 10px 12px;
+    min-height: 64px;
   }
 
-  .subscription-card {
-    padding: 16px;
-    height: 140px; /* 移动端调整高度 */
-  }
-
-  .title-row {
+  .item-header {
     flex-wrap: wrap;
+    gap: 6px;
   }
 
-  .subtitle-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+  .item-actions {
+    align-items: center;
+    gap: 4px;
   }
 
-  .card-actions {
-    justify-content: flex-end;
-  }
-
-  .card-footer {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
+  .action-group {
+    order: 2;
   }
 
   .use-btn {
-    width: 100%;
+    order: 1;
+  }
+
+  .preview-text {
+    max-width: 200px;
   }
 }
 
 @media (max-width: 480px) {
-  .modern-sub {
-    gap: 20px;
+  .subscription-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 10px;
+    min-height: auto;
   }
 
-  .hero-icon {
-    width: 48px;
-    height: 48px;
+  .item-info {
+    gap: 4px;
   }
 
-  .hero-title {
-    font-size: 22px;
+  .item-actions {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
   }
 
-  .hero-subtitle {
-    font-size: 14px;
-  }
-
-  .subscription-card {
-    padding: 14px;
-    gap: 10px;
-    height: 120px; /* 小屏幕更紧凑 */
-  }
-
-  .sub-name {
-    font-size: 13px;
+  .action-group {
+    order: 1;
   }
 
   .use-btn {
-    height: 28px;
-    font-size: 11px;
+    order: 2;
+  }
+
+  .preview-text {
+    max-width: none;
   }
 }
 </style>

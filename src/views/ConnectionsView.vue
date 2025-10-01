@@ -1,183 +1,230 @@
 <template>
-  <div class="connections-view">
-    <!-- 英雄式页面头部 -->
-    <div class="hero-header">
-      <div class="hero-content">
-        <div class="hero-icon">
-          <n-icon size="48">
-            <link-outline />
+  <div class="ultra-connections">
+    <!-- 紧凑工具栏 -->
+    <div class="connections-toolbar">
+      <div class="toolbar-left">
+        <div class="toolbar-icon">
+          <n-icon size="16">
+            <LinkOutline />
           </n-icon>
         </div>
-        <div class="hero-text">
-          <h1 class="hero-title">{{ t('connections.title') }}</h1>
-          <p class="hero-subtitle">{{ t('connections.subtitle') }}</p>
+        <div class="toolbar-info">
+          <span class="toolbar-title">{{ t('connections.title') }}</span>
+          <span class="toolbar-stats">{{ connections.length }} {{ t('connections.totalCount', { count: connections.length }) }}</span>
         </div>
-        <div class="hero-action">
-          <n-button
-            type="primary"
-            @click="refreshConnections"
-            :loading="loading"
-            size="large"
-            round
-            class="hero-btn"
-          >
-            <template #icon>
-              <n-icon><refresh-outline /></n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <n-button
+          @click="refreshConnections"
+          :loading="loading"
+          type="primary"
+          size="small"
+          class="refresh-btn"
+        >
+          <template #icon>
+            <n-icon size="12"><RefreshOutline /></n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
       </div>
     </div>
 
-    <!-- 统计卡片网格 -->
-    <div class="stats-grid">
-      <div class="stat-card active-connections">
-        <div class="stat-icon">
-          <n-icon size="24"><link-outline /></n-icon>
+    <!-- 统计面板 -->
+    <div class="stats-panel">
+      <div class="stat-orb active-orb">
+        <div class="orb-icon">
+          <n-icon size="14"><LinkOutline /></n-icon>
         </div>
-        <div class="stat-content">
-          <div class="stat-value">
+        <div class="orb-content">
+          <div class="orb-value">
             <n-number-animation ref="activeCountRef" :from="0" :to="connections.length" />
           </div>
-          <div class="stat-label">{{ t('connections.activeConnections') }}</div>
+          <div class="orb-label">{{ t('connections.activeConnections') }}</div>
         </div>
       </div>
 
-      <div class="stat-card upload-stats">
-        <div class="stat-icon">
-          <n-icon size="24"><arrow-up-outline /></n-icon>
+      <div class="stat-orb upload-orb">
+        <div class="orb-icon">
+          <n-icon size="14"><ArrowUpOutline /></n-icon>
         </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ formatBytes(connectionsTotal.upload) }}</div>
-          <div class="stat-label">{{ t('connections.uploadTotal') }}</div>
-        </div>
-      </div>
-
-      <div class="stat-card download-stats">
-        <div class="stat-icon">
-          <n-icon size="24"><arrow-down-outline /></n-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ formatBytes(connectionsTotal.download) }}</div>
-          <div class="stat-label">{{ t('connections.downloadTotal') }}</div>
+        <div class="orb-content">
+          <div class="orb-value">{{ formatBytes(connectionsTotal.upload) }}</div>
+          <div class="orb-label">{{ t('home.traffic.uploadTotal') }}</div>
         </div>
       </div>
 
-      <div class="stat-card memory-stats">
-        <div class="stat-icon">
-          <n-icon size="24"><hardware-chip-outline /></n-icon>
+      <div class="stat-orb download-orb">
+        <div class="orb-icon">
+          <n-icon size="14"><ArrowDownOutline /></n-icon>
         </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ filteredConnections.length }}</div>
-          <div class="stat-label">{{ t('connections.matchedConnections') }}</div>
+        <div class="orb-content">
+          <div class="orb-value">{{ formatBytes(connectionsTotal.download) }}</div>
+          <div class="orb-label">{{ t('home.traffic.downloadTotal') }}</div>
+        </div>
+      </div>
+
+      <div class="stat-orb filtered-orb">
+        <div class="orb-icon">
+          <n-icon size="14"><HardwareChipOutline /></n-icon>
+        </div>
+        <div class="orb-content">
+          <div class="orb-value">{{ filteredConnections.length }}</div>
+          <div class="orb-label">{{ t('connections.matchedConnections') }}</div>
         </div>
       </div>
     </div>
 
-    <!-- 搜索筛选卡片 -->
-    <div class="filter-card">
-      <div class="filter-header">
-        <h3 class="filter-title">{{ t('connections.searchAndFilter') }}</h3>
-        <div class="filter-stats">
-          <n-tag type="info" size="small" round>
-            {{ t('connections.totalCount', { count: connections.length }) }}
-          </n-tag>
-          <n-tag
-            v-if="searchQuery || networkFilter || ruleFilter"
-            type="success"
+    <!-- 连接内容区域 -->
+    <div class="connections-content">
+      <!-- 搜索筛选区域 -->
+      <div class="search-section">
+        <div class="search-input-group">
+          <n-input
+            v-model:value="searchQuery"
+            :placeholder="t('connections.searchPlaceholder')"
+            clearable
             size="small"
-            round
+            class="search-input"
           >
-            {{ t('connections.matchingCount', { count: filteredConnections.length }) }}
+            <template #prefix>
+              <n-icon size="14">
+                <SearchOutline />
+              </n-icon>
+            </template>
+          </n-input>
+
+          <div class="filter-selects">
+            <n-select
+              v-model:value="networkFilter"
+              :options="networkOptions"
+              :placeholder="t('connections.networkTypeFilter')"
+              clearable
+              size="small"
+              class="filter-select"
+            />
+            <n-select
+              v-model:value="ruleFilter"
+              :options="ruleOptions"
+              :placeholder="t('connections.ruleFilter')"
+              clearable
+              size="small"
+              class="filter-select"
+            />
+          </div>
+        </div>
+
+        <div class="filter-tags" v-if="searchQuery || networkFilter || ruleFilter">
+          <n-tag v-if="searchQuery" size="tiny" round class="filter-tag">
+            {{ t('common.search') }}: {{ searchQuery }}
+          </n-tag>
+          <n-tag v-if="networkFilter" size="tiny" round class="filter-tag">
+            {{ t('connections.networkTypeFilter') }}: {{ networkFilter }}
+          </n-tag>
+          <n-tag v-if="ruleFilter" size="tiny" round class="filter-tag">
+            {{ t('connections.ruleFilter') }}: {{ ruleFilter }}
           </n-tag>
         </div>
       </div>
 
-      <div class="filter-controls">
-        <n-input
-          v-model:value="searchQuery"
-          :placeholder="t('connections.searchPlaceholder')"
-          clearable
-          size="large"
-          class="search-input"
-        >
-          <template #prefix>
-            <n-icon><search-outline /></n-icon>
-          </template>
-        </n-input>
+      <!-- 连接列表 -->
+      <div class="connections-list">
+        <n-spin :show="loading">
+          <div v-if="filteredConnections.length > 0" class="connections-grid">
+            <div
+              v-for="(conn, index) in filteredConnections"
+              :key="conn.id"
+              class="connection-item"
+              :class="{ 'connection-highlight': isConnectionHighlighted(conn) }"
+            >
+              <!-- 连接ID -->
+              <div class="connection-id">
+                <div class="id-badge">
+                  {{ getConnectionShortId(conn.id) }}
+                </div>
+              </div>
 
-        <div class="filter-selects">
-          <n-select
-            v-model:value="networkFilter"
-            :options="networkOptions"
-            :placeholder="t('connections.networkTypeFilter')"
-            clearable
-            size="large"
-            class="filter-select"
-          />
+              <!-- 时间 -->
+              <div class="connection-time">
+                <div class="time-text">
+                  {{ formatConnectionTime(conn.start) }}
+                </div>
+              </div>
 
-          <n-select
-            v-model:value="ruleFilter"
-            :options="ruleOptions"
-            :placeholder="t('connections.ruleFilter')"
-            clearable
-            size="large"
-            class="filter-select"
-          />
-        </div>
-      </div>
-    </div>
+              <!-- 网络类型 -->
+              <div class="connection-network">
+                <div class="network-badge" :class="getNetworkClass(conn.metadata.network)">
+                  {{ conn.metadata.network?.toUpperCase() }}
+                </div>
+              </div>
 
-    <!-- 连接表格卡片 -->
-    <div class="table-card">
-      <n-spin :show="loading">
-        <div v-if="filteredConnections.length > 0" class="table-container">
-          <n-data-table
-            :columns="columns"
-            :data="filteredConnections"
-            :pagination="pagination"
-            :bordered="false"
-            :max-height="500"
-            striped
-            class="connections-table"
-          />
-        </div>
-        <div v-else class="empty-state">
-          <div class="empty-icon">
-            <n-icon size="64">
-              <link-outline />
-            </n-icon>
+              <!-- 源地址 -->
+              <div class="connection-source">
+                <div class="source-text" :title="getSourceText(conn)">
+                  {{ getSourceText(conn) }}
+                </div>
+              </div>
+
+              <!-- 目标地址 -->
+              <div class="connection-destination">
+                <div class="dest-text" :title="getDestinationText(conn)">
+                  {{ getDestinationText(conn) }}
+                </div>
+              </div>
+
+              <!-- 规则 -->
+              <div class="connection-rule">
+                <div class="rule-badge" :class="getRuleClass(conn.rule)">
+                  {{ conn.rule }}
+                </div>
+              </div>
+
+              <!-- 流量 -->
+              <div class="connection-traffic">
+                <div class="traffic-info">
+                  <div class="traffic-upload">↑{{ formatBytes(conn.upload) }}</div>
+                  <div class="traffic-download">↓{{ formatBytes(conn.download) }}</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <h3 class="empty-title">
-            {{
-              searchQuery || networkFilter || ruleFilter
-                ? t('connections.noMatchingConnections2')
-                : t('connections.noActiveConnections')
-            }}
-          </h3>
-          <p class="empty-description">
-            {{
-              searchQuery || networkFilter || ruleFilter
-                ? t('connections.adjustSearchOrFilters')
-                : t('connections.noActiveNetworkConnections')
-            }}
-          </p>
-          <n-button
-            v-if="!searchQuery && !networkFilter && !ruleFilter"
-            @click="refreshConnections"
-            type="primary"
-            size="large"
-            round
-            class="empty-action"
-          >
-            <template #icon>
-              <n-icon><refresh-outline /></n-icon>
-            </template>
-            {{ t('connections.refreshConnections') }}
-          </n-button>
-        </div>
-      </n-spin>
+
+          <!-- 空状态 -->
+          <div v-else class="empty-state">
+            <div class="empty-icon">
+              <n-icon size="32">
+                <LinkOutline />
+              </n-icon>
+            </div>
+            <div class="empty-title">
+              {{
+                searchQuery || networkFilter || ruleFilter
+                  ? t('connections.noMatchingConnections2')
+                  : t('connections.noActiveConnections')
+              }}
+            </div>
+            <div class="empty-desc">
+              {{
+                searchQuery || networkFilter || ruleFilter
+                  ? t('connections.adjustSearchOrFilters')
+                  : t('connections.refreshConnections')
+              }}
+            </div>
+            <n-button
+              v-if="!searchQuery && !networkFilter && !ruleFilter"
+              @click="refreshConnections"
+              type="primary"
+              size="medium"
+              class="empty-btn"
+            >
+              <template #icon>
+                <n-icon size="14"><RefreshOutline /></n-icon>
+              </template>
+              {{ t('connections.refreshConnections') }}
+            </n-button>
+          </div>
+        </n-spin>
+      </div>
     </div>
   </div>
 </template>
@@ -320,7 +367,7 @@ const formatTime = (timeString: string) => {
 // 定义表格列
 const columns: DataTableColumns<Connection> = [
   {
-    title: 'ID',
+    title: t('connections.unknown'),
     key: 'id',
     width: 100,
     ellipsis: {
@@ -665,6 +712,72 @@ const pagination = {
   pageSize: 15,
 }
 
+// 辅助方法
+const getConnectionShortId = (id: string): string => {
+  if (!id) return 'N/A'
+  return id.length > 8 ? id.substring(0, 8) + '...' : id
+}
+
+const formatConnectionTime = (timeString: string): string => {
+  try {
+    const date = new Date(timeString)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+
+    if (diff < 60000) {
+      return Math.floor(diff / 1000) + 's'
+    } else if (diff < 3600000) {
+      return Math.floor(diff / 60000) + 'm'
+    } else if (diff < 86400000) {
+      return Math.floor(diff / 3600000) + 'h'
+    } else {
+      return date.toLocaleDateString()
+    }
+  } catch (e) {
+    return t('common.unknown')
+  }
+}
+
+const getSourceText = (conn: Connection): string => {
+  const { sourceIP, sourcePort } = conn.metadata
+  return `${sourceIP}:${sourcePort}`
+}
+
+const getDestinationText = (conn: Connection): string => {
+  const { destinationIP, destinationPort, host } = conn.metadata
+  return host || `${destinationIP}:${destinationPort}`
+}
+
+const getNetworkClass = (network: string): string => {
+  if (network === 'tcp') return 'network-tcp'
+  if (network === 'udp') return 'network-udp'
+  return 'network-other'
+}
+
+const getRuleClass = (rule: string): string => {
+  if (!rule) return 'rule-default'
+  if (rule.includes('direct')) return 'rule-direct'
+  if (rule.includes('proxy')) return 'rule-proxy'
+  if (rule.includes('reject')) return 'rule-reject'
+  return 'rule-normal'
+}
+
+const isConnectionHighlighted = (conn: Connection): boolean => {
+  if (!searchQuery.value) return false
+
+  const searchText = searchQuery.value.toLowerCase()
+  const sourceText = getSourceText(conn).toLowerCase()
+  const destText = getDestinationText(conn).toLowerCase()
+
+  return (
+    conn.id.toLowerCase().includes(searchText) ||
+    sourceText.includes(searchText) ||
+    destText.includes(searchText) ||
+    (conn.rule && conn.rule.toLowerCase().includes(searchText)) ||
+    (conn.metadata.processPath?.toLowerCase() || '').includes(searchText)
+  )
+}
+
 // 刷新连接列表
 const refreshConnections = async () => {
   loading.value = true
@@ -696,327 +809,476 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.connections-view {
-  min-height: 100vh;
+.ultra-connections {
+  padding: 16px;
   background: var(--n-color-embedded);
-  padding: 20px;
+  min-height: calc(100vh - 36px);
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+  gap: 16px;
+  animation: slideFadeIn 0.4s ease-out;
 }
 
-/* 英雄式头部 */
-.hero-header {
+/* 紧凑工具栏 */
+.connections-toolbar {
   background: var(--n-card-color);
-  border-radius: 20px;
-  padding: 24px 32px;
-  box-shadow: var(--n-box-shadow-2);
-  border: 1px solid var(--n-border-color);
-  position: relative;
-  overflow: hidden;
-}
-
-.hero-header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #00b42a 0%, #4080ff 50%, #2266dd 100%);
-  border-radius: 20px 20px 0 0;
-}
-
-.hero-content {
+  border-radius: 12px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
-  gap: 24px;
+  justify-content: space-between;
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
-.hero-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: 18px;
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 12px 32px rgba(0, 180, 42, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 180, 42, 0.3);
 }
 
-.hero-text {
-  flex: 1;
+.toolbar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.hero-title {
-  font-size: 2rem;
-  font-weight: 800;
-  margin: 0 0 8px 0;
-  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  line-height: 1.2;
-}
-
-.hero-subtitle {
-  font-size: 1.1rem;
-  color: var(--n-text-color-3);
-  margin: 0;
-  font-weight: 500;
-}
-
-.hero-action {
-  flex-shrink: 0;
-}
-
-.hero-btn {
-  height: 48px;
-  padding: 0 24px;
+.toolbar-title {
   font-size: 1rem;
   font-weight: 600;
-  border-radius: 24px;
-  box-shadow:
-    0 8px 32px rgba(0, 180, 42, 0.25),
-    0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--n-text-color-1);
+  margin: 0;
 }
 
-.hero-btn:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 16px 48px rgba(0, 180, 42, 0.4),
-    0 4px 12px rgba(0, 0, 0, 0.15);
+.toolbar-stats {
+  font-size: 0.75rem;
+  color: var(--n-text-color-3);
+  margin: 0;
 }
 
-/* 统计卡片网格 */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.stat-card {
-  background: var(--n-card-color);
-  border-radius: 16px;
-  padding: 20px;
+.toolbar-right {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  gap: 8px;
+}
+
+.refresh-btn {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 180, 42, 0.3);
+}
+
+/* 统计面板 */
+.stats-panel {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  background: var(--n-card-color);
+  border-radius: 12px;
+  padding: 16px;
   box-shadow: var(--n-box-shadow-1);
   border: 1px solid var(--n-border-color);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-orb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
   position: relative;
   overflow: hidden;
 }
 
-.stat-card::before {
+.stat-orb:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-orb::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  border-radius: 14px 14px 0 0;
+  height: 2px;
+  border-radius: 8px 8px 0 0;
 }
 
-.stat-card.active-connections::before {
+.active-orb::before {
   background: linear-gradient(90deg, #00b42a 0%, #009a1a 100%);
 }
 
-.stat-card.upload-stats::before {
+.upload-orb::before {
   background: linear-gradient(90deg, #f53f3f 0%, #cb2a2a 100%);
 }
 
-.stat-card.download-stats::before {
+.download-orb::before {
   background: linear-gradient(90deg, #4080ff 0%, #2266dd 100%);
 }
 
-.stat-card.memory-stats::before {
-  background: linear-gradient(90deg, #f53f3f 0%, #cb2a2a 100%);
+.filtered-orb::before {
+  background: linear-gradient(90deg, #ff9500 0%, #ff6200 100%);
 }
 
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.12),
-    0 4px 8px rgba(0, 0, 0, 0.08);
-}
-
-.stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+.orb-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.active-connections .stat-icon {
-  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
   color: white;
-  box-shadow: 0 8px 24px rgba(0, 180, 42, 0.3);
-}
-
-.upload-stats .stat-icon {
-  background: linear-gradient(135deg, #f53f3f 0%, #cb2a2a 100%);
-  color: white;
-  box-shadow: 0 8px 24px rgba(245, 63, 63, 0.3);
-}
-
-.download-stats .stat-icon {
-  background: linear-gradient(135deg, #4080ff 0%, #2266dd 100%);
-  color: white;
-  box-shadow: 0 8px 24px rgba(64, 128, 255, 0.3);
-}
-
-.memory-stats .stat-icon {
-  background: linear-gradient(135deg, #f53f3f 0%, #cb2a2a 100%);
-  color: white;
-  box-shadow: 0 8px 24px rgba(245, 63, 63, 0.3);
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-label {
-  font-size: 0.875rem;
   font-weight: 500;
-  color: var(--n-text-color-3);
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
-.stat-value {
-  font-size: 1.5rem;
+.active-orb .orb-icon {
+  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
+}
+
+.upload-orb .orb-icon {
+  background: linear-gradient(135deg, #f53f3f 0%, #cb2a2a 100%);
+}
+
+.download-orb .orb-icon {
+  background: linear-gradient(135deg, #4080ff 0%, #2266dd 100%);
+}
+
+.filtered-orb .orb-icon {
+  background: linear-gradient(135deg, #ff9500 0%, #ff6200 100%);
+}
+
+.orb-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.orb-value {
+  font-size: 1rem;
   font-weight: 700;
   color: var(--n-text-color-1);
   line-height: 1.2;
 }
 
-/* 筛选卡片 */
-.filter-card {
+.orb-label {
+  font-size: 0.7rem;
+  color: var(--n-text-color-3);
+  font-weight: 500;
+}
+
+/* 连接内容区域 */
+.connections-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* 搜索筛选区域 */
+.search-section {
   background: var(--n-card-color);
-  border-radius: 16px;
-  padding: 24px;
+  border-radius: 12px;
+  padding: 16px;
   box-shadow: var(--n-box-shadow-1);
   border: 1px solid var(--n-border-color);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.filter-header {
+.search-input-group {
   display: flex;
-  justify-content: space-between;
+  gap: 12px;
   align-items: center;
-  margin-bottom: 12px;
-}
-
-.filter-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0;
-}
-
-.filter-stats {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.filter-controls {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
 
 .search-input {
   flex: 1;
-  min-width: 300px;
+  min-width: 280px;
+}
+
+.search-input :deep(.n-input) {
+  border-radius: 8px;
+  border: 1px solid var(--n-border-color);
+  transition: all 0.2s ease;
+}
+
+.search-input :deep(.n-input:hover) {
+  border-color: #00b42a;
+}
+
+.search-input :deep(.n-input.n-input--focus) {
+  border-color: #00b42a;
+  box-shadow: 0 0 0 2px rgba(0, 180, 42, 0.1);
 }
 
 .filter-selects {
   display: flex;
-  gap: 12px;
-  align-items: stretch;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .filter-select {
-  min-width: 180px;
-}
-
-.search-input :deep(.n-input) {
-  border-radius: 12px;
-  border: 2px solid var(--n-border-color);
-  transition: all 0.3s ease;
-}
-
-.search-input :deep(.n-input:hover) {
-  border-color: rgba(64, 128, 255, 0.3);
-}
-
-.search-input :deep(.n-input.n-input--focus) {
-  border-color: #4080ff;
-  box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
+  min-width: 140px;
 }
 
 .filter-select :deep(.n-base-selection) {
-  border-radius: 12px;
-  border: 2px solid var(--n-border-color);
-  transition: all 0.3s ease;
+  border-radius: 8px;
+  border: 1px solid var(--n-border-color);
+  transition: all 0.2s ease;
 }
 
 .filter-select :deep(.n-base-selection:hover) {
-  border-color: rgba(64, 128, 255, 0.3);
+  border-color: #00b42a;
 }
 
 .filter-select :deep(.n-base-selection.n-base-selection--focus) {
-  border-color: #4080ff;
-  box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
+  border-color: #00b42a;
+  box-shadow: 0 0 0 2px rgba(0, 180, 42, 0.1);
 }
 
-/* 表格卡片 */
-.table-card {
+.filter-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-tag {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* 连接列表 */
+.connections-list {
+  flex: 1;
   background: var(--n-card-color);
-  border-radius: 16px;
+  border-radius: 12px;
+  padding: 16px;
   box-shadow: var(--n-box-shadow-1);
   border: 1px solid var(--n-border-color);
+  min-height: 0;
+}
+
+.connections-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.connection-item {
+  display: grid;
+  grid-template-columns: 60px 50px 60px 120px 140px 100px 100px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--n-color-embedded);
+  border-radius: 8px;
+  border: 1px solid var(--n-border-color);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
   overflow: hidden;
 }
 
-.table-container {
-  min-height: 400px;
-  padding: 16px;
+.connection-item:hover {
+  background: var(--n-color-embedded-modal);
+  border-color: #00b42a;
+  transform: translateX(2px);
+  box-shadow: 0 2px 8px rgba(0, 180, 42, 0.1);
 }
 
-.connections-table :deep(.n-data-table) {
-  border-radius: 0;
+.connection-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+  transition: background 0.2s ease;
 }
 
-.connections-table :deep(.n-data-table-th) {
-  background: var(--n-color-embedded);
-  font-weight: 600;
+.connection-item:hover::before {
+  background: #00b42a;
+}
+
+.connection-highlight {
+  background: rgba(0, 180, 42, 0.05);
+  border-color: rgba(0, 180, 42, 0.2);
+}
+
+.connection-highlight::before {
+  background: #00b42a;
+}
+
+.connection-id {
+  display: flex;
+  align-items: center;
+}
+
+.id-badge {
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--n-text-color-2);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.connection-time {
+  display: flex;
+  align-items: center;
+}
+
+.time-text {
+  font-size: 0.75rem;
+  color: var(--n-text-color-2);
+  font-weight: 500;
+}
+
+.connection-network {
+  display: flex;
+  align-items: center;
+}
+
+.network-badge {
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.network-tcp {
+  background: rgba(64, 128, 255, 0.1);
+  color: #4080ff;
+  border: 1px solid rgba(64, 128, 255, 0.2);
+}
+
+.network-udp {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.network-other {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.connection-source,
+.connection-destination {
+  flex: 1;
+  min-width: 0;
+}
+
+.source-text,
+.dest-text {
+  font-size: 0.75rem;
   color: var(--n-text-color-1);
-  border-bottom: 2px solid var(--n-border-color);
-  padding: 12px 8px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.connections-table :deep(.n-data-table-td) {
-  padding: 8px;
-  border-bottom: 1px solid var(--n-border-color);
+.connection-rule {
+  display: flex;
+  align-items: center;
 }
 
-.connections-table :deep(.n-data-table-tr:hover .n-data-table-td) {
-  background: linear-gradient(135deg, rgba(64, 128, 255, 0.02) 0%, rgba(144, 147, 153, 0.02) 100%);
+.rule-badge {
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.rule-direct {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.rule-proxy {
+  background: rgba(64, 128, 255, 0.1);
+  color: #4080ff;
+  border: 1px solid rgba(64, 128, 255, 0.2);
+}
+
+.rule-reject {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.rule-normal {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.rule-default {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.connection-traffic {
+  display: flex;
+  align-items: center;
+}
+
+.traffic-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.traffic-upload,
+.traffic-download {
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.traffic-upload {
+  color: #f53f3f;
+}
+
+.traffic-download {
+  color: #4080ff;
 }
 
 /* 空状态 */
@@ -1025,101 +1287,117 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 350px;
-  padding: 48px 24px;
+  min-height: 300px;
+  padding: 40px 20px;
   text-align: center;
 }
 
 .empty-icon {
   color: var(--n-text-color-disabled);
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  opacity: 0.5;
 }
 
 .empty-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.125rem;
+  font-weight: 600;
   color: var(--n-text-color-1);
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
 }
 
-.empty-description {
-  font-size: 1rem;
+.empty-desc {
+  font-size: 0.875rem;
   color: var(--n-text-color-3);
-  margin: 0 0 24px 0;
-  line-height: 1.6;
-  max-width: 400px;
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+  max-width: 300px;
 }
 
-.empty-action {
-  margin-top: 24px;
+.empty-btn {
+  height: 36px;
+  padding: 0 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s ease;
 }
 
-/* 深色模式样式会通过CSS变量自动应用 */
+.empty-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 180, 42, 0.3);
+}
 
-/* 文本颜色会通过CSS变量自动适配暗色模式 */
+/* 动画效果 */
+@keyframes slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 /* 响应式设计 */
 @media (max-width: 1024px) {
-  .connections-view {
-    padding: 16px;
-    gap: 16px;
-  }
-
-  .stats-grid {
+  .stats-panel {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 768px) {
-  .connections-view {
+  .ultra-connections {
     padding: 12px;
-    gap: 16px;
+    gap: 12px;
   }
 
-  .hero-header {
-    padding: 20px;
-    border-radius: 16px;
+  .connections-toolbar {
+    padding: 10px 12px;
   }
 
-  .hero-content {
+  .toolbar-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .toolbar-title {
+    font-size: 0.875rem;
+  }
+
+  .toolbar-stats {
+    font-size: 0.7rem;
+  }
+
+  .stats-panel {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .stat-orb {
+    padding: 8px;
     flex-direction: column;
     text-align: center;
-    gap: 16px;
+    gap: 4px;
   }
 
-  .hero-icon {
-    width: 64px;
-    height: 64px;
+  .orb-icon {
+    width: 24px;
+    height: 24px;
   }
 
-  .hero-title {
-    font-size: 1.75rem;
+  .orb-value {
+    font-size: 0.875rem;
   }
 
-  .hero-subtitle {
-    font-size: 1rem;
+  .orb-label {
+    font-size: 0.65rem;
   }
 
-  .stats-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .stat-card {
-    padding: 16px;
-  }
-
-  .filter-card {
-    padding: 20px;
-  }
-
-  .filter-controls {
+  .search-input-group {
     flex-direction: column;
-    gap: 12px;
-  }
-
-  .filter-selects {
-    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
   }
 
@@ -1127,53 +1405,116 @@ onUnmounted(() => {
     min-width: unset;
   }
 
+  .filter-selects {
+    justify-content: space-between;
+  }
+
   .filter-select {
-    min-width: unset;
+    flex: 1;
+    min-width: 120px;
   }
 
-  .table-card {
-    border-radius: 14px;
+  .connection-item {
+    grid-template-columns: 50px 40px 50px 1fr 80px 80px;
+    gap: 6px;
+    padding: 8px 10px;
   }
 
-  .connections-table :deep(.n-data-table) {
-    font-size: 0.875rem;
+  .connection-time {
+    display: none;
   }
 
-  .connections-table :deep(.n-data-table-th),
-  .connections-table :deep(.n-data-table-td) {
-    padding: 8px 6px;
+  .source-text,
+  .dest-text {
+    font-size: 0.7rem;
   }
 }
 
 @media (max-width: 480px) {
-  .connections-view {
+  .ultra-connections {
     padding: 8px;
+    gap: 8px;
   }
 
-  .hero-header {
-    padding: 16px;
+  .connections-toolbar {
+    padding: 8px 10px;
   }
 
-  .hero-title {
-    font-size: 1.5rem;
+  .toolbar-left {
+    gap: 8px;
   }
 
-  .hero-btn {
-    height: 44px;
-    padding: 0 20px;
-    font-size: 0.875rem;
+  .toolbar-icon {
+    width: 24px;
+    height: 24px;
   }
 
-  .stat-card {
-    padding: 14px;
+  .toolbar-title {
+    font-size: 0.8rem;
   }
 
-  .filter-card {
-    padding: 16px;
-  }
-
-  .table-container {
+  .search-section {
     padding: 12px;
   }
+
+  .connections-list {
+    padding: 12px;
+  }
+
+  .stats-panel {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .connection-item {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 8px 10px;
+  }
+
+  .connection-id,
+  .connection-network,
+  .connection-rule,
+  .connection-traffic {
+    display: none;
+  }
+
+  .source-text,
+  .dest-text {
+    font-size: 0.8rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.4;
+  }
+
+  .empty-state {
+    padding: 32px 16px;
+    min-height: 250px;
+  }
+
+  .empty-title {
+    font-size: 1rem;
+  }
+
+  .empty-desc {
+    font-size: 0.8rem;
+  }
+}
+
+/* Naive UI 组件优化 */
+:deep(.n-spin-container) {
+  min-height: 200px;
+}
+
+:deep(.n-input__input-el) {
+  font-size: 0.875rem !important;
+}
+
+:deep(.n-base-selection-label) {
+  font-size: 0.875rem !important;
+}
+
+:deep(.n-button__content) {
+  font-size: 0.875rem !important;
 }
 </style>

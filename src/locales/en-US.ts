@@ -27,6 +27,9 @@ export default {
     later: 'Later',
     minimizedToTray: 'Minimized to Tray',
     collapse: 'Collapse',
+    appName: 'Sing-Box Windows',
+    search: 'Search',
+    requestTimeout: 'Request Timeout',
   },
   nav: {
     home: 'Home',
@@ -64,6 +67,12 @@ export default {
         'Capture and proxy all system traffic via virtual network card, requires administrator privileges',
       manualDescription: 'Configure proxy settings manually in your applications and browsers',
     },
+    nodeMode: {
+      global: 'Global Mode',
+      rule: 'Rule Mode',
+      globalTip: 'Route all traffic through proxy',
+      ruleTip: 'Smart routing based on rules',
+    },
     proxyHeader: {
       flowMode: 'Traffic Proxy Mode',
       nodeMode: 'Node Proxy Mode',
@@ -81,6 +90,10 @@ export default {
     stop: 'Stop',
     restart: 'Restart',
     restartAsAdmin: 'Restart as Admin',
+    escalatePrivileges: 'Escalate Privileges',
+    proxyModeSelector: 'Proxy Mode',
+    nodeModeSelector: 'Node Mode',
+    trafficMonitor: 'Traffic Monitor',
     traffic: {
       uploadSpeed: 'Upload Speed',
       downloadSpeed: 'Download Speed',
@@ -257,8 +270,11 @@ export default {
     kernelVersion: 'Kernel Version',
     notInstalled: 'Not Installed',
     newVersionAvailable: 'New version available: {version}',
+    newVersion: 'New Version',
     manualDownload: 'Manual Download',
     checkInstallation: 'Check Installation',
+    redownload: 'Re-download Current Version',
+    checkInstall: 'Check Installation',
     general: {
       title: 'General',
       subtitle: 'Language, network and port configuration',
@@ -274,6 +290,7 @@ export default {
       auto: 'Auto',
       changed: 'Language changed',
       changeSuccess: 'Language changed successfully',
+      description: 'Select application interface display language',
     },
     update: {
       title: 'Update Settings',

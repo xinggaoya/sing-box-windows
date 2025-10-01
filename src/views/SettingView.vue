@@ -1,33 +1,30 @@
 <template>
-  <div class="modern-settings">
-    <!-- 英雄式头部 -->
-    <div class="settings-hero">
-      <div class="hero-content">
-        <div class="hero-info">
-          <div class="hero-icon">
-            <n-icon size="32">
-              <SettingsOutline />
-            </n-icon>
-          </div>
-          <div class="hero-text">
-            <h1 class="hero-title">{{ t('setting.title') }}</h1>
-            <p class="hero-subtitle">{{ t('setting.subtitle') }}</p>
-          </div>
+  <div class="ultra-settings">
+    <!-- 紧凑工具栏 -->
+    <div class="settings-toolbar">
+      <div class="toolbar-left">
+        <div class="toolbar-icon">
+          <n-icon size="16">
+            <SettingsOutline />
+          </n-icon>
         </div>
+        <div class="toolbar-info">
+          <span class="toolbar-title">{{ t('setting.title') }}</span>
+          <span class="toolbar-stats">{{ t('setting.subtitle') }}</span>
+        </div>
+      </div>
 
-        <div class="hero-status">
-          <div class="status-card">
-            <div class="status-item">
-              <span class="status-label">{{ t('setting.appVersion') }}</span>
-              <span class="status-value">{{ updateStore.appVersion }}</span>
-            </div>
-            <div class="status-item">
-              <span class="status-label">{{ t('setting.kernelVersion') }}</span>
-              <span class="status-value">{{
-                formatVersion(kernelStore.version.version) || t('setting.notInstalled')
-              }}</span>
-            </div>
-          </div>
+      <div class="toolbar-right">
+        <div class="version-info">
+          <span class="version-label">{{ t('setting.appVersion') }}</span>
+          <span class="version-value">{{ updateStore.appVersion }}</span>
+        </div>
+        <div class="version-divider"></div>
+        <div class="version-info">
+          <span class="version-label">{{ t('setting.kernelVersion') }}</span>
+          <span class="version-value">{{
+            formatVersion(kernelStore.version.version) || t('setting.notInstalled')
+          }}</span>
         </div>
       </div>
     </div>
@@ -38,54 +35,52 @@
       <section class="settings-section">
         <div class="section-header">
           <div class="section-icon kernel-icon">
-            <n-icon size="24"><SettingsOutline /></n-icon>
+            <n-icon size="18"><SettingsOutline /></n-icon>
           </div>
           <div class="section-info">
             <h2 class="section-title">{{ t('setting.kernel.title') }}</h2>
-            <p class="section-description">{{ t('setting.kernel.subtitle') }}</p>
           </div>
           <div class="section-status">
             <n-tag
               v-if="kernelStore.version.version"
               type="success"
-              size="medium"
+              size="small"
               round
-              class="status-tag"
             >
               {{ formatVersion(kernelStore.version.version) }}
             </n-tag>
-            <n-tag v-else type="error" size="medium" round class="status-tag">
-              {{ t('setting.kernel.notInstalled') }}
+            <n-tag v-else type="error" size="small" round>
+              {{ t('setting.notInstalled') }}
             </n-tag>
-            <n-tag v-if="hasNewVersion" type="warning" size="medium" round class="status-tag">
-              {{
-                t('setting.newVersionAvailable', { version: formatVersion(kernelStore.newVersion) })
-              }}
+            <n-tag v-if="hasNewVersion" type="warning" size="small" round>
+              {{ t('setting.newVersionAvailable') }}
             </n-tag>
           </div>
         </div>
 
         <div class="section-content">
           <!-- 状态提醒 -->
-          <n-alert
-            v-if="hasNewVersion"
-            type="warning"
-            :show-icon="true"
-            :title="t('setting.kernel.newVersionFound')"
-            class="status-alert"
-          >
-            {{ t('setting.kernel.updateTip') }}
-          </n-alert>
+          <div v-if="hasNewVersion || !kernelStore.version.version" class="status-alerts">
+            <n-alert
+              v-if="hasNewVersion"
+              type="warning"
+              :show-icon="false"
+              size="small"
+              class="compact-alert"
+            >
+              {{ t('setting.newVersionFound') }}
+            </n-alert>
 
-          <n-alert
-            v-if="!kernelStore.version.version"
-            type="error"
-            :show-icon="true"
-            :title="t('setting.kernel.notInstalled')"
-            class="status-alert"
-          >
-            {{ t('setting.kernel.installPrompt') }}
-          </n-alert>
+            <n-alert
+              v-if="!kernelStore.version.version"
+              type="error"
+              :show-icon="false"
+              size="small"
+              class="compact-alert"
+            >
+              {{ t('setting.installPrompt') }}
+            </n-alert>
+          </div>
 
           <!-- 下载进度 -->
           <div v-if="downloading" class="download-area">
@@ -94,6 +89,7 @@
               :percentage="downloadProgress"
               :processing="downloadProgress < 100"
               :indicator-placement="'inside'"
+              size="small"
               class="download-progress"
             >
               {{ downloadMessage }}
@@ -101,34 +97,28 @@
           </div>
 
           <!-- 操作按钮区 -->
-          <div class="actions-grid">
+          <div class="action-buttons">
             <n-button
               type="primary"
               @click="downloadTheKernel"
               :loading="loading"
               :disabled="downloading"
-              size="large"
+              size="small"
               class="primary-action"
-              round
             >
               <template #icon>
-                <n-icon><DownloadOutline /></n-icon>
+                <n-icon size="14"><DownloadOutline /></n-icon>
               </template>
               {{
-                hasNewVersion
-                  ? t('setting.kernel.downloadNew')
-                  : kernelStore.version.version
-                    ? t('setting.kernel.redownload')
-                    : t('setting.kernel.download')
+                hasNewVersion ? t('setting.update') : kernelStore.version.version ? t('setting.redownload') : t('setting.download')
               }}
             </n-button>
 
             <n-button
               @click="showManualDownloadModal"
               :disabled="downloading"
-              size="large"
+              size="small"
               class="secondary-action"
-              round
             >
               {{ t('setting.manualDownload') }}
             </n-button>
@@ -136,18 +126,16 @@
             <n-button
               @click="checkManualInstall"
               :disabled="downloading"
-              size="large"
+              size="small"
               class="secondary-action"
-              round
             >
-              {{ t('setting.checkInstallation') }}
+              {{ t('setting.checkInstall') }}
             </n-button>
           </div>
 
           <!-- 错误提示 -->
-          <n-alert v-if="downloadError" type="error" :show-icon="true" class="status-alert">
-            <template #header>{{ t('setting.kernel.downloadFailed') }}</template>
-            <div style="white-space: pre-line">{{ downloadError }}</div>
+          <n-alert v-if="downloadError" type="error" :show-icon="false" size="small" class="compact-alert">
+            {{ downloadError }}
           </n-alert>
         </div>
       </section>
@@ -156,57 +144,34 @@
       <section class="settings-section">
         <div class="section-header">
           <div class="section-icon startup-icon">
-            <n-icon size="24"><PowerOutline /></n-icon>
+            <n-icon size="18"><PowerOutline /></n-icon>
           </div>
           <div class="section-info">
             <h2 class="section-title">{{ t('setting.startup.title') }}</h2>
-            <p class="section-description">{{ t('setting.startup.subtitle') }}</p>
           </div>
         </div>
 
         <div class="section-content">
-          <div class="settings-list">
-            <div class="setting-row">
+          <div class="settings-grid">
+            <div class="setting-item">
               <div class="setting-info">
                 <div class="setting-title">{{ t('setting.autoStart.app') }}</div>
-                <div class="setting-desc">
-                  {{
-                    autoStart
-                      ? t('setting.startup.bootTip')
-                      : t('setting.startup.manualTip')
-                  }}
-                </div>
               </div>
               <n-switch
                 v-model:value="autoStart"
                 @update-value="onAutoStartChange"
-                size="large"
-                class="setting-control"
-              >
-                <template #checked>{{ t('common.on') }}</template>
-                <template #unchecked>{{ t('common.off') }}</template>
-              </n-switch>
+                size="small"
+              />
             </div>
 
-            <div class="setting-row">
+            <div class="setting-item">
               <div class="setting-info">
                 <div class="setting-title">{{ t('setting.autoStart.kernel') }}</div>
-                <div class="setting-desc">
-                  {{
-                    appStore.autoStartKernel
-                      ? t('setting.startup.autoKernelTip')
-                      : t('setting.startup.manualKernelTip')
-                  }}
-                </div>
               </div>
               <n-switch
                 v-model:value="appStore.autoStartKernel"
-                size="large"
-                class="setting-control"
-              >
-                <template #checked>{{ t('common.on') }}</template>
-                <template #unchecked>{{ t('common.off') }}</template>
-              </n-switch>
+                size="small"
+              />
             </div>
           </div>
         </div>
@@ -216,61 +181,49 @@
       <section class="settings-section">
         <div class="section-header">
           <div class="section-icon general-icon">
-            <n-icon size="24"><GlobeOutline /></n-icon>
+            <n-icon size="18"><GlobeOutline /></n-icon>
           </div>
           <div class="section-info">
             <h2 class="section-title">{{ t('setting.general.title') }}</h2>
-            <p class="section-description">{{ t('setting.general.subtitle') }}</p>
           </div>
         </div>
 
         <div class="section-content">
-          <div class="settings-list">
-            <div class="setting-row">
+          <div class="settings-grid">
+            <div class="setting-item">
               <div class="setting-info">
                 <div class="setting-title">{{ $t('setting.language.title') }}</div>
+                <div class="setting-desc">{{ $t('setting.language.description') }}</div>
               </div>
               <n-select
                 v-model:value="localeStore.locale"
                 :options="languageOptions"
-                size="large"
-                class="setting-control"
+                size="small"
                 @update:value="handleChangeLanguage"
-                style="width: 200px"
+                class="setting-select"
               />
             </div>
 
-            <div class="setting-row">
+            <div class="setting-item">
               <div class="setting-info">
                 <div class="setting-title">{{ t('setting.network.ipv6') }}</div>
-                <div class="setting-desc">
-                  {{
-                    appStore.preferIpv6
-                      ? t('setting.network.preferIpv6')
-                      : t('setting.network.onlyIpv4')
-                  }}
-                </div>
               </div>
               <n-switch
                 v-model:value="appStore.preferIpv6"
                 @update-value="onIpVersionChange"
-                size="large"
-                class="setting-control"
-              >
-                <template #checked>{{ t('common.on') }}</template>
-                <template #unchecked>{{ t('common.off') }}</template>
-              </n-switch>
+                size="small"
+              />
             </div>
 
-            <div class="setting-row">
+            <div class="setting-item">
               <div class="setting-info">
                 <div class="setting-title">{{ t('setting.network.ports') }}</div>
                 <div class="setting-desc">{{ t('setting.network.portsDesc') }}</div>
               </div>
               <n-button
-                size="large"
+                size="small"
                 @click="showPortSettings"
-                class="setting-control config-button"
+                class="setting-button"
               >
                 {{ t('setting.network.configure') }}
               </n-button>
@@ -279,100 +232,48 @@
         </div>
       </section>
 
-      <!-- 开发者工具区域 -->
-      <section class="settings-section">
-        <div class="section-header">
-          <div class="section-icon developer-icon">
-            <n-icon size="24"><CodeOutline /></n-icon>
-          </div>
-          <div class="section-info">
-            <h2 class="section-title">{{ t('setting.developer.title') }}</h2>
-            <p class="section-description">{{ t('setting.developer.subtitle') }}</p>
-          </div>
-        </div>
-
-        <div class="section-content">
-          <div class="settings-list">
-            <div class="setting-row">
-              <div class="setting-info">
-                <div class="setting-title">{{ t('setting.developer.openDevtools') }}</div>
-                <div class="setting-desc">{{ t('setting.developer.description') }}</div>
-              </div>
-              <n-button
-                type="primary"
-                size="large"
-                @click="handleOpenDevtools"
-                :loading="devtoolsLoading"
-                class="setting-control"
-                round
-              >
-                {{ t('setting.developer.openDevtools') }}
-              </n-button>
-            </div>
-          </div>
-
-          <n-alert type="warning" :show-icon="true" class="status-alert" style="margin-top: 16px">
-            {{ t('setting.developer.warning') }}
-          </n-alert>
-        </div>
-      </section>
-
       <!-- 更新设置区域 -->
       <section class="settings-section">
         <div class="section-header">
           <div class="section-icon update-icon">
-            <n-icon size="24"><RefreshOutline /></n-icon>
+            <n-icon size="18"><RefreshOutline /></n-icon>
           </div>
           <div class="section-info">
             <h2 class="section-title">{{ t('setting.update.title') }}</h2>
-            <p class="section-description">{{ t('setting.update.subtitle') }}</p>
           </div>
         </div>
 
         <div class="section-content">
-          <div class="settings-list">
-            <div class="setting-row">
+          <div class="settings-grid">
+            <div class="setting-item">
               <div class="setting-info">
                 <div class="setting-title">{{ t('setting.update.autoCheck') }}</div>
-                <div class="setting-desc">{{ t('setting.update.autoCheckDesc') }}</div>
               </div>
               <n-switch
                 v-model:value="updateStore.autoCheckUpdate"
-                size="large"
-                class="setting-control"
-              >
-                <template #checked>{{ t('common.on') }}</template>
-                <template #unchecked>{{ t('common.off') }}</template>
-              </n-switch>
+                size="small"
+              />
             </div>
 
-            <div class="setting-row">
+            <div class="setting-item">
               <div class="setting-info">
                 <div class="setting-title">{{ t('setting.update.acceptPrerelease') }}</div>
-                <div class="setting-desc">
-                  {{ t('setting.update.acceptPrereleaseDesc') }}
-                </div>
               </div>
               <n-switch
                 v-model:value="updateStore.acceptPrerelease"
-                size="large"
-                class="setting-control"
+                size="small"
                 @update-value="onPrereleaseSettingChange"
-              >
-                <template #checked>{{ t('common.on') }}</template>
-                <template #unchecked>{{ t('common.off') }}</template>
-              </n-switch>
+              />
             </div>
           </div>
 
           <n-alert
             v-if="updateStore.acceptPrerelease"
             type="warning"
-            :show-icon="true"
-            class="status-alert"
-            style="margin-top: 16px"
+            :show-icon="false"
+            size="small"
+            class="compact-alert"
           >
-            <template #header>{{ t('setting.update.prereleaseWarning') }}</template>
             {{ t('setting.update.prereleaseWarningDesc') }}
           </n-alert>
         </div>
@@ -382,101 +283,56 @@
       <section class="settings-section">
         <div class="section-header">
           <div class="section-icon about-icon">
-            <n-icon size="24"><InformationCircleOutline /></n-icon>
+            <n-icon size="18"><InformationCircleOutline /></n-icon>
           </div>
           <div class="section-info">
             <h2 class="section-title">{{ t('setting.about.title') }}</h2>
-            <p class="section-description">{{ t('setting.about.subtitle') }}</p>
           </div>
         </div>
 
         <div class="section-content">
-          <!-- 信息网格 -->
           <div class="info-grid">
-            <div class="info-card">
-              <div class="info-header">
-                <span class="info-label">{{ t('setting.about.appVersion') }}</span>
-                <n-button
-                  ghost
-                  @click="handleCheckUpdate"
-                  :loading="checkingUpdate"
-                  size="small"
-                  class="check-update-btn"
-                  round
-                >
-                  <template #icon>
-                    <n-icon><RefreshOutline /></n-icon>
-                  </template>
-                  {{ t('setting.update.check') }}
-                </n-button>
-              </div>
+            <div class="info-item">
+              <div class="info-label">{{ t('setting.appVersion') }}</div>
               <div class="info-value">{{ updateStore.appVersion }}</div>
             </div>
 
-            <div class="info-card">
-              <div class="info-header">
-                <span class="info-label">{{ t('setting.about.kernelVersion') }}</span>
-              </div>
+            <div class="info-item">
+              <div class="info-label">{{ t('setting.kernelVersion') }}</div>
               <div class="info-value">
                 {{ formatVersion(kernelStore.version.version) || t('setting.notInstalled') }}
               </div>
             </div>
 
-            <div class="info-card">
-              <div class="info-header">
-                <span class="info-label">{{ t('setting.about.system') }}</span>
-              </div>
+            <div class="info-item">
+              <div class="info-label">{{ t('setting.about.system') }}</div>
               <div class="info-value">Windows</div>
             </div>
 
-            <div class="info-card">
-              <div class="info-header">
-                <span class="info-label">{{ t('setting.about.license') }}</span>
-              </div>
+            <div class="info-item">
+              <div class="info-label">{{ t('setting.about.license') }}</div>
               <div class="info-value">MIT License</div>
             </div>
           </div>
 
-          <!-- 链接区域 -->
           <div class="links-area">
             <n-button
               text
               tag="a"
               href="https://github.com/xinggaoya/sing-box-windows"
               target="_blank"
+              size="small"
               class="link-button"
-              size="large"
             >
               <template #icon>
-                <n-icon><LogoGithub /></n-icon>
+                <n-icon size="14"><LogoGithub /></n-icon>
               </template>
-              {{ t('setting.about.githubRepo') }}
-            </n-button>
-            <div class="divider-line"></div>
-            <n-button
-              text
-              tag="a"
-              href="https://github.com/xinggaoya/sing-box-windows"
-              target="_blank"
-              class="link-button"
-              size="large"
-            >
-              <template #icon>
-                <n-icon><GlobeOutline /></n-icon>
-              </template>
-              {{ t('setting.about.website') }}
+              GitHub
             </n-button>
           </div>
         </div>
       </section>
     </div>
-
-    <!-- 回到顶部 -->
-    <n-back-top :right="32" :bottom="32" @click="scrollToTop">
-      <div class="back-top-button">
-        <n-icon size="20"><ChevronUpOutline /></n-icon>
-      </div>
-    </n-back-top>
   </div>
 
   <!-- 端口设置对话框 -->
@@ -585,7 +441,7 @@ const appDataPath = ref('')
 
 // 语言选项
 const languageOptions = [
-  { label: '自动', value: 'auto' as Locale },
+  { label: t('setting.language.auto'), value: 'auto' as Locale },
   ...supportedLocales.map((locale) => ({
     label: locale.name,
     value: locale.code as Locale,
@@ -940,143 +796,134 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.modern-settings {
+.ultra-settings {
+  padding: 16px;
+  background: var(--n-color-embedded);
+  min-height: calc(100vh - 36px);
   display: flex;
   flex-direction: column;
-  gap: 32px;
-  min-height: 100%;
-  padding: 0;
+  gap: 16px;
+  animation: slideFadeIn 0.4s ease-out;
 }
 
-/* 英雄式头部 */
-.settings-hero {
+/* 紧凑工具栏 */
+.settings-toolbar {
   background: var(--n-card-color);
-  border-radius: 24px;
-  border: 1px solid var(--n-border-color);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.settings-hero:hover {
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
-}
-
-.hero-content {
+  border-radius: 12px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 32px 40px;
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
-.hero-info {
+.toolbar-left {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
 }
 
-.hero-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+.toolbar-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 12px rgba(139, 92, 237, 0.3);
 }
 
-.hero-text {
+.toolbar-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
 }
 
-.hero-title {
-  font-size: 32px;
-  font-weight: 800;
-  margin: 0;
-  color: var(--n-text-color);
-  line-height: 1.2;
-}
-
-.hero-subtitle {
-  font-size: 16px;
-  color: var(--n-text-color-2);
+.toolbar-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--n-text-color-1);
   margin: 0;
 }
 
-.hero-status {
-  flex-shrink: 0;
+.toolbar-stats {
+  font-size: 0.75rem;
+  color: var(--n-text-color-3);
+  margin: 0;
 }
 
-.status-card {
+.toolbar-right {
   display: flex;
-  gap: 24px;
-  padding: 16px 24px;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 16px;
-  border: 1px solid var(--n-border-color);
+  align-items: center;
+  gap: 12px;
 }
 
-.status-item {
+.version-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  text-align: center;
+  align-items: center;
+  gap: 2px;
 }
 
-.status-label {
-  font-size: 12px;
+.version-label {
+  font-size: 0.7rem;
   color: var(--n-text-color-3);
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
-.status-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--n-text-color);
+.version-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--n-text-color-1);
+}
+
+.version-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--n-border-color);
+  margin: 0 8px;
 }
 
 /* 设置内容区 */
 .settings-content {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 16px;
 }
 
 /* 设置区块 */
 .settings-section {
   background: var(--n-card-color);
-  border-radius: 20px;
+  border-radius: 12px;
   border: 1px solid var(--n-border-color);
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--n-box-shadow-1);
+  transition: all 0.2s ease;
 }
 
 .settings-section:hover {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--n-box-shadow-2);
+  transform: translateY(-1px);
 }
 
 /* 区块头部 */
 .section-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 24px 32px;
+  gap: 12px;
+  padding: 16px;
   border-bottom: 1px solid var(--n-border-color);
   background: rgba(0, 0, 0, 0.01);
 }
 
 .section-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1096,10 +943,6 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
 }
 
-.developer-icon {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-}
-
 .update-icon {
   background: linear-gradient(135deg, #06b6d4, #0891b2);
 }
@@ -1113,93 +956,82 @@ onUnmounted(() => {
 }
 
 .section-title {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  color: var(--n-text-color);
-}
-
-.section-description {
-  font-size: 14px;
-  color: var(--n-text-color-2);
+  font-size: 1rem;
+  font-weight: 600;
   margin: 0;
+  color: var(--n-text-color-1);
 }
 
 .section-status {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* 区块内容 */
+.section-content {
+  padding: 16px;
+}
+
+/* 状态提醒 */
+.status-alerts {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.compact-alert {
+  border-radius: 6px;
+}
+
+/* 下载区域 */
+.download-area {
+  margin-bottom: 16px;
+}
+
+.download-progress {
+  height: 32px;
+  border-radius: 8px;
+}
+
+/* 操作按钮区 */
+.action-buttons {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.status-tag {
-  font-weight: 600;
-}
-
-/* 区块内容 */
-.section-content {
-  padding: 24px 32px 32px;
-}
-
-/* 状态提醒 */
-.status-alert {
-  margin-bottom: 20px;
-  border-radius: 12px;
-}
-
-/* 下载区域 */
-.download-area {
-  margin-bottom: 20px;
-}
-
-.download-progress {
-  height: 40px;
-  border-radius: 20px;
-  overflow: hidden;
-}
-
-/* 操作按钮网格 */
-.actions-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 16px;
-}
-
 .primary-action {
-  height: 48px;
-  font-weight: 600;
-  grid-column: span 1;
-}
-
-.secondary-action {
-  height: 48px;
   font-weight: 500;
 }
 
-/* 设置列表 */
-.settings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+.secondary-action {
+  font-weight: 400;
 }
 
-.setting-row {
+/* 设置网格 */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.setting-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--n-border-color);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 12px;
+  background: var(--n-color-embedded);
+  border-radius: 8px;
+  border: 1px solid var(--n-border-color);
+  transition: all 0.2s ease;
 }
 
-.setting-row:last-child {
-  border-bottom: none;
-}
-
-.setting-row:hover {
-  background: rgba(0, 0, 0, 0.02);
-  margin: 0 -16px;
-  padding: 20px 16px;
-  border-radius: 12px;
+.setting-item:hover {
+  background: var(--n-color-embedded-modal);
+  border-color: #8b5cf6;
+  transform: translateY(-1px);
 }
 
 .setting-info {
@@ -1208,79 +1040,70 @@ onUnmounted(() => {
 }
 
 .setting-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--n-text-color);
-  margin-bottom: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--n-text-color-1);
 }
 
 .setting-desc {
-  font-size: 14px;
-  color: var(--n-text-color-2);
-  line-height: 1.4;
+  font-size: 0.75rem;
+  color: var(--n-text-color-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.setting-control {
-  flex-shrink: 0;
-  margin-left: 20px;
+.setting-select {
+  min-width: 120px;
+  max-width: 150px;
 }
 
-.config-button {
-  border: 2px solid var(--n-border-color);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.setting-button {
+  border: 1px solid var(--n-border-color);
+  transition: all 0.2s ease;
 }
 
-.config-button:hover {
-  border-color: var(--n-primary-color);
-  transform: translateY(-2px);
+.setting-button:hover {
+  border-color: #8b5cf6;
+  transform: translateY(-1px);
 }
 
 /* 信息网格 */
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.info-card {
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 16px;
+.info-item {
+  padding: 16px;
+  background: var(--n-color-embedded);
+  border-radius: 8px;
   border: 1px solid var(--n-border-color);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
 }
 
-.info-card:hover {
-  background: rgba(0, 0, 0, 0.04);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-}
-
-.info-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+.info-item:hover {
+  background: var(--n-color-embedded-modal);
+  border-color: #8b5cf6;
+  transform: translateY(-1px);
 }
 
 .info-label {
-  font-size: 12px;
+  font-size: 0.7rem;
   color: var(--n-text-color-3);
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin-bottom: 4px;
 }
 
 .info-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--n-text-color);
-}
-
-.check-update-btn {
-  height: 28px;
-  font-size: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--n-text-color-1);
 }
 
 /* 链接区域 */
@@ -1288,153 +1111,228 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding-top: 20px;
+  padding-top: 16px;
   border-top: 1px solid var(--n-border-color);
 }
 
 .link-button {
-  font-weight: 600;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+  transition: all 0.2s ease;
+  color: #8b5cf6;
 }
 
 .link-button:hover {
-  transform: translateY(-2px);
-}
-
-.divider-line {
-  width: 1px;
-  height: 20px;
-  background: var(--n-border-color);
-}
-
-/* 回到顶部 */
-.back-top-button {
-  width: 48px;
-  height: 48px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.back-top-button:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.4);
+  transform: translateY(-1px);
+  color: #7c3aed;
 }
 
 /* 模态框样式 */
-.modern-modal {
-  border-radius: 20px;
-}
-
-.port-settings-form {
-  padding: 20px 0;
-}
-
-.port-input {
+:deep(.n-modal) {
   border-radius: 12px;
 }
 
-/* 深色模式适配 */
-[data-theme='dark'] .status-card {
-  background: rgba(255, 255, 255, 0.04);
+.port-settings-form {
+  padding: 16px 0;
 }
 
-[data-theme='dark'] .setting-row:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-[data-theme='dark'] .info-card {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-[data-theme='dark'] .info-card:hover {
-  background: rgba(255, 255, 255, 0.08);
+/* 动画效果 */
+@keyframes slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .hero-content {
-    flex-direction: column;
-    gap: 24px;
-    padding: 24px;
-    text-align: center;
+  .ultra-settings {
+    padding: 12px;
+    gap: 12px;
   }
 
-  .status-card {
-    flex-direction: column;
-    gap: 16px;
+  .settings-toolbar {
+    padding: 10px 12px;
+  }
+
+  .toolbar-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .toolbar-title {
+    font-size: 0.875rem;
+  }
+
+  .toolbar-stats {
+    font-size: 0.7rem;
+  }
+
+  .toolbar-right {
+    gap: 8px;
+  }
+
+  .version-info {
+    gap: 1px;
+  }
+
+  .version-label {
+    font-size: 0.65rem;
+  }
+
+  .version-value {
+    font-size: 0.75rem;
+  }
+
+  .version-divider {
+    height: 16px;
+    margin: 0 6px;
   }
 
   .section-header {
-    flex-direction: column;
-    gap: 12px;
-    padding: 20px;
-    text-align: center;
+    padding: 12px;
+  }
+
+  .section-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .section-title {
+    font-size: 0.875rem;
   }
 
   .section-content {
-    padding: 20px;
+    padding: 12px;
   }
 
-  .setting-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .setting-control {
-    margin-left: 0;
-    align-self: flex-end;
-  }
-
-  .actions-grid {
+  .settings-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .primary-action,
+  .secondary-action {
+    width: 100%;
   }
 
   .info-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .links-area {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .divider-line {
-    width: 40px;
-    height: 1px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
   }
 }
 
 @media (max-width: 480px) {
-  .modern-settings {
-    gap: 20px;
+  .ultra-settings {
+    padding: 8px;
+    gap: 8px;
   }
 
-  .hero-icon {
-    width: 56px;
-    height: 56px;
+  .settings-toolbar {
+    padding: 8px 10px;
   }
 
-  .hero-title {
-    font-size: 24px;
+  .toolbar-left {
+    gap: 8px;
+  }
+
+  .toolbar-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .toolbar-title {
+    font-size: 0.8rem;
+  }
+
+  .toolbar-right {
+    gap: 6px;
+  }
+
+  .version-info {
+    display: none;
+  }
+
+  .version-divider {
+    display: none;
+  }
+
+  .section-header {
+    padding: 10px;
+    gap: 8px;
   }
 
   .section-icon {
-    width: 40px;
-    height: 40px;
+    width: 28px;
+    height: 28px;
   }
 
   .section-title {
-    font-size: 18px;
+    font-size: 0.8rem;
   }
+
+  .section-content {
+    padding: 10px;
+  }
+
+  .setting-item {
+    padding: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .setting-select {
+    min-width: 100px;
+    max-width: 100%;
+  }
+
+  .setting-info {
+    text-align: center;
+  }
+
+  .setting-desc {
+    white-space: normal;
+    line-height: 1.3;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* Naive UI 组件优化 */
+:deep(.n-button__content) {
+  font-size: 0.875rem !important;
+}
+
+:deep(.n-switch) {
+  font-size: 0.875rem !important;
+}
+
+:deep(.n-select) {
+  font-size: 0.875rem !important;
+}
+
+:deep(.n-alert) {
+  font-size: 0.8rem !important;
+}
+
+:deep(.n-progress) {
+  font-size: 0.8rem !important;
+}
+
+:deep(.n-tag) {
+  font-size: 0.7rem !important;
+  font-weight: 500 !important;
 }
 </style>

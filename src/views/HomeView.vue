@@ -1,13 +1,15 @@
 <template>
-  <div class="modern-home">
-    <!-- 状态总览区域 -->
-    <div class="status-overview">
-      <!-- 主状态卡片 -->
-      <div class="hero-status-card">
-        <div class="status-visual">
-          <div class="status-ring" :class="statusRingClass">
-            <div class="status-inner">
-              <n-icon :size="48" :class="statusIconClass">
+  <div class="ultra-home">
+    <!-- 超紧凑状态区域 -->
+    <div class="status-compact">
+      <!-- 主状态显示 -->
+      <div class="main-status">
+        <div class="status-visual-compact">
+          <div class="status-orb" :class="statusOrbClass">
+            <div class="orb-core"></div>
+            <div class="orb-pulse" v-if="appState.isRunning"></div>
+            <div class="orb-icon">
+              <n-icon :size="24" :class="statusIconClass">
                 <PowerOutline v-if="!appState.isRunning" />
                 <CheckmarkCircleOutline v-else-if="appState.wsConnected" />
                 <TimeOutline v-else-if="isStarting || appState.isConnecting" />
@@ -17,192 +19,160 @@
           </div>
         </div>
 
-        <div class="status-content">
-          <h1 class="status-title">{{ getStatusTitle() }}</h1>
-          <p class="status-description">{{ getStatusSubtitle() }}</p>
+        <div class="status-info-compact">
+          <div class="status-title-compact">{{ getStatusTitle() }}</div>
+          <div class="status-desc-compact">{{ getStatusSubtitle() }}</div>
 
-          <!-- 控制按钮 -->
-          <div class="control-section">
+          <!-- 紧凑控制按钮 -->
+          <div class="control-compact">
             <n-button
               v-if="!appState.isRunning"
               type="primary"
-              size="large"
-              round
+              size="medium"
               :loading="isStarting"
               @click="runKernel"
-              class="primary-action-btn"
             >
               <template #icon>
-                <n-icon><PowerOutline /></n-icon>
+                <n-icon size="16"><PowerOutline /></n-icon>
               </template>
               {{ t('home.start') }}
             </n-button>
 
-            <n-button
-              v-else
-              type="error"
-              size="large"
-              round
-              :loading="isStopping"
-              @click="stopKernel"
-              class="primary-action-btn"
-            >
+            <n-button v-else type="error" size="medium" :loading="isStopping" @click="stopKernel">
               <template #icon>
-                <n-icon><PowerOutline /></n-icon>
+                <n-icon size="16"><PowerOutline /></n-icon>
               </template>
               {{ t('home.stop') }}
             </n-button>
 
             <n-button
-              v-if="appState.isRunning && !isAdmin && (currentProxyMode === 'tun' || isSwitching)"
+              v-if="appState.isRunning && !isAdmin && currentProxyMode === 'tun'"
               type="warning"
-              size="medium"
-              round
+              size="small"
               :loading="isRestarting"
               @click="restartAsAdmin"
-              class="secondary-action-btn"
+              class="admin-btn"
             >
               <template #icon>
-                <n-icon><ShieldOutline /></n-icon>
+                <n-icon size="14"><ShieldOutline /></n-icon>
               </template>
-              {{ t('home.restartAsAdmin') }}
+              {{ t('home.escalatePrivileges') }}
             </n-button>
           </div>
         </div>
       </div>
 
-      <!-- 快速统计卡片 -->
-      <div class="quick-stats">
-        <div class="stats-grid">
-          <div class="stat-card" v-for="stat in statsData" :key="stat.key">
-            <div class="stat-icon" :class="`stat-${stat.type}`">
-              <n-icon :size="20" :component="stat.icon" />
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stat.value }}</div>
-              <div class="stat-label">{{ stat.label }}</div>
-            </div>
+      <!-- 实时数据面板 -->
+      <div class="realtime-panel">
+        <div class="metric-chip" v-for="metric in realtimeMetrics" :key="metric.key">
+          <div class="metric-icon" :class="`metric-${metric.type}`">
+            <n-icon :size="14" :component="metric.icon" />
+          </div>
+          <div class="metric-data">
+            <div class="metric-value">{{ metric.value }}</div>
+            <div class="metric-label">{{ metric.label }}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 配置和图表区域 -->
-    <div class="content-grid">
-      <!-- 代理配置卡片 -->
-      <n-card class="config-card" :bordered="false">
-        <template #header>
-          <div class="card-header">
-            <div class="header-info">
-              <n-icon size="20" class="header-icon">
-                <LayersOutline />
-              </n-icon>
-              <span class="header-title">{{ t('home.proxyHeader.flowMode') }}</span>
+    <!-- 配置面板 -->
+    <div class="config-panel">
+      <!-- 代理模式选择 -->
+      <div class="mode-selector">
+        <div class="selector-header">
+          <n-icon size="16" class="selector-icon">
+            <LayersOutline />
+          </n-icon>
+          <span class="selector-title">{{ t('home.proxyModeSelector') }}</span>
+        </div>
+        <div class="mode-options">
+          <div
+            v-for="mode in proxyModes"
+            :key="mode.value"
+            class="mode-option"
+            :class="{
+              'mode-active': currentProxyMode === mode.value,
+              'mode-disabled': isSwitching || isStarting || isStopping,
+            }"
+            @click="!isSwitching && !isStarting && !isStopping && onModeChange(mode.value)"
+          >
+            <div class="option-icon">
+              <n-icon :size="16" :component="mode.icon" />
             </div>
-          </div>
-        </template>
-
-        <div class="config-content">
-          <div class="mode-tabs">
-            <div
-              v-for="mode in proxyModes"
-              :key="mode.value"
-              class="mode-tab"
-              :class="{
-                active: currentProxyMode === mode.value,
-                disabled: isSwitching || isStarting || isStopping,
-              }"
-              @click="!isSwitching && !isStarting && !isStopping && onModeChange(mode.value)"
-            >
-              <div class="tab-icon">
-                <n-icon :size="18" :component="mode.icon" />
-              </div>
-              <div class="tab-content">
-                <div class="tab-title">{{ t(mode.nameKey) }}</div>
-                <div class="tab-desc">{{ t(mode.tipKey) }}</div>
-              </div>
+            <div class="option-content">
+              <div class="option-name">{{ t(mode.nameKey) }}</div>
+              <div class="option-desc">{{ t(mode.tipKey) }}</div>
             </div>
+            <div class="option-indicator"></div>
           </div>
         </div>
-      </n-card>
+      </div>
 
-      <!-- 节点配置卡片 -->
-      <n-card class="config-card" :bordered="false">
-        <template #header>
-          <div class="card-header">
-            <div class="header-info">
-              <n-icon size="20" class="header-icon">
-                <GitNetworkOutline />
-              </n-icon>
-              <span class="header-title">{{ t('home.proxyHeader.nodeMode') }}</span>
+      <!-- 节点模式选择 -->
+      <div class="mode-selector">
+        <div class="selector-header">
+          <n-icon size="16" class="selector-icon">
+            <GitNetworkOutline />
+          </n-icon>
+          <span class="selector-title">{{ t('home.nodeModeSelector') }}</span>
+        </div>
+        <div class="mode-options">
+          <div
+            v-for="mode in nodeProxyModes"
+            :key="mode.value"
+            class="mode-option"
+            :class="{
+              'mode-active': currentNodeProxyMode === mode.value,
+              'mode-disabled': !appState.isRunning || isSwitching || isStarting || isStopping,
+            }"
+            @click="
+              appState.isRunning &&
+              !isSwitching &&
+              !isStarting &&
+              !isStopping &&
+              handleNodeProxyModeChange(mode.value)
+            "
+          >
+            <div class="option-icon">
+              <n-icon :size="16" :component="mode.icon" />
             </div>
-          </div>
-        </template>
-
-        <div class="config-content">
-          <div class="mode-tabs">
-            <div
-              v-for="mode in nodeProxyModes"
-              :key="mode.value"
-              class="mode-tab"
-              :class="{
-                active: currentNodeProxyMode === mode.value,
-                disabled: !appState.isRunning || isSwitching || isStarting || isStopping,
-              }"
-              @click="
-                appState.isRunning &&
-                !isSwitching &&
-                !isStarting &&
-                !isStopping &&
-                handleNodeProxyModeChange(mode.value)
-              "
-            >
-              <div class="tab-icon">
-                <n-icon :size="18" :component="mode.icon" />
-              </div>
-              <div class="tab-content">
-                <div class="tab-title">{{ mode.label }}</div>
-                <div class="tab-desc">{{ t(`proxy.mode.${mode.value}Description`) }}</div>
-              </div>
+            <div class="option-content">
+              <div class="option-name">{{ mode.label }}</div>
+              <div class="option-desc">{{ t(`proxy.mode.${mode.value}Description`) }}</div>
             </div>
+            <div class="option-indicator"></div>
           </div>
         </div>
-      </n-card>
+      </div>
+    </div>
 
-      <!-- 流量图表卡片 -->
-      <n-card class="chart-card" :bordered="false">
-        <template #header>
-          <div class="card-header">
-            <div class="header-info">
-              <n-icon size="20" class="header-icon">
-                <AnalyticsOutline />
-              </n-icon>
-              <span class="header-title">{{ t('home.traffic.title') }}</span>
-            </div>
-            <div class="header-stats">
-              <div class="header-stat">
-                <n-icon size="14" class="stat-icon upload">
-                  <CloudUploadOutline />
-                </n-icon>
-                <span>{{ formattedTotalUpload }}</span>
-              </div>
-              <div class="header-stat">
-                <n-icon size="14" class="stat-icon download">
-                  <CloudDownloadOutline />
-                </n-icon>
-                <span>{{ formattedTotalDownload }}</span>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <div class="chart-content">
-          <TrafficChart
-            :upload-speed="trafficStore.traffic.up"
-            :download-speed="trafficStore.traffic.down"
-          />
+    <!-- 流量监控 -->
+    <div class="traffic-monitor">
+      <div class="monitor-header">
+        <div class="header-info">
+          <n-icon size="16" class="monitor-icon">
+            <AnalyticsOutline />
+          </n-icon>
+          <span class="monitor-title">{{ t('home.trafficMonitor') }}</span>
         </div>
-      </n-card>
+        <div class="traffic-summary">
+          <div class="summary-item upload">
+            <n-icon size="12"><CloudUploadOutline /></n-icon>
+            <span>{{ formattedTotalUpload }}</span>
+          </div>
+          <div class="summary-item download">
+            <n-icon size="12"><CloudDownloadOutline /></n-icon>
+            <span>{{ formattedTotalDownload }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <TrafficChart
+          :upload-speed="trafficStore.traffic.up"
+          :download-speed="trafficStore.traffic.down"
+        />
+      </div>
     </div>
 
     <!-- 节点模式切换确认对话框 -->
@@ -323,11 +293,13 @@ const nodeProxyModes = [
   {
     label: t('proxy.mode.global'),
     value: 'global',
+    tipKey: 'home.nodeMode.globalTip',
     icon: GlobeOutline,
   },
   {
     label: t('proxy.mode.rule'),
     value: 'rule',
+    tipKey: 'home.nodeMode.ruleTip',
     icon: LayersOutline,
   },
 ]
@@ -381,6 +353,45 @@ const statusIconClass = computed(() => {
 
   return 'icon-stopped'
 })
+
+// 状态球类计算
+const statusOrbClass = computed(() => {
+  if (isStarting.value || appState.isConnecting) return 'orb-connecting'
+  if (appState.isRunning) return 'orb-running'
+  return 'orb-stopped'
+})
+
+// 实时指标数据
+const realtimeMetrics = computed(() => [
+  {
+    key: 'upload',
+    type: 'upload',
+    icon: ArrowUpOutline,
+    value: formattedUploadSpeed.value,
+    label: t('home.traffic.uploadSpeed'),
+  },
+  {
+    key: 'download',
+    type: 'download',
+    icon: ArrowDownOutline,
+    value: formattedDownloadSpeed.value,
+    label: t('home.traffic.downloadSpeed'),
+  },
+  {
+    key: 'memory',
+    type: 'memory',
+    icon: HardwareChipOutline,
+    value: formattedMemory.value,
+    label: t('home.traffic.memory'),
+  },
+  {
+    key: 'connections',
+    type: 'connections',
+    icon: GitNetworkOutline,
+    value: activeConnectionsCount.value,
+    label: t('home.traffic.connections'),
+  },
+])
 
 // 格式化数据
 const formattedUploadSpeed = computed(() => formatBandwidth(Number(trafficStore.traffic.up) || 0))
@@ -557,7 +568,7 @@ const runKernel = async () => {
 
       if (isKernelRunning) {
         // 内核进程存在，设置为运行状态
-        message.warning('内核进程已在运行，但可能需要重新连接')
+        message.warning(t('notification.kernelProcessRunning'))
         appState.setRunningState(true)
 
         // WebSocket 连接现在由后端自动管理
@@ -949,212 +960,269 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.modern-home {
+.ultra-home {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   min-height: 100%;
-  overflow-x: hidden;
+  font-size: 13px;
 }
 
-/* 状态总览区域 */
-.status-overview {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 28px;
-  margin-bottom: 8px;
-  align-items: start;
+/* 超紧凑状态区域 */
+.status-compact {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  margin-bottom: 4px;
 }
 
-/* 主状态卡片 */
-.hero-status-card {
-  background: var(--n-card-color);
-  border-radius: 20px;
-  padding: 32px;
+/* 主状态显示 */
+.main-status {
+  flex: 1;
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(12px);
+  border: 1px solid
+    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  border-radius: 12px;
+  padding: 20px;
   display: flex;
   align-items: center;
-  gap: 32px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid var(--n-border-color);
+  gap: 20px;
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.hero-status-card:hover {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
+.main-status:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(0, 0, 0, 0.08)"');
 }
 
-.status-visual {
+/* 状态视觉 */
+.status-visual-compact {
   flex-shrink: 0;
 }
 
-.status-ring {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
+.status-orb {
+  width: 64px;
+  height: 64px;
   position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.status-ring.status-running {
-  background: conic-gradient(from 0deg, #10b981, #059669, #10b981);
-  animation: rotate 3s linear infinite;
-}
-
-.status-ring.status-connecting {
-  background: conic-gradient(from 0deg, #f59e0b, #d97706, #f59e0b);
-  animation: rotate 2s linear infinite;
-}
-
-.status-ring.status-error {
-  background: conic-gradient(from 0deg, #ef4444, #dc2626, #ef4444);
-}
-
-.status-ring.status-stopped {
-  background: v-bind('themeStore.isDark ? "rgba(75, 85, 99, 0.3)" : "rgba(156, 163, 175, 0.3)"');
-}
-
-.status-inner {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  right: 4px;
-  bottom: 4px;
-  background: var(--n-card-color);
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 50%;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.icon-running {
-  color: #10b981;
-}
-.icon-connecting {
-  color: #f59e0b;
-}
-.icon-error {
-  color: #ef4444;
-}
-.icon-stopped {
-  color: v-bind('themeStore.isDark ? "#9CA3AF" : "#6B7280"');
+.status-orb.orb-running {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow:
+    0 0 0 3px rgba(16, 185, 129, 0.2),
+    0 0 20px rgba(16, 185, 129, 0.3);
 }
 
-@keyframes rotate {
-  to {
-    transform: rotate(360deg);
+.status-orb.orb-connecting {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow:
+    0 0 0 3px rgba(245, 158, 11, 0.2),
+    0 0 20px rgba(245, 158, 11, 0.3);
+  animation: orb-pulse 2s ease-in-out infinite;
+}
+
+.status-orb.orb-stopped {
+  background: v-bind('themeStore.isDark ? "#374151" : "#d1d5db"');
+  box-shadow: 0 0 0 3px
+    v-bind('themeStore.isDark ? "rgba(55, 65, 81, 0.2)" : "rgba(209, 213, 219, 0.2)"');
+}
+
+.orb-core {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  background: v-bind('themeStore.isDark ? "#0f0f10" : "#fafafa"');
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.orb-pulse {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  animation: pulse-wave 2s ease-in-out infinite;
+}
+
+.orb-icon {
+  position: relative;
+  z-index: 2;
+}
+
+@keyframes orb-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
   }
 }
 
-.status-content {
+@keyframes pulse-wave {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+}
+
+/* 状态信息 */
+.status-info-compact {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  min-width: 0;
 }
 
-.status-title {
-  font-size: 28px;
+.status-title-compact {
+  font-size: 20px;
   font-weight: 700;
-  margin: 0;
   color: var(--n-text-color);
+  margin: 0;
   line-height: 1.2;
 }
 
-.status-description {
-  font-size: 16px;
+.status-desc-compact {
+  font-size: 13px;
   color: var(--n-text-color-2);
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
-.control-section {
+/* 紧凑控制按钮 */
+.control-compact {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
-.primary-action-btn {
-  min-width: 120px;
-  height: 44px;
+.start-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  min-width: 80px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
-.secondary-action-btn {
-  height: 36px;
+.start-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
-/* 快速统计 - 优化布局 */
-.quick-stats {
-  flex-shrink: 0;
-  width: 320px;
+.stop-btn {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  min-width: 80px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
 }
 
-.stats-grid {
+.stop-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.admin-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+}
+
+.admin-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(245, 158, 11, 0.4);
+}
+
+/* 实时数据面板 */
+.realtime-panel {
+  flex: 0 0 280px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 8px;
+  align-content: start;
 }
 
-.stat-card {
-  background: var(--n-card-color);
-  border-radius: 16px;
-  padding: 18px 16px;
-  border: 1px solid var(--n-border-color);
+.metric-chip {
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(12px);
+  border: 1px solid
+    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  border-radius: 10px;
+  padding: 12px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  min-height: 72px;
+  min-height: 56px;
 }
 
-.stat-card:hover {
-  border-color: var(--n-primary-color);
+.metric-chip:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
 }
 
-.stat-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+.metric-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-/* 改进统计图标配色 - 增强对比度 */
-.stat-upload {
+.metric-upload {
   background: v-bind('themeStore.isDark ? "rgba(248, 113, 113, 0.2)" : "rgba(239, 68, 68, 0.1)"');
   color: v-bind('themeStore.isDark ? "#F87171" : "#DC2626"');
 }
 
-.stat-download {
+.metric-download {
   background: v-bind('themeStore.isDark ? "rgba(96, 165, 250, 0.2)" : "rgba(59, 130, 246, 0.1)"');
   color: v-bind('themeStore.isDark ? "#60A5FA" : "#2563EB"');
 }
 
-.stat-memory {
+.metric-memory {
   background: v-bind('themeStore.isDark ? "rgba(196, 181, 253, 0.2)" : "rgba(168, 85, 247, 0.1)"');
   color: v-bind('themeStore.isDark ? "#C4B5FD" : "#7C3AED"');
 }
 
-.stat-connections {
+.metric-connections {
   background: v-bind('themeStore.isDark ? "rgba(74, 222, 128, 0.2)" : "rgba(34, 197, 94, 0.1)"');
   color: v-bind('themeStore.isDark ? "#4ADE80" : "#16A34A"');
 }
 
-.stat-info {
+.metric-data {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
 }
 
-.stat-value {
-  font-size: 15px;
+.metric-value {
+  font-size: 14px;
   font-weight: 600;
   color: var(--n-text-color);
   line-height: 1.2;
@@ -1163,188 +1231,247 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
-.stat-label {
-  font-size: 11px;
+.metric-label {
+  font-size: 10px;
   color: var(--n-text-color-3);
-  margin-top: 3px;
+  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.2;
 }
 
-/* 内容网格 */
-.content-grid {
+/* 配置面板 */
+.config-panel {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 16px;
 }
 
-.chart-card {
-  grid-column: span 2;
+.mode-selector {
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(12px);
+  border: 1px solid
+    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 卡片样式 */
-.config-card,
-.chart-card {
-  border-radius: 16px !important;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
-  border: 1px solid var(--n-border-color) !important;
+.mode-selector:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
 }
 
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.header-info {
+.selector-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
-  flex: 1;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid
+    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
 }
 
-.header-icon {
-  color: var(--n-primary-color);
+.selector-icon {
+  color: #6366f1;
   flex-shrink: 0;
 }
 
-.header-title {
-  font-size: 16px;
+.selector-title {
+  font-size: 14px;
   font-weight: 600;
   color: var(--n-text-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.header-stats {
-  display: flex;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.header-stat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--n-text-color-2);
-}
-
-.header-stat .stat-icon.upload {
-  color: v-bind('themeStore.isDark ? "#F87171" : "#DC2626"');
-}
-
-.header-stat .stat-icon.download {
-  color: v-bind('themeStore.isDark ? "#60A5FA" : "#2563EB"');
-}
-
-/* 配置内容 - 改进配色 */
-.config-content {
-  padding: 8px 0;
-}
-
-.mode-tabs {
+.mode-options {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.mode-tab {
+.mode-option {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 12px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid transparent;
-  color: var(--n-text-color);
-  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 56px; /* 确保最小高度保持一致 */
 }
 
-.mode-tab:hover:not(.disabled) {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)"');
-  border-color: var(--n-border-color);
+.mode-option:hover:not(.mode-disabled) {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
+  transform: translateX(2px);
 }
 
-.mode-tab.active {
-  background: v-bind('themeStore.isDark ? "rgba(100, 108, 255, 0.2)" : "rgba(100, 108, 255, 0.1)"');
-  border-color: var(--n-primary-color);
-  color: var(--n-primary-color);
+.mode-option.mode-active {
+  background: v-bind('themeStore.isDark ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.1)"');
+  border-color: #6366f1;
+  color: #6366f1;
 }
 
-.mode-tab.disabled {
-  opacity: 0.4;
+.mode-option.mode-disabled {
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
-.tab-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+.option-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.06)"');
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)"');
   flex-shrink: 0;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 2px; /* 微调以与文本对齐 */
 }
 
-.mode-tab.active .tab-icon {
-  background: var(--n-primary-color);
+.mode-option.mode-active .option-icon {
+  background: #6366f1;
   color: white;
-  box-shadow: 0 2px 8px rgba(100, 108, 255, 0.3);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
 }
 
-.mode-tab.active .tab-icon .n-icon {
-  color: white !important;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
-}
-
-.tab-content {
+.option-content {
   flex: 1;
   min-width: 0;
 }
 
-.tab-title {
-  font-size: 14px;
+.option-name {
+  font-size: 13px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   color: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.tab-desc {
-  font-size: 12px;
-  color: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 0, 0, 0.6)"');
-  line-height: 1.4;
+.option-desc {
+  font-size: 11px;
+  color: var(--n-text-color-3);
+  line-height: 1.3;
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  word-break: break-word;
+  max-height: 28px; /* 2行文字的最大高度 */
 }
 
-/* 图表内容 */
-.chart-content {
-  height: 280px;
-  padding: 16px 0;
+.option-indicator {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #6366f1, #8b5cf6);
+  opacity: 0;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mode-option.mode-active .option-indicator {
+  opacity: 1;
+}
+
+/* 流量监控 */
+.traffic-monitor {
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(12px);
+  border: 1px solid
+    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.traffic-monitor:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
+}
+
+.monitor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid
+    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+}
+
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monitor-icon {
+  color: #6366f1;
+  flex-shrink: 0;
+}
+
+.monitor-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--n-text-color);
+}
+
+.traffic-summary {
+  display: flex;
+  gap: 12px;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--n-text-color-2);
+}
+
+.summary-item.upload {
+  color: v-bind('themeStore.isDark ? "#F87171" : "#DC2626"');
+}
+
+.summary-item.download {
+  color: v-bind('themeStore.isDark ? "#60A5FA" : "#2563EB"');
+}
+
+.chart-container {
+  height: 200px;
+}
+
+/* 图标状态颜色 */
+.icon-running {
+  color: #10b981;
+}
+
+.icon-connecting {
+  color: #f59e0b;
+}
+
+.icon-error {
+  color: #ef4444;
+}
+
+.icon-stopped {
+  color: v-bind('themeStore.isDark ? "#9CA3AF" : "#6B7280"');
 }
 
 /* 模态框样式 */
 .modal-content {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 0;
+  gap: 12px;
+  padding: 4px 0;
 }
 
 .modal-icon {
@@ -1353,136 +1480,93 @@ onUnmounted(() => {
 
 .modal-text {
   color: var(--n-text-color-2);
-  line-height: 1.6;
+  line-height: 1.5;
+  font-size: 13px;
 }
 
 /* 响应式设计 */
-@media (max-width: 1200px) {
-  .content-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  .chart-card {
-    grid-column: span 1;
-  }
-
-  .config-card {
-    min-width: 0;
-  }
-}
-
 @media (max-width: 1024px) {
-  .quick-stats {
-    width: 300px;
-  }
-
-  .stats-grid {
-    gap: 14px;
-  }
-}
-
-@media (max-width: 896px) {
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .header-stats {
+  .config-panel {
+    grid-template-columns: 1fr;
     gap: 12px;
-    font-size: 12px;
   }
 
-  .mode-tab {
-    padding: 14px;
-    gap: 10px;
-  }
-
-  .tab-icon {
-    width: 32px;
-    height: 32px;
-  }
-
-  .tab-title {
-    font-size: 13px;
-  }
-
-  .tab-desc {
-    font-size: 11px;
-    -webkit-line-clamp: 1;
+  .realtime-panel {
+    flex: 0 0 240px;
   }
 }
 
 @media (max-width: 768px) {
-  .status-overview {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  .quick-stats {
-    width: 100%;
-  }
-
-  .hero-status-card {
+  .status-compact {
     flex-direction: column;
-    text-align: center;
-    gap: 24px;
-    padding: 24px;
+    gap: 12px;
   }
 
-  .stats-grid {
+  .realtime-panel {
+    flex: 1;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
   }
 
-  .stat-card {
+  .metric-chip {
     flex-direction: column;
-    padding: 14px 10px;
     text-align: center;
-    min-height: 80px;
-    gap: 8px;
+    gap: 6px;
+    padding: 10px 6px;
+    min-height: 64px;
   }
 
-  .stat-icon {
-    width: 32px;
-    height: 32px;
+  .main-status {
+    padding: 16px;
+    gap: 16px;
   }
 
-  .stat-value {
-    font-size: 14px;
+  .status-orb {
+    width: 56px;
+    height: 56px;
   }
 
-  .stat-label {
+  .orb-core {
+    width: 48px;
+    height: 48px;
+  }
+
+  .status-title-compact {
+    font-size: 18px;
+  }
+
+  .control-compact {
+    justify-content: center;
+  }
+
+  .mode-option {
+    min-height: 48px;
+    padding: 8px;
+  }
+
+  .option-desc {
     font-size: 10px;
+    max-height: 24px;
+    -webkit-line-clamp: 2;
   }
 
-  .config-card,
-  .chart-card {
-    margin: 0 -8px;
-    border-radius: 12px !important;
+  .option-icon {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ultra-home {
+    gap: 12px;
   }
 
-  .mode-tab {
+  .mode-selector,
+  .traffic-monitor {
     padding: 12px;
-    gap: 8px;
   }
 
-  .tab-icon {
-    width: 28px;
-    height: 28px;
-  }
-
-  .tab-title {
-    font-size: 12px;
-  }
-
-  .tab-desc {
-    font-size: 10px;
-  }
-
-  .header-title {
-    font-size: 14px;
+  .chart-container {
+    height: 160px;
   }
 }
 </style>

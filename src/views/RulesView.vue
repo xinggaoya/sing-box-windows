@@ -1,143 +1,160 @@
 <template>
-  <div class="rules-view">
-    <!-- 英雄式页面头部 -->
-    <div class="hero-header">
-      <div class="hero-content">
-        <div class="hero-icon">
-          <n-icon size="48">
-            <search-outline />
+  <div class="ultra-rules">
+    <!-- 紧凑工具栏 -->
+    <div class="rules-toolbar">
+      <div class="toolbar-left">
+        <div class="toolbar-icon">
+          <n-icon size="16">
+            <FilterOutline />
           </n-icon>
         </div>
-        <div class="hero-text">
-          <h1 class="hero-title">{{ t('rules.title') }}</h1>
-          <p class="hero-subtitle">
-            {{ rules.length }} {{ t('rules.totalRules') }} •
-            {{ t('rules.subtitle') }}
-          </p>
-        </div>
-        <div class="hero-action">
-          <n-button
-            @click="fetchRules"
-            :loading="loading"
-            size="large"
-            type="primary"
-            round
-            class="hero-btn"
-          >
-            <template #icon>
-              <n-icon>
-                <refresh-outline />
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 搜索筛选卡片 -->
-    <div class="filter-card">
-      <div class="filter-header">
-        <h3 class="filter-title">{{ t('rules.searchAndFilter') }}</h3>
-        <div class="filter-stats">
-          <n-tag type="info" size="small" round>
-            {{ t('rules.totalRulesLabel', { count: rules.length }) }}
-          </n-tag>
-          <n-tag v-if="searchQuery || typeFilter || proxyFilter" type="success" size="small" round>
-            {{ t('rules.matchingLabel', { count: filteredRules.length }) }}
-          </n-tag>
+        <div class="toolbar-info">
+          <span class="toolbar-title">{{ t('rules.title') }}</span>
+          <span class="toolbar-stats">{{ filteredRules.length }} {{ t('rules.totalRulesLabel', { count: filteredRules.length }) }}</span>
         </div>
       </div>
 
-      <div class="filter-controls">
-        <n-input
-          v-model:value="searchQuery"
-          :placeholder="t('rules.searchPlaceholder')"
-          clearable
-          size="large"
-          class="search-input"
+      <div class="toolbar-right">
+        <n-button
+          @click="fetchRules"
+          :loading="loading"
+          type="primary"
+          size="small"
+          class="refresh-btn"
         >
-          <template #prefix>
-            <n-icon size="16">
-              <search-outline />
-            </n-icon>
+          <template #icon>
+            <n-icon size="12"><RefreshOutline /></n-icon>
           </template>
-        </n-input>
-
-        <div class="filter-selects">
-          <n-select
-            v-model:value="typeFilter"
-            :options="typeOptions"
-            :placeholder="t('rules.filterByType')"
-            clearable
-            size="large"
-            class="filter-select"
-          />
-          <n-select
-            v-model:value="proxyFilter"
-            :options="proxyOptions"
-            :placeholder="t('rules.filterByProxy')"
-            clearable
-            size="large"
-            class="filter-select"
-          />
-        </div>
+          {{ t('common.refresh') }}
+        </n-button>
       </div>
     </div>
 
-    <!-- 规则表格卡片 -->
-    <div class="table-card">
-      <n-spin :show="loading">
-        <div v-if="filteredRules.length > 0" class="table-container">
-          <n-data-table
-            :columns="columns"
-            :data="filteredRules"
-            :pagination="pagination"
-            :bordered="false"
-            :max-height="600"
-            striped
-            class="rules-table"
-          />
-        </div>
-
-        <!-- 空状态 -->
-        <div v-else class="empty-state">
-          <div class="empty-icon">
-            <n-icon size="64">
-              <search-outline />
-            </n-icon>
-          </div>
-          <h3 class="empty-title">
-            {{
-              searchQuery || typeFilter || proxyFilter
-                ? t('rules.noMatchingRulesFound')
-                : t('rules.noRulesData')
-            }}
-          </h3>
-          <p class="empty-description">
-            {{
-              searchQuery || typeFilter || proxyFilter
-                ? t('rules.adjustSearchConditions')
-                : t('rules.clickRefreshToGetRules')
-            }}
-          </p>
-          <n-button
-            v-if="!searchQuery && !typeFilter && !proxyFilter"
-            @click="fetchRules"
-            type="primary"
-            size="large"
-            round
-            class="empty-action"
+    <!-- 搜索筛选区域 -->
+    <div class="rules-content">
+      <div class="search-section">
+        <div class="search-input-group">
+          <n-input
+            v-model:value="searchQuery"
+            :placeholder="t('rules.searchPlaceholder')"
+            clearable
+            size="small"
+            class="search-input"
           >
-            <template #icon>
-              <n-icon>
-                <refresh-outline />
+            <template #prefix>
+              <n-icon size="14">
+                <SearchOutline />
               </n-icon>
             </template>
-            {{ t('rules.getRules') }}
-          </n-button>
+          </n-input>
+
+          <div class="filter-selects">
+            <n-select
+              v-model:value="typeFilter"
+              :options="typeOptions"
+              :placeholder="t('rules.type')"
+              clearable
+              size="small"
+              class="filter-select"
+            />
+            <n-select
+              v-model:value="proxyFilter"
+              :options="proxyOptions"
+              :placeholder="t('rules.targetProxy')"
+              clearable
+              size="small"
+              class="filter-select"
+            />
+          </div>
         </div>
-      </n-spin>
+
+        <div class="filter-tags" v-if="searchQuery || typeFilter || proxyFilter">
+          <n-tag v-if="searchQuery" size="tiny" round class="filter-tag">
+            {{ t('common.search') }}: {{ searchQuery }}
+          </n-tag>
+          <n-tag v-if="typeFilter" size="tiny" round class="filter-tag">
+            {{ t('rules.type') }}: {{ typeFilter }}
+          </n-tag>
+          <n-tag v-if="proxyFilter" size="tiny" round class="filter-tag">
+            {{ t('rules.targetProxy') }}: {{ proxyFilter }}
+          </n-tag>
+        </div>
+      </div>
+
+      <!-- 规则列表 -->
+      <div class="rules-list">
+        <n-spin :show="loading">
+          <div v-if="filteredRules.length > 0" class="rules-grid">
+            <div
+              v-for="(rule, index) in filteredRules"
+              :key="index"
+              class="rule-item"
+              :class="{ 'rule-highlight': isRuleHighlighted(rule) }"
+            >
+              <!-- 规则类型 -->
+              <div class="rule-type">
+                <div class="type-badge" :class="getTypeClass(rule.type)">
+                  {{ rule.type }}
+                </div>
+              </div>
+
+              <!-- 规则内容 -->
+              <div class="rule-content">
+                <div class="rule-text" :title="rule.payload">
+                  {{ getHighlightedText(rule.payload) }}
+                </div>
+              </div>
+
+              <!-- 代理目标 -->
+              <div class="rule-proxy">
+                <div class="proxy-badge" :class="getProxyClass(rule.proxy)">
+                  {{ getProxyName(rule.proxy) }}
+                </div>
+              </div>
+
+              <!-- 规则序号 -->
+              <div class="rule-index">
+                #{{ index + 1 }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-else class="empty-state">
+            <div class="empty-icon">
+              <n-icon size="32">
+                <FilterOutline />
+              </n-icon>
+            </div>
+            <div class="empty-title">
+              {{
+                searchQuery || typeFilter || proxyFilter
+                  ? t('rules.noMatchingRulesFound')
+                  : t('rules.noRulesData')
+              }}
+            </div>
+            <div class="empty-desc">
+              {{
+                searchQuery || typeFilter || proxyFilter
+                  ? t('rules.adjustSearchConditions')
+                  : t('rules.clickRefreshToGetRules')
+              }}
+            </div>
+            <n-button
+              v-if="!searchQuery && !typeFilter && !proxyFilter"
+              @click="fetchRules"
+              type="primary"
+              size="medium"
+              class="empty-btn"
+            >
+              <template #icon>
+                <n-icon size="14"><RefreshOutline /></n-icon>
+              </template>
+              {{ t('rules.getRules') }}
+            </n-button>
+          </div>
+        </n-spin>
+      </div>
     </div>
   </div>
 </template>
@@ -145,13 +162,15 @@
 <script setup lang="ts">
 import { ref, onMounted, h, computed, nextTick } from 'vue'
 import { useMessage, NTag, DataTableColumns, SelectOption } from 'naive-ui'
-import { RefreshOutline, SearchOutline } from '@vicons/ionicons5'
+import { RefreshOutline, SearchOutline, FilterOutline } from '@vicons/ionicons5'
 import { tauriApi } from '@/services/tauri-api'
 import { useI18n } from 'vue-i18n'
+import { useThemeStore } from '@/stores/app/ThemeStore'
 
 const message = useMessage()
 const loading = ref(false)
 const { t } = useI18n()
+const themeStore = useThemeStore()
 
 interface Rule {
   type: string
@@ -219,7 +238,7 @@ const proxyOptions = computed(() => {
 
   return [
     { label: t('rules.directConnect'), value: 'direct' },
-    { label: '拦截', value: 'reject' },
+    { label: t('rules.blockAction'), value: 'reject' },
     ...Array.from(proxies)
       .filter((proxy) => proxy !== 'direct' && proxy !== 'reject')
       .map((proxy) => ({ label: proxy, value: proxy })),
@@ -347,9 +366,49 @@ const columns: DataTableColumns<Rule> = [
   },
 ]
 
-// 分页设置
-const pagination = {
-  pageSize: 15,
+// 辅助方法
+const getProxyName = (proxy: string): string => {
+  if (proxy.startsWith('route(') && proxy.endsWith(')')) {
+    return proxy.substring(6, proxy.length - 1)
+  }
+  return proxy
+}
+
+const getTypeClass = (type: string): string => {
+  if (type === 'logical') return 'type-logical'
+  if (type === 'default') return 'type-default'
+  return 'type-normal'
+}
+
+const getProxyClass = (proxy: string): string => {
+  if (proxy === 'reject') return 'proxy-reject'
+  if (proxy === t('rules.directConnect')) return 'proxy-direct'
+  if (proxy === 'hijack-dns' || proxy === 'sniff') return 'proxy-info'
+  return 'proxy-normal'
+}
+
+const isRuleHighlighted = (rule: Rule): boolean => {
+  if (!searchQuery.value) return false
+
+  const query = searchQuery.value.toLowerCase()
+  const payload = String(rule.payload || '').toLowerCase()
+  const proxy = String(rule.proxy || '').toLowerCase()
+  const type = String(rule.type || '').toLowerCase()
+
+  return payload.includes(query) || proxy.includes(query) || type.includes(query)
+}
+
+const getHighlightedText = (text: string): string => {
+  if (!searchQuery.value) return text
+
+  const index = text.toLowerCase().indexOf(searchQuery.value.toLowerCase())
+  if (index === -1) return text
+
+  const beforeMatch = text.substring(0, index)
+  const match = text.substring(index, index + searchQuery.value.length)
+  const afterMatch = text.substring(index + searchQuery.value.length)
+
+  return `${beforeMatch}<mark>${match}</mark>${afterMatch}`
 }
 
 // 获取规则列表
@@ -361,7 +420,7 @@ const fetchRules = async () => {
   try {
     // 添加超时机制防止请求挂起
     const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('请求超时')), 10000),
+      setTimeout(() => reject(new Error(t('common.requestTimeout'))), 10000),
     )
 
     const response = (await Promise.race([tauriApi.proxy.getRules(), timeout])) as RulesResponse
@@ -379,8 +438,8 @@ const fetchRules = async () => {
     console.error(t('rules.fetchError'), error)
     rules.value = []
     // 区分不同类型的错误
-    if (error instanceof Error && error.message === '请求超时') {
-      message.error('获取规则超时，请检查内核是否正常运行')
+    if (error instanceof Error && error.message === t('common.requestTimeout')) {
+      message.error(t('rules.fetchTimeout'))
     } else {
       message.error(`${t('rules.fetchError')}: ${error}`)
     }
@@ -401,202 +460,328 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.rules-view {
-  min-height: 100vh;
+.ultra-rules {
+  padding: 16px;
   background: var(--n-color-embedded);
-  padding: 20px;
+  min-height: calc(100vh - 36px);
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-  animation: fadeIn 0.4s ease-out;
+  gap: 16px;
+  animation: slideFadeIn 0.4s ease-out;
 }
 
-/* 英雄式页面头部 */
-.hero-header {
+/* 紧凑工具栏 */
+.rules-toolbar {
   background: var(--n-card-color);
-  border-radius: 20px;
-  padding: 24px 32px;
-  box-shadow: var(--n-box-shadow-2);
-  border: 1px solid var(--n-border-color);
-  position: relative;
-  overflow: hidden;
-}
-
-.hero-header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #4080ff 0%, #2266dd 50%, #909399 100%);
-  border-radius: 20px 20px 0 0;
-}
-
-.hero-content {
+  border-radius: 12px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
-  gap: 24px;
+  justify-content: space-between;
+  box-shadow: var(--n-box-shadow-1);
+  border: 1px solid var(--n-border-color);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
-.hero-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: 18px;
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: linear-gradient(135deg, #4080ff 0%, #2266dd 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 12px 32px rgba(64, 128, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(64, 128, 255, 0.3);
 }
 
-.hero-text {
-  flex: 1;
+.toolbar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.hero-title {
-  font-size: 2rem;
-  font-weight: 800;
-  margin: 0 0 8px 0;
-  background: linear-gradient(135deg, #4080ff 0%, #2266dd 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  line-height: 1.2;
-}
-
-.hero-subtitle {
-  font-size: 1.1rem;
-  color: var(--n-text-color-3);
-  margin: 0;
-  line-height: 1.5;
-  font-weight: 500;
-}
-
-.hero-action {
-  flex-shrink: 0;
-}
-
-.hero-btn {
-  height: 48px;
-  padding: 0 24px;
+.toolbar-title {
   font-size: 1rem;
   font-weight: 600;
-  border-radius: 24px;
-  box-shadow:
-    0 8px 32px rgba(64, 128, 255, 0.25),
-    0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--n-text-color-1);
+  margin: 0;
 }
 
-.hero-btn:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 16px 48px rgba(64, 128, 255, 0.4),
-    0 4px 12px rgba(0, 0, 0, 0.15);
+.toolbar-stats {
+  font-size: 0.75rem;
+  color: var(--n-text-color-3);
+  margin: 0;
 }
 
-/* 搜索筛选卡片 */
-.filter-card {
+.toolbar-right {
+  display: flex;
+  gap: 8px;
+}
+
+.refresh-btn {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 128, 255, 0.3);
+}
+
+/* 搜索筛选区域 */
+.rules-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.search-section {
   background: var(--n-card-color);
-  border-radius: 16px;
-  padding: 24px;
+  border-radius: 12px;
+  padding: 16px;
   box-shadow: var(--n-box-shadow-1);
   border: 1px solid var(--n-border-color);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.filter-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.filter-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0;
-  color: var(--n-text-color-1);
-}
-
-.filter-stats {
+.search-input-group {
   display: flex;
   gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
   flex-wrap: wrap;
-}
-
-.filter-controls {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  align-items: stretch;
 }
 
 .search-input {
   flex: 1;
-  min-width: 300px;
+  min-width: 280px;
 }
 
 .search-input :deep(.n-input) {
-  border-radius: 12px;
-  border: 2px solid var(--n-border-color);
-  transition: all 0.3s ease;
+  border-radius: 8px;
+  border: 1px solid var(--n-border-color);
+  transition: all 0.2s ease;
 }
 
 .search-input :deep(.n-input:hover) {
-  border-color: rgba(64, 128, 255, 0.3);
+  border-color: #4080ff;
 }
 
 .search-input :deep(.n-input.n-input--focus) {
   border-color: #4080ff;
-  box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
+  box-shadow: 0 0 0 2px rgba(64, 128, 255, 0.1);
 }
 
 .filter-selects {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .filter-select {
-  min-width: 180px;
+  min-width: 140px;
 }
 
 .filter-select :deep(.n-base-selection) {
-  border-radius: 12px;
-  border: 2px solid var(--n-border-color);
-  transition: all 0.3s ease;
+  border-radius: 8px;
+  border: 1px solid var(--n-border-color);
+  transition: all 0.2s ease;
 }
 
 .filter-select :deep(.n-base-selection:hover) {
-  border-color: rgba(64, 128, 255, 0.3);
+  border-color: #4080ff;
 }
 
 .filter-select :deep(.n-base-selection.n-base-selection--focus) {
   border-color: #4080ff;
-  box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
+  box-shadow: 0 0 0 2px rgba(64, 128, 255, 0.1);
 }
 
-/* 规则表格卡片 */
-.table-card {
+.filter-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-tag {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* 规则列表 */
+.rules-list {
+  flex: 1;
   background: var(--n-card-color);
-  border-radius: 16px;
+  border-radius: 12px;
+  padding: 16px;
   box-shadow: var(--n-box-shadow-1);
   border: 1px solid var(--n-border-color);
+  min-height: 0;
+}
+
+.rules-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rule-item {
+  display: grid;
+  grid-template-columns: 80px 1fr 120px 40px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--n-color-embedded);
+  border-radius: 8px;
+  border: 1px solid var(--n-border-color);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
   overflow: hidden;
 }
 
-.table-container {
-  padding: 16px;
-  min-height: 400px;
+.rule-item:hover {
+  background: var(--n-color-embedded-modal);
+  border-color: #4080ff;
+  transform: translateX(2px);
+  box-shadow: 0 2px 8px rgba(64, 128, 255, 0.1);
 }
 
-.rules-table {
-  border-radius: 0;
+.rule-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+  transition: background 0.2s ease;
+}
+
+.rule-item:hover::before {
+  background: #4080ff;
+}
+
+.rule-highlight {
+  background: rgba(64, 128, 255, 0.05);
+  border-color: rgba(64, 128, 255, 0.2);
+}
+
+.rule-highlight::before {
+  background: #4080ff;
+}
+
+.rule-type {
+  display: flex;
+  align-items: center;
+}
+
+.type-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.type-logical {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.type-default {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.type-normal {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.rule-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.rule-text {
+  font-size: 0.875rem;
+  color: var(--n-text-color-1);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rule-proxy {
+  display: flex;
+  align-items: center;
+}
+
+.proxy-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.proxy-reject {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.proxy-direct {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.proxy-info {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.proxy-normal {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.rule-index {
+  font-size: 0.75rem;
+  color: var(--n-text-color-3);
+  font-weight: 500;
+  text-align: right;
+}
+
+/* 高亮标记 */
+.rule-text :deep(mark) {
+  background: rgba(64, 128, 255, 0.2);
+  color: var(--n-text-color-1);
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: 600;
 }
 
 /* 空状态 */
@@ -605,52 +790,51 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
-  padding: 48px 24px;
+  min-height: 300px;
+  padding: 40px 20px;
   text-align: center;
 }
 
 .empty-icon {
   color: var(--n-text-color-disabled);
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  opacity: 0.5;
 }
 
 .empty-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--n-text-color-1);
-  margin: 0 0 12px 0;
-}
-
-.empty-description {
-  font-size: 1rem;
-  color: var(--n-text-color-3);
-  margin: 0 0 24px 0;
-  line-height: 1.6;
-  max-width: 400px;
-}
-
-.empty-action {
-  height: 48px;
-  padding: 0 24px;
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 600;
-  border-radius: 24px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--n-text-color-1);
+  margin: 0 0 8px 0;
 }
 
-.empty-action:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 32px rgba(64, 128, 255, 0.3);
+.empty-desc {
+  font-size: 0.875rem;
+  color: var(--n-text-color-3);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+  max-width: 300px;
 }
 
-/* 暗黑模式样式会通过CSS变量自动应用 */
+.empty-btn {
+  height: 36px;
+  padding: 0 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.empty-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 128, 255, 0.3);
+}
 
 /* 动画效果 */
-@keyframes fadeIn {
+@keyframes slideFadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -659,50 +843,33 @@ onMounted(() => {
 }
 
 /* 响应式设计 */
-@media (max-width: 1024px) {
-  .rules-view {
-    padding: 16px;
-    gap: 16px;
-  }
-}
-
 @media (max-width: 768px) {
-  .rules-view {
+  .ultra-rules {
     padding: 12px;
-    gap: 16px;
-  }
-
-  .hero-header {
-    padding: 20px;
-    border-radius: 16px;
-  }
-
-  .hero-content {
-    flex-direction: column;
-    text-align: center;
-    gap: 16px;
-  }
-
-  .hero-icon {
-    width: 64px;
-    height: 64px;
-  }
-
-  .hero-title {
-    font-size: 1.75rem;
-  }
-
-  .hero-subtitle {
-    font-size: 1rem;
-  }
-
-  .filter-card {
-    padding: 20px;
-  }
-
-  .filter-controls {
-    flex-direction: column;
     gap: 12px;
+  }
+
+  .rules-toolbar {
+    padding: 10px 12px;
+  }
+
+  .toolbar-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .toolbar-title {
+    font-size: 0.875rem;
+  }
+
+  .toolbar-stats {
+    font-size: 0.7rem;
+  }
+
+  .search-input-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
   }
 
   .search-input {
@@ -710,107 +877,114 @@ onMounted(() => {
   }
 
   .filter-selects {
-    flex-direction: column;
-    gap: 8px;
+    justify-content: space-between;
   }
 
   .filter-select {
-    min-width: unset;
+    flex: 1;
+    min-width: 120px;
   }
 
-  .table-card {
-    border-radius: 14px;
+  .rule-item {
+    grid-template-columns: 60px 1fr 100px 30px;
+    gap: 8px;
+    padding: 10px 12px;
   }
 
-  .table-container {
-    padding: 12px;
+  .type-badge,
+  .proxy-badge {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+  }
+
+  .rule-text {
+    font-size: 0.8rem;
+  }
+
+  .rule-index {
+    font-size: 0.7rem;
   }
 }
 
 @media (max-width: 480px) {
-  .rules-view {
+  .ultra-rules {
     padding: 8px;
+    gap: 8px;
   }
 
-  .hero-header {
-    padding: 16px;
+  .rules-toolbar {
+    padding: 8px 10px;
   }
 
-  .hero-title {
-    font-size: 1.5rem;
+  .toolbar-left {
+    gap: 8px;
   }
 
-  .hero-btn {
-    height: 44px;
-    padding: 0 20px;
-    font-size: 0.875rem;
+  .toolbar-icon {
+    width: 24px;
+    height: 24px;
   }
 
-  .filter-card {
-    padding: 16px;
+  .toolbar-title {
+    font-size: 0.8rem;
   }
 
-  .filter-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    text-align: center;
+  .search-section {
+    padding: 12px;
   }
 
-  .filter-stats {
-    justify-content: center;
+  .rules-list {
+    padding: 12px;
+  }
+
+  .rule-item {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .rule-type,
+  .rule-proxy,
+  .rule-index {
+    display: none;
+  }
+
+  .rule-text {
+    font-size: 0.8rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.4;
   }
 
   .empty-state {
     padding: 32px 16px;
-    min-height: 320px;
+    min-height: 250px;
   }
 
   .empty-title {
-    font-size: 1.25rem;
+    font-size: 1rem;
   }
 
-  .empty-description {
-    font-size: 0.875rem;
-  }
-
-  .empty-action {
-    height: 44px;
-    padding: 0 20px;
-    font-size: 0.875rem;
+  .empty-desc {
+    font-size: 0.8rem;
   }
 }
 
-/* Naive UI 组件样式覆盖 */
-:deep(.n-data-table) {
-  background: transparent;
-}
-
-:deep(.n-data-table-thead) {
-  background: var(--n-color-embedded);
-}
-
-:deep(.n-data-table-th) {
-  background: var(--n-color-embedded);
-  border-bottom: 1px solid var(--n-border-color);
-  font-weight: 600;
-}
-
-:deep(.n-data-table-td) {
-  border-bottom: 1px solid var(--n-border-color);
-}
-
-:deep(.n-data-table-tr:hover .n-data-table-td) {
-  background: var(--n-color-embedded-popover);
-}
-
-/* 删除暗色模式自定义样式，现在通过CSS变量自动应用 */
-
-:deep(.n-badge) {
-  --n-font-size: 10px;
-}
-
+/* Naive UI 组件优化 */
 :deep(.n-spin-container) {
   min-height: 200px;
+}
+
+:deep(.n-input__input-el) {
+  font-size: 0.875rem !important;
+}
+
+:deep(.n-base-selection-label) {
+  font-size: 0.875rem !important;
+}
+
+:deep(.n-button__content) {
+  font-size: 0.875rem !important;
 }
 </style>

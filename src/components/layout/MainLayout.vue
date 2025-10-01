@@ -1,132 +1,118 @@
 <template>
   <n-config-provider :theme="theme" :theme-overrides="themeOverrides">
-    <n-layout class="modern-layout" position="absolute">
-      <!-- 极简顶部栏 -->
-      <n-layout-header class="modern-header">
+    <n-layout class="ultra-modern-layout" position="absolute">
+      <!-- 超紧凑顶部栏 - 集成窗口控制 -->
+      <n-layout-header class="ultra-header" :style="{ height: '36px' }">
         <div class="header-content" data-tauri-drag-region>
-          <!-- 左侧：仅保留必要的标题 -->
+          <!-- 左侧：动态状态指示器 -->
           <div class="header-left">
-            <n-gradient-text :size="16" class="app-title-gradient">
-              Sing-Box Windows</n-gradient-text
-            >
+            <div class="app-logo-mini" @click="onSelect('home')" data-tauri-drag-region="false">
+              <img :src="logo" alt="Logo" class="logo-img" />
+            </div>
+            <div class="status-indicator-mini" :class="statusClass">
+              <div class="pulse-dot"></div>
+            </div>
+            <span class="app-title-mini">{{ t('common.appName') }}</span>
           </div>
 
           <!-- 右侧：窗口控制 -->
-          <div class="header-right">
-            <button class="window-btn" @click="windowStore.minimizeWindow">
-              <n-icon size="14"><RemoveOutline /></n-icon>
+          <div class="header-controls">
+            <button class="control-btn minimize" @click="windowStore.minimizeWindow">
+              <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
             </button>
-            <button class="window-btn" @click="windowStore.toggleMaximize">
-              <n-icon size="14">
-                <CropOutline v-if="windowStore.windowState.isMaximized" />
-                <SquareOutline v-else />
-              </n-icon>
+            <button class="control-btn maximize" @click="windowStore.toggleMaximize">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <rect x="1" y="1" width="8" height="8" stroke="currentColor" stroke-width="1"/>
+              </svg>
             </button>
-            <button
-              class="window-btn window-btn-close"
-              @click="() => windowStore.hideWindow(router)"
-            >
-              <n-icon size="14"><CloseOutline /></n-icon>
+            <button class="control-btn close" @click="() => windowStore.hideWindow(router)">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
             </button>
           </div>
         </div>
       </n-layout-header>
 
-      <!-- 主内容区 -->
-      <n-layout has-sider position="absolute" style="top: 48px" class="main-container">
-        <!-- 现代化侧边栏 -->
+      <!-- 主内容区 - 优化空间利用 -->
+      <n-layout has-sider position="absolute" style="top: 36px" class="main-container">
+        <!-- 超薄侧边栏 -->
         <n-layout-sider
-          class="modern-sider"
-          :width="240"
-          :collapsed-width="72"
+          class="ultra-sider"
+          :width="180"
+          :collapsed-width="56"
           :collapsed="collapsed"
           collapse-mode="width"
           :native-scrollbar="false"
         >
           <div class="sider-content">
-            <!-- Logo 和状态区域 -->
-            <div class="logo-section">
-              <div class="logo-wrapper">
-                <n-image
-                  :src="logo"
-                  :width="collapsed ? 40 : 56"
-                  :height="collapsed ? 40 : 56"
-                  preview-disabled
-                  class="app-logo"
-                />
-                <div class="logo-glow" :class="{ active: appStore.isRunning }"></div>
+            <!-- 精简Logo区域 -->
+            <div class="logo-section-compact">
+              <div class="logo-container" @click="onSelect('home')">
+                <div class="logo-icon" :class="{ active: appStore.isRunning }">
+                  <div class="logo-core"></div>
+                  <div class="logo-ring" v-if="appStore.isRunning"></div>
+                </div>
               </div>
-
-              <transition name="fade">
-                <div v-if="!collapsed" class="app-info">
-                  <div class="app-name">Sing-Box</div>
-                  <div class="status-container">
-                    <n-badge
-                      :value="appStore.isRunning ? t('common.running') : t('common.stopped')"
-                      :type="appStore.isRunning ? 'success' : 'error'"
-                      :offset="[0, 0]"
-                      class="status-badge"
-                    />
-                  </div>
+              <transition name="fade-slide">
+                <div v-if="!collapsed" class="status-text">
+                  <span class="status-label">{{ appStore.isRunning ? t('status.running') : t('status.stopped') }}</span>
                 </div>
               </transition>
             </div>
 
-            <!-- 导航菜单 -->
-            <div class="nav-section">
+            <!-- 垂直导航菜单 -->
+            <div class="nav-section-compact">
               <div
                 v-for="item in menuItems"
                 :key="item.key"
-                class="nav-item"
+                class="nav-item-compact"
                 :class="{
-                  active: currentMenu === item.key,
-                  disabled: item.disabled,
+                  'nav-active': currentMenu === item.key,
+                  'nav-disabled': item.disabled,
                 }"
                 @click="!item.disabled && onSelect(item.key)"
               >
-                <div class="nav-icon">
-                  <n-icon :size="20" :component="item.icon" />
-                  <div class="nav-indicator"></div>
+                <div class="nav-icon-compact">
+                  <n-icon :size="18" :component="item.icon" />
                 </div>
-                <transition name="fade">
-                  <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
+                <transition name="fade-slide">
+                  <span v-if="!collapsed" class="nav-text">{{ item.label }}</span>
                 </transition>
+                <div class="nav-glow"></div>
               </div>
             </div>
 
-            <!-- 底部功能区 -->
-            <div class="sider-footer">
-              <!-- 主题切换 -->
-              <div class="footer-item" @click="themeStore.toggleTheme">
-                <n-icon :size="20">
+            <!-- 底部工具区 -->
+            <div class="tools-section">
+              <div class="tool-item" @click="themeStore.toggleTheme">
+                <n-icon :size="16">
                   <MoonOutline v-if="themeStore.isDark" />
                   <SunnyOutline v-else />
                 </n-icon>
-                <transition name="fade">
-                  <span v-if="!collapsed" class="footer-label">
-                    {{ themeStore.isDark ? t('common.darkMode') : t('common.lightMode') }}
-                  </span>
+                <transition name="fade-slide">
+                  <span v-if="!collapsed" class="tool-text">{{ themeStore.isDark ? t('setting.theme.dark') : t('setting.theme.light') }}</span>
                 </transition>
               </div>
-
-              <!-- 折叠按钮 -->
-              <div class="footer-item" @click="collapsed = !collapsed">
-                <n-icon :size="20">
+              <div class="divider" v-if="!collapsed"></div>
+              <div class="tool-item" @click="collapsed = !collapsed">
+                <n-icon :size="16">
                   <ChevronBackOutline v-if="!collapsed" />
                   <ChevronForwardOutline v-else />
                 </n-icon>
-                <transition name="fade">
-                  <span v-if="!collapsed" class="footer-label">{{ t('common.collapse') }}</span>
-                </transition>
               </div>
             </div>
           </div>
         </n-layout-sider>
 
-        <!-- 内容区域 -->
-        <n-layout-content class="modern-content">
-          <div class="content-wrapper">
-            <router-view />
+        <!-- 优化内容区域 -->
+        <n-layout-content class="ultra-content">
+          <div class="content-wrapper-compact">
+            <router-view v-slot="{ Component }">
+              <transition name="page-fade" mode="default">
+                <component :is="Component" :key="$route.path" />
+              </transition>
+            </router-view>
           </div>
         </n-layout-content>
       </n-layout>
@@ -196,26 +182,45 @@ const currentMenu = ref('home')
 // 主题配置
 const theme = computed(() => (themeStore.isDark ? darkTheme : null))
 
+// 状态类计算
+const statusClass = computed(() => {
+  if (appStore.isRunning) return 'status-running'
+  return 'status-stopped'
+})
+
 const themeOverrides = computed<GlobalThemeOverrides>(() => ({
   common: {
-    borderRadius: '12px',
-    borderRadiusSmall: '8px',
-    primaryColor: '#646cff',
-    primaryColorHover: '#747bff',
-    primaryColorPressed: '#535bf2',
-    primaryColorSuppl: '#747bff',
+    borderRadius: '8px',
+    borderRadiusSmall: '6px',
+    borderRadiusMedium: '8px',
+    primaryColor: '#6366f1',
+    primaryColorHover: '#818cf8',
+    primaryColorPressed: '#4f46e5',
+    primaryColorSuppl: '#818cf8',
+    fontSize: '13px',
   },
   Layout: {
-    headerHeight: '48px',
+    headerHeight: '36px',
     headerBorderColor: 'transparent',
     siderBorderColor: 'transparent',
     color: 'transparent',
-    siderColor: themeStore.isDark ? 'rgba(24, 24, 28, 0.6)' : 'rgba(255, 255, 255, 0.6)',
+    siderColor: themeStore.isDark ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
     contentColor: 'transparent',
   },
   Card: {
-    borderRadius: '16px',
-    color: themeStore.isDark ? 'rgba(24, 24, 28, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+    borderRadius: '12px',
+    color: themeStore.isDark ? 'rgba(17, 24, 39, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+    borderColor: 'transparent',
+  },
+  Button: {
+    borderRadiusSmall: '6px',
+    borderRadiusMedium: '8px',
+    heightSmall: '28px',
+    heightMedium: '32px',
+    heightLarge: '36px',
+    fontSizeSmall: '12px',
+    fontSizeMedium: '13px',
+    fontSizeLarge: '14px',
   },
 }))
 
@@ -348,21 +353,21 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 现代化布局样式 */
-.modern-layout {
-  background: var(--n-body-color);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+/* 超现代化布局样式 */
+.ultra-modern-layout {
+  background: v-bind('themeStore.isDark ? "#0f0f10" : "#fafafa"');
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', sans-serif;
+  font-size: 13px;
 }
 
-/* 极简顶部栏 */
-.modern-header {
-  height: 48px !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
-  border-bottom: 1px solid
-    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"');
-  z-index: 100;
+/* 超紧凑顶部栏 */
+.ultra-header {
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  background: v-bind('themeStore.isDark ? "rgba(15, 15, 16, 0.8)" : "rgba(255, 255, 255, 0.7)"');
+  border-bottom: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  z-index: 1000;
+  box-shadow: 0 1px 0 0 v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.02)"');
 }
 
 .header-content {
@@ -370,347 +375,395 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 12px;
+  user-select: none;
 }
 
-.app-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--n-text-color);
-  letter-spacing: -0.2px;
-}
-
-.header-right {
+.header-left {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 8px;
 }
 
-.window-btn {
-  width: 32px;
-  height: 32px;
+.app-logo-mini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-logo-mini:hover .logo-img {
+  transform: scale(1.1);
+}
+
+.app-logo-mini:active {
+  transform: scale(0.95);
+}
+
+.status-indicator-mini {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-indicator-mini.status-running {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.status-indicator-mini.status-stopped {
+  background: v-bind('themeStore.isDark ? "#374151" : "#d1d5db"');
+}
+
+.pulse-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-running .pulse-dot {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.1); }
+}
+
+.app-title-mini {
+  font-size: 13px;
+  font-weight: 600;
+  color: v-bind('themeStore.isDark ? "#f3f4f6" : "#111827"');
+  letter-spacing: -0.02em;
+}
+
+.header-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.control-btn {
+  width: 28px;
+  height: 28px;
   border: none;
   background: transparent;
-  border-radius: 8px;
-  color: var(--n-text-color);
+  border-radius: 6px;
+  color: v-bind('themeStore.isDark ? "#9ca3af" : "#6b7280"');
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 10px;
 }
 
-.window-btn:hover {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)"');
+.control-btn:hover {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)"');
+  color: v-bind('themeStore.isDark ? "#e5e7eb" : "#374151"');
 }
 
-.window-btn-close:hover {
+.control-btn.close:hover {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
 }
 
 /* 主容器 */
 .main-container {
-  background: v-bind('themeStore.isDark ? "#0a0a0a" : "#f8f9fa"');
+  background: v-bind('themeStore.isDark ? "#0f0f10" : "#fafafa"');
 }
 
-/* 现代化侧边栏 */
-.modern-sider {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  background: v-bind(
-    'themeStore.isDark ? "rgba(24, 24, 28, 0.6)" : "rgba(255, 255, 255, 0.6)"'
-  ) !important;
-  border-right: 1px solid
-    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"');
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* 超薄侧边栏 */
+.ultra-sider {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.95)" : "rgba(255, 255, 255, 0.95)"') !important;
+  border-right: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 24px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
 }
 
 .sider-content {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 24px 16px;
+  padding: 16px 8px;
+  gap: 20px;
 }
 
-/* Logo 区域 */
-.logo-section {
-  margin-bottom: 28px;
+/* 精简Logo区域 */
+.logo-section-compact {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
   padding: 8px 0;
 }
 
-.logo-wrapper {
+.logo-container {
+  cursor: pointer;
+  position: relative;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.app-logo {
-  border-radius: 18px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
-.app-logo:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+.logo-core {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 6px;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.logo-glow {
+.logo-ring {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 72px;
-  height: 72px;
-  background: radial-gradient(circle, rgba(100, 108, 255, 0.3) 0%, transparent 70%);
+  width: 32px;
+  height: 32px;
+  border: 2px solid transparent;
   border-radius: 50%;
-  opacity: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  pointer-events: none;
+  background: conic-gradient(from 0deg, #6366f1, #8b5cf6, #ec4899, #6366f1);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 1px));
+  animation: rotate 3s linear infinite;
 }
 
-.logo-glow.active {
-  opacity: 1;
-  animation: pulse 3s ease-in-out infinite;
+.logo-icon.active .logo-core {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.15);
-    opacity: 0.3;
-  }
+.logo-icon:hover .logo-core {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
-.app-info {
-  text-align: center;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+@keyframes rotate {
+  to { transform: rotate(360deg); }
 }
 
-.app-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--n-text-color);
-  letter-spacing: -0.2px;
-}
-
-.status-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
+.status-text {
   text-align: center;
 }
 
-.status-badge {
-  font-size: 10px;
+.status-label {
+  font-size: 11px;
   font-weight: 500;
-  margin: 0 auto;
+  color: v-bind('themeStore.isDark ? "#9ca3af" : "#6b7280"');
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-/* 强制n-badge组件及其子元素居中 */
-:deep(.n-badge) {
-  width: 100%;
-  display: flex !important;
-  justify-content: center !important;
-  text-align: center;
-}
-
-:deep(.n-badge .n-badge-sup) {
-  position: static !important;
-  transform: none !important;
-  margin: 0 auto !important;
-}
-
-/* 导航区域 */
-.nav-section {
+/* 垂直导航菜单 */
+.nav-section-compact {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
-.nav-item {
+.nav-item-compact {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 12px;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: var(--n-text-color-2);
+  color: v-bind('themeStore.isDark ? "#9ca3af" : "#6b7280"');
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 36px;
 }
 
-.nav-item:hover:not(.disabled) {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
-  color: var(--n-text-color);
+.nav-item-compact:hover:not(.nav-disabled) {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  color: v-bind('themeStore.isDark ? "#e5e7eb" : "#374151"');
+  transform: translateX(2px);
 }
 
-.nav-item.active {
-  background: v-bind(
-    'themeStore.isDark ? "rgba(100, 108, 255, 0.15)" : "rgba(100, 108, 255, 0.1)"'
-  );
-  color: #646cff;
+.nav-item-compact.nav-active {
+  background: v-bind('themeStore.isDark ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.1)"');
+  color: #6366f1;
+  font-weight: 600;
 }
 
-.nav-item.disabled {
-  opacity: 0.4;
+.nav-item-compact.nav-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: linear-gradient(180deg, #6366f1, #8b5cf6);
+  border-radius: 0 2px 2px 0;
+}
+
+.nav-item-compact.nav-disabled {
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
-.nav-icon {
-  position: relative;
+.nav-icon-compact {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.nav-indicator {
-  position: absolute;
-  left: -28px;
-  width: 3px;
+  flex-shrink: 0;
+  width: 20px;
   height: 20px;
-  background: #646cff;
-  border-radius: 0 3px 3px 0;
+}
+
+.nav-text {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.nav-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: radial-gradient(circle at center, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
   opacity: 0;
-  transform: translateX(-4px);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
 }
 
-.nav-item.active .nav-indicator {
+.nav-item-compact.nav-active .nav-glow {
   opacity: 1;
-  transform: translateX(0);
 }
 
-.nav-label {
-  font-size: 14px;
+/* 底部工具区 */
+.tools-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+}
+
+.tool-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: v-bind('themeStore.isDark ? "#9ca3af" : "#6b7280"');
+  font-size: 12px;
+  min-height: 32px;
+}
+
+.tool-item:hover {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  color: v-bind('themeStore.isDark ? "#e5e7eb" : "#374151"');
+}
+
+.tool-text {
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
 
-/* 底部功能区 */
-.sider-footer {
-  margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid
-    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"');
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.divider {
+  height: 1px;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  margin: 4px 0;
 }
 
-.footer-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: var(--n-text-color-2);
-}
-
-.footer-item:hover {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
-  color: var(--n-text-color);
-}
-
-.footer-label {
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-/* 内容区域 */
-.modern-content {
-  padding: 24px;
+/* 优化内容区域 */
+.ultra-content {
+  padding: 16px;
   overflow: auto;
 }
 
-.content-wrapper {
-  max-width: 1400px;
+.content-wrapper-compact {
+  max-width: 1200px;
   margin: 0 auto;
   height: 100%;
+  min-height: calc(100vh - 36px);
 }
 
-/* 过渡动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s;
+/* 页面切换动画 - 优化版 */
+.page-fade-enter-active {
+  transition: all 0.15s ease-out;
 }
 
-.fade-enter-from,
-.fade-leave-to {
+.page-fade-leave-active {
+  transition: none;
+}
+
+.page-fade-enter-from {
   opacity: 0;
+  transform: translateY(4px);
 }
 
-/* 过渡动画已移除，提高稳定性 */
-
-/* 应用标题渐变样式 */
-.app-title-gradient {
-  font-weight: 600;
-  letter-spacing: -0.3px;
-  color: black;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.page-fade-leave-to {
+  opacity: 1;
 }
 
-.app-title-gradient:hover {
-  text-shadow: 0 0 30px rgba(29, 29, 34, 0.5);
-  transform: scale(1.02);
+/* 侧边栏动画 */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-8px);
 }
 
 /* 折叠状态优化 */
-.modern-sider.collapsed .logo-section {
-  gap: 12px;
-  margin-bottom: 24px;
+.ultra-sider[collapsed] .sider-content {
+  padding: 16px 4px;
 }
 
-.modern-sider.collapsed .app-logo {
-  border-radius: 12px;
+.ultra-sider[collapsed] .nav-item-compact {
+  justify-content: center;
+  padding: 8px;
 }
 
-.modern-sider.collapsed .logo-glow {
-  width: 56px;
-  height: 56px;
+.ultra-sider[collapsed] .tool-item {
+  justify-content: center;
+  padding: 8px;
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .modern-sider {
-    position: fixed;
-    height: 100%;
-    z-index: 99;
-  }
-
-  .logo-section {
-    padding: 4px 0;
-    margin-bottom: 20px;
-  }
-
-  .app-name {
-    font-size: 14px;
-  }
-
-  .status-badge {
-    font-size: 9px;
-  }
-}
-
-/* 滚动条样式 */
+/* 滚动条美化 */
 :deep(.n-scrollbar) {
   height: 100%;
 }
@@ -722,5 +775,48 @@ onBeforeUnmount(() => {
 
 :deep(.n-layout-sider-scroll-container::-webkit-scrollbar) {
   display: none;
+}
+
+/* 暗黑模式下的特殊效果 */
+.ultra-modern-layout :deep(.n-card) {
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"') !important;
+  backdrop-filter: blur(8px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"') !important;
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"') !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .ultra-sider {
+    position: fixed;
+    height: 100%;
+    z-index: 999;
+  }
+
+  .content-wrapper-compact {
+    padding: 12px;
+  }
+}
+
+/* 微交互效果 */
+.nav-item-compact:active {
+  transform: scale(0.98) translateX(2px);
+}
+
+.tool-item:active {
+  transform: scale(0.98);
+}
+
+/* 玻璃态效果增强 */
+@media (prefers-reduced-motion: no-preference) {
+  .ultra-header {
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  .ultra-sider {
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+  }
 }
 </style>
