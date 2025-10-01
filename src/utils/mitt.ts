@@ -66,6 +66,8 @@ export type Events = {
 
   // 内存管理事件
   'memory-cleanup-requested': void
+  'global-cleanup-requested': void
+  'vue-component-cleanup': void
 
   // WebSocket 连接状态事件
   'traffic-connection-state': ConnectionState

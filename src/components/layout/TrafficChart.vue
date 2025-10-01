@@ -15,10 +15,11 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, defineProps, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, defineProps, onMounted, onUnmounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useThemeVars } from 'naive-ui'
 import { formatBandwidth } from '@/utils/index'
 import { useI18n } from 'vue-i18n'
+import mitt from '@/utils/mitt'
 
 defineOptions({
   name: 'TrafficChart',
@@ -350,6 +351,9 @@ onMounted(() => {
     startUpdates()
   })
 
+  // 设置托盘模式监听器
+  setupTrayModeListener()
+
   // 添加窗口大小变化事件监听器，使用防抖处理
   let resizeTimeout: number | null = null
   const handleResize = () => {
@@ -376,8 +380,20 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
 })
 
+// 监听页面可见性变化，优化托盘模式下的性能
+const isPageVisible = ref(true)
+const isLowPowerMode = ref(false)
+
+// 检查是否在托盘模式
+const checkTrayMode = () => {
+  const currentRoute = window.location.pathname
+  return currentRoute === '/blank' || document.hidden
+}
+
 // 组件卸载时清理
 onUnmounted(() => {
+  console.log('🧹 TrafficChart组件卸载，清理GPU资源')
+
   // 清理更新定时器
   if (updateTimer !== null) {
     clearInterval(updateTimer)
@@ -387,19 +403,120 @@ onUnmounted(() => {
   // 清理窗口事件监听器
   window.removeEventListener('resize', handleResize)
 
-  // 清理所有画布引用，帮助垃圾回收
+  // 深度清理画布资源，释放GPU内存
   if (chartCanvas.value) {
-    const ctx = chartCanvas.value.getContext('2d')
+    const canvas = chartCanvas.value
+
+    // 清理2D上下文
+    const ctx = canvas.getContext('2d')
     if (ctx) {
-      ctx.clearRect(0, 0, chartCanvas.value.width, chartCanvas.value.height)
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      // 重置所有2D上下文状态
+      ctx.resetTransform()
+      ctx.globalAlpha = 1
+      ctx.globalCompositeOperation = 'source-over'
     }
+
+    // 清理WebGL上下文（如果存在）
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    if (gl) {
+      // 强制丢失WebGL上下文以释放GPU内存
+      const loseContext = (gl as any).getExtension('WEBGL_lose_context')
+      if (loseContext) {
+        loseContext.loseContext()
+      }
+    }
+
+    // 重置canvas尺寸到最小值以释放GPU内存
+    canvas.width = 1
+    canvas.height = 1
+    canvas.style.width = '1px'
+    canvas.style.height = '1px'
+
+    // 清除canvas引用
+    chartCanvas.value = null
   }
 
   // 清空数据数组
   uploadData.value = []
   downloadData.value = []
   timeLabels.value = []
+
+  console.log('✅ TrafficChart GPU资源清理完成')
 })
+
+// 监听托盘模式变化
+const setupTrayModeListener = () => {
+  // 监听路由变化
+  const checkTrayStatus = () => {
+    const wasInTrayMode = !isPageVisible.value
+    isPageVisible.value = !checkTrayMode()
+
+    if (wasInTrayMode && isPageVisible.value) {
+      // 从托盘模式恢复，重新开始更新
+      console.log('📈 从托盘模式恢复，重新启动图表更新')
+      startUpdates()
+    } else if (!wasInTrayMode && !isPageVisible.value) {
+      // 进入托盘模式，停止更新以节省资源
+      console.log('📉 进入托盘模式，停止图表更新以节省资源')
+      if (updateTimer !== null) {
+        clearInterval(updateTimer)
+        updateTimer = null
+      }
+    }
+  }
+
+  // 监听内存清理事件
+  mitt.on('memory-cleanup-requested', () => {
+    console.log('🧹 TrafficChart响应内存清理请求')
+    // 暂停更新
+    isLowPowerMode.value = true
+    if (updateTimer !== null) {
+      clearInterval(updateTimer)
+      updateTimer = null
+    }
+
+    // 清理当前画布
+    if (chartCanvas.value) {
+      const canvas = chartCanvas.value
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+      }
+    }
+  })
+
+  // 监听窗口显示事件
+  mitt.on('window-show', () => {
+    console.log('🪟 窗口显示，恢复图表更新')
+    isPageVisible.value = true
+    isLowPowerMode.value = false
+    if (updateTimer === null) {
+      startUpdates()
+    }
+  })
+
+  // 监听窗口最小化事件
+  mitt.on('window-minimize', () => {
+    console.log('🪟 窗口最小化，停止图表更新')
+    isPageVisible.value = false
+    if (updateTimer !== null) {
+      clearInterval(updateTimer)
+      updateTimer = null
+    }
+  })
+
+  // 定期检查托盘状态
+  const statusCheckTimer = setInterval(checkTrayStatus, 2000)
+
+  // 清理函数
+  onBeforeUnmount(() => {
+    clearInterval(statusCheckTimer)
+    mitt.off('memory-cleanup-requested')
+    mitt.off('window-show')
+    mitt.off('window-minimize')
+  })
+}
 
 // 监听主题变化
 watch(themeVars, () => {

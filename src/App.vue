@@ -36,6 +36,7 @@ import { tauriApi } from '@/services/tauri-api'
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 
 import { storeManager, type StoreType } from '@/stores/StoreManager'
+import { globalMemoryManager } from '@/utils/memory-leak-fix'
 
 // 直接导入需要的Store
 import { useThemeStore } from '@/stores/app/ThemeStore'
@@ -122,6 +123,9 @@ onMounted(async () => {
   try {
     // 初始化Store管理器
     await storeManager.initialize()
+
+    // 初始化全局内存管理器
+    globalMemoryManager.initialize()
 
     // 加载核心Store（不包括theme，因为已经直接导入了）
     appStore = await storeManager.loadStore<AppStore>('app')

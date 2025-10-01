@@ -26,6 +26,7 @@ export default {
     restore: '还原',
     later: '稍后',
     minimizedToTray: '已最小化到托盘',
+    appName: 'Sing-Box Windows',
     collapse: '收起',
   },
   nav: {

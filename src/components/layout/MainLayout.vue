@@ -330,6 +330,25 @@ const handleGlobalSkip = () => {
   showUpdateModal.value = false
 }
 
+// 监听托盘模式变化
+const isLowPowerMode = ref(false)
+
+// 优化GPU使用的样式切换
+const toggleGPUPerformance = (enable: boolean) => {
+  const root = document.documentElement
+  if (enable) {
+    // 高性能模式：启用GPU加速和动画
+    root.style.setProperty('--gpu-acceleration', 'auto')
+    root.style.setProperty('--animation-duration', '0.2s')
+    console.log('🚀 启用GPU高性能模式')
+  } else {
+    // 低功耗模式：禁用GPU加速
+    root.style.setProperty('--gpu-acceleration', 'none')
+    root.style.setProperty('--animation-duration', '0s')
+    console.log('🔋 启用低功耗模式')
+  }
+}
+
 // 生命周期
 onMounted(async () => {
   await updateStore.fetchAppVersion()
@@ -345,10 +364,34 @@ onMounted(async () => {
   if (menuKey) {
     currentMenu.value = menuKey
   }
+
+  // 监听内存清理请求
+  mitt.on('memory-cleanup-requested', () => {
+    console.log('🧹 MainLayout响应内存清理请求')
+    isLowPowerMode.value = true
+    toggleGPUPerformance(false)
+  })
+
+  // 监听窗口显示事件
+  mitt.on('window-show', () => {
+    console.log('🪟 窗口显示，恢复GPU性能')
+    isLowPowerMode.value = false
+    toggleGPUPerformance(true)
+  })
+
+  // 监听窗口最小化事件
+  mitt.on('window-minimize', () => {
+    console.log('🪟 窗口最小化，降低GPU性能')
+    isLowPowerMode.value = true
+    toggleGPUPerformance(false)
+  })
 })
 
 onBeforeUnmount(() => {
   mitt.off('show-update-modal', handleShowUpdateModal)
+  mitt.off('memory-cleanup-requested')
+  mitt.off('window-show')
+  mitt.off('window-minimize')
 })
 </script>
 
@@ -358,16 +401,25 @@ onBeforeUnmount(() => {
   background: v-bind('themeStore.isDark ? "#0f0f10" : "#fafafa"');
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', sans-serif;
   font-size: 13px;
+  /* 优化GPU使用 */
+  transform: translateZ(0);
+  will-change: auto;
+  backface-visibility: hidden;
 }
 
 /* 超紧凑顶部栏 */
 .ultra-header {
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  background: v-bind('themeStore.isDark ? "rgba(15, 15, 16, 0.8)" : "rgba(255, 255, 255, 0.7)"');
+  /* 减少GPU占用的背景效果 */
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  background: v-bind('themeStore.isDark ? "rgba(15, 15, 16, 0.9)" : "rgba(255, 255, 255, 0.85)"');
   border-bottom: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
   z-index: 1000;
   box-shadow: 0 1px 0 0 v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.02)"');
+  /* GPU优化 */
+  will-change: auto;
+  transform: translateZ(0);
+  contain: layout style paint;
 }
 
 .header-content {
@@ -493,12 +545,18 @@ onBeforeUnmount(() => {
 
 /* 超薄侧边栏 */
 .ultra-sider {
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.95)" : "rgba(255, 255, 255, 0.95)"') !important;
+  /* 减少GPU占用的背景效果 */
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.97)" : "rgba(255, 255, 255, 0.97)"') !important;
   border-right: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 4px 0 24px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
+  /* 减少动画复杂度 */
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: 2px 0 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.15)" : "rgba(0, 0, 0, 0.03)"');
+  /* GPU优化 */
+  will-change: auto;
+  transform: translateZ(0);
+  contain: layout style paint;
 }
 
 .sider-content {
@@ -553,7 +611,11 @@ onBeforeUnmount(() => {
   background: conic-gradient(from 0deg, #6366f1, #8b5cf6, #ec4899, #6366f1);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 1px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 1px));
-  animation: rotate 3s linear infinite;
+  /* 减少动画频率以节省GPU资源 */
+  animation: rotate 6s linear infinite;
+  /* GPU优化 */
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .logo-icon.active .logo-core {
