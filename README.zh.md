@@ -17,6 +17,11 @@
   </p>
 
   <p>
+    <a href="README.zh.md">🇨🇳 中文</a> •
+    <a href="README.md">🇺🇸 English</a>
+  </p>
+
+  <p>
     <a href="https://github.com/xinggaoya/sing-box-windows/releases">
       <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows?style=for-the-badge&logo=github" alt="GitHub release">
     </a>
