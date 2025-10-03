@@ -1,364 +1,342 @@
-# Sing-Box Windows
-
 <div align="center">
-    <img src="./src/assets/icon.png" alt="Sing-Box Windows Logo" width="128" height="128" />
-    <h1>Sing-Box Windows</h1>
-    <p>🚀 An elegant and modern Sing-Box Windows GUI client</p>
-    <p>
-        <img src="https://img.shields.io/github/license/xinggaoya/sing-box-windows" alt="license" />
-        <img src="https://img.shields.io/github/stars/xinggaoya/sing-box-windows" alt="stars" />
-        <img src="https://img.shields.io/github/downloads/xinggaoya/sing-box-windows/total" alt="downloads" />
-        <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows" alt="release" />
-        <img src="https://img.shields.io/github/last-commit/xinggaoya/sing-box-windows" alt="last commit" />
-    </p>
-    <p>
-        <a href="README.zh.md">中文</a> | 
-        <a href="README.md">English</a>
-    </p>
+  <img src="src/assets/icon.png" alt="Sing-Box GUI Client" width="120" height="120">
+
+  <h1>Sing-Box Windows</h1>
+
+  <p>
+    <strong>A modern Sing-Box GUI client for Windows built with Tauri 2.0 + Vue 3</strong>
+  </p>
+
+  <p>
+    <a href="#features">✨ Features</a> •
+    <a href="#installation">🚀 Installation</a> •
+    <a href="#quick-start">🎯 Quick Start</a> •
+    <a href="#screenshots">📸 Screenshots</a> •
+    <a href="#development">🛠️ Development</a> •
+    <a href="#contributing">💡 Contributing</a>
+  </p>
+
+  <p>
+    <a href="https://github.com/xinggaoya/sing-box-windows/releases">
+      <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows?style=for-the-badge&logo=github" alt="GitHub release">
+    </a>
+    <img src="https://img.shields.io/badge/platform-Windows-blue?style=for-the-badge&logo=windows" alt="Platform">
+    <img src="https://img.shields.io/badge/version-1.8.2-informational?style=for-the-badge" alt="Version">
+    <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
+  </p>
 </div>
 
-## 🎯 Features
+---
 
-### 🖥️ **Modern User Interface**
+## 🌟 About
 
-- Built with [Tauri 2.0](https://tauri.app/) and [Vue 3](https://vuejs.org/) for optimal performance
-- Responsive design with [Naive UI](https://www.naiveui.com/) components
-- Support for light/dark themes with automatic system detection
-- Intuitive and user-friendly interface design
+Sing-Box GUI Client is a cutting-edge Windows application that provides a modern, intuitive interface for managing Sing-Box proxy configurations. Built with the powerful combination of Tauri 2.0 and Vue 3, it offers exceptional performance, security, and user experience.
 
-### 🌐 **Comprehensive Proxy Support**
+### 🎯 Key Highlights
 
-- **System Proxy Mode**: Automatic system-wide proxy configuration
-- **TUN Mode**: Traffic routing at the network level (requires administrator privileges)
-- **Manual Mode**: Custom proxy configuration for advanced users
-- Smart proxy switching with one-click toggle
+- **🚀 Blazing Fast**: Built with Rust backend and optimized Vue 3 frontend
+- **💎 Modern UI**: Beautiful, responsive interface with Naive UI components
+- **🔒 Secure**: Rust-based backend ensures memory safety and performance
+- **🌐 Real-time**: WebSocket communication for live updates
+- **🎨 Customizable**: Light/Dark themes with extensive personalization options
 
-### 📊 **Advanced Statistics & Monitoring**
+---
 
-- Real-time traffic monitoring with beautiful charts
-- Connection statistics and active connections viewer
-- Memory usage monitoring
-- Historical data tracking
-- Bandwidth usage analysis
+## ✨ Features
 
-### 🔄 **Subscription Management**
+### 🎯 Core Functionality
+- **Proxy Management**: Easy configuration and switching between different proxy modes
+- **Subscription Management**: Automatic subscription updates and management
+- **Connection Monitoring**: Real-time connection statistics and monitoring
+- **Log Management**: Comprehensive logging with filtering and search
+- **Rule Management**: Visual routing rule configuration and management
+- **System Integration**: System tray support with quick access controls
 
-- Multiple subscription formats support:
-  - Direct subscription URLs
-  - Sing-box JSON configuration
-  - Automatic Base64 decoding
-- Automatic subscription updates
-- Subscription grouping and management
-- Import/export configuration
+### 🎨 User Experience
+- **Modern Interface**: Clean, intuitive design based on Naive UI components
+- **Multi-language Support**: English, Chinese, Japanese, and Russian
+- **Theme System**: Light, Dark, and Auto themes with custom colors
+- **Responsive Design**: Optimized for various screen sizes and DPI settings
 
-### 🔍 **Complete Logging System**
+### 🔧 Advanced Features
+- **Real-time Statistics**: Live bandwidth and connection monitoring via WebSocket
+- **Auto-start**: Automatic system startup with delayed launch option
+- **Update Management**: Automatic update checking and installation
+- **Memory Optimization**: Efficient resource management and cleanup with StoreManager
 
-- Real-time log viewing with syntax highlighting
-- Multiple log levels (Info, Warning, Error)
-- Log filtering and search capabilities
-- Export logs for debugging
-- Automatic log rotation
+---
 
-### ⚡ **Performance Optimization**
+## 🚀 Installation
 
-- Memory management and leak prevention
-- Efficient WebSocket connections
-- Lazy loading and virtual scrolling
-- Background processing for heavy operations
-- Minimal resource footprint
+### 📥 System Requirements
 
-### 🔒 **Security Features**
+- **Operating System**: Windows 10/11 (x64)
+- **Memory**: 4GB RAM minimum (8GB recommended)
+- **Storage**: 100MB free disk space
+- **Network**: Internet connection for subscriptions and updates
 
-- Secure configuration storage
-- Automatic privilege escalation for TUN mode
-- Safe subscription parsing
-- Process isolation
+### 🎯 Installation Methods
 
-### 🌍 **Internationalization**
+#### Method 1: Download Release (Recommended)
+1. Visit the [Releases Page](https://github.com/yourusername/sing-box-windows/releases)
+2. Download the latest `sing-box-windows-x.x.x-setup.exe`
+3. Run the installer and follow the setup wizard
+4. Launch the application from Start Menu or Desktop shortcut
 
-- Multi-language support
-- Currently available in:
-  - English
-  - 中文 (Chinese)
-  - 日本語 (Japanese)
-  - Русский (Russian)
-- Easy to add new languages
+#### Method 2: Portable Version
+1. Download the latest `sing-box-windows-x.x.x-portable.zip`
+2. Extract to your desired folder
+3. Run `sing-box-windows.exe`
+
+#### Method 3: Package Manager (Coming Soon)
+```powershell
+# Using winget (planned)
+winget install sing-box-windows
+
+# Using Chocolatey (planned)
+choco install sing-box-windows
+```
+
+---
+
+## 🎯 Quick Start
+
+### 1. Initial Setup
+After installation, the application will guide you through the initial setup:
+
+1. **Language Selection**: Choose your preferred language
+2. **Theme Configuration**: Select Light/Dark/Auto theme
+3. **Network Settings**: Configure basic network settings
+
+### 2. Add Subscription
+1. Navigate to the **Subscription** tab
+2. Click **Add Subscription**
+3. Enter your subscription URL and name
+4. Configure update settings
+5. Click **Save and Update**
+
+### 3. Configure Proxy
+1. Go to the **Proxy** tab
+2. Select your preferred server from the list
+3. Choose proxy mode (Global, Rule, Direct)
+4. Toggle **Connect** to activate
+
+### 4. Monitor Connections
+1. Visit the **Connections** tab
+2. View real-time connection statistics
+3. Monitor bandwidth usage
+4. Filter and search connections
+
+---
 
 ## 📸 Screenshots
 
 <div align="center">
-    <img src="./docs/image.png" alt="Sing-Box Windows Main Interface" width="800">
-    <p><em>Main interface showing proxy status, statistics, and controls</em></p>
+  <img src="docs/image.png" alt="Sing-Box GUI Client Interface" width="800">
+
+  <p><em>Main application interface showing proxy management and system status</em></p>
 </div>
 
-## 🚀 Quick Start
+---
 
-### System Requirements
+## 🛠️ Development
 
-- **Operating System**: Windows 10 1809 or later
-- **Architecture**: x64 (64-bit)
-- **Memory**: 4GB RAM recommended
-- **Disk Space**: 100MB available space
-- **Network**: Internet connection for downloading core and subscriptions
+### 📋 Prerequisites
 
-### Download and Install
+- **Node.js**: 18+ (recommend using [pnpm](https://pnpm.io/))
+- **Rust**: 1.70+ with nightly toolchain
+- **Tauri CLI**: Latest version
 
-1. **Download**: Get the latest version from the [Releases](https://github.com/xinggaoya/sing-box-windows/releases) page
-2. **Install**: Run the installer (`.msi` or `.exe` setup file)
-   - The installer supports automatic updates
-   - Choose installation directory if needed
-3. **First Launch**: The application will automatically complete necessary configuration
+### 🚀 Setup Development Environment
 
-### Basic Usage
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/xinggaoya/sing-box-windows.git
+   cd sing-box-windows
+   ```
 
-#### 🔧 **Initial Setup**
+2. **Install Dependencies**
+   ```bash
+   # Install frontend dependencies
+   pnpm install
 
-1. **Download Sing-Box Core**:
+   # Install Rust dependencies (automatic)
+   ```
 
-   - Navigate to [Settings] → [Core Management]
-   - Click "Download Latest Core"
-   - Wait for automatic installation
+3. **Start Development Server**
+   ```bash
+   # Start development mode with hot reload
+   pnpm tauri dev
+   ```
 
-2. **Configure Subscriptions**:
-   - Go to [Subscriptions] page
-   - Click "Add Subscription"
-   - Enter your subscription URL or import JSON configuration
-   - The app supports automatic Base64 decoding
+4. **Build for Production**
+   ```bash
+   # Build release version
+   pnpm tauri build
+   ```
 
-#### 🌐 **Connecting to Proxy**
-
-1. **Select Node**:
-
-   - Go to [Home] page
-   - Browse available nodes from your subscriptions
-   - Test node latency using the "Test" button
-   - Select your preferred node
-
-2. **Choose Proxy Mode**:
-
-   - **System Proxy**: Automatic system-wide configuration
-   - **TUN Mode**: Network-level routing (requires admin rights)
-   - **Manual**: Custom configuration
-
-3. **Connect**:
-   - Click the "Connect" button
-   - Monitor connection status in real-time
-   - View traffic statistics and active connections
-
-> **💡 Tip**: For TUN mode, the application will request administrator privileges and automatically configure system settings
-
-### Advanced Features
-
-#### 📋 **Rule Management**
-
-- Navigate to [Rules] page to view and manage routing rules
-- Support for custom rule sets
-- Automatic rule updates from subscriptions
-- Rule priority management
-
-#### 🛠️ **System Integration**
-
-- **System Tray**: Quick access from Windows system tray
-- **Auto-start**: Configure automatic startup on Windows boot
-- **Auto-connect**: Automatically connect to last used configuration
-- **Notifications**: Desktop notifications for connection status
-
-#### 📊 **Advanced Monitoring**
-
-- **Connections**: View active connections and their details
-- **Traffic Analysis**: Detailed bandwidth usage statistics
-- **Performance Metrics**: Memory usage and system performance
-- **Logs**: Comprehensive logging with filtering options
-
-## 🛠️ Development Guide
-
-### Environment Requirements
-
-- **Node.js**: 18.0 or higher
-- **Rust**: Latest stable version (1.70+)
-- **Visual Studio**: 2019 or higher with C++ development tools
-- **Git**: Latest version
-- **pnpm**: Package manager
-
-### Local Development
+### 🧪 Development Commands
 
 ```bash
-# Clone the repository
-git clone https://github.com/xinggaoya/sing-box-windows.git
-cd sing-box-windows
+# Development
+pnpm tauri dev          # Start development server with hot reload
 
-# Install dependencies
-pnpm install
+# Building
+pnpm tauri build        # Build release version
 
-# Start development server (with hot reload)
-pnpm tauri dev
+# Code Quality
+pnpm lint               # Run ESLint and OXLint with auto-fix
+pnpm format             # Format code with Prettier
+pnpm type-check         # TypeScript type checking
 
-# Build production version
-pnpm tauri build
-
-# Run tests
-pnpm test
-
-# Type checking
-pnpm type-check
-
-# Lint code
-pnpm lint
+# Frontend only
+pnpm dev                # Start Vite dev server
+pnpm build              # Build frontend only
 ```
 
-### Development Documentation
-
-For comprehensive development documentation, please check:
-
-- [Development Guide](./docs/development.md) - Detailed development instructions
-- [Internationalization Guide](./docs/i18n.md) - Adding new languages
-
-### Project Architecture
+### 🏗️ Project Structure
 
 ```
 sing-box-windows/
-├── src/                    # Frontend source code
-│   ├── components/        # Reusable Vue components
-│   │   ├── home/         # Home page components
-│   │   ├── layout/       # Layout components
-│   │   └── ...           # Other component categories
-│   ├── stores/           # Pinia state management
-│   │   ├── app/          # Application-level stores
-│   │   ├── kernel/       # Kernel-related stores
-│   │   ├── subscription/ # Subscription management
-│   │   └── tray/         # System tray integration
-│   ├── services/         # Business logic services
-│   ├── utils/            # Utility functions
-│   ├── locales/          # Internationalization files
-│   └── views/            # Page components
-├── src-tauri/            # Rust backend code
-│   ├── src/              # Rust source code
-│   │   ├── app/          # Application modules
-│   │   │   ├── core/     # Core functionality
-│   │   │   ├── network/  # Network operations
-│   │   │   └── system/   # System integration
-│   │   ├── utils/        # Utility functions
-│   │   └── main.rs       # Application entry point
-│   └── Cargo.toml        # Rust dependencies
-├── docs/                 # Documentation
-└── public/               # Static assets
+├── 📁 src/                    # Frontend (Vue 3)
+│   ├── 📁 components/         # Reusable components
+│   │   ├── 📁 home/          # Dashboard components
+│   │   ├── 📁 layout/        # Layout components
+│   │   └── 📁 common/        # Common UI components
+│   ├── 📁 stores/            # Pinia state management
+│   ├── 📁 services/          # Business logic services
+│   ├── 📁 utils/             # Utility functions
+│   ├── 📁 locales/           # Internationalization
+│   └── 📁 views/             # Page components
+├── 📁 src-tauri/             # Backend (Rust)
+│   ├── 📁 src/
+│   │   ├── 📁 app/           # Application modules
+│   │   │   ├── 📁 core/      # Core functionality
+│   │   │   ├── 📁 network/   # Network operations
+│   │   │   └── 📁 system/    # System integration
+│   │   └── 📄 main.rs        # Application entry point
+│   └── 📄 Cargo.toml         # Rust dependencies
+└── 📁 docs/                  # Documentation
 ```
 
-## 📦 Technology Stack
+---
 
-### Frontend
+## 🔧 Configuration
 
-- 🎯 **[Tauri 2.0](https://tauri.app/)** - Modern cross-platform application framework
-- ⚡ **[Vue 3](https://vuejs.org/)** - Progressive JavaScript framework
-- 🎨 **[Naive UI](https://www.naiveui.com/)** - High-quality Vue 3 component library
-- 📊 **[Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)** - High-performance graphics rendering
-- 🔧 **[TypeScript](https://www.typescriptlang.org/)** - Type-safe JavaScript
-- 🗃️ **[Pinia](https://pinia.vuejs.org/)** - State management for Vue
-- 🛣️ **[Vue Router](https://router.vuejs.org/)** - Official router for Vue.js
+### 📄 Storage System
 
-### Backend
+This application uses **Tauri Store Plugin** for backend data persistence, which provides secure and efficient storage using binary database files.
 
-- 🦀 **[Rust](https://www.rust-lang.org/)** - High-performance systems programming language
-- ⚡ **[tokio](https://tokio.rs/)** - Asynchronous runtime for Rust
-- 🔗 **[serde](https://serde.rs/)** - Serialization framework
-- 🌐 **[reqwest](https://github.com/seanmonstar/reqwest)** - HTTP client library
+### 🗄️ Storage Location
 
-### Tools & Infrastructure
+- **Windows**: `%APPDATA%\sing-box-windows\*.bin` (binary database files)
+- **Portable**: `<app-directory>\*.bin` (binary database files)
 
-- 📦 **[pnpm](https://pnpm.io/)** - Fast, disk space efficient package manager
-- 🔍 **[ESLint](https://eslint.org/)** - JavaScript/TypeScript linting
-- 🎨 **[Prettier](https://prettier.io/)** - Code formatting
-- 🏗️ **[Vite](https://vitejs.dev/)** - Next generation frontend tooling
+### ⚙️ Configuration Structure
+
+The application stores configuration data in structured binary files using Tauri's Store plugin. Key configuration areas include:
+
+#### Application Settings (`app.bin`)
+```typescript
+{
+  language: "en-US" | "zh-CN" | "ja-JP" | "ru-RU",
+  theme: "light" | "dark" | "auto",
+  proxyMode: "system" | "tun" | "manual",
+  autoStartKernel: boolean,
+  preferIpv6: boolean,
+  proxyPort: number,      // Default: 12080
+  apiPort: number         // Default: 12081
+}
+```
+
+#### Theme Settings (`theme.bin`)
+```typescript
+{
+  primaryColor: string,
+  isDark: boolean,
+  followSystem: boolean
+}
+```
+
+#### Subscription Data (`subscription.bin`)
+```typescript
+{
+  subscriptions: Array<{
+    id: string,
+    name: string,
+    url: string,
+    autoUpdate: boolean,
+    lastUpdate: string
+  }>
+}
+```
+
+### 🔧 Data Persistence Features
+
+- **Binary Storage**: Uses efficient binary format for fast read/write operations
+- **Automatic Sync**: Real-time data synchronization between frontend and backend
+- **Memory Optimization**: Intelligent caching and lazy loading for large datasets
+- **Data Integrity**: Built-in validation and error recovery mechanisms
+- **Cross-session Persistence**: All settings and data preserved across application restarts
+
+---
 
 ## 🤝 Contributing
 
-We welcome all forms of contributions! Here's how you can help:
+We welcome contributions from the community! Here's how you can help:
 
-### Types of Contributions
+### 🎯 Ways to Contribute
 
-- 🐛 **Bug Reports**: Report issues and bugs
-- 💡 **Feature Requests**: Suggest new features
-- 📝 **Documentation**: Improve documentation
-- 🔧 **Code Contributions**: Fix bugs or implement features
-- 🌍 **Translations**: Add support for new languages
-- 🎨 **UI/UX Improvements**: Enhance user interface
+1. **🐛 Report Bugs**: Found an issue? [Open an issue](https://github.com/xinggaoya/sing-box-windows/issues)
+2. **💡 Feature Requests**: Have an idea? [Suggest a feature](https://github.com/xinggaoya/sing-box-windows/discussions)
+3. **🔧 Code Contributions**: Fork and submit pull requests
+4. **📖 Documentation**: Help improve documentation
+5. **🌐 Translation**: Contribute to [localization](src/locales/)
 
-### Contribution Process
+### 🚀 Development Workflow
 
-1. **Fork** the repository
-2. **Clone** your fork locally
-3. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-4. **Make** your changes with clear commit messages
-5. **Test** your changes thoroughly
-6. **Push** to your branch (`git push origin feature/amazing-feature`)
-7. **Submit** a Pull Request with detailed description
+1. Fork the repository from [GitHub](https://github.com/xinggaoya/sing-box-windows)
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and test thoroughly
+4. Commit your changes: `git commit -m 'Add amazing feature'`
+5. Push to the branch: `git push origin feature/amazing-feature`
+6. Open a Pull Request
 
-### Development Guidelines
+### 📋 Code Style Guidelines
 
-- Follow existing code style and conventions
-- Write meaningful commit messages
-- Add tests for new features
-- Update documentation when necessary
-- Ensure all tests pass before submitting
+- **Frontend**: Follow [Vue 3 Style Guide](https://vuejs.org/style-guide/)
+- **Backend**: Follow [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/)
+- **Commits**: Use [Conventional Commits](https://www.conventionalcommits.org/)
+- **Linting**: Code should pass both ESLint and OXLint checks
 
-### Translation Contributions
+---
 
-To add a new language:
+## 🙏 Acknowledgments
 
-1. Create a new file in `src/locales/` (e.g., `fr-FR.ts`)
-2. Copy the structure from `en-US.ts`
-3. Translate all text strings
-4. Add the language to the language selector
-5. Test the translations thoroughly
+- [Sing-Box](https://github.com/SagerNet/sing-box) - The powerful proxy core
+- [Tauri](https://tauri.app/) - Amazing Rust-based app framework
+- [Vue.js](https://vuejs.org/) - Progressive JavaScript framework
+- [Naive UI](https://www.naiveui.com/) - Beautiful Vue 3 component library
+- [Vite](https://vitejs.dev/) - Fast build tool and dev server
+
+---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE) - see the LICENSE file for details.
-
-## 📮 Support & Community
-
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/xinggaoya/sing-box-windows/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/xinggaoya/sing-box-windows/discussions)
-- 📘 **Documentation**: [Development Docs](./docs/development.md)
-
-## 🙏 Acknowledgements
-
-Special thanks to these amazing projects and contributors:
-
-### Core Technologies
-
-- **[sing-box](https://github.com/SagerNet/sing-box)** - The powerful proxy platform
-- **[Tauri](https://tauri.app/)** - Secure, fast, and lightweight application framework
-- **[Vue.js](https://vuejs.org/)** - The progressive JavaScript framework
-- **[Naive UI](https://www.naiveui.com/)** - Beautiful and powerful UI component library
-
-### Community
-
-- **[All Contributors](https://github.com/xinggaoya/sing-box-windows/graphs/contributors)** - Thank you for your valuable contributions
-- **Users and Testers** - Your feedback helps improve the application
-- **Translators** - Making the app accessible worldwide
-
-## 📈 Roadmap
-
-### Upcoming Features
-
-- [ ] Plugin system for extensibility
-- [ ] Custom themes and UI customization
-- [ ] Advanced routing rules editor
-- [ ] Cloud configuration sync
-- [ ] Mobile companion app
-- [ ] Network diagnostics tools
-
-### Version History
-
-- **v1.7.9** - Current stable release
-- **v1.7.x** - Performance optimizations and bug fixes
-- **v1.6.x** - Enhanced UI and internationalization
-- **v1.5.x** - Initial public release
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 <div align="center">
-    <p>If this project helps you, please consider giving it a ⭐️!</p>
-    <p>Made with ❤️ by the Sing-Box Windows team</p>
+  <p>
+    <strong>Built with ❤️ by XingGao</strong>
+  </p>
+  <p>
+    <a href="https://github.com/xinggaoya/sing-box-windows">
+      <img src="https://img.shields.io/github/stars/xinggaoya/sing-box-windows?style=social" alt="GitHub stars">
+    </a>
+    <a href="https://github.com/xinggaoya/sing-box-windows/fork">
+      <img src="https://img.shields.io/github/forks/xinggaoya/sing-box-windows?style=social" alt="GitHub forks">
+    </a>
+  </p>
 </div>

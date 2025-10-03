@@ -1,364 +1,342 @@
-# Sing-Box Windows
-
 <div align="center">
-    <img src="./src/assets/icon.png" alt="Sing-Box Windows Logo" width="128" height="128" />
-    <h1>Sing-Box Windows</h1>
-    <p>🚀 一个优雅现代的 Sing-Box Windows GUI 客户端</p>
-    <p>
-        <img src="https://img.shields.io/github/license/xinggaoya/sing-box-windows" alt="license" />
-        <img src="https://img.shields.io/github/stars/xinggaoya/sing-box-windows" alt="stars" />
-        <img src="https://img.shields.io/github/downloads/xinggaoya/sing-box-windows/total" alt="downloads" />
-        <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows" alt="release" />
-        <img src="https://img.shields.io/github/last-commit/xinggaoya/sing-box-windows" alt="last commit" />
-    </p>
-    <p>
-        <a href="README.zh.md">中文</a> | 
-        <a href="README.md">English</a>
-    </p>
+  <img src="src/assets/icon.png" alt="Sing-Box GUI 客户端" width="120" height="120">
+
+  <h1>Sing-Box Windows</h1>
+
+  <p>
+    <strong>基于 Tauri 2.0 + Vue 3 构建的现代化 Sing-Box Windows GUI 客户端</strong>
+  </p>
+
+  <p>
+    <a href="#功能特性">✨ 功能特性</a> •
+    <a href="#安装指南">🚀 安装指南</a> •
+    <a href="#快速开始">🎯 快速开始</a> •
+    <a href="#界面截图">📸 界面截图</a> •
+    <a href="#开发指南">🛠️ 开发指南</a> •
+    <a href="#贡献指南">💡 贡献指南</a>
+  </p>
+
+  <p>
+    <a href="https://github.com/xinggaoya/sing-box-windows/releases">
+      <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows?style=for-the-badge&logo=github" alt="GitHub release">
+    </a>
+    <img src="https://img.shields.io/badge/platform-Windows-blue?style=for-the-badge&logo=windows" alt="平台支持">
+    <img src="https://img.shields.io/badge/version-1.8.2-informational?style=for-the-badge" alt="版本">
+    <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="许可证">
+  </p>
 </div>
 
-## 🎯 核心特性
+---
 
-### 🖥️ **现代化用户界面**
+## 🌟 项目介绍
 
-- 基于 [Tauri 2.0](https://tauri.app/) 和 [Vue 3](https://vuejs.org/) 构建，性能卓越
-- 采用 [Naive UI](https://www.naiveui.com/) 组件库的响应式设计
-- 支持亮色/暗色主题，自动跟随系统设置
-- 直观友好的用户界面设计
+Sing-Box GUI 客户端是一款尖端的 Windows 应用程序，为管理 Sing-Box 代理配置提供了现代化、直观的界面。基于强大的 Tauri 2.0 和 Vue 3 技术栈构建，提供卓越的性能、安全性和用户体验。
 
-### 🌐 **全面的代理支持**
+### 🎯 核心亮点
 
-- **系统代理模式**：自动配置系统级代理
-- **TUN 模式**：网络层级流量路由（需要管理员权限）
-- **手动模式**：为高级用户提供自定义代理配置
-- 智能代理切换，一键切换模式
+- **🚀 极速性能**: Rust 后端 + 优化的 Vue 3 前端
+- **💎 现代界面**: 基于 Naive UI 的美观响应式设计
+- **🔒 安全可靠**: Rust 后端确保内存安全和性能
+- **🌐 实时通信**: WebSocket 实现实时数据更新
+- **🎨 高度可定制**: 明暗主题切换，丰富的个性化选项
 
-### 📊 **高级统计与监控**
+---
 
-- 实时流量监控，配备精美图表
-- 连接统计和活动连接查看器
-- 内存使用监控
-- 历史数据追踪
-- 带宽使用分析
+## ✨ 功能特性
 
-### 🔄 **订阅管理**
+### 🎯 核心功能
+- **代理管理**: 轻松配置和切换不同代理模式
+- **订阅管理**: 自动订阅更新和管理
+- **连接监控**: 实时连接统计和监控
+- **日志管理**: 完整的日志记录，支持过滤和搜索
+- **规则管理**: 可视化路由规则配置和管理
+- **系统集成**: 系统托盘支持，快速访问控制
 
-- 支持多种订阅格式：
-  - 直接订阅链接
-  - Sing-box JSON 配置
-  - 自动 Base64 解码
-- 自动订阅更新
-- 订阅分组和管理
-- 导入/导出配置
+### 🎨 用户体验
+- **现代界面**: 基于 Naive UI 组件的简洁直观设计
+- **多语言支持**: 简体中文、英文、日语、俄语
+- **主题系统**: 明亮、暗黑、自动主题，支持自定义颜色
+- **响应式设计**: 适配各种屏幕尺寸和 DPI 设置
 
-### 🔍 **完整的日志系统**
+### 🔧 高级特性
+- **实时统计**: 通过 WebSocket 实现实时带宽和连接监控
+- **自动启动**: 系统开机自动启动，支持延迟启动
+- **更新管理**: 自动检查和安装更新
+- **内存优化**: 通过 StoreManager 实现高效的资源管理和清理
 
-- 实时日志查看，支持语法高亮
-- 多级日志（信息、警告、错误）
-- 日志过滤和搜索功能
-- 导出日志用于调试
-- 自动日志轮转
+---
 
-### ⚡ **性能优化**
+## 🚀 安装指南
 
-- 内存管理和内存泄漏防护
-- 高效的 WebSocket 连接
-- 懒加载和虚拟滚动
-- 重型操作的后台处理
-- 最小资源占用
+### 📥 系统要求
 
-### 🔒 **安全特性**
+- **操作系统**: Windows 10/11 (x64)
+- **内存**: 最低 4GB RAM (推荐 8GB)
+- **存储空间**: 100MB 可用磁盘空间
+- **网络**: 订阅和更新需要网络连接
 
-- 安全的配置存储
-- TUN 模式自动权限提升
-- 安全的订阅解析
-- 进程隔离
+### 🎯 安装方式
 
-### 🌍 **国际化支持**
+#### 方式一：下载安装包（推荐）
+1. 访问 [发布页面](https://github.com/xinggaoya/sing-box-windows/releases)
+2. 下载最新的 `sing-box-windows-x.x.x-setup.exe`
+3. 运行安装程序并按照向导操作
+4. 从开始菜单或桌面快捷方式启动应用
 
-- 多语言支持
-- 目前支持的语言：
-  - English（英语）
-  - 中文（简体中文）
-  - 日本語（日语）
-  - Русский（俄语）
-- 易于添加新语言
+#### 方式二：便携版
+1. 下载最新的 `sing-box-windows-x.x.x-portable.zip`
+2. 解压到您想要的文件夹
+3. 运行 `sing-box-windows.exe`
 
-## 📸 界面预览
+#### 方式三：包管理器（即将支持）
+```powershell
+# 使用 winget（计划中）
+winget install sing-box-windows
+
+# 使用 Chocolatey（计划中）
+choco install sing-box-windows
+```
+
+---
+
+## 🎯 快速开始
+
+### 1. 初始设置
+安装完成后，应用程序将引导您完成初始设置：
+
+1. **语言选择**: 选择您偏好的语言
+2. **主题配置**: 选择明亮/暗黑/自动主题
+3. **网络设置**: 配置基本网络设置
+
+### 2. 添加订阅
+1. 导航到 **订阅** 选项卡
+2. 点击 **添加订阅**
+3. 输入您的订阅 URL 和名称
+4. 配置更新设置
+5. 点击 **保存并更新**
+
+### 3. 配置代理
+1. 转到 **代理** 选项卡
+2. 从列表中选择您偏好的服务器
+3. 选择代理模式（全局/规则/直连）
+4. 切换 **连接** 按钮以激活
+
+### 4. 监控连接
+1. 访问 **连接** 选项卡
+2. 查看实时连接统计
+3. 监控带宽使用情况
+4. 过滤和搜索连接
+
+---
+
+## 📸 界面截图
 
 <div align="center">
-    <img src="./docs/image.png" alt="Sing-Box Windows 主界面" width="800">
-    <p><em>主界面展示代理状态、统计信息和控制功能</em></p>
+  <img src="docs/image.png" alt="Sing-Box GUI 客户端界面" width="800">
+
+  <p><em>应用主界面，展示代理管理和系统状态</em></p>
 </div>
 
-## 🚀 快速开始
-
-### 系统要求
-
-- **操作系统**：Windows 10 1809 或更高版本
-- **架构**：x64（64位）
-- **内存**：推荐 4GB RAM
-- **磁盘空间**：100MB 可用空间
-- **网络**：需要互联网连接以下载内核和订阅
-
-### 下载安装
-
-1. **下载**：从 [Releases](https://github.com/xinggaoya/sing-box-windows/releases) 页面获取最新版本
-2. **安装**：运行安装程序（`.msi` 或 `.exe` 安装文件）
-   - 安装程序支持自动更新
-   - 可选择安装目录
-3. **首次启动**：应用程序将自动完成必要配置
-
-### 基本使用
-
-#### 🔧 **初始设置**
-
-1. **下载 Sing-Box 内核**：
-
-   - 进入【设置】→【内核管理】
-   - 点击"下载最新内核"
-   - 等待自动安装完成
-
-2. **配置订阅**：
-   - 进入【订阅】页面
-   - 点击"添加订阅"
-   - 输入订阅链接或导入 JSON 配置
-   - 应用支持自动 Base64 解码
-
-#### 🌐 **连接代理**
-
-1. **选择节点**：
-
-   - 进入【主页】
-   - 浏览来自订阅的可用节点
-   - 使用"测试"按钮测试节点延迟
-   - 选择首选节点
-
-2. **选择代理模式**：
-
-   - **系统代理**：自动系统级配置
-   - **TUN 模式**：网络级路由（需要管理员权限）
-   - **手动**：自定义配置
-
-3. **连接**：
-   - 点击"连接"按钮
-   - 实时监控连接状态
-   - 查看流量统计和活动连接
-
-> **💡 提示**：使用 TUN 模式时，应用程序会请求管理员权限并自动配置系统设置
-
-### 高级功能
-
-#### 📋 **规则管理**
-
-- 进入【规则】页面查看和管理路由规则
-- 支持自定义规则集
-- 从订阅自动更新规则
-- 规则优先级管理
-
-#### 🛠️ **系统集成**
-
-- **系统托盘**：从 Windows 系统托盘快速访问
-- **开机自启**：配置 Windows 启动时自动启动
-- **自动连接**：自动连接到上次使用的配置
-- **通知**：连接状态的桌面通知
-
-#### 📊 **高级监控**
-
-- **连接**：查看活动连接及其详细信息
-- **流量分析**：详细的带宽使用统计
-- **性能指标**：内存使用和系统性能
-- **日志**：具有过滤选项的综合日志记录
+---
 
 ## 🛠️ 开发指南
 
-### 环境要求
+### 📋 开发环境要求
 
-- **Node.js**：18.0 或更高版本
-- **Rust**：最新稳定版（1.70+）
-- **Visual Studio**：2019 或更高版本，需包含 C++ 开发工具
-- **Git**：最新版本
-- **pnpm**：包管理器
+- **Node.js**: 18+ (推荐使用 [pnpm](https://pnpm.io/))
+- **Rust**: 1.70+ 带有 nightly 工具链
+- **Tauri CLI**: 最新版本
 
-### 本地开发
+### 🚀 搭建开发环境
+
+1. **克隆仓库**
+   ```bash
+   git clone https://github.com/xinggaoya/sing-box-windows.git
+   cd sing-box-windows
+   ```
+
+2. **安装依赖**
+   ```bash
+   # 安装前端依赖
+   pnpm install
+
+   # 安装 Rust 依赖（自动）
+   ```
+
+3. **启动开发服务器**
+   ```bash
+   # 启动开发模式（热重载）
+   pnpm tauri dev
+   ```
+
+4. **构建生产版本**
+   ```bash
+   # 构建发布版本
+   pnpm tauri build
+   ```
+
+### 🧪 开发命令
 
 ```bash
-# 克隆仓库
-git clone https://github.com/xinggaoya/sing-box-windows.git
-cd sing-box-windows
+# 开发
+pnpm tauri dev          # 启动开发服务器（热重载）
 
-# 安装依赖
-pnpm install
+# 构建
+pnpm tauri build        # 构建发布版本
 
-# 启动开发服务器（支持热重载）
-pnpm tauri dev
+# 代码质量
+pnpm lint               # 运行 ESLint 和 OXLint 自动修复
+pnpm format             # 使用 Prettier 格式化代码
+pnpm type-check         # TypeScript 类型检查
 
-# 构建生产版本
-pnpm tauri build
-
-# 运行测试
-pnpm test
-
-# 类型检查
-pnpm type-check
-
-# 代码检查
-pnpm lint
+# 仅前端
+pnpm dev                # 启动 Vite 开发服务器
+pnpm build              # 仅构建前端
 ```
 
-### 开发文档
-
-获取完整的开发文档，请查看：
-
-- [开发指南](./docs/development.md) - 详细的开发说明
-- [国际化指南](./docs/i18n.md) - 添加新语言
-
-### 项目架构
+### 🏗️ 项目结构
 
 ```
 sing-box-windows/
-├── src/                    # 前端源代码
-│   ├── components/        # 可复用的 Vue 组件
-│   │   ├── home/         # 主页组件
-│   │   ├── layout/       # 布局组件
-│   │   └── ...           # 其他组件分类
-│   ├── stores/           # Pinia 状态管理
-│   │   ├── app/          # 应用级状态
-│   │   ├── kernel/       # 内核相关状态
-│   │   ├── subscription/ # 订阅管理
-│   │   └── tray/         # 系统托盘集成
-│   ├── services/         # 业务逻辑服务
-│   ├── utils/            # 工具函数
-│   ├── locales/          # 国际化文件
-│   └── views/            # 页面组件
-├── src-tauri/            # Rust 后端代码
-│   ├── src/              # Rust 源代码
-│   │   ├── app/          # 应用模块
-│   │   │   ├── core/     # 核心功能
-│   │   │   ├── network/  # 网络操作
-│   │   │   └── system/   # 系统集成
-│   │   ├── utils/        # 工具函数
-│   │   └── main.rs       # 应用入口点
-│   └── Cargo.toml        # Rust 依赖
-├── docs/                 # 文档
-└── public/               # 静态资源
+├── 📁 src/                    # 前端 (Vue 3)
+│   ├── 📁 components/         # 可复用组件
+│   │   ├── 📁 home/          # 仪表板组件
+│   │   ├── 📁 layout/        # 布局组件
+│   │   └── 📁 common/        # 通用 UI 组件
+│   ├── 📁 stores/            # Pinia 状态管理
+│   ├── 📁 services/          # 业务逻辑服务
+│   ├── 📁 utils/             # 工具函数
+│   ├── 📁 locales/           # 国际化
+│   └── 📁 views/             # 页面组件
+├── 📁 src-tauri/             # 后端 (Rust)
+│   ├── 📁 src/
+│   │   ├── 📁 app/           # 应用模块
+│   │   │   ├── 📁 core/      # 核心功能
+│   │   │   ├── 📁 network/   # 网络操作
+│   │   │   └── 📁 system/    # 系统集成
+│   │   └── 📄 main.rs        # 应用入口点
+│   └── 📄 Cargo.toml         # Rust 依赖
+└── 📁 docs/                  # 文档
 ```
 
-## 📦 技术栈
+---
 
-### 前端技术
+## 🔧 配置说明
 
-- 🎯 **[Tauri 2.0](https://tauri.app/)** - 现代化跨平台应用框架
-- ⚡ **[Vue 3](https://vuejs.org/)** - 渐进式 JavaScript 框架
-- 🎨 **[Naive UI](https://www.naiveui.com/)** - 高质量 Vue 3 组件库
-- 📊 **[Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)** - 高性能图形渲染
-- 🔧 **[TypeScript](https://www.typescriptlang.org/)** - 类型安全的 JavaScript
-- 🗃️ **[Pinia](https://pinia.vuejs.org/)** - Vue 状态管理
-- 🛣️ **[Vue Router](https://router.vuejs.org/)** - Vue.js 官方路由
+### 📄 存储系统
 
-### 后端技术
+本应用使用 **Tauri Store 插件** 进行后端数据持久化，提供安全高效的二进制数据库文件存储。
 
-- 🦀 **[Rust](https://www.rust-lang.org/)** - 高性能系统编程语言
-- ⚡ **[tokio](https://tokio.rs/)** - Rust 异步运行时
-- 🔗 **[serde](https://serde.rs/)** - 序列化框架
-- 🌐 **[reqwest](https://github.com/seanmonstar/reqwest)** - HTTP 客户端库
+### 🗄️ 存储位置
 
-### 工具和基础设施
+- **Windows**: `%APPDATA%\sing-box-windows\*.bin` (二进制数据库文件)
+- **便携版**: `<应用目录>\*.bin` (二进制数据库文件)
 
-- 📦 **[pnpm](https://pnpm.io/)** - 快速、磁盘空间高效的包管理器
-- 🔍 **[ESLint](https://eslint.org/)** - JavaScript/TypeScript 代码检查
-- 🎨 **[Prettier](https://prettier.io/)** - 代码格式化
-- 🏗️ **[Vite](https://vitejs.dev/)** - 下一代前端构建工具
+### ⚙️ 配置结构
+
+应用使用 Tauri Store 插件将配置数据存储在结构化的二进制文件中。主要配置区域包括：
+
+#### 应用设置 (`app.bin`)
+```typescript
+{
+  language: "en-US" | "zh-CN" | "ja-JP" | "ru-RU",
+  theme: "light" | "dark" | "auto",
+  proxyMode: "system" | "tun" | "manual",
+  autoStartKernel: boolean,
+  preferIpv6: boolean,
+  proxyPort: number,      // 默认: 12080
+  apiPort: number         // 默认: 12081
+}
+```
+
+#### 主题设置 (`theme.bin`)
+```typescript
+{
+  primaryColor: string,
+  isDark: boolean,
+  followSystem: boolean
+}
+```
+
+#### 订阅数据 (`subscription.bin`)
+```typescript
+{
+  subscriptions: Array<{
+    id: string,
+    name: string,
+    url: string,
+    autoUpdate: boolean,
+    lastUpdate: string
+  }>
+}
+```
+
+### 🔧 数据持久化特性
+
+- **二进制存储**: 使用高效的二进制格式进行快速读写操作
+- **自动同步**: 前端和后端之间的实时数据同步
+- **内存优化**: 针对大数据集的智能缓存和懒加载
+- **数据完整性**: 内置验证和错误恢复机制
+- **跨会话持久化**: 所有设置和数据在应用重启后保持不变
+
+---
 
 ## 🤝 贡献指南
 
-我们欢迎各种形式的贡献！以下是您可以提供帮助的方式：
+我们欢迎社区贡献！以下是如何参与的方式：
 
-### 贡献类型
+### 🎯 贡献方式
 
-- 🐛 **错误报告**：报告问题和错误
-- 💡 **功能请求**：建议新功能
-- 📝 **文档**：改进文档
-- 🔧 **代码贡献**：修复错误或实现功能
-- 🌍 **翻译**：添加对新语言的支持
-- 🎨 **UI/UX 改进**：增强用户界面
+1. **🐛 报告问题**: 发现了问题？[提交 issue](https://github.com/xinggaoya/sing-box-windows/issues)
+2. **💡 功能建议**: 有好的想法？[在讨论区提出](https://github.com/xinggaoya/sing-box-windows/discussions)
+3. **🔧 代码贡献**: Fork 并提交 Pull Request
+4. **📖 文档改进**: 帮助完善文档
+5. **🌐 本地化**: 参与 [翻译工作](src/locales/)
 
-### 贡献流程
+### 🚀 开发流程
 
-1. **Fork** 仓库
-2. **Clone** 您的 fork 到本地
-3. **创建** 功能分支（`git checkout -b feature/amazing-feature`）
-4. **进行** 更改并编写清晰的提交消息
-5. **测试** 您的更改
-6. **推送** 到您的分支（`git push origin feature/amazing-feature`）
-7. **提交** 带有详细描述的 Pull Request
+1. 从 [GitHub](https://github.com/xinggaoya/sing-box-windows) Fork 仓库
+2. 创建功能分支: `git checkout -b feature/amazing-feature`
+3. 进行修改并充分测试
+4. 提交更改: `git commit -m 'Add amazing feature'`
+5. 推送到分支: `git push origin feature/amazing-feature`
+6. 创建 Pull Request
 
-### 开发指南
+### 📋 代码规范
 
-- 遵循现有的代码风格和约定
-- 编写有意义的提交消息
-- 为新功能添加测试
-- 必要时更新文档
-- 确保所有测试在提交前通过
+- **前端**: 遵循 [Vue 3 风格指南](https://vuejs.org/style-guide/)
+- **后端**: 遵循 [Rust API 指南](https://rust-lang.github.io/api-guidelines/)
+- **提交**: 使用 [约定式提交](https://www.conventionalcommits.org/zh-hans/)
+- **代码检查**: 代码需通过 ESLint 和 OXLint 检查
 
-### 翻译贡献
-
-添加新语言：
-
-1. 在 `src/locales/` 中创建新文件（例如 `fr-FR.ts`）
-2. 从 `en-US.ts` 复制结构
-3. 翻译所有文本字符串
-4. 将语言添加到语言选择器
-5. 彻底测试翻译
-
-## 📄 许可证
-
-本项目采用 [MIT 许可证](LICENSE) - 详情请查看 LICENSE 文件。
-
-## 📮 支持与社区
-
-- 🐛 **错误报告**：[GitHub Issues](https://github.com/xinggaoya/sing-box-windows/issues)
-- 💬 **讨论**：[GitHub Discussions](https://github.com/xinggaoya/sing-box-windows/discussions)
-- 📘 **文档**：[开发文档](./docs/development.md)
+---
 
 ## 🙏 致谢
 
-特别感谢这些优秀的项目和贡献者：
+- [Sing-Box](https://github.com/SagerNet/sing-box) - 强大的代理核心
+- [Tauri](https://tauri.app/) - 优秀的 Rust 应用框架
+- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
+- [Naive UI](https://www.naiveui.com/) - 美观的 Vue 3 组件库
+- [Vite](https://vitejs.dev/) - 快速的构建工具和开发服务器
 
-### 核心技术
+---
 
-- **[sing-box](https://github.com/SagerNet/sing-box)** - 强大的代理平台
-- **[Tauri](https://tauri.app/)** - 安全、快速、轻量级的应用程序框架
-- **[Vue.js](https://vuejs.org/)** - 渐进式 JavaScript 框架
-- **[Naive UI](https://www.naiveui.com/)** - 美观强大的 UI 组件库
+## 📄 许可证
 
-### 社区
-
-- **[所有贡献者](https://github.com/xinggaoya/sing-box-windows/graphs/contributors)** - 感谢您的宝贵贡献
-- **用户和测试者** - 您的反馈帮助改进应用程序
-- **翻译者** - 让应用程序走向世界
-
-## 📈 路线图
-
-### 即将推出的功能
-
-- [ ] 插件系统以提供扩展性
-- [ ] 自定义主题和 UI 定制
-- [ ] 高级路由规则编辑器
-- [ ] 云配置同步
-- [ ] 移动端配套应用
-- [ ] 网络诊断工具
-
-### 版本历史
-
-- **v1.7.9** - 当前稳定版本
-- **v1.7.x** - 性能优化和错误修复
-- **v1.6.x** - 增强的 UI 和国际化
-- **v1.5.x** - 初始公开发布
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
 ---
 
 <div align="center">
-    <p>如果这个项目对您有帮助，请考虑给它一个 ⭐️！</p>
-    <p>由 Sing-Box Windows 团队用 ❤️ 制作</p>
+  <p>
+    <strong>由 XingGao 用 ❤️ 构建</strong>
+  </p>
+  <p>
+    <a href="https://github.com/xinggaoya/sing-box-windows">
+      <img src="https://img.shields.io/github/stars/xinggaoya/sing-box-windows?style=social" alt="GitHub stars">
+    </a>
+    <a href="https://github.com/xinggaoya/sing-box-windows/fork">
+      <img src="https://img.shields.io/github/forks/xinggaoya/sing-box-windows?style=social" alt="GitHub forks">
+    </a>
+  </p>
 </div>
