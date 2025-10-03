@@ -4,6 +4,7 @@
  */
 
 import mitt from '@/utils/mitt'
+import { storeManager } from '@/stores/StoreManager'
 
 // 扩展Performance接口以包含内存信息
 interface PerformanceWithMemory extends Performance {
@@ -437,7 +438,100 @@ export class TemporaryStoreManager {
   }
 }
 
+// 全局内存管理器 - 新增
+export class GlobalMemoryManager {
+  private static instance: GlobalMemoryManager
+  private isInitialized = false
+
+  static getInstance(): GlobalMemoryManager {
+    if (!GlobalMemoryManager.instance) {
+      GlobalMemoryManager.instance = new GlobalMemoryManager()
+    }
+    return GlobalMemoryManager.instance
+  }
+
+  /**
+   * 初始化全局内存管理
+   */
+  initialize() {
+    if (this.isInitialized) return
+    this.isInitialized = true
+
+    console.log('🌍 初始化全局内存管理器')
+
+    // 监听全局清理请求
+    mitt.on('global-cleanup-requested', this.handleGlobalCleanup.bind(this))
+
+    // 监听Vue组件清理请求
+    mitt.on('vue-component-cleanup', this.handleVueComponentCleanup.bind(this))
+
+    // 监听页面可见性变化
+    document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this))
+  }
+
+  /**
+   * 处理全局清理请求
+   */
+  private handleGlobalCleanup() {
+    console.log('🧹 执行全局内存清理')
+
+    // 清理WebSocket连接
+    webSocketCleaner.cleanupAll()
+
+    // 清理临时Store
+    temporaryStoreManager.cleanupAllStores()
+
+    // 触发内存泄露检测
+    memoryLeakDetector.forceCheck()
+  }
+
+  /**
+   * 处理Vue组件清理请求
+   */
+  private handleVueComponentCleanup() {
+    console.log('🔧 执行Vue组件内存清理')
+
+    // 清理Store管理器中的非核心Store
+    storeManager.cleanup()
+
+    // 触发垃圾回收（如果可用）
+    if ('gc' in window) {
+      ;(window as any).gc()
+    }
+  }
+
+  /**
+   * 处理页面可见性变化
+   */
+  private handleVisibilityChange() {
+    if (document.hidden) {
+      console.log('📱 页面隐藏，触发内存优化')
+      // 页面隐藏时优化内存
+      setTimeout(() => {
+        mitt.emit('memory-cleanup-requested')
+      }, 1000)
+    } else {
+      console.log('📱 页面显示，恢复正常状态')
+    }
+  }
+
+  /**
+   * 销毁内存管理器
+   */
+  destroy() {
+    if (!this.isInitialized) return
+
+    mitt.off('global-cleanup-requested')
+    mitt.off('vue-component-cleanup')
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange)
+
+    this.isInitialized = false
+    console.log('🌍 全局内存管理器已销毁')
+  }
+}
+
 // 导出单例实例
 export const memoryLeakDetector = MemoryLeakDetector.getInstance()
 export const webSocketCleaner = WebSocketCleaner.getInstance()
 export const temporaryStoreManager = TemporaryStoreManager.getInstance()
+export const globalMemoryManager = GlobalMemoryManager.getInstance()
