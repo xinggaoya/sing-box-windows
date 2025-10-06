@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import mitt from '@/utils/mitt'
+import { eventService } from '@/services/event-service'
 import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 // 定义连接状态接口
@@ -83,14 +83,8 @@ export const useConnectionStore = defineStore(
     // 内存清理定时器
     let memoryCleanupTimer: number | null = null
 
-    // 存储事件监听器清理函数
-    let unlistenConnectionsStateFn: (() => void) | null = null
-    let unlistenConnectionsDataFn: (() => void) | null = null
-    let unlistenMemoryStateFn: (() => void) | null = null
-    let unlistenMemoryDataFn: (() => void) | null = null
-
-    // Mitt事件监听器状态
-    let mittListenersRegistered = false
+    // 事件监听器状态
+    let eventListenersSetup = false
 
     // 健康检查函数 - 连接数据
     const startConnectionsHealthCheck = () => {
@@ -109,7 +103,7 @@ export const useConnectionStore = defineStore(
           connectionsState.value.connected &&
           (!lastConnection || Date.now() - new Date(lastConnection.start).getTime() > 15000)
         ) {
-          reconnectConnectionsWebSocket()
+          console.log('🔄 连接数据长时间未更新，可能需要重新连接')
         }
       }, 5000)
     }
@@ -125,79 +119,55 @@ export const useConnectionStore = defineStore(
       memoryHealthCheck = window.setInterval(() => {
         // 如果超过10秒没有更新数据且状态为已连接，尝试重新连接
         if (memoryState.value.connected && Date.now() - memory.value.lastUpdated > 10000) {
-          reconnectMemoryWebSocket()
+          console.log('🔄 内存数据长时间未更新，可能需要重新连接')
         }
       }, 5000)
     }
 
-    // 重新连接连接WebSocket (现在通过后端处理)
-    const reconnectConnectionsWebSocket = async () => {
+    // 设置Tauri事件监听器
+    const setupEventListeners = async () => {
+      if (eventListenersSetup) return
+
       try {
-        // 通过WebSocket服务重新连接
-        mitt.emit('websocket-reconnect', 'connections')
-      } catch (error) {
-        console.error('重新连接连接WebSocket失败:', error)
-      }
-    }
+        // 监听连接数据事件
+        await eventService.onConnectionsData((data) => {
+          // 类型检查
+          if (data && typeof data === 'object' && 'connections' in data) {
+            updateConnections(data as unknown as ConnectionsData)
+            connectionsState.value.connected = true
+            connectionsState.value.error = null
+          }
+        })
 
-    // 重新连接内存WebSocket (现在通过后端处理)
-    const reconnectMemoryWebSocket = async () => {
-      try {
-        // 通过WebSocket服务重新连接
-        mitt.emit('websocket-reconnect', 'memory')
-      } catch (error) {
-        console.error('重新连接内存WebSocket失败:', error)
-      }
-    }
+        // 监听内存数据事件
+        await eventService.onMemoryData((data) => {
+          // 类型检查
+          if (data && typeof data === 'object' && 'inuse' in data && 'oslimit' in data) {
+            updateMemory(data as unknown as { inuse: number; oslimit: number })
+            memoryState.value.connected = true
+            memoryState.value.error = null
+          }
+        })
 
-    // 设置Mitt事件监听器
-    const setupMittListeners = () => {
-      if (mittListenersRegistered) return
-
-      // 监听连接数据事件
-      mitt.on('connections-data', (data) => {
-        // 类型检查
-        if (data && typeof data === 'object' && 'connections' in data) {
-          updateConnections(data as unknown as ConnectionsData)
-          connectionsState.value.connected = true
-          connectionsState.value.error = null
-        }
-      })
-
-      // 监听内存数据事件
-      mitt.on('memory-data', (data) => {
-        // 类型检查
-        if (data && typeof data === 'object' && 'inuse' in data && 'oslimit' in data) {
-          updateMemory(data as unknown as { inuse: number; oslimit: number })
-          memoryState.value.connected = true
-          memoryState.value.error = null
-        }
-      })
-
-      // 监听WebSocket连接状态
-      mitt.on('ws-connected', () => {
+        // 当收到任何数据时，说明连接正常
         connectionsState.value.connected = true
         memoryState.value.connected = true
-      })
 
-      mitt.on('ws-disconnected', () => {
-        connectionsState.value.connected = false
-        memoryState.value.connected = false
-      })
-
-      mittListenersRegistered = true
+        eventListenersSetup = true
+        console.log('✅ 连接Store事件监听器设置完成')
+      } catch (error) {
+        console.error('❌ 连接Store事件监听器设置失败:', error)
+      }
     }
 
-    // 清理Mitt监听器
-    const cleanupMittListeners = () => {
-      if (!mittListenersRegistered) return
+    // 清理事件监听器
+    const cleanupEventListeners = () => {
+      if (!eventListenersSetup) return
 
-      mitt.off('connections-data')
-      mitt.off('memory-data')
-      mitt.off('ws-connected')
-      mitt.off('ws-disconnected')
+      eventService.removeEventListener('connections-data')
+      eventService.removeEventListener('memory-data')
 
-      mittListenersRegistered = false
+      eventListenersSetup = false
     }
 
     // 重置连接数据
@@ -226,29 +196,7 @@ export const useConnectionStore = defineStore(
 
     // 清理所有监听器
     const cleanupListeners = () => {
-      // 清理Mitt监听器
-      cleanupMittListeners()
-
-      // 清理Tauri监听器
-      if (unlistenConnectionsStateFn) {
-        unlistenConnectionsStateFn()
-        unlistenConnectionsStateFn = null
-      }
-
-      if (unlistenConnectionsDataFn) {
-        unlistenConnectionsDataFn()
-        unlistenConnectionsDataFn = null
-      }
-
-      if (unlistenMemoryStateFn) {
-        unlistenMemoryStateFn()
-        unlistenMemoryStateFn = null
-      }
-
-      if (unlistenMemoryDataFn) {
-        unlistenMemoryDataFn()
-        unlistenMemoryDataFn = null
-      }
+      cleanupEventListeners()
 
       // 清除健康检查定时器
       if (connectionsHealthCheck !== null) {
@@ -295,8 +243,7 @@ export const useConnectionStore = defineStore(
           // 1分钟无更新
           // 可能需要重新连接内存监控
           if (memoryState.value.connected) {
-            console.log('🔄 内存数据长时间未更新，尝试重新连接')
-            reconnectMemoryWebSocket()
+            console.log('🔄 内存数据长时间未更新，可能需要重新连接')
           }
         }
       }, 30 * 1000) // 30秒检查一次
@@ -344,8 +291,8 @@ export const useConnectionStore = defineStore(
     }
 
     // Store初始化方法
-    const initializeStore = () => {
-      setupMittListeners()
+    const initializeStore = async () => {
+      await setupEventListeners()
       startMemoryMonitoring()
       startConnectionsHealthCheck()
       startMemoryHealthCheck()
@@ -379,12 +326,10 @@ export const useConnectionStore = defineStore(
       memory,
 
       // 方法
-      setupMittListeners,
-      cleanupMittListeners,
+      setupEventListeners,
+      cleanupEventListeners,
       cleanupListeners,
       resetData,
-      reconnectConnectionsWebSocket,
-      reconnectMemoryWebSocket,
       updateConnections,
       updateMemory,
       smartConnectionCleanup,

@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
-import mitt from '@/utils/mitt'
 import { useMessage } from 'naive-ui'
 import { config } from '@/services/tauri-api'
 
@@ -132,40 +131,12 @@ export const useAppStore = defineStore(
       // 初始化数据恢复Promise
       initializeDataRestore()
 
-      // 添加对WebSocket连接状态的监听
-      mitt.on('ws-connected', () => {
-        console.log('WebSocket连接成功事件接收到')
-        wsConnected.value = true
-        // 如果状态不一致，更新运行状态
-        if (!isRunning.value) {
-          isRunning.value = true
-          mitt.emit('process-status')
-        }
-      })
-
-      mitt.on('ws-disconnected', () => {
-        console.log('WebSocket连接断开事件接收到')
-        wsConnected.value = false
-        // 如果连接断开且状态是运行中，需要更新状态
-        if (isRunning.value) {
-          // 延迟一点时间再判断，避免短暂断开后自动重连的情况
-          if (connectionCheckTimeout) {
-            clearTimeout(connectionCheckTimeout)
-          }
-          connectionCheckTimeout = window.setTimeout(() => {
-            // 再次检查，如果还是断开状态，则认为内核已停止
-            if (!wsConnected.value) {
-              mitt.emit('process-status')
-            }
-          }, 5000) // 5秒后再检查
-        }
-      })
+      // WebSocket连接状态管理现在由后端直接处理，无需前端监听
+      console.log('✅ AppStore初始化完成 - 使用Tauri事件系统')
     }
 
     // Store清理方法
     const cleanupStore = () => {
-      mitt.off('ws-connected')
-      mitt.off('ws-disconnected')
       if (connectionCheckTimeout) {
         clearTimeout(connectionCheckTimeout)
         connectionCheckTimeout = null
@@ -177,44 +148,31 @@ export const useAppStore = defineStore(
       if (isRunning.value !== state) {
         isRunning.value = state
 
-        // 如果设置为运行中，启动WebSocket连接检查
         if (state) {
-          startWebSocketCheck()
+          // 现在使用Tauri事件系统，无需手动检查WebSocket连接
+          console.log('内核运行状态已设置，事件系统会自动处理连接')
 
-          // 添加延迟检查机制，确保 WebSocket 连接建立
+          // 移除WebSocket连接检查，因为Tauri事件系统会自动处理
           setTimeout(async () => {
-            if (isRunning.value && !wsConnected.value) {
-              console.log('⚠️ 内核运行中但 WebSocket 未连接，尝试手动建立连接...')
-              try {
-                const { webSocketService } = await import('@/services/websocket-service')
-                const success = await webSocketService.ensureWebSocketConnection()
-                if (success) {
-                  console.log('✅ 手动 WebSocket 连接建立成功')
-                } else {
-                  console.warn('❌ 手动 WebSocket 连接建立失败')
-                }
-              } catch (error) {
-                console.error('手动建立 WebSocket 连接时出错:', error)
-              }
-            }
-          }, 3000) // 3秒后检查
+            console.log('📡 Tauri事件系统已激活，等待后端推送数据')
+          }, 2000)
         } else {
-          // 如果设置为停止，清除WebSocket连接
+          // 如果设置为停止，清除连接状态
           wsConnected.value = false
           // 同时确保连接中状态也被清除
           isConnecting.value = false
         }
 
-        // 发送进程状态变更事件
-        mitt.emit('process-status')
+        // 进程状态变更现在通过Pinia响应式系统处理
+        console.log('进程状态已变更:', state)
       }
     }
 
     // 设置连接中状态
     const setConnectingState = (state: boolean) => {
       isConnecting.value = state
-      // 发送状态变更事件
-      mitt.emit('connecting-status-changed', state)
+      // 连接状态变更现在通过Pinia响应式系统处理
+      console.log('连接状态已变更:', state)
     }
 
     // 启动WebSocket连接检查 - 简化版本，主要依赖事件系统
@@ -260,8 +218,8 @@ export const useAppStore = defineStore(
       // 更新状态
       proxyMode.value = targetMode
 
-      // 发出代理模式变更事件，通知其他组件
-      mitt.emit('proxy-mode-changed')
+      // 代理模式变更事件现在通过Pinia响应式系统处理
+      console.log('代理模式已切换到:', targetMode)
     }
 
     // 设置代理模式

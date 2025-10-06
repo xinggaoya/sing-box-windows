@@ -2,8 +2,6 @@
  * Store 管理器 - 实现按需加载和内存优化
  */
 
-import { createPinia } from 'pinia'
-
 // Store类型定义
 export type StoreType =
   | 'app'

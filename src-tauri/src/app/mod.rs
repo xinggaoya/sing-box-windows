@@ -5,6 +5,9 @@ pub mod constants;
 pub mod core {
     pub mod kernel_service;
     pub mod proxy_service;
+    pub mod task_manager;
+    pub mod websocket_relay;
+    pub mod event_relay;
 }
 
 // Network services

@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { listen } from '@tauri-apps/api/event'
-import mitt from '@/utils/mitt'
+import { eventService } from '@/services/event-service'
 import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 // 定义消息类型
@@ -28,11 +27,8 @@ export const useLogStore = defineStore(
     // 消息回调函数
     let messageCallback: ((type: MessageType, content: string) => void) | null = null
 
-    // 存储事件监听器清理函数
-    let unlistenLogsFn: (() => void) | null = null
-
-    // 是否已经设置了mitt监听器
-    let mittListenerSet = false
+    // 事件监听器状态
+    let eventListenersSetup = false
 
     // 日志清理定时器
     let logCleanupInterval: number | null = null
@@ -46,30 +42,21 @@ export const useLogStore = defineStore(
         // 先清理可能存在的旧监听器
         cleanupListeners()
 
-        // 监听Tauri日志事件
-        unlistenLogsFn = await listen('log-data', (event) => {
-          processLogData(event.payload)
+        // 监听日志数据事件
+        await eventService.onLogData((data) => {
+          processLogData(data)
         })
-
-        // 监听mitt事件总线的日志事件（从WebSocket服务中转发）
-        if (!mittListenerSet) {
-          mitt.on('log-data', handleMittLogData)
-          mittListenerSet = true
-        }
 
         // 启动定期清理机制
         startPeriodicCleanup()
 
+        eventListenersSetup = true
+        console.log('✅ 日志Store事件监听器设置完成')
         return true
       } catch (error) {
-        console.error('设置日志监听器失败:', error)
+        console.error('❌ 设置日志监听器失败:', error)
         return false
       }
-    }
-
-    // 处理mitt事件总线上的日志数据
-    const handleMittLogData = (data: unknown) => {
-      processLogData(data)
     }
 
     // 处理日志数据
@@ -190,16 +177,9 @@ export const useLogStore = defineStore(
     const cleanupListeners = () => {
       console.log('🧹 开始清理日志Store监听器')
 
-      if (unlistenLogsFn) {
-        console.log('清理Tauri日志监听器')
-        unlistenLogsFn()
-        unlistenLogsFn = null
-      }
-
-      if (mittListenerSet) {
-        console.log('清理mitt日志监听器')
-        mitt.off('log-data', handleMittLogData)
-        mittListenerSet = false
+      if (eventListenersSetup) {
+        eventService.removeEventListener('log-data')
+        eventListenersSetup = false
       }
 
       // 清理定期清理定时器
@@ -209,17 +189,6 @@ export const useLogStore = defineStore(
       }
     }
 
-    // 监听内存清理请求
-    mitt.on('memory-cleanup-requested', () => {
-      console.log('🧹 响应内存清理请求 - Log Store')
-
-      // 如果日志过多，清理旧日志
-      if (logs.value.length > MAX_LOGS / 2) {
-        logs.value = logs.value.slice(0, MAX_LOGS / 2)
-        console.log('🧹 清理了旧日志数据')
-      }
-    })
-
     // 注册清理函数
     temporaryStoreManager.registerCleanup(() => {
       cleanupListeners()
@@ -227,7 +196,8 @@ export const useLogStore = defineStore(
     })
 
     // Store初始化方法
-    const initializeStore = () => {
+    const initializeStore = async () => {
+      await setupLogListener()
       startMemoryMonitoring()
 
       // 注册到临时Store管理器

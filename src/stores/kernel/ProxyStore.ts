@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { useAppStore } from '@/stores'
-import mitt from '@/utils/mitt'
 
 // 代理模式声明
 import { ProxyMode } from '@/stores'
@@ -54,8 +53,8 @@ export const useProxyStore = defineStore('proxy', () => {
       // 切换成功后更新状态
       appStore.switchProxyMode(targetMode)
 
-      // 发出代理模式变更事件，通知其他组件
-      mitt.emit('proxy-mode-changed')
+      // 代理模式变更事件现在可以通过Pinia的响应式系统处理
+      console.log('代理模式已切换到:', targetMode)
 
       return false // 不需要关闭窗口
     } catch (error) {
@@ -155,7 +154,7 @@ export const useProxyStore = defineStore('proxy', () => {
   }
 
   // 测试所有节点延迟
-  const testAllNodesDelay = async (port: number) => {
+  const testAllNodesDelay = async (_port: number) => {
     const results: Record<string, number> = {}
 
     for (const node of nodeList.value) {

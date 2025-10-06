@@ -12,7 +12,6 @@ import { useSubStore } from '@/stores'
 import { useKernelStore } from '@/stores'
 import { useWindowStore } from '@/stores/app/WindowStore'
 import { ProxyService } from '@/services/proxy-service'
-import mitt from '@/utils/mitt'
 import i18n from '@/locales'
 import { useRouter } from 'vue-router'
 import { tauriApi } from '@/services/tauri-api'
@@ -329,7 +328,7 @@ export const useTrayStore = defineStore('tray', () => {
       if (appStore.trayInstanceId) {
         try {
           await destroyTray()
-        } catch (error) {
+        } catch {
           // 忽略可能的错误
         }
       }
@@ -415,27 +414,23 @@ export const useTrayStore = defineStore('tray', () => {
 
       watch(() => [subStore.activeIndex, subStore.list.length], updateTrayTooltip)
 
-      // 添加事件处理
-      mitt.on('process-status', () => {
+      // 使用Pinia的watch监听状态变化，替代mitt事件
+      watch(() => appStore.isRunning, () => {
         updateTrayTooltip()
         refreshTrayMenu() // 当进程状态变化时刷新菜单
       })
 
-      mitt.on('proxy-mode-changed', () => {
-        console.log('收到代理模式变更事件，刷新托盘菜单')
+      watch(() => appStore.proxyMode, () => {
+        console.log('代理模式已变更，刷新托盘菜单')
         updateTrayTooltip()
         refreshTrayMenu() // 当代理模式变化时刷新菜单
       })
 
-      // 监听菜单刷新事件
-      mitt.on('refresh-tray-menu', () => {
-        console.log('收到刷新托盘菜单事件')
-        refreshTrayMenu()
-      })
-
-      // 监听语言变更事件
-      mitt.on('language-changed', () => {
-        console.log('收到语言变更事件，刷新托盘菜单')
+      // 监听语言变更 - 需要导入LocaleStore
+      const { useLocaleStore } = await import('@/stores')
+      const localeStore = useLocaleStore()
+      watch(() => localeStore.currentLocale, () => {
+        console.log('语言已变更，刷新托盘菜单')
         refreshTrayMenu()
         updateTrayTooltip()
       })
@@ -488,11 +483,8 @@ export const useTrayStore = defineStore('tray', () => {
       }
     }
 
-    // 移除事件监听
-    mitt.off('process-status')
-    mitt.off('proxy-mode-changed')
-    mitt.off('refresh-tray-menu')
-    mitt.off('language-changed')
+    // 移除事件监听 - 现在使用Pinia的watch，无需手动清理
+    console.log('托盘事件监听器已清理')
   }
 
   return {

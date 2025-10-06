@@ -1,4 +1,3 @@
-import { Window } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useProxyStore } from '@/stores/kernel/ProxyStore'

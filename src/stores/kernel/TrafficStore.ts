@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import mitt from '@/utils/mitt'
+import { eventService } from '@/services/event-service'
 import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 // 声明traffic-data事件的类型
@@ -35,7 +35,7 @@ export const useTrafficStore = defineStore(
     })
 
     // 事件监听器状态
-    let mittListenerRegistered = false
+    let eventListenersSetup = false
 
     // 内存清理定时器
     let memoryCleanupTimer: number | null = null
@@ -73,50 +73,36 @@ export const useTrafficStore = defineStore(
       }
     }
 
-    // 设置Mitt事件监听器
-    const setupMittListeners = () => {
-      if (mittListenerRegistered) return
+    // 设置Tauri事件监听器
+    const setupEventListeners = async () => {
+      if (eventListenersSetup) return
 
-      // 监听流量数据事件
-      mitt.on('traffic-data', (data) => {
-        if (data && typeof data === 'object' && 'up' in data && 'down' in data) {
-          updateTrafficStats(data as unknown as TrafficData)
-        }
-      })
+      try {
+        // 监听流量数据事件
+        await eventService.onTrafficData((data) => {
+          if (data && typeof data === 'object' && 'up' in data && 'down' in data) {
+            updateTrafficStats(data as unknown as TrafficData)
+          }
+        })
 
-      // 监听WebSocket连接状态
-      mitt.on('ws-connected', () => {
+        // 当收到流量数据时，说明连接正常
         connectionState.value.connected = true
         connectionState.value.connecting = false
         connectionState.value.error = null
-      })
 
-      mitt.on('ws-disconnected', () => {
-        connectionState.value.connected = false
-        connectionState.value.connecting = false
-      })
-
-      mittListenerRegistered = true
-    }
-
-    // 清理Mitt监听器
-    const cleanupMittListeners = () => {
-      if (!mittListenerRegistered) return
-
-      mitt.off('traffic-data')
-      mitt.off('ws-connected')
-      mitt.off('ws-disconnected')
-
-      mittListenerRegistered = false
-    }
-
-    // 重新连接WebSocket
-    const reconnectWebSocket = async () => {
-      try {
-        mitt.emit('websocket-reconnect', 'traffic')
+        eventListenersSetup = true
+        console.log('✅ 流量Store事件监听器设置完成')
       } catch (error) {
-        console.error('重新连接流量WebSocket失败:', error)
+        console.error('❌ 流量Store事件监听器设置失败:', error)
       }
+    }
+
+    // 清理事件监听器
+    const cleanupEventListeners = () => {
+      if (!eventListenersSetup) return
+
+      eventService.removeEventListener('traffic-data')
+      eventListenersSetup = false
     }
 
     // 重置流量统计
@@ -136,12 +122,12 @@ export const useTrafficStore = defineStore(
 
     // 清理所有监听器
     const cleanupListeners = () => {
-      cleanupMittListeners()
+      cleanupEventListeners()
     }
 
     // Store初始化方法
-    const initializeStore = () => {
-      setupMittListeners()
+    const initializeStore = async () => {
+      await setupEventListeners()
       startMemoryOptimization()
 
       // 注册到临时Store管理器
@@ -201,13 +187,11 @@ export const useTrafficStore = defineStore(
     return {
       traffic,
       connectionState,
-      setupMittListeners,
-      setupTrafficListener: setupMittListeners, // 为兼容性添加别名
-      cleanupMittListeners,
+      setupEventListeners,
+      cleanupEventListeners,
       cleanupListeners,
       resetStats,
       updateTrafficStats,
-      reconnectWebSocket,
       startMemoryOptimization,
       stopMemoryOptimization,
       initializeStore,

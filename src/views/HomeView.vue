@@ -757,16 +757,16 @@ const setupListeners = async () => {
 
       // 使用Promise.all同时设置监听器
       await Promise.all([
-        trafficStore.setupMittListeners(),
-        connectionStore.setupMittListeners(),
+        trafficStore.setupEventListeners(),
+        connectionStore.setupEventListeners(),
       ]).catch((e) => {
         console.error('设置监听器失败，尝试重试', e)
         // 尝试重试一次
         return new Promise((resolve) => {
           setTimeout(async () => {
             try {
-              await trafficStore.setupMittListeners()
-              await connectionStore.setupMittListeners()
+              await trafficStore.setupEventListeners()
+              await connectionStore.setupEventListeners()
               resolve(true)
             } catch (retryError) {
               console.error('重试设置监听器失败', retryError)

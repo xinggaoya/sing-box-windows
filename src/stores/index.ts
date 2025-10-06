@@ -128,10 +128,6 @@ function piniaTauriPersist(context: PiniaPluginContext) {
   // 获取配置选项
   const isHighFrequency =
     typeof persistOptions === 'object' && persistOptions.highFrequency === true
-  const debounceDelay =
-    typeof persistOptions === 'object' && persistOptions.debounceDelay
-      ? persistOptions.debounceDelay
-      : 1000
 
   // 初始化时从 Tauri Store 恢复状态
   getStore(storeKey).then(async (tauriStore) => {

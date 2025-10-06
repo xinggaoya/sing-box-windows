@@ -26,18 +26,9 @@ app.use(i18n)
 // 初始化Store管理器
 storeManager.initialize()
 
-// 初始化简化版WebSocket服务
-import { webSocketService } from '@/services/websocket-service'
-// WebSocket服务会自动初始化事件监听器
-console.log('🔧 WebSocket 服务已导入并初始化')
-
-// 添加一些调试信息
-setTimeout(() => {
-  console.log('📡 WebSocket 服务初始化状态检查:', {
-    isConnected: webSocketService.isWebSocketConnected(),
-    serviceInstance: !!webSocketService,
-  })
-}, 1000)
+// 初始化事件服务（替代WebSocket服务）
+import { eventService } from '@/services/event-service'
+console.log('🔧 Tauri 事件服务已导入')
 
 // 设置应用关闭时的清理逻辑
 window.addEventListener('beforeunload', async () => {
@@ -52,12 +43,12 @@ window.addEventListener('beforeunload', async () => {
     console.error('强制保存数据失败:', error)
   }
 
-  // 销毁WebSocketService实例
+  // 清理事件服务
   try {
-    const { WebSocketService } = await import('@/services/websocket-service')
-    WebSocketService.destroyInstance()
+    eventService.destroy()
+    console.log('事件服务已清理')
   } catch (error) {
-    console.error('WebSocketService清理失败:', error)
+    console.error('事件服务清理失败:', error)
   }
 
   // 清理所有WebSocket连接和定时器

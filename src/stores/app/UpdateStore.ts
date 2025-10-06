@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { getVersion } from '@tauri-apps/api/app'
-import mitt from '@/utils/mitt'
 
 // 定义更新信息类型
 interface UpdateInfo {
@@ -126,8 +125,8 @@ export const useUpdateStore = defineStore(
           const versionType = updateInfo.is_prerelease ? '测试版本' : '正式版本'
           updateState.value.message = `发现新${versionType} ${updateInfo.latest_version}`
 
-          // 在任何模式下都发送更新可用事件
-          mitt.emit('update-available', updateInfo)
+          // 更新可用事件现在通过Pinia响应式系统处理
+          console.log('发现新版本:', updateInfo.latest_version)
 
           return updateInfo
         } else {
@@ -160,8 +159,8 @@ export const useUpdateStore = defineStore(
         updateState.value.progress = 0
         updateState.value.error = null
 
-        // 通知下载开始
-        mitt.emit('download-progress', {
+        // 下载进度现在通过Pinia响应式系统处理
+        console.log('开始下载更新:', {
           status: 'downloading',
           progress: 0,
           message: '准备下载更新...',

@@ -1,6 +1,11 @@
-import type { Emitter } from 'mitt'
 import mitt from 'mitt'
-import { ConnectionState } from '../services/websocket-service'
+
+// 定义连接状态接口（移除了对WebSocket服务的依赖）
+export interface ConnectionState {
+  connected: boolean
+  connecting: boolean
+  error: Error | null
+}
 
 // 定义下载进度接口
 export interface DownloadProgress {
@@ -38,58 +43,11 @@ export interface RulesData {
   }>
 }
 
-// 定义事件类型
-export type Events = {
-  // 窗口相关事件
-  'window-minimize': void
-  'window-show': void
-  'window-maximize': void
-  'window-unmaximize': void
+// 注意：mitt现在已弃用，改为使用Tauri事件系统和Pinia响应式系统
+// 保留此文件仅为向后兼容，建议新代码使用Tauri事件或Pinia
 
-  // 应用初始化事件
-  'message-instance-ready': unknown
-
-  // 进程相关事件
-  'process-status': void
-  'download-progress': DownloadProgress
-  'proxy-mode-changed': void
-  'refresh-tray-menu': void
-  'update-available': UpdateInfo
-  'show-update-modal': UpdateModalData
-  'language-changed': void
-  'kernel-started': void
-  'kernel-stopped': void
-  'kernel-start-failed': { error: string }
-  'connecting-status-changed': boolean
-  'tray-clicked': void
-  error: string
-
-  // 内存管理事件
-  'memory-cleanup-requested': void
-  'global-cleanup-requested': void
-  'vue-component-cleanup': void
-
-  // WebSocket 连接状态事件
-  'traffic-connection-state': ConnectionState
-  'memory-connection-state': ConnectionState
-  'connections-connection-state': ConnectionState
-  'logs-connection-state': ConnectionState
-  'ws-connected': void // 添加WebSocket连接成功事件
-  'ws-disconnected': void // 添加WebSocket连接断开事件
-
-  // WebSocket 重连事件
-  'websocket-reconnect': string
-
-  // WebSocket 数据事件
-  'traffic-data': Record<string, unknown>
-  'memory-data': Record<string, unknown>
-  'connections-data': Record<string, unknown>
-  'log-data': { type: string; payload: string }
-  'proxy-data': Record<string, unknown>
-  'rules-data': RulesData
-}
-
-// 创建 mitt 实例
-const emitter = mitt<Events>()
+// 创建 mitt 实例（向后兼容）
+const emitter = mitt<any>()
 
 export default emitter
+export { mitt } // 重新导出mitt，如果某些地方还需要使用

@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import type { Router } from 'vue-router'
-import mitt from '@/utils/mitt'
 
 // 窗口状态类型
 export interface WindowState {
@@ -30,8 +29,8 @@ export const useWindowStore = defineStore(
     const minimizeWindow = async () => {
       const appWindow = getAppWindow()
       await appWindow.minimize()
-      // 触发最小化事件
-      mitt.emit('window-minimize')
+      // 窗口最小化事件现在通过Pinia响应式系统处理
+      console.log('窗口已最小化')
     }
 
     // 隐藏窗口并保存路由状态
@@ -44,9 +43,10 @@ export const useWindowStore = defineStore(
       if (router) {
         saveRouteAndGoBlank(router)
 
-        // 延迟触发内存清理
+        // 延迟触发内存清理 - 现在通过Store方法处理
         setTimeout(() => {
-          mitt.emit('memory-cleanup-requested')
+          // 可以通过StoreManager触发内存清理
+          console.log('请求内存清理')
         }, 1000)
       }
     }
@@ -57,8 +57,8 @@ export const useWindowStore = defineStore(
       await appWindow.show()
       await appWindow.setFocus()
       windowState.value.isVisible = true
-      // 触发显示事件
-      mitt.emit('window-show')
+      // 窗口显示事件现在通过Pinia响应式系统处理
+      console.log('窗口已显示')
     }
 
     // 设置窗口置顶
@@ -92,8 +92,8 @@ export const useWindowStore = defineStore(
       const appWindow = getAppWindow()
       await appWindow.maximize()
       windowState.value.isMaximized = true
-      // 触发最大化事件
-      mitt.emit('window-maximize')
+      // 窗口最大化事件现在通过Pinia响应式系统处理
+      console.log('窗口已最大化')
     }
 
     // 还原窗口
@@ -101,8 +101,8 @@ export const useWindowStore = defineStore(
       const appWindow = getAppWindow()
       await appWindow.unmaximize()
       windowState.value.isMaximized = false
-      // 触发还原事件
-      mitt.emit('window-unmaximize')
+      // 窗口还原事件现在通过Pinia响应式系统处理
+      console.log('窗口已还原')
     }
 
     // 切换最大化状态

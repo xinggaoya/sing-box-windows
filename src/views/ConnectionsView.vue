@@ -797,7 +797,7 @@ onMounted(async () => {
   // 当组件挂载时，确保连接数据已经初始化
   if (!connections.value.length) {
     // 设置连接监听器
-    await connectionStore.setupMittListeners()
+    await connectionStore.setupEventListeners()
     refreshConnections()
   }
 })

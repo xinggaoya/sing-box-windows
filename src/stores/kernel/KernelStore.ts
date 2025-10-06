@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
-import mitt from '@/utils/mitt'
+import { eventService } from '@/services/event-service'
 import { useAppStore } from '../app/AppStore'
 import { useConnectionStore } from './ConnectionStore'
 import { useTrafficStore } from './TrafficStore'
@@ -34,6 +34,9 @@ export const useKernelStore = defineStore(
 
     // 启动过程定时器
     let startupTimer: NodeJS.Timeout | null = null
+
+    // 事件监听器状态
+    let eventListenersSetup = false
 
     // 清理所有定时器
     const clearTimers = () => {
@@ -83,7 +86,7 @@ export const useKernelStore = defineStore(
       }
     }
 
-    // 启动内核（简化版本，后端会自动启动 WebSocket 中继）
+    // 启动内核（简化版本，后端会自动启动事件中继）
     const startKernel = async () => {
       console.log('🚀 开始启动内核...')
 
@@ -98,16 +101,14 @@ export const useKernelStore = defineStore(
         // 确保数据Store已初始化，准备接收数据
         await ensureDataStoresInitialized()
 
-        // 启动内核 - 后端会自动启动 WebSocket 中继
+        // 启动内核 - 后端会自动启动事件中继
         await tauriApi.kernel.startKernel(proxyMode)
-        console.log('✅ 内核启动成功，WebSocket 中继已自动启动')
+        console.log('✅ 内核启动成功，事件中继已自动启动')
 
         // 设置运行状态
         appStore.setRunningState(true)
         appStore.setConnectingState(false)
 
-        // 通知内核状态变更
-        mitt.emit('kernel-started')
         console.log('🎉 内核启动完成')
 
         return true
@@ -130,14 +131,9 @@ export const useKernelStore = defineStore(
           errorMessage = error
         }
 
-        // 通知启动失败
-        mitt.emit('kernel-start-failed', { error: errorMessage })
-
         throw new Error(errorMessage)
       }
     }
-
-    // WebSocket 连接现在由后端自动处理
 
     // 停止内核
     const stopKernel = async () => {
@@ -146,7 +142,7 @@ export const useKernelStore = defineStore(
         clearTimers()
         cleanupEventListeners()
 
-        // 停止内核（后端会自动清理 WebSocket 连接）
+        // 停止内核（后端会自动清理事件连接）
         await tauriApi.kernel.stopKernel()
 
         // 设置运行状态
@@ -161,9 +157,6 @@ export const useKernelStore = defineStore(
         connectionStore.resetData()
         trafficStore.resetStats()
         runtimeStore.resetRuntimeData()
-
-        // 通知内核状态变更
-        mitt.emit('kernel-stopped')
 
         return true
       } catch (error) {
@@ -216,34 +209,35 @@ export const useKernelStore = defineStore(
 
     // 初始化事件监听器
     const initEventListeners = async () => {
+      if (eventListenersSetup) return
+
       try {
+        // 监听内核就绪事件
+        await eventService.onKernelReady(() => {
+          console.log('🎉 收到内核就绪事件')
+          appStore.setRunningState(true)
+          appStore.setConnectingState(false)
+        })
+
         // 更新版本信息
         await updateVersion()
 
         // 检查是否有新版本
         await checkKernelVersion()
 
-        // 初始化连接监听器
-        const connectionStore = useConnectionStore()
-        connectionStore.setupMittListeners()
-
-        // 初始化流量监听器
-        const trafficStore = useTrafficStore()
-        trafficStore.setupMittListeners()
-
-        // 初始化日志监听器
-        const logStore = useLogStore()
-        await logStore.setupLogListener()
-
+        eventListenersSetup = true
+        console.log('✅ KernelStore事件监听器初始化完成')
         return true
       } catch (error) {
-        console.error('初始化事件监听器失败:', error)
+        console.error('❌ 初始化事件监听器失败:', error)
         return false
       }
     }
 
     // 清理事件监听器
     const cleanupEventListeners = () => {
+      if (!eventListenersSetup) return
+
       // 清理计时器
       clearTimers()
 
@@ -258,9 +252,12 @@ export const useKernelStore = defineStore(
       // 清理日志监听器
       const logStore = useLogStore()
       logStore.cleanupListeners()
-    }
 
-    // WebSocket 连接现在由后端自动处理，这个函数已废弃
+      // 移除事件监听器
+      eventService.removeEventListener('kernel-ready')
+
+      eventListenersSetup = false
+    }
 
     // 确保数据相关的Store已初始化
     const ensureDataStoresInitialized = async () => {
@@ -272,12 +269,12 @@ export const useKernelStore = defineStore(
         await storeManager.preloadStores(['connection', 'traffic', 'log'])
         console.log('📦 数据Store预加载完成')
 
-        // 立即手动初始化这些Store的事件监听器，确保在WebSocket连接前就准备好
+        // 立即手动初始化这些Store的事件监听器，确保在事件连接前就准备好
         try {
           const connectionStore = storeManager.getLoadedStore('connection')
           if (connectionStore) {
             // @ts-expect-error - Store类型推断问题，安全调用
-            connectionStore.initializeStore?.()
+            await connectionStore.initializeStore?.()
             console.log('📡 ConnectionStore事件监听器已初始化')
           }
         } catch (error) {
@@ -288,7 +285,7 @@ export const useKernelStore = defineStore(
           const trafficStore = storeManager.getLoadedStore('traffic')
           if (trafficStore) {
             // @ts-expect-error - Store类型推断问题，安全调用
-            trafficStore.initializeStore?.()
+            await trafficStore.initializeStore?.()
             console.log('📊 TrafficStore事件监听器已初始化')
           }
         } catch (error) {
@@ -299,7 +296,7 @@ export const useKernelStore = defineStore(
           const logStore = storeManager.getLoadedStore('log')
           if (logStore) {
             // @ts-expect-error - Store类型推断问题，安全调用
-            logStore.initializeStore?.()
+            await logStore.initializeStore?.()
             console.log('📝 LogStore事件监听器已初始化')
           }
         } catch (error) {
@@ -312,23 +309,11 @@ export const useKernelStore = defineStore(
       }
     }
 
-    // WebSocket 连接现在由后端自动处理
-
-    // 重置临时数据 (应用启动时调用) - 现在委托给运行时store
-    const resetTemporaryData = () => {
-      // 获取运行时store并重置数据
-      const runtimeStore = useKernelRuntimeStore()
-      runtimeStore.resetRuntimeData()
-
-      // 清理可能存在的定时器
-      clearTimers()
-
-      console.log('🔄 临时数据已重置')
-    }
-
     // Store初始化方法
     const initializeStore = async () => {
       try {
+        await initEventListeners()
+
         // 获取运行时store并初始化
         const runtimeStore = useKernelRuntimeStore()
         runtimeStore.initializeStore()
@@ -359,11 +344,6 @@ export const useKernelStore = defineStore(
       toggleIpVersion,
       initEventListeners,
       cleanupEventListeners,
-      resetTemporaryData: () => {
-        // 委托给运行时store处理
-        const runtimeStore = useKernelRuntimeStore()
-        runtimeStore.resetRuntimeData()
-      },
       initializeStore,
     }
   },

@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supportedLocales } from '@/locales'
-import mitt from '@/utils/mitt'
 
 // 语言类型
 export type Locale = 'zh-CN' | 'en-US' | 'ru-RU' | 'ja-JP' | 'auto'
@@ -27,7 +26,8 @@ export const useLocaleStore = defineStore(
     // 语言切换
     const setLocale = (newLocale: Locale) => {
       locale.value = newLocale
-      mitt.emit('language-changed')
+      // 语言变更事件现在通过Pinia响应式系统处理
+      console.log('语言已切换到:', newLocale)
     }
 
     // 获取当前语言名称
