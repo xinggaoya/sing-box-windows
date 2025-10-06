@@ -1,12 +1,10 @@
 use serde::Serialize;
-use crate::app::constants::network_config;
 use futures_util::StreamExt;
 use serde_json::Value;
 use std::sync::Arc;
 use tauri::Emitter;
-use tauri::{Runtime, Window};
-use tokio::sync::mpsc;
-use tokio::task::{self, JoinHandle};
+use tauri::Window;
+use tokio::task;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tracing::{error, info, warn};
 use url::Url;
@@ -18,8 +16,9 @@ pub struct WebSocketRelay<R> {
     endpoint: String,
     event_name: String,
     parser: Arc<dyn Fn(Value) -> R + Send + Sync>,
-    api_port: u16,
-    token: String,
+    // API connection details (for future use)
+    // api_port: u16,
+    // token: String,
 }
 
 impl<R: Send + Sync + 'static + Serialize> WebSocketRelay<R> {
@@ -39,8 +38,8 @@ impl<R: Send + Sync + 'static + Serialize> WebSocketRelay<R> {
             endpoint: format!("ws://127.0.0.1:{}{}?token={}", api_port, endpoint, token),
             event_name: event_name.to_string(),
             parser: Arc::new(parser),
-            api_port,
-            token,
+            // api_port,
+            // token,
         }
     }
 
@@ -48,7 +47,7 @@ impl<R: Send + Sync + 'static + Serialize> WebSocketRelay<R> {
     pub async fn start(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let url = Url::parse(&self.endpoint)?;
         let (ws_stream, _) = connect_async(url).await?;
-        let (mut write, mut read) = ws_stream.split();
+        let (_write, mut read) = ws_stream.split();
 
         let window = self.window.clone();
         let event_name = self.event_name.clone();

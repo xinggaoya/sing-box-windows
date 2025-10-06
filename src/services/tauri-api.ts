@@ -17,10 +17,10 @@ interface ProxiesData {
 
 // 内核相关接口
 export const kernelApi = {
-  startKernel: async (proxyMode?: string) => {
+  startKernel: async (proxyMode?: string, apiPort?: number) => {
     const appStore = useAppStore()
     await appStore.waitForDataRestore()
-    return invoke<void>('start_kernel', { proxyMode, apiPort: appStore.apiPort })
+    return invoke<void>('start_kernel', { proxyMode, apiPort: apiPort || appStore.apiPort })
   },
 
   stopKernel: () => invoke<void>('stop_kernel'),
@@ -33,7 +33,10 @@ export const kernelApi = {
 
   checkKernelVersion: () => invoke<string>('check_kernel_version'),
 
-  checkKernelStatus: () => invoke<boolean>('check_kernel_status'),
+  checkKernelStatus: (apiPort?: number) => {
+    const appStore = useAppStore()
+    return invoke<any>('check_kernel_status', { apiPort: apiPort || appStore.apiPort })
+  },
 
   getKernelRunningState: () => invoke<boolean>('is_kernel_running'),
 

@@ -106,7 +106,7 @@ pub async fn download_latest_kernel() -> Result<(), String> {
 
 // 启动内核
 #[tauri::command]
-pub async fn start_kernel() -> Result<String, String> {
+pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Result<String, String> {
     let kernel_path = paths::get_kernel_path();
     let config_path = paths::get_config_path();
 
@@ -121,6 +121,16 @@ pub async fn start_kernel() -> Result<String, String> {
     // 检查内核是否已经在运行
     if is_kernel_running().await.unwrap_or(false) {
         warn!("内核已在运行中");
+        
+        // 如果内核已在运行，检查事件中继是否需要启动
+        if let Some(port) = api_port {
+            info!("内核已运行，检查并启动事件中继...");
+            match start_websocket_relay(app_handle.clone(), Some(port)).await {
+                Ok(_) => info!("✅ 事件中继启动成功"),
+                Err(e) => warn!("⚠️ 事件中继启动失败: {}", e),
+            }
+        }
+        
         return Ok("内核已在运行中".to_string());
     }
 
@@ -135,6 +145,25 @@ pub async fn start_kernel() -> Result<String, String> {
 
     if is_kernel_running().await.unwrap_or(false) {
         info!("✅ 内核启动成功");
+        
+        // 自动启动事件中继
+        if let Some(port) = api_port {
+            info!("🔌 自动启动事件中继服务...");
+            match start_websocket_relay(app_handle.clone(), Some(port)).await {
+                Ok(_) => {
+                    info!("✅ 事件中继启动成功");
+                    
+                    // 发送内核就绪事件到前端
+                    if let Err(e) = app_handle.emit("kernel-ready", true) {
+                        error!("发送内核就绪事件失败: {}", e);
+                    }
+                },
+                Err(e) => {
+                    error!("❌ 事件中继启动失败: {}", e);
+                    return Err(format!("内核启动成功，但事件中继启动失败: {}", e));
+                }
+            }
+        }
         
         // 通知内核就绪
         KERNEL_READY_NOTIFY.notify_waiters();
@@ -171,10 +200,10 @@ pub async fn stop_kernel() -> Result<String, String> {
 
 // 重启内核
 #[tauri::command]
-pub async fn restart_kernel() -> Result<String, String> {
+pub async fn restart_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Result<String, String> {
     stop_kernel().await?;
     tokio::time::sleep(Duration::from_secs(3)).await;
-    start_kernel().await
+    start_kernel(app_handle, api_port).await
 }
 
 /// 启动事件中继服务
@@ -325,7 +354,7 @@ async fn cleanup_event_relay_tasks() {
 
 /// 检查WebSocket端点是否就绪
 async fn check_websocket_endpoints_ready(api_port: u16, token: &str) -> bool {
-    use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+    use tokio_tungstenite::connect_async;
     use url::Url;
 
     let endpoints = ["traffic", "memory", "logs", "connections"];

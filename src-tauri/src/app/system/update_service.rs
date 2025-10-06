@@ -3,7 +3,6 @@ use crate::app::network_config;
 use crate::utils::app_util::get_work_dir_sync;
 use semver::Version;
 use serde_json::json;
-use std::os::windows::process::CommandExt;
 use std::path::Path;
 use tauri::Emitter;
 

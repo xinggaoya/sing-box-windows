@@ -86,7 +86,7 @@ export const useKernelStore = defineStore(
       }
     }
 
-    // 启动内核（简化版本，后端会自动启动事件中继）
+    // 启动内核（完整版本，包含状态检查）
     const startKernel = async () => {
       console.log('🚀 开始启动内核...')
 
@@ -101,17 +101,23 @@ export const useKernelStore = defineStore(
         // 确保数据Store已初始化，准备接收数据
         await ensureDataStoresInitialized()
 
-        // 启动内核 - 后端会自动启动事件中继
-        await tauriApi.kernel.startKernel(proxyMode)
-        console.log('✅ 内核启动成功，事件中继已自动启动')
+        // 启动内核 - 传递API端口参数，后端会自动启动事件中继
+        await tauriApi.kernel.startKernel(proxyMode, appStore.apiPort)
+        console.log('✅ 内核进程启动成功，等待事件中继就绪...')
 
-        // 设置运行状态
-        appStore.setRunningState(true)
-        appStore.setConnectingState(false)
+        // 等待并检查完整状态
+        const isFullyReady = await pollKernelStatus(appStore.apiPort, 10)
+        
+        if (isFullyReady) {
+          // 设置运行状态
+          appStore.setRunningState(true)
+          appStore.setConnectingState(false)
 
-        console.log('🎉 内核启动完成')
-
-        return true
+          console.log('🎉 内核启动完成 - 进程、API和WebSocket全部就绪')
+          return true
+        } else {
+          throw new Error('内核启动超时，事件中继未能正常工作')
+        }
       } catch (error) {
         // 启动失败处理
         console.error('❌ 内核启动失败:', error)
@@ -133,6 +139,43 @@ export const useKernelStore = defineStore(
 
         throw new Error(errorMessage)
       }
+    }
+
+    // 轮询检查内核完整状态
+    const pollKernelStatus = async (apiPort: number, maxAttempts: number): Promise<boolean> => {
+      console.log(`🔍 开始轮询检查内核状态，最大尝试次数: ${maxAttempts}`)
+      
+      for (let i = 0; i < maxAttempts; i++) {
+        try {
+          console.log(`📊 第 ${i + 1} 次状态检查...`)
+          
+          const status = await tauriApi.kernel.checkKernelStatus(apiPort)
+          console.log(`📊 状态检查结果:`, status)
+          
+          const isFullyReady = status.process_running && 
+                              status.api_ready && 
+                              status.websocket_ready
+          
+          if (isFullyReady) {
+            console.log('✅ 内核完全就绪！')
+            return true
+          }
+          
+          // 显示详细状态
+          console.log(`⏳ 内核未完全就绪: 进程=${status.process_running}, API=${status.api_ready}, WebSocket=${status.websocket_ready}`)
+          
+        } catch (error) {
+          console.warn(`⚠️ 第 ${i + 1} 次状态检查失败:`, error)
+        }
+        
+        // 等待1秒再检查
+        if (i < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+      
+      console.error('❌ 内核状态轮询超时，未能完全就绪')
+      return false
     }
 
     // 停止内核

@@ -14,8 +14,9 @@ pub struct EventDirectRelay<R> {
     endpoint: String,
     event_name: String,
     parser: Arc<dyn Fn(Value) -> R + Send + Sync>,
-    api_port: u16,
-    token: String,
+    // API connection details (for future use)
+    // api_port: u16,
+    // token: String,
 }
 
 impl<R: Send + Sync + 'static + Serialize> EventDirectRelay<R> {
@@ -35,8 +36,8 @@ impl<R: Send + Sync + 'static + Serialize> EventDirectRelay<R> {
             endpoint: format!("ws://127.0.0.1:{}{}?token={}", api_port, endpoint, token),
             event_name: event_name.to_string(),
             parser: Arc::new(parser),
-            api_port,
-            token,
+            // api_port,
+            // token,
         }
     }
 
@@ -49,9 +50,9 @@ impl<R: Send + Sync + 'static + Serialize> EventDirectRelay<R> {
         let app_handle = self.app_handle.clone();
         let event_name = self.event_name.clone();
         let parser = self.parser.clone();
-        let event_name_for_logging = event_name.clone();
-        let event_name_for_logging2 = event_name_for_logging.clone();
-        let event_name_for_logging3 = event_name_for_logging.clone();
+        let _event_name_for_logging = event_name.clone();
+        // let _event_name_for_logging2 = event_name_for_logging.clone();
+        // let _event_name_for_logging3 = event_name_for_logging.clone();
 
         // 处理接收到的消息
         let receive_task = tokio::task::spawn(async move {
