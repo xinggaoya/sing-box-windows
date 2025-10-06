@@ -1,4 +1,4 @@
-use crate::utils::app_util::get_work_dir;
+use crate::utils::app_util::get_work_dir_sync;
 use serde_json::json;
 use serde_json::Value;
 use std::error::Error;
@@ -8,7 +8,7 @@ use tracing::{error, info};
 
 // 更新sing-box配置文件中的端口设置
 fn update_singbox_config_ports(proxy_port: u16, api_port: u16) -> Result<(), Box<dyn Error>> {
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let config_path = Path::new(&work_dir).join("sing-box/config.json");
 
     // 检查配置文件是否存在

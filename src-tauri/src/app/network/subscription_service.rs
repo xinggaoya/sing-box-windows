@@ -1,5 +1,5 @@
 use crate::app::constants::{messages, network_config, paths};
-use crate::utils::app_util::get_work_dir;
+use crate::utils::app_util::get_work_dir_sync;
 use crate::utils::http_client;
 use base64;
 use serde_json::{json, Value};
@@ -97,7 +97,7 @@ pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
 
     info!("正在切换代理模式为: {}", mode);
 
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let path = Path::new(&work_dir).join("sing-box/config.json");
 
     // 检查文件是否存在
@@ -199,7 +199,7 @@ async fn download_and_process_subscription(
     api_port: Option<u16>,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let sing_box_dir = Path::new(&work_dir).join("sing-box");
 
     if !sing_box_dir.exists() {
@@ -316,7 +316,7 @@ async fn download_and_process_subscription(
     );
 
     // 使用模板和提取的节点信息创建新的配置
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let dir = Path::new(&work_dir).join("sing-box");
     // 确保目录存在
     if let Err(e) = std::fs::create_dir_all(&dir) {
@@ -1065,7 +1065,7 @@ fn process_subscription_content(
     api_port: Option<u16>,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let sing_box_dir = Path::new(&work_dir).join("sing-box");
 
     if !sing_box_dir.exists() {
@@ -1349,7 +1349,7 @@ fn process_original_config(
     }
 
     // 保存配置到文件
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let config_path = Path::new(&work_dir).join("sing-box/config.json");
     info!("正在保存配置到: {:?}", config_path);
 
@@ -1381,7 +1381,7 @@ fn process_original_config(
 pub fn get_current_proxy_mode() -> Result<String, String> {
     info!("正在获取当前代理模式");
 
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let path = Path::new(&work_dir).join("sing-box/config.json");
 
     // 检查配置文件是否存在

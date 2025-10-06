@@ -1,6 +1,6 @@
 use crate::app::constants::{config, messages, network_config, paths};
 use crate::entity::config_model;
-use crate::utils::app_util::get_work_dir;
+use crate::utils::app_util::get_work_dir_sync;
 use crate::utils::config_util::ConfigUtil;
 use crate::utils::http_client;
 use serde_json::{json, Value};
@@ -91,7 +91,7 @@ pub fn set_tun_proxy(port: u16) -> Result<(), String> {
 }
 
 fn set_tun_proxy_impl(port: u16) -> Result<(), Box<dyn Error>> {
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let path = Path::new(&work_dir).join("sing-box/config.json");
     let path_str = path.to_str().ok_or("配置文件路径包含无效字符")?;
     let mut json_util = ConfigUtil::new(path_str)?;
@@ -147,7 +147,7 @@ pub fn toggle_ip_version(prefer_ipv6: bool) -> Result<(), String> {
         if prefer_ipv6 { "IPv6优先" } else { "仅IPv4" }
     );
 
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let path = Path::new(&work_dir).join("sing-box/config.json");
 
     // 读取文件内容

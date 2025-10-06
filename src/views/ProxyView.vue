@@ -304,7 +304,7 @@ const setupEventListeners = async () => {
 const init = async () => {
   isLoading.value = true
   try {
-    const data = await tauriApi.proxy.getProxies(appStore.apiPort)
+    const data = await tauriApi.proxy.getProxies()
     rawProxies.value = data.proxies
 
     // 提取代理组
@@ -391,7 +391,7 @@ const testNodeDelay = async (group: string) => {
   testingGroup.value = group
   try {
     console.log(`开始测试组延迟: ${group}, API端口: ${appStore.apiPort}`)
-    await tauriApi.proxy.testGroupDelay(group, appStore.apiPort)
+    await tauriApi.proxy.testGroupDelay(group)
     console.log(`组延迟测试请求已发送: ${group}`)
   } catch (error) {
     console.error(`测试组 ${group} 失败:`, error)
@@ -405,7 +405,7 @@ const testNodeDelay = async (group: string) => {
  */
 const changeProxy = async (group: string, proxy: string) => {
   try {
-    await tauriApi.proxy.changeProxy(group, proxy, appStore.apiPort)
+    await tauriApi.proxy.changeProxy(group, proxy)
     message.success(t('proxy.switchSuccess', { group: group, proxy: proxy }))
     // 重新加载数据
     await init()

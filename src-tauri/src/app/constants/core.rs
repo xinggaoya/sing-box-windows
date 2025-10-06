@@ -16,12 +16,12 @@ pub mod process {
 
 /// 文件路径常量
 pub mod paths {
-    use crate::utils::app_util::get_work_dir;
+    use crate::utils::app_util::get_work_dir_sync;
     use std::path::PathBuf;
 
     /// 获取 Sing-Box 可执行文件路径
     pub fn get_kernel_path() -> PathBuf {
-        let work_dir = get_work_dir();
+        let work_dir = get_work_dir_sync();
         PathBuf::from(&work_dir)
             .join("sing-box")
             .join("sing-box.exe")
@@ -29,13 +29,13 @@ pub mod paths {
 
     /// 获取 Sing-Box 工作目录
     pub fn get_kernel_work_dir() -> PathBuf {
-        let work_dir = get_work_dir();
+        let work_dir = get_work_dir_sync();
         PathBuf::from(&work_dir).join("sing-box")
     }
 
     /// 获取配置文件路径
     pub fn get_config_path() -> PathBuf {
-        let work_dir = get_work_dir();
+        let work_dir = get_work_dir_sync();
         PathBuf::from(&work_dir)
             .join("sing-box")
             .join("config.json")

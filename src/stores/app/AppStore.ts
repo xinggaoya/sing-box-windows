@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { onMounted, ref, watch } from 'vue'
-import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
+import { ref } from 'vue'
+import { enable, disable } from '@tauri-apps/plugin-autostart'
 import mitt from '@/utils/mitt'
 import { useMessage } from 'naive-ui'
 import { config } from '@/services/tauri-api'

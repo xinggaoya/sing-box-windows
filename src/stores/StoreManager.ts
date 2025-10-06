@@ -2,7 +2,6 @@
  * Store 管理器 - 实现按需加载和内存优化
  */
 
-import type { App } from 'vue'
 import { createPinia } from 'pinia'
 
 // Store类型定义

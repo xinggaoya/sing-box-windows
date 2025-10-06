@@ -1,6 +1,6 @@
 use crate::app::constants::{api, messages};
 use crate::app::network_config;
-use crate::utils::app_util::get_work_dir;
+use crate::utils::app_util::get_work_dir_sync;
 use semver::Version;
 use serde_json::json;
 use std::os::windows::process::CommandExt;
@@ -161,7 +161,7 @@ pub async fn download_and_install_update(
     window: tauri::Window,
     download_url: String,
 ) -> Result<(), String> {
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let download_path = Path::new(&work_dir).join("update.exe");
 
     // 发送开始下载事件
@@ -229,7 +229,7 @@ pub async fn download_and_install_update(
     );
 
     // 启动安装程序（在后台运行）
-    match std::process::Command::new(download_path)
+    match tokio::process::Command::new(download_path)
         .creation_flags(0x08000000)
         .spawn()
     {

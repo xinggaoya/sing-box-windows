@@ -110,7 +110,7 @@ export const useProxyStore = defineStore('proxy', () => {
   // 获取代理节点列表
   const getProxyNodes = async () => {
     try {
-      const result = await tauriApi.proxy.getProxies(appStore.apiPort)
+      const result = await tauriApi.proxy.getProxies()
       // 假设返回的是一个对象，需要提取节点列表
       if (result && Array.isArray(result.proxies)) {
         nodeList.value = result.proxies
@@ -128,7 +128,7 @@ export const useProxyStore = defineStore('proxy', () => {
     try {
       if (index >= 0 && index < nodeList.value.length) {
         const nodeName = nodeList.value[index]
-        await tauriApi.proxy.changeProxy('GLOBAL', nodeName, appStore.apiPort)
+        await tauriApi.proxy.changeProxy('GLOBAL', nodeName)
         selectedNodeIndex.value = index
         return true
       }

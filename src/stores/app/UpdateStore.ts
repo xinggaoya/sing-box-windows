@@ -104,9 +104,14 @@ export const useUpdateStore = defineStore(
         updateState.value.error = null
         updateState.value.message = '正在检查更新...'
 
-        const updateInfo = await tauriApi.update.checkUpdate(
+        // 确保当前版本已获取
+        if (!appVersion.value) {
+          await fetchAppVersion()
+        }
+        
+        const updateInfo = await tauriApi.system.checkUpdate(
           appVersion.value,
-          acceptPrerelease.value,
+          acceptPrerelease.value
         )
 
         if (updateInfo && updateInfo.has_update) {
@@ -163,7 +168,7 @@ export const useUpdateStore = defineStore(
         })
 
         // 开始下载和安装
-        const result = await tauriApi.update.downloadAndInstallUpdate(downloadUrl.value)
+        const result = await tauriApi.system.downloadAndInstallUpdate(window)
         return result
       } catch (error) {
         console.error('下载更新失败:', error)

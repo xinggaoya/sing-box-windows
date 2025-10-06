@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
 import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 

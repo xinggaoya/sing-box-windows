@@ -1,6 +1,6 @@
 use crate::app::constants::{messages, network_config, paths, process};
 use crate::process::manager::ProcessManager;
-use crate::utils::app_util::get_work_dir;
+use crate::utils::app_util::get_work_dir_sync;
 use crate::utils::file_util::unzip_file;
 use crate::utils::http_client;
 use futures_util::StreamExt;
@@ -128,7 +128,7 @@ pub async fn start_kernel(
     SHOULD_STOP_WS.store(false, Ordering::Relaxed);
 
     // 获取内核配置文件路径
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     let config_path = Path::new(&work_dir).join("sing-box/config.json");
 
     // 检查配置文件是否存在
@@ -188,7 +188,7 @@ pub async fn start_kernel(
 // 智能检查是否需要管理员权限
 async fn check_admin_requirement(config_path: &Path) -> Result<(), String> {
     // 首先尝试读取配置文件内容来判断是否需要管理员权限
-    let needs_admin = match std::fs::read_to_string(config_path) {
+    let needs_admin = match tokio::fs::read_to_string(config_path).await {
         Ok(content) => {
             match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(config) => {
@@ -439,7 +439,7 @@ pub async fn restart_kernel(
 // 下载内核
 #[tauri::command]
 pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String> {
-    let work_dir = get_work_dir();
+    let work_dir = get_work_dir_sync();
     info!("当前工作目录: {}", work_dir);
 
     let path = Path::new(&work_dir).join("sing-box/");
@@ -454,7 +454,7 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
     }
 
     // 确保目录存在
-    if let Err(e) = std::fs::create_dir_all(&path) {
+    if let Err(e) = tokio::fs::create_dir_all(&path).await {
         error!("创建目录失败: {}", e);
         return Err(format!("创建目录失败: {}", e));
     }
@@ -565,7 +565,7 @@ pub async fn download_latest_kernel(window: tauri::Window) -> Result<(), String>
         error!("下载失败: {}", e);
         return Err(format!(
             "下载失败: {}。\n您可以尝试手动下载：\n1. 访问 https://github.com/SagerNet/sing-box/releases/latest\n2. 下载 {}\n3. 解压并将文件放置在 {}/sing-box/ 目录下",
-            e, target_asset_name, get_work_dir()
+            e, target_asset_name, get_work_dir_sync()
         ));
     }
 
@@ -1143,10 +1143,11 @@ async fn start_connections_relay_internal<R: Runtime>(
 #[tauri::command]
 pub async fn is_kernel_running() -> Result<bool, String> {
     // 通过tasklist命令检查sing-box.exe是否在运行
-    let output = std::process::Command::new("tasklist")
+    let output = tokio::process::Command::new("tasklist")
         .args(&["/FI", "IMAGENAME eq sing-box.exe", "/FO", "CSV", "/NH"])
         .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
         .output()
+        .await
         .map_err(|e| format!("检查内核进程失败: {}", e))?;
 
     // 检查输出中是否包含sing-box.exe

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import mitt from '@/utils/mitt'
-import { StoreCleaner, temporaryStoreManager } from '@/utils/memory-leak-fix'
+import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 // 定义消息类型
 export type MessageType = 'success' | 'info' | 'error' | 'warning'
@@ -221,7 +221,7 @@ export const useLogStore = defineStore(
     })
 
     // 注册清理函数
-    StoreCleaner.registerCleanup(() => {
+    temporaryStoreManager.registerCleanup(() => {
       cleanupListeners()
       logs.value = []
     })

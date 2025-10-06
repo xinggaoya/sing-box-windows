@@ -527,7 +527,7 @@ const downloadTheKernel = async () => {
       duration: 3000,
     })
 
-    await tauriApi.subscription.downloadLatestKernel()
+    await tauriApi.system.downloadLatestKernel(window)
 
     // 下载成功后更新版本信息
     await kernelStore.updateVersion()
