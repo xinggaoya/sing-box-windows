@@ -33,8 +33,8 @@ export const useKernelStore = defineStore(
 
     const config = ref<KernelConfig>({
       proxy_mode: 'manual',
-      api_port: 9090,
-      proxy_port: 7890,
+      api_port: 12081,
+      proxy_port: 12080,
       prefer_ipv6: false,
       auto_start: false,
     })
@@ -88,13 +88,25 @@ export const useKernelStore = defineStore(
 
     const syncConfig = async () => {
       try {
-        config.value = await kernelService.getKernelConfig()
+        // 等待AppStore数据恢复完成
+        await appStore.waitForDataRestore(5000)
         
-        // 同步到 appStore
-        appStore.setProxyMode(config.value.proxy_mode as any)
-        // appStore.setApiPort(config.value.api_port) // 方法不存在，暂时注释
-        // appStore.setProxyPort(config.value.proxy_port) // 方法不存在，暂时注释
-        appStore.setPreferIpv6(config.value.prefer_ipv6)
+        // 从AppStore同步配置到KernelStore
+        config.value = {
+          proxy_mode: appStore.proxyMode as any,
+          api_port: appStore.apiPort,
+          proxy_port: appStore.proxyPort,
+          prefer_ipv6: appStore.preferIpv6,
+          auto_start: appStore.autoStartKernel,
+        }
+        
+        console.log('📋 内核配置已同步:', {
+          proxy_mode: config.value.proxy_mode,
+          api_port: config.value.api_port,
+          proxy_port: config.value.proxy_port,
+          prefer_ipv6: config.value.prefer_ipv6,
+          auto_start: config.value.auto_start,
+        })
       } catch (error) {
         console.error('同步内核配置失败:', error)
       }

@@ -41,11 +41,11 @@ interface PersistOptions {
 
 // 扩展Pinia选项类型
 declare module 'pinia' {
-  export interface DefineStoreOptions<Id, S, G, A> {
+  export interface DefineStoreOptions<_Id, _S, _G, _A> {
     persist?: boolean | PersistOptions
   }
   
-  export interface DefineSetupStoreOptions<Id, S, G, A> {
+  export interface DefineSetupStoreOptions<_Id, _S, _G, _A> {
     persist?: boolean | PersistOptions
   }
 }

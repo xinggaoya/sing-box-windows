@@ -516,8 +516,8 @@ pub async fn get_system_uptime() -> Result<u64, String> {
 
 /// 重构版本的启动命令 - 增强版
 #[tauri::command]
-pub async fn kernel_start_enhanced(app_handle: AppHandle, proxy_mode: Option<String>) -> Result<String, String> {
-    info!("🚀 启动内核增强版，代理模式: {:?}", proxy_mode);
+pub async fn kernel_start_enhanced(app_handle: AppHandle, proxy_mode: Option<String>, api_port: Option<u16>) -> Result<String, String> {
+    info!("🚀 启动内核增强版，代理模式: {:?}, API端口: {:?}", proxy_mode, api_port);
     
     // 检查内核是否已在运行
     if is_kernel_running().await.unwrap_or(false) {
@@ -530,10 +530,32 @@ pub async fn kernel_start_enhanced(app_handle: AppHandle, proxy_mode: Option<Str
         Ok(_) => {
             info!("✅ 内核进程启动成功");
             
-            // 发送内核就绪事件
-            let _ = app_handle.emit("kernel-ready", ());
-            
-            Ok("内核启动成功".to_string())
+            // 如果提供了API端口，尝试启动事件中继
+            if let Some(port) = api_port {
+                info!("🔌 启动事件中继服务，端口: {}", port);
+                match start_websocket_relay(app_handle.clone(), Some(port)).await {
+                    Ok(_) => {
+                        info!("✅ 事件中继启动成功");
+                        
+                        // 发送内核就绪事件
+                        let _ = app_handle.emit("kernel-ready", ());
+                        
+                        Ok("内核启动成功，事件中继已启动".to_string())
+                    }
+                    Err(e) => {
+                        warn!("⚠️ 事件中继启动失败: {}, 但内核进程已启动", e);
+                        
+                        // 即使事件中继失败，内核也已经启动了
+                        let _ = app_handle.emit("kernel-ready", ());
+                        
+                        Ok("内核启动成功，但事件中继启动失败".to_string())
+                    }
+                }
+            } else {
+                // 没有提供API端口，只发送内核就绪事件
+                let _ = app_handle.emit("kernel-ready", ());
+                Ok("内核启动成功".to_string())
+            }
         }
         Err(e) => {
             error!("❌ 内核启动失败: {}", e);
@@ -556,7 +578,8 @@ pub async fn kernel_stop_enhanced() -> Result<String, String> {
 /// 重构版本的状态查询命令 - 增强版
 #[tauri::command]
 pub async fn kernel_get_status_enhanced(api_port: Option<u16>) -> Result<serde_json::Value, String> {
-    let port = api_port.unwrap_or(9090);
+    // 使用传递的端口或默认端口12081（与AppStore默认值保持一致）
+    let port = api_port.unwrap_or(12081);
     
     let process_running = is_kernel_running().await?;
     let mut api_ready = false;
@@ -593,7 +616,7 @@ pub async fn kernel_get_status_enhanced(api_port: Option<u16>) -> Result<serde_j
 
 /// 健康检查命令
 #[tauri::command]
-pub async fn kernel_check_health() -> Result<serde_json::Value, String> {
+pub async fn kernel_check_health(api_port: Option<u16>) -> Result<serde_json::Value, String> {
     let mut issues = Vec::new();
     let mut healthy = true;
 
@@ -614,17 +637,18 @@ pub async fn kernel_check_health() -> Result<serde_json::Value, String> {
     // 检查进程状态
     let process_running = is_kernel_running().await.unwrap_or(false);
     if process_running {
-        // 简单的API检查
+        // 使用传递的端口或默认端口12081
+        let port = api_port.unwrap_or(12081);
         let client = http_client::get_client();
-        let api_url = "http://127.0.0.1:9090/version";
+        let api_url = format!("http://127.0.0.1:{}/version", port);
         
-        let api_ready = match client.get(api_url).timeout(Duration::from_secs(2)).send().await {
+        let api_ready = match client.get(&api_url).timeout(Duration::from_secs(2)).send().await {
             Ok(response) if response.status().is_success() => true,
             _ => false,
         };
         
         if !api_ready {
-            issues.push("内核进程运行但API不可用".to_string());
+            issues.push(format!("内核进程运行但API不可用（端口: {}）", port));
             healthy = false;
         }
     }

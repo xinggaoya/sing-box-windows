@@ -227,7 +227,7 @@ export const useAppStore = defineStore(
         // 使用Tauri命令获取系统启动时间
         const uptime = await tauriApi.system.getSystemUptime()
         return Math.floor(uptime / 1000) // 转换为秒
-      } catch (error) {
+      } catch (_error) {
         console.warn('无法获取系统运行时间，使用应用启动时间估算')
         // 如果无法获取系统时间，使用性能时间估算
         return Math.floor(performance.now() / 1000)

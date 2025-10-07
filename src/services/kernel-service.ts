@@ -56,9 +56,21 @@ class KernelService {
     try {
       console.log('🚀 开始启动内核...', options)
       
-      // 使用新的增强启动命令
+      // 获取当前端口配置
+      const { useAppStore } = await import('@/stores/app/AppStore')
+      const appStore = useAppStore()
+      await appStore.waitForDataRestore(5000) // 等待端口配置加载完成
+      
       const proxyMode = options.config?.proxy_mode || 'manual'
-      const result = await invoke<string>('kernel_start_enhanced', { proxyMode })
+      const apiPort = options.config?.api_port || appStore.apiPort
+      
+      console.log('🔌 使用端口配置:', { apiPort, proxyMode })
+      
+      // 使用新的增强启动命令
+      const result = await invoke<string>('kernel_start_enhanced', { 
+        proxyMode,
+        apiPort 
+      })
       
       console.log('✅ 内核启动结果:', result)
       
@@ -151,7 +163,17 @@ class KernelService {
     }
 
     try {
-      const status = await invoke<any>('kernel_get_status_enhanced')
+      // 获取当前端口配置
+      const { useAppStore } = await import('@/stores/app/AppStore')
+      const appStore = useAppStore()
+      await appStore.waitForDataRestore(3000) // 等待端口配置加载完成
+      
+      const apiPort = appStore.apiPort
+      console.log('📊 查询内核状态，使用API端口:', apiPort)
+      
+      const status = await invoke<any>('kernel_get_status_enhanced', { 
+        apiPort 
+      })
       
       // 更新缓存
       this.statusCache.set(cacheKey, { status, timestamp: now })
@@ -277,7 +299,17 @@ class KernelService {
    */
   async checkKernelHealth(): Promise<{ healthy: boolean; issues: string[] }> {
     try {
-      return await invoke<{ healthy: boolean; issues: string[] }>('kernel_check_health')
+      // 获取当前端口配置
+      const { useAppStore } = await import('@/stores/app/AppStore')
+      const appStore = useAppStore()
+      await appStore.waitForDataRestore(3000) // 等待端口配置加载完成
+      
+      const apiPort = appStore.apiPort
+      console.log('🏥 检查内核健康状态，使用API端口:', apiPort)
+      
+      return await invoke<{ healthy: boolean; issues: string[] }>('kernel_check_health', { 
+        apiPort 
+      })
     } catch (error) {
       console.error('检查内核健康状态失败:', error)
       return { 
