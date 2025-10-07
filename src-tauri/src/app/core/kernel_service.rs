@@ -511,3 +511,126 @@ pub async fn get_system_uptime() -> Result<u64, String> {
         }
     }
 }
+
+// ========== 新增的重构版本命令 ==========
+
+/// 重构版本的启动命令 - 增强版
+#[tauri::command]
+pub async fn kernel_start_enhanced(app_handle: AppHandle, proxy_mode: Option<String>) -> Result<String, String> {
+    info!("🚀 启动内核增强版，代理模式: {:?}", proxy_mode);
+    
+    // 检查内核是否已在运行
+    if is_kernel_running().await.unwrap_or(false) {
+        info!("内核已在运行中");
+        return Ok("内核已在运行中".to_string());
+    }
+
+    // 启动内核进程
+    match PROCESS_MANAGER.start().await {
+        Ok(_) => {
+            info!("✅ 内核进程启动成功");
+            
+            // 发送内核就绪事件
+            let _ = app_handle.emit("kernel-ready", ());
+            
+            Ok("内核启动成功".to_string())
+        }
+        Err(e) => {
+            error!("❌ 内核启动失败: {}", e);
+            Err(format!("内核启动失败: {}", e))
+        }
+    }
+}
+
+/// 重构版本的停止命令 - 增强版
+#[tauri::command]
+pub async fn kernel_stop_enhanced() -> Result<String, String> {
+    info!("🛑 停止内核增强版");
+    
+    match stop_kernel().await {
+        Ok(_) => Ok("内核停止成功".to_string()),
+        Err(e) => Err(format!("内核停止失败: {}", e)),
+    }
+}
+
+/// 重构版本的状态查询命令 - 增强版
+#[tauri::command]
+pub async fn kernel_get_status_enhanced(api_port: Option<u16>) -> Result<serde_json::Value, String> {
+    let port = api_port.unwrap_or(9090);
+    
+    let process_running = is_kernel_running().await?;
+    let mut api_ready = false;
+    let mut websocket_ready = false;
+    
+    if process_running {
+        // 检查API状态
+        let client = http_client::get_client();
+        let api_url = format!("http://127.0.0.1:{}/version", port);
+        
+        api_ready = match client.get(&api_url).timeout(Duration::from_secs(2)).send().await {
+            Ok(response) if response.status().is_success() => true,
+            _ => false,
+        };
+        
+        // 检查WebSocket状态（简化版）
+        if api_ready {
+            let token = crate::app::core::proxy_service::get_api_token();
+            let url_str = format!("ws://127.0.0.1:{}/traffic?token={}", port, token);
+            
+            websocket_ready = tokio_tungstenite::connect_async(&url_str).await.is_ok();
+        }
+    }
+    
+    Ok(serde_json::json!({
+        "process_running": process_running,
+        "api_ready": api_ready,
+        "websocket_ready": websocket_ready,
+        "uptime_ms": 0,
+        "version": null,
+        "error": null
+    }))
+}
+
+/// 健康检查命令
+#[tauri::command]
+pub async fn kernel_check_health() -> Result<serde_json::Value, String> {
+    let mut issues = Vec::new();
+    let mut healthy = true;
+
+    // 检查内核文件
+    let kernel_path = paths::get_kernel_path();
+    if !kernel_path.exists() {
+        issues.push("内核文件不存在".to_string());
+        healthy = false;
+    }
+
+    // 检查配置文件
+    let config_path = paths::get_config_path();
+    if !config_path.exists() {
+        issues.push("配置文件不存在".to_string());
+        healthy = false;
+    }
+
+    // 检查进程状态
+    let process_running = is_kernel_running().await.unwrap_or(false);
+    if process_running {
+        // 简单的API检查
+        let client = http_client::get_client();
+        let api_url = "http://127.0.0.1:9090/version";
+        
+        let api_ready = match client.get(api_url).timeout(Duration::from_secs(2)).send().await {
+            Ok(response) if response.status().is_success() => true,
+            _ => false,
+        };
+        
+        if !api_ready {
+            issues.push("内核进程运行但API不可用".to_string());
+            healthy = false;
+        }
+    }
+
+    Ok(serde_json::json!({
+        "healthy": healthy,
+        "issues": issues
+    }))
+}

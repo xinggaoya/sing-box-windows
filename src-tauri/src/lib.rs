@@ -71,7 +71,12 @@ pub fn run() {
             crate::app::storage::storage_service::reset_state,
             crate::app::storage::storage_service::backup_state,
             crate::app::storage::storage_service::restore_state,
-            // Core - Kernel service commands
+            // Core - Kernel manager commands (暂时注释，有问题需要解决)
+            // crate::app::core::kernel_manager::kernel_start,
+            // crate::app::core::kernel_manager::kernel_stop,
+            // crate::app::core::kernel_manager::kernel_get_status,
+            // crate::app::core::kernel_manager::kernel_get_version,
+            // Core - Kernel service commands (legacy)
             crate::app::core::kernel_service::start_kernel,
             crate::app::core::kernel_service::stop_kernel,
             crate::app::core::kernel_service::restart_kernel,
@@ -81,6 +86,11 @@ pub fn run() {
             crate::app::core::kernel_service::is_kernel_running,
             crate::app::core::kernel_service::check_kernel_status,
             crate::app::core::kernel_service::get_system_uptime,
+            // Core - Kernel service commands (enhanced)
+            crate::app::core::kernel_service::kernel_start_enhanced,
+            crate::app::core::kernel_service::kernel_stop_enhanced,
+            crate::app::core::kernel_service::kernel_get_status_enhanced,
+            crate::app::core::kernel_service::kernel_check_health,
             // Network - Subscription service commands
             crate::app::network::subscription_service::download_subscription,
             crate::app::network::subscription_service::add_manual_subscription,

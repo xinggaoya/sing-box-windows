@@ -242,6 +242,7 @@ import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { ProxyService } from '@/services/proxy-service'
 import { useI18n } from 'vue-i18n'
+import { kernelService } from '@/services/kernel-service'
 import { tauriApi } from '@/services/tauri-api'
 
 const message = useMessage()
@@ -496,17 +497,15 @@ const getStatusSubtitle = () => {
   return t('home.status.stoppedDesc')
 }
 
-// 核心操作方法 - 补充完整的功能逻辑
+// 核心操作方法 - 使用重构后的服务
 const runKernel = async () => {
   try {
     isStarting.value = true
-    // 确保当前模式已设置到appStore
-    appState.setProxyMode(currentProxyMode.value)
-
-    // 检查TUN模式下是否需要管理员权限
+    
+    // 检查TUN模式下是否需要管理员权限（保留此逻辑）
     if (currentProxyMode.value === 'tun') {
-      // 每次启动TUN模式时都重新检查管理员权限
-      const currentIsAdmin = await tauriApi.system.checkAdmin()
+      const { systemApi } = await import('@/services/tauri-api')
+      const currentIsAdmin = await systemApi.checkAdmin()
 
       if (!currentIsAdmin) {
         dialog.warning({
@@ -516,17 +515,14 @@ const runKernel = async () => {
           negativeText: t('common.cancel'),
           onPositiveClick: async () => {
             try {
-              // 先调用API修改配置为TUN模式
               message.info(t('notification.applyingTunMode'))
-              await tauriApi.proxy.setTunProxy()
-
-              // 设置应用状态
+              const { proxyApi } = await import('@/services/tauri-api')
+              await proxyApi.setTunProxy()
+              
               appState.setProxyMode('tun')
               currentProxyMode.value = 'tun'
-
-              // 设置挂起的TUN模式标记，重启后会应用（配置已经修改好了）
               localStorage.setItem('pending-tun-mode', 'true')
-
+              
               message.success(t('notification.tunConfigApplied'))
               await restartAsAdmin()
             } catch (error) {
@@ -539,84 +535,46 @@ const runKernel = async () => {
       }
     }
 
-    // 显示启动中提示
-    message.info(t('notification.startingKernel'))
-
-    // 监听启动失败事件
-    const onStartFailed = (event: { error: string }) => {
-      message.error(event.error)
-      mitt.off('kernel-start-failed', onStartFailed)
-    }
-    mitt.on('kernel-start-failed', onStartFailed)
-
-    // 监听连接状态变化
-    const onConnectionChange = (isConnecting: boolean) => {
-      if (isConnecting) {
-        message.info(t('notification.connectingToKernel'))
-      }
-    }
-    mitt.on('connecting-status-changed', onConnectionChange)
-
-    // 启动内核（简化版本，依赖后端检查）
-    try {
-      await kernelStore.startKernel()
+    // 直接使用 kernelService 而不是 kernelStore
+    const { kernelService } = await import('@/services/kernel-service')
+    const result = await kernelService.startKernel({
+      config: { 
+        proxy_mode: currentProxyMode.value as any,
+        api_port: appState.apiPort,
+        proxy_port: appState.proxyPort,
+        prefer_ipv6: appState.preferIpv6,
+        auto_start: false 
+      },
+      forceRestart: false,
+      timeoutMs: 30000
+    })
+    
+    if (result.success) {
       message.success(t('notification.kernelStarted'))
-      return // 后端确认启动成功
-    } catch (startError) {
-      // 启动失败，但检查内核进程是否实际在运行
-      const isKernelRunning = await tauriApi.kernel.isKernelRunning().catch(() => false)
-
-      if (isKernelRunning) {
-        // 内核进程存在，设置为运行状态
-        message.warning(t('notification.kernelProcessRunning'))
-        appState.setRunningState(true)
-
-        // WebSocket 连接现在由后端自动管理
-        console.log('内核进程在运行，WebSocket 连接应该会自动建立')
-
-        return
-      }
-
-      // 内核确实没有运行，抛出错误
-      throw startError
+    } else {
+      message.error(result.message || t('notification.startFailed'))
     }
   } catch (error) {
-    // 处理已知错误
-    let errorMessage =
-      typeof error === 'string'
-        ? error
-        : error instanceof Error
-          ? error.message
-          : t('notification.unknownError')
-
-    // 如果错误信息太长，截取一部分
-    if (errorMessage.length > 150) {
-      errorMessage = errorMessage.substring(0, 150) + '...'
-    }
-
-    // 显示错误并带有详细说明
-    dialog.error({
-      title: t('notification.startFailed'),
-      content: `${errorMessage}\n\n${t('notification.checkTheFollowing')}:\n1. ${t('notification.checkConfig')}\n2. ${t('notification.checkNetwork')}\n3. ${t('notification.checkPermissions')}`,
-      positiveText: t('common.ok'),
-    })
-
-    // 确保内核状态设为关闭
-    appState.setRunningState(false)
+    console.error('启动内核异常:', error)
+    message.error(`${t('notification.startFailed')}: ${error}`)
   } finally {
     isStarting.value = false
-    // 清理事件监听
-    mitt.off('kernel-start-failed')
-    mitt.off('connecting-status-changed')
   }
 }
 
 const stopKernel = async () => {
   try {
     isStopping.value = true
-    await kernelStore.stopKernel()
-    appState.setRunningState(false)
-    message.success(t('notification.kernelStopped'))
+    const { kernelService } = await import('@/services/kernel-service')
+    const result = await kernelService.stopKernel()
+    if (result.success) {
+      message.success(t('notification.kernelStopped'))
+    } else {
+      message.error(result.message || t('notification.stopFailed'))
+    }
+  } catch (error) {
+    console.error('停止内核异常:', error)
+    message.error(`${t('notification.stopFailed')}: ${error}`)
   } finally {
     isStopping.value = false
   }

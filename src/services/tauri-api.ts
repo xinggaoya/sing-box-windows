@@ -15,38 +15,87 @@ interface ProxiesData {
   proxies: Record<string, ProxyData>
 }
 
-// 内核相关接口
+// 内核相关接口 (重构版本)
 export const kernelApi = {
-  startKernel: async (proxyMode?: string, apiPort?: number) => {
+  // 新的内核管理接口
+  startKernel: async (options?: { config?: any; forceRestart?: boolean; timeoutMs?: number }) => {
     const appStore = useAppStore()
     await appStore.waitForDataRestore()
-    return invoke<void>('start_kernel', { proxyMode, apiPort: apiPort || appStore.apiPort })
+    return invoke<{ success: boolean; message: string }>('kernel_start', { 
+      options: {
+        config: options?.config || { 
+          proxy_mode: appStore.proxyMode, 
+          api_port: appStore.apiPort,
+          proxy_port: appStore.proxyPort,
+          prefer_ipv6: appStore.preferIpv6,
+          auto_start: false 
+        },
+        force_restart: options?.forceRestart || false,
+        timeout_ms: options?.timeoutMs || 30000,
+      }
+    })
   },
 
-  stopKernel: () => invoke<void>('stop_kernel'),
+  stopKernel: async (options?: { force?: boolean; timeoutMs?: number }) => 
+    invoke<{ success: boolean; message: string }>('kernel_stop', { 
+      options: {
+        force: options?.force || false,
+        timeout_ms: options?.timeoutMs || 10000,
+      }
+    }),
 
-  restartKernel: async () => {
+  restartKernel: async (options?: { force?: boolean; timeoutMs?: number }) => {
+    // 组合停止和启动操作
+    const stopResult = await kernelApi.stopKernel(options)
+    if (!stopResult.success) {
+      return stopResult
+    }
+    
+    // 等待1秒
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
     const appStore = useAppStore()
-    await appStore.waitForDataRestore()
-    return invoke<void>('restart_kernel', { apiPort: appStore.apiPort })
+    return kernelApi.startKernel({
+      config: { 
+        proxy_mode: appStore.proxyMode, 
+        api_port: appStore.apiPort,
+        proxy_port: appStore.proxyPort,
+        prefer_ipv6: appStore.preferIpv6,
+        auto_start: false 
+      },
+      forceRestart: true,
+      timeoutMs: options?.timeoutMs
+    })
   },
 
+  getKernelStatus: () => invoke<any>('kernel_get_status'),
+
+  getKernelVersion: () => invoke<string>('kernel_get_version'),
+
+  switchProxyMode: (mode: 'system' | 'tun' | 'manual') => 
+    invoke<{ success: boolean; message: string }>('kernel_switch_proxy_mode', { mode }),
+
+  toggleIpVersion: (preferIpv6: boolean) => 
+    invoke<{ success: boolean; message: string }>('kernel_toggle_ip_version', { prefer_ipv6: preferIpv6 }),
+
+  getKernelConfig: () => invoke<any>('kernel_get_config'),
+
+  updateKernelConfig: (config: any) => 
+    invoke<{ success: boolean; message: string }>('kernel_update_config', { config }),
+
+  checkKernelHealth: () => invoke<{ healthy: boolean; issues: string[] }>('kernel_check_health'),
+
+  // 兼容旧接口
+  isKernelRunning: () => invoke<boolean>('is_kernel_running'),
   checkKernelVersion: () => invoke<string>('check_kernel_version'),
-
   checkKernelStatus: (apiPort?: number) => {
     const appStore = useAppStore()
-    return invoke<any>('check_kernel_status', { apiPort: apiPort || appStore.apiPort })
+    return invoke<any>('check_kernel_status', { api_port: apiPort || appStore.apiPort })
   },
-
   getKernelRunningState: () => invoke<boolean>('is_kernel_running'),
-
   getApiToken: () => invoke<string>('get_api_token'),
-
   downloadKernel: (window: any) => invoke<void>('download_kernel', { window }),
-
-  installKernel: () => invoke<void>('install_kernel'),
-
-  isKernelRunning: () => invoke<boolean>('is_kernel_running')
+  installKernel: () => invoke<void>('install_kernel')
 }
 
 // 代理相关接口

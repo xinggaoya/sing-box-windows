@@ -75,6 +75,22 @@ export class EventService {
   }
 
   /**
+   * 通用事件监听方法
+   */
+  public on(eventName: string, callback: (data: any) => void): () => void {
+    listen(eventName, (event) => {
+      callback(event.payload)
+    }).then(unlisten => {
+      this.eventListeners.set(eventName, unlisten)
+    })
+    
+    // 返回取消监听的函数
+    return () => {
+      this.removeEventListener(eventName)
+    }
+  }
+
+  /**
    * 移除特定事件监听器
    */
   public removeEventListener(eventName: string) {

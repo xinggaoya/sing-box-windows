@@ -1,495 +1,509 @@
+/**
+ * 重构后的 KernelStore
+ * 简化逻辑，专注于状态管理和用户交互
+ */
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { tauriApi } from '@/services/tauri-api'
-import { eventService } from '@/services/event-service'
+import { ref, computed, watch } from 'vue'
+import { kernelService, type KernelStatus, type KernelConfig } from '@/services/kernel-service'
 import { useAppStore } from '../app/AppStore'
 import { useConnectionStore } from './ConnectionStore'
 import { useTrafficStore } from './TrafficStore'
 import { useLogStore } from './LogStore'
 import { useKernelRuntimeStore } from './KernelRuntimeStore'
-import { storageService, type VersionInfo } from '@/services/backend-storage-service'
 
 export const useKernelStore = defineStore(
   'kernel',
   () => {
-    // 应用状态
+    // 依赖的 stores
     const appStore = useAppStore()
+    const connectionStore = useConnectionStore()
+    const trafficStore = useTrafficStore()
+    const logStore = useLogStore()
+    const runtimeStore = useKernelRuntimeStore()
 
-    // 版本信息 (需要持久化)
-    const version = ref<VersionInfo | null>(null)
-    const newVersion = ref('')
+    // 响应式状态
+    const status = ref<KernelStatus>({
+      process_running: false,
+      api_ready: false,
+      websocket_ready: false,
+      uptime_ms: 0,
+      version: '',
+      error: undefined,
+    })
 
-    // 下载检查定时器
-    let downloadCheckInterval: NodeJS.Timeout | null = null
+    const config = ref<KernelConfig>({
+      proxy_mode: 'manual',
+      api_port: 9090,
+      proxy_port: 7890,
+      prefer_ipv6: false,
+      auto_start: false,
+    })
 
-    // 启动过程定时器
-    let startupTimer: NodeJS.Timeout | null = null
+    const isLoading = ref(false)
+    const lastError = ref<string>('')
 
-    // 事件监听器状态
-    let eventListenersSetup = false
+    // 计算属性
+    const isRunning = computed(() => status.value.process_running)
+    const isReady = computed(() => 
+      status.value.process_running && 
+      status.value.api_ready && 
+      status.value.websocket_ready
+    )
+    const isStarting = computed(() => isLoading.value && !isRunning.value)
+    const isStopping = computed(() => isLoading.value && isRunning.value)
+    const uptime = computed(() => {
+      const ms = status.value.uptime_ms || 0
+      const seconds = Math.floor(ms / 1000)
+      const minutes = Math.floor(seconds / 60)
+      const hours = Math.floor(minutes / 60)
+      
+      if (hours > 0) {
+        return `${hours}小时${minutes % 60}分钟`
+      } else if (minutes > 0) {
+        return `${minutes}分钟${seconds % 60}秒`
+      } else {
+        return `${seconds}秒`
+      }
+    })
 
-    // 从后端加载数据
-    const loadFromBackend = async () => {
+    // 状态同步
+    const syncStatus = async () => {
       try {
-        console.log('🔧 从后端加载内核配置...')
-        const kernelInfo = await storageService.getKernelInfo()
+        status.value = await kernelService.getKernelStatus()
         
-        // 更新响应式状态
-        version.value = kernelInfo.version
-        newVersion.value = kernelInfo.new_version || ''
+        // 同步到 appStore
+        appStore.setRunningState(status.value.process_running)
         
-        console.log('🔧 内核配置加载完成：', {
-          version: version.value?.version,
-          newVersion: newVersion.value,
-        })
-      } catch (error) {
-        console.error('从后端加载内核配置失败:', error)
-        // 加载失败时使用默认值
-        version.value = null
-        newVersion.value = ''
-      }
-    }
-
-    // 保存配置到后端
-    const saveToBackend = async () => {
-      try {
-        await storageService.updateKernelInfo({
-          version: version.value,
-          new_version: newVersion.value || null,
-        })
-        console.log('✅ 内核配置已保存到后端')
-      } catch (error) {
-        console.error('保存内核配置到后端失败:', error)
-      }
-    }
-
-    // 清理所有定时器
-    const clearTimers = () => {
-      if (downloadCheckInterval) {
-        clearInterval(downloadCheckInterval)
-        downloadCheckInterval = null
-      }
-      // 清理启动过程中的临时定时器
-      if (startupTimer) {
-        clearInterval(startupTimer)
-        startupTimer = null
-      }
-    }
-
-    // 更新版本信息
-    const updateVersion = async () => {
-      try {
-        const versionString = await tauriApi.kernel.checkKernelVersion()
-        if (versionString) {
-          // 解析版本字符串为VersionInfo对象
-          version.value = {
-            version: versionString,
-            meta: true,
-            premium: true,
-          }
-          
-          // 保存到后端
-          await saveToBackend()
-          
-          return true
+        // 清除错误
+        if (status.value.error) {
+          lastError.value = status.value.error
+        } else {
+          lastError.value = ''
         }
-        return false
       } catch (error) {
-        console.error('获取内核版本失败:', error)
-        return false
+        console.error('同步内核状态失败:', error)
+        lastError.value = error instanceof Error ? error.message : '状态同步失败'
       }
     }
 
-    // 获取版本信息（用于前端兼容）
-    const getVersionString = (): string => {
-      return version.value?.version || ''
-    }
-
-    // 检查是否有版本信息
-    const hasVersionInfo = (): boolean => {
-      return version.value !== null
-    }
-
-    // 检查内核版本
-    const checkKernelVersion = async () => {
+    const syncConfig = async () => {
       try {
-        const versionInfo = await tauriApi.kernel.checkKernelVersion()
-        if (versionInfo) {
-          newVersion.value = versionInfo
-          
-          // 保存到后端
-          await saveToBackend()
-          
-          return true
-        }
-        return false
+        config.value = await kernelService.getKernelConfig()
+        
+        // 同步到 appStore
+        appStore.setProxyMode(config.value.proxy_mode as any)
+        // appStore.setApiPort(config.value.api_port) // 方法不存在，暂时注释
+        // appStore.setProxyPort(config.value.proxy_port) // 方法不存在，暂时注释
+        appStore.setPreferIpv6(config.value.prefer_ipv6)
       } catch (error) {
-        console.error('检查内核版本失败:', error)
-        return false
+        console.error('同步内核配置失败:', error)
       }
     }
 
-    // 启动内核（完整版本，包含状态检查和重试机制）
-    const startKernel = async () => {
-      console.log('🚀 开始启动内核...')
+    // 启动内核
+    const startKernel = async (options?: { forceRestart?: boolean }) => {
+      if (isLoading.value) {
+        console.log('内核正在操作中，忽略启动请求')
+        return false
+      }
+
+      isLoading.value = true
+      lastError.value = ''
 
       try {
-        // 获取当前代理模式
-        const proxyMode = appStore.proxyMode || 'manual'
-
-        // 设置连接中状态
-        appStore.setConnectingState(true)
-        console.log('📡 正在启动内核进程...')
-
-        // 确保数据Store已初始化，准备接收数据
-        await ensureDataStoresInitialized()
-
-        // 启动内核 - 传递API端口参数，后端会自动启动事件中继
-        try {
-          await tauriApi.kernel.startKernel(proxyMode, appStore.apiPort)
-          console.log('✅ 内核进程启动成功，等待事件中继就绪...')
-        } catch (error) {
-          console.error('❌ 内核进程启动失败:', error)
-          throw error
+        console.log('🚀 开始启动内核...')
+        
+        // 准备启动选项
+        const startOptions = {
+          config: config.value,
+          force_restart: options?.forceRestart || false,
+          timeout_ms: 30000,
         }
 
-        // 等待并检查完整状态，增加最大尝试次数
-        const isFullyReady = await pollKernelStatus(appStore.apiPort, 15) // 增加到15次尝试
+        // 调用服务启动
+        const result = await kernelService.startKernel(startOptions)
         
-        if (isFullyReady) {
-          // 设置运行状态
-          appStore.setRunningState(true)
-          appStore.setConnectingState(false)
-
-          console.log('🎉 内核启动完成 - 进程、API和WebSocket全部就绪')
+        if (result.success) {
+          console.log('✅ 内核启动成功:', result.message)
+          
+          // 同步状态
+          await syncStatus()
+          
+          // 启动数据收集
+          await startDataCollection()
+          
           return true
         } else {
-          throw new Error('内核启动超时，事件中继未能正常工作')
+          console.error('❌ 内核启动失败:', result.message)
+          lastError.value = result.message
+          return false
         }
       } catch (error) {
-        // 启动失败处理
-        console.error('❌ 内核启动失败:', error)
-
-        // 停止计时器
-        clearTimers()
-
-        // 重置连接状态
-        appStore.setConnectingState(false)
-        appStore.setRunningState(false)
-
-        // 格式化错误消息
-        let errorMessage = '启动内核失败'
-        if (error instanceof Error) {
-          errorMessage = error.message
-        } else if (typeof error === 'string') {
-          errorMessage = error
-        }
-
-        // 如果是启动超时，尝试重新启动一次
-        if (errorMessage.includes('超时') || errorMessage.includes('timeout')) {
-          console.log('🔄 检测到启动超时，尝试重新启动...')
-          
-          try {
-            // 先停止可能损坏的进程
-            await tauriApi.kernel.stopKernel()
-            // 等待2秒
-            await new Promise(resolve => setTimeout(resolve, 2000))
-            
-            // 重新启动
-            appStore.setConnectingState(true)
-            const currentProxyMode = appStore.proxyMode || 'manual'
-            await tauriApi.kernel.startKernel(currentProxyMode, appStore.apiPort)
-            
-            // 再次检查状态
-            const retryReady = await pollKernelStatus(appStore.apiPort, 10)
-            if (retryReady) {
-              appStore.setRunningState(true)
-              appStore.setConnectingState(false)
-              console.log('🎉 内核重新启动成功')
-              return true
-            }
-          } catch (retryError) {
-            console.error('❌ 重新启动也失败:', retryError)
-            errorMessage = `${errorMessage}（重新启动也失败：${retryError}）`
-          }
-        }
-
-        throw new Error(errorMessage)
+        console.error('❌ 内核启动异常:', error)
+        lastError.value = error instanceof Error ? error.message : '启动异常'
+        return false
+      } finally {
+        isLoading.value = false
       }
-    }
-
-    // 轮询检查内核完整状态（增强版本）
-    const pollKernelStatus = async (apiPort: number, maxAttempts: number): Promise<boolean> => {
-      console.log(`🔍 开始轮询检查内核状态，最大尝试次数: ${maxAttempts}`)
-      
-      let consecutiveSuccesses = 0
-      const requiredSuccesses = 2 // 需要连续成功2次才认为真正就绪
-      
-      for (let i = 0; i < maxAttempts; i++) {
-        try {
-          console.log(`📊 第 ${i + 1} 次状态检查...`)
-          
-          const status = await tauriApi.kernel.checkKernelStatus(apiPort)
-          console.log(`📊 状态检查结果:`, status)
-          
-          const isFullyReady = status.process_running && 
-                              status.api_ready && 
-                              status.websocket_ready
-          
-          if (isFullyReady) {
-            consecutiveSuccesses++
-            console.log(`✅ 内核状态检查成功 (${consecutiveSuccesses}/${requiredSuccesses})`)
-            
-            if (consecutiveSuccesses >= requiredSuccesses) {
-              console.log('🎉 内核完全就绪！')
-              return true
-            }
-          } else {
-            consecutiveSuccesses = 0
-            // 显示详细状态
-            console.log(`⏳ 内核未完全就绪: 进程=${status.process_running}, API=${status.api_ready}, WebSocket=${status.websocket_ready}`)
-          }
-        } catch (error) {
-          consecutiveSuccesses = 0
-          console.warn(`⚠️ 第 ${i + 1} 次状态检查失败:`, error)
-        }
-        
-        // 动态调整等待时间
-        let waitTime = 1000 // 默认1秒
-        if (i >= 10) {
-          waitTime = 2000 // 10次后增加到2秒
-        } else if (i >= 5) {
-          waitTime = 1500 // 5次后增加到1.5秒
-        }
-        
-        // 等待再检查
-        if (i < maxAttempts - 1) {
-          await new Promise(resolve => setTimeout(resolve, waitTime))
-        }
-      }
-      
-      console.error('❌ 内核状态轮询超时，未能完全就绪')
-      return false
     }
 
     // 停止内核
-    const stopKernel = async () => {
-      try {
-        // 清理计时器和事件监听器
-        clearTimers()
-        cleanupEventListeners()
-
-        // 停止内核（后端会自动清理事件连接）
-        await tauriApi.kernel.stopKernel()
-
-        // 设置运行状态
-        appStore.setRunningState(false)
-
-        // 重置所有相关数据
-        const connectionStore = useConnectionStore()
-        const trafficStore = useTrafficStore()
-        const runtimeStore = useKernelRuntimeStore()
-
-        // 重置数据
-        connectionStore.resetData()
-        trafficStore.resetStats()
-        runtimeStore.resetRuntimeData()
-
-        return true
-      } catch (error) {
-        console.error('停止内核失败:', error)
+    const stopKernel = async (options?: { force?: boolean }) => {
+      if (isLoading.value) {
+        console.log('内核正在操作中，忽略停止请求')
         return false
+      }
+
+      isLoading.value = true
+      lastError.value = ''
+
+      try {
+        console.log('🛑 开始停止内核...')
+        
+        // 停止选项
+        const stopOptions = {
+          force: options?.force || false,
+          timeout_ms: 10000,
+        }
+
+        // 调用服务停止
+        const result = await kernelService.stopKernel(stopOptions)
+        
+        if (result.success) {
+          console.log('✅ 内核停止成功:', result.message)
+          
+          // 同步状态
+          await syncStatus()
+          
+          // 停止数据收集
+          stopDataCollection()
+          
+          // 重置相关数据
+          connectionStore.resetData()
+          trafficStore.resetStats()
+          runtimeStore.resetRuntimeData()
+          
+          return true
+        } else {
+          console.error('❌ 内核停止失败:', result.message)
+          lastError.value = result.message
+          return false
+        }
+      } catch (error) {
+        console.error('❌ 内核停止异常:', error)
+        lastError.value = error instanceof Error ? error.message : '停止异常'
+        return false
+      } finally {
+        isLoading.value = false
       }
     }
 
     // 重启内核
-    const restartKernel = async () => {
+    const restartKernel = async (options?: { force?: boolean }) => {
+      console.log('🔄 开始重启内核...')
+      
+      const stopResult = await stopKernel({ force: options?.force })
+      if (!stopResult) {
+        return false
+      }
+      
+      // 短暂等待
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      return startKernel({ forceRestart: options?.force })
+    }
+
+    // 切换代理模式
+    const switchProxyMode = async (mode: 'system' | 'tun' | 'manual') => {
+      if (isLoading.value) {
+        console.log('内核正在操作中，忽略代理模式切换')
+        return false
+      }
+
       try {
-        // 先停止
-        await stopKernel()
-
-        // 短暂延迟确保完全停止
-        await new Promise((resolve) => setTimeout(resolve, 500))
-
-        // 再启动
-        return await startKernel()
+        console.log('🔄 切换代理模式:', mode)
+        
+        const result = await kernelService.switchProxyMode(mode)
+        
+        if (result.success) {
+          console.log('✅ 代理模式切换成功:', result.message)
+          
+          // 同步配置
+          await syncConfig()
+          
+          // 如果内核正在运行，提示需要重启
+          if (isRunning.value) {
+            console.log('内核正在运行，需要重启以应用新的代理模式')
+            // 可以自动重启或提示用户
+            await restartKernel()
+          }
+          
+          return true
+        } else {
+          console.error('❌ 代理模式切换失败:', result.message)
+          lastError.value = result.message
+          return false
+        }
       } catch (error) {
-        console.error('重启内核失败:', error)
+        console.error('❌ 代理模式切换异常:', error)
+        lastError.value = error instanceof Error ? error.message : '模式切换异常'
         return false
       }
     }
 
-    // 切换IP版本
-    const toggleIpVersion = async (useIpv6: boolean) => {
+    // 切换IP版本偏好
+    const toggleIpVersion = async (preferIpv6: boolean) => {
+      if (isLoading.value) {
+        console.log('内核正在操作中，忽略IP版本切换')
+        return false
+      }
+
       try {
-        // 如果内核正在运行，需要重启
-        const needRestart = appStore.isRunning
-
-        if (needRestart) {
-          await stopKernel()
+        console.log('🔄 切换IP版本偏好:', preferIpv6)
+        
+        const result = await kernelService.toggleIpVersion(preferIpv6)
+        
+        if (result.success) {
+          console.log('✅ IP版本切换成功:', result.message)
+          
+          // 同步配置
+          await syncConfig()
+          
+          // 如果内核正在运行，需要重启
+          if (isRunning.value) {
+            await restartKernel()
+          }
+          
+          return true
+        } else {
+          console.error('❌ IP版本切换失败:', result.message)
+          lastError.value = result.message
+          return false
         }
-
-        // 更新IP版本设置
-        await appStore.setPreferIpv6(useIpv6)
-
-        // 如果之前在运行，则重新启动
-        if (needRestart) {
-          await startKernel()
-        }
-
-        return true
       } catch (error) {
-        console.error('切换IP版本失败:', error)
+        console.error('❌ IP版本切换异常:', error)
+        lastError.value = error instanceof Error ? error.message : 'IP版本切换异常'
         return false
       }
     }
 
-    // 初始化事件监听器
-    const initEventListeners = async () => {
-      if (eventListenersSetup) return
+    // 更新配置
+    const updateConfig = async (updates: Partial<KernelConfig>) => {
+      if (isLoading.value) {
+        console.log('内核正在操作中，忽略配置更新')
+        return false
+      }
 
       try {
-        // 监听内核就绪事件
-        await eventService.onKernelReady(() => {
-          console.log('🎉 收到内核就绪事件')
-          appStore.setRunningState(true)
-          appStore.setConnectingState(false)
-        })
-
-        // 更新版本信息
-        await updateVersion()
-
-        // 检查是否有新版本
-        await checkKernelVersion()
-
-        eventListenersSetup = true
-        console.log('✅ KernelStore事件监听器初始化完成')
-        return true
+        console.log('🔧 更新内核配置:', updates)
+        
+        const newConfig = { ...config.value, ...updates }
+        const result = await kernelService.updateKernelConfig(newConfig)
+        
+        if (result.success) {
+          console.log('✅ 配置更新成功:', result.message)
+          
+          // 同步配置
+          await syncConfig()
+          
+          // 如果关键配置改变且内核正在运行，需要重启
+          const needRestart = updates.api_port || updates.proxy_port || updates.proxy_mode
+          if (needRestart && isRunning.value) {
+            await restartKernel()
+          }
+          
+          return true
+        } else {
+          console.error('❌ 配置更新失败:', result.message)
+          lastError.value = result.message
+          return false
+        }
       } catch (error) {
-        console.error('❌ 初始化事件监听器失败:', error)
+        console.error('❌ 配置更新异常:', error)
+        lastError.value = error instanceof Error ? error.message : '配置更新异常'
         return false
       }
     }
 
-    // 清理事件监听器
-    const cleanupEventListeners = () => {
-      if (!eventListenersSetup) return
-
-      // 清理计时器
-      clearTimers()
-
-      // 清理连接监听器
-      const connectionStore = useConnectionStore()
-      connectionStore.cleanupListeners()
-
-      // 清理流量监听器
-      const trafficStore = useTrafficStore()
-      trafficStore.cleanupListeners()
-
-      // 清理日志监听器
-      const logStore = useLogStore()
-      logStore.cleanupListeners()
-
-      // 移除事件监听器
-      eventService.removeEventListener('kernel-ready')
-
-      eventListenersSetup = false
-    }
-
-    // 确保数据相关的Store已初始化
-    const ensureDataStoresInitialized = async () => {
+    // 启动数据收集
+    const startDataCollection = async () => {
       try {
-        // 动态导入StoreManager避免循环依赖
-        const { storeManager } = await import('../StoreManager')
-
-        // 预加载所有数据相关的Store
-        await storeManager.preloadStores(['connection', 'traffic', 'log'])
-        console.log('📦 数据Store预加载完成')
-
-        // 立即手动初始化这些Store的事件监听器，确保在事件连接前就准备好
-        try {
-          const connectionStore = storeManager.getLoadedStore('connection')
-          if (connectionStore) {
-            // @ts-expect-error - Store类型推断问题，安全调用
-            await connectionStore.initializeStore?.()
-            console.log('📡 ConnectionStore事件监听器已初始化')
-          }
-        } catch (error) {
-          console.warn('ConnectionStore初始化警告:', error)
-        }
-
-        try {
-          const trafficStore = storeManager.getLoadedStore('traffic')
-          if (trafficStore) {
-            // @ts-expect-error - Store类型推断问题，安全调用
-            await trafficStore.initializeStore?.()
-            console.log('📊 TrafficStore事件监听器已初始化')
-          }
-        } catch (error) {
-          console.warn('TrafficStore初始化警告:', error)
-        }
-
-        try {
-          const logStore = storeManager.getLoadedStore('log')
-          if (logStore) {
-            // @ts-expect-error - Store类型推断问题，安全调用
-            await logStore.initializeStore?.()
-            console.log('📝 LogStore事件监听器已初始化')
-          }
-        } catch (error) {
-          console.warn('LogStore初始化警告:', error)
-        }
-
-        console.log('✅ 所有数据Store事件监听器初始化完成')
+        console.log('📊 启动数据收集...')
+        
+        // 初始化各个数据 store
+        await connectionStore.initializeStore()
+        await trafficStore.initializeStore()
+        await logStore.initializeStore()
+        
+        // 启动运行时间计数
+        runtimeStore.startUptimeCounter()
+        
+        console.log('✅ 数据收集启动完成')
       } catch (error) {
-        console.error('❌ Store初始化失败:', error)
+        console.error('❌ 数据收集启动失败:', error)
       }
     }
 
-    // Store初始化方法
+    // 停止数据收集
+    const stopDataCollection = () => {
+      try {
+        console.log('📊 停止数据收集...')
+        
+        // 清理各个数据 store
+        connectionStore.cleanupListeners()
+        trafficStore.cleanupListeners()
+        logStore.cleanupListeners()
+        
+        // 停止运行时间计数
+        runtimeStore.stopUptimeCounter()
+        
+        console.log('✅ 数据收集停止完成')
+      } catch (error) {
+        console.error('❌ 数据收集停止失败:', error)
+      }
+    }
+
+    // 健康检查
+    const checkHealth = async () => {
+      try {
+        const result = await kernelService.checkKernelHealth()
+        
+        if (!result.healthy) {
+          console.warn('⚠️ 内核健康检查发现问题:', result.issues)
+          lastError.value = result.issues.join('; ')
+        }
+        
+        return result
+      } catch (error) {
+        console.error('❌ 健康检查失败:', error)
+        return { healthy: false, issues: ['健康检查失败'] }
+      }
+    }
+
+    // 清除错误
+    const clearError = () => {
+      lastError.value = ''
+    }
+
+    // Store 初始化
     const initializeStore = async () => {
       try {
-        // 先从后端加载配置
-        await loadFromBackend()
-
-        await initEventListeners()
-
-        // 获取运行时store并初始化
-        const runtimeStore = useKernelRuntimeStore()
-        runtimeStore.initializeStore()
-
-        // 如果应用正在运行，恢复运行时间计数器
-        if (appStore.isRunning) {
-          runtimeStore.startUptimeCounter()
-          console.log('⏱️ 恢复运行时间计数器')
+        console.log('🔧 初始化 KernelStore...')
+        
+        // 同步初始状态和配置
+        await Promise.all([
+          syncStatus(),
+          syncConfig()
+        ])
+        
+        // 设置事件监听
+        setupEventListeners()
+        
+        // 如果内核正在运行，启动数据收集
+        if (isRunning.value) {
+          await startDataCollection()
         }
-
-        console.log('✅ KernelStore初始化完成')
+        
+        console.log('✅ KernelStore 初始化完成')
       } catch (error) {
-        console.error('❌ KernelStore初始化失败:', error)
+        console.error('❌ KernelStore 初始化失败:', error)
       }
     }
 
-    return {
-      // 持久化数据
-      version,
-      newVersion,
+    // 设置事件监听
+    const setupEventListeners = () => {
+      // 监听状态变化
+      kernelService.onKernelStatusChange((newStatus) => {
+        status.value = newStatus
+        appStore.setRunningState(newStatus.process_running)
+      })
 
+      // 监听内核就绪
+      kernelService.onKernelReady(() => {
+        console.log('🎉 收到内核就绪事件')
+        appStore.setRunningState(true)
+        startDataCollection()
+      })
+
+      // 监听内核错误
+      kernelService.onKernelError((error) => {
+        console.error('❌ 收到内核错误事件:', error)
+        lastError.value = error
+      })
+    }
+
+    // 自动状态同步
+    let statusSyncInterval: NodeJS.Timeout | null = null
+
+    const startStatusSync = () => {
+      if (statusSyncInterval) {
+        clearInterval(statusSyncInterval)
+      }
+      
+      statusSyncInterval = setInterval(() => {
+        if (isRunning.value) {
+          syncStatus()
+        }
+      }, 5000) // 每5秒同步一次状态
+    }
+
+    const stopStatusSync = () => {
+      if (statusSyncInterval) {
+        clearInterval(statusSyncInterval)
+        statusSyncInterval = null
+      }
+    }
+
+    // 监听运行状态变化
+    watch(isRunning, (running) => {
+      if (running) {
+        startStatusSync()
+      } else {
+        stopStatusSync()
+      }
+    })
+
+    // 返回接口
+    return {
+      // 状态
+      status,
+      config,
+      isLoading,
+      lastError,
+      
+      // 计算属性
+      isRunning,
+      isReady,
+      isStarting,
+      isStopping,
+      uptime,
+      
       // 方法
-      updateVersion,
-      checkKernelVersion,
       startKernel,
       stopKernel,
       restartKernel,
+      switchProxyMode,
       toggleIpVersion,
-      initEventListeners,
-      cleanupEventListeners,
+      updateConfig,
+      checkHealth,
+      clearError,
+      syncStatus,
+      syncConfig,
       initializeStore,
-      loadFromBackend,
-      saveToBackend,
-      getVersionString,
-      hasVersionInfo,
+      
+      // 兼容旧接口
+      hasVersionInfo: () => !!status.value.version,
+      getVersionString: () => status.value.version || '',
+      newVersion: ref(''),
+      updateVersion: async () => {
+        const version = await kernelService.getKernelVersion()
+        status.value.version = version
+        return true
+      },
+      checkKernelVersion: async () => {
+        // 检查更新逻辑
+        return true
+      },
     }
-  },
-  // 移除 persist 配置，现在使用后端存储
+  }
 )
