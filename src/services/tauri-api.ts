@@ -147,10 +147,10 @@ export const subscriptionApi = {
     })
   },
 
-  addManualSubscription: async (url: string, useOriginalConfig: boolean) => {
+  addManualSubscription: async (content: string, useOriginalConfig: boolean) => {
     const appStore = useAppStore()
     return invoke<void>('add_manual_subscription', {
-      url,
+      content,
       useOriginalConfig,
       proxyPort: appStore.proxyPort,
       apiPort: appStore.apiPort
