@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
 import { useMessage } from 'naive-ui'
-import { config } from '@/services/tauri-api'
+import { config, tauriApi } from '@/services/tauri-api'
 
 // 代理模式类型
 export type ProxyMode = 'system' | 'tun' | 'manual'
@@ -52,6 +52,11 @@ export const useAppStore = defineStore(
     const wsConnected = ref(false)
     // 连接中状态（正在启动内核但尚未完成连接）
     const isConnecting = ref(false)
+
+    // 开机自启动检测
+    const isAutostartScenario = ref(false)
+    // 自动启动延迟计时器
+    let autostartDelayTimer: ReturnType<typeof setTimeout> | null = null
 
     // 数据恢复完成标志 - 解决启动竞态条件
     const isDataRestored = ref(false)
@@ -131,8 +136,71 @@ export const useAppStore = defineStore(
       // 初始化数据恢复Promise
       initializeDataRestore()
 
+      // 检测是否是开机自启动场景
+      await detectAutostartScenario()
+
       // WebSocket连接状态管理现在由后端直接处理，无需前端监听
       console.log('✅ AppStore初始化完成 - 使用Tauri事件系统')
+    }
+
+    // 检测开机自启动场景
+    const detectAutostartScenario = async () => {
+      try {
+        // 检查系统启动时间
+        const systemUptime = await getSystemUptime()
+        const isRecentStartup = systemUptime < 180 // 3分钟内认为是开机自启动
+        
+        // 检查应用启动时间
+        const appStartTime = Date.now() - performance.now()
+        const isRecentAppStart = (Date.now() - appStartTime) < 30000 // 30秒内启动的应用
+        
+        isAutostartScenario.value = isRecentStartup && isRecentAppStart
+        
+        if (isAutostartScenario.value) {
+          console.log(`🕐 检测到开机自启动场景: 系统运行${systemUptime}秒, 应用启动${Math.round((Date.now() - appStartTime) / 1000)}秒前`)
+        } else {
+          console.log(`🖥️ 检测到正常启动场景: 系统运行${systemUptime}秒, 应用启动${Math.round((Date.now() - appStartTime) / 1000)}秒前`)
+        }
+      } catch (error) {
+        console.warn('检测开机自启动场景失败:', error)
+        isAutostartScenario.value = false
+      }
+    }
+
+    // 获取系统运行时间（秒）
+    const getSystemUptime = async (): Promise<number> => {
+      try {
+        // 使用Tauri命令获取系统启动时间
+        const uptime = await tauriApi.system.getSystemUptime()
+        return Math.floor(uptime / 1000) // 转换为秒
+      } catch (error) {
+        console.warn('无法获取系统运行时间，使用应用启动时间估算')
+        // 如果无法获取系统时间，使用性能时间估算
+        return Math.floor(performance.now() / 1000)
+      }
+    }
+
+    // 延迟启动内核（用于开机自启动场景）
+    const delayedKernelStart = async (delayMs: number = 10000): Promise<boolean> => {
+      console.log(`⏰ 开机自启动场景，延迟${delayMs/1000}秒后启动内核...`)
+      
+      return new Promise((resolve) => {
+        autostartDelayTimer = setTimeout(async () => {
+          try {
+            console.log('🚀 延迟时间到，开始启动内核...')
+            // 动态导入避免循环依赖
+            const { useKernelStore } = await import('../kernel/KernelStore')
+            const kernelStore = useKernelStore()
+            const result = await kernelStore.startKernel()
+            resolve(result)
+          } catch (error) {
+            console.error('延迟启动内核失败:', error)
+            resolve(false)
+          } finally {
+            autostartDelayTimer = null
+          }
+        }, delayMs)
+      })
     }
 
     // Store清理方法
@@ -140,6 +208,11 @@ export const useAppStore = defineStore(
       if (connectionCheckTimeout) {
         clearTimeout(connectionCheckTimeout)
         connectionCheckTimeout = null
+      }
+      
+      if (autostartDelayTimer) {
+        clearTimeout(autostartDelayTimer)
+        autostartDelayTimer = null
       }
     }
 
@@ -255,6 +328,7 @@ export const useAppStore = defineStore(
       preferIpv6,
       proxyPort,
       apiPort,
+      isAutostartScenario,
       setRunningState,
       setConnectingState,
       toggleAutoStart,
@@ -272,6 +346,8 @@ export const useAppStore = defineStore(
       cleanupStore,
       markDataRestored,
       waitForDataRestore,
+      detectAutostartScenario,
+      delayedKernelStart,
     }
   },
   {

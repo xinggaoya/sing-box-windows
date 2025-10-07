@@ -41,7 +41,11 @@ interface PersistOptions {
 
 // 扩展Pinia选项类型
 declare module 'pinia' {
-  interface DefineStoreOptionsBase<S, Store> {
+  export interface DefineStoreOptions<Id, S, G, A> {
+    persist?: boolean | PersistOptions
+  }
+  
+  export interface DefineSetupStoreOptions<Id, S, G, A> {
     persist?: boolean | PersistOptions
   }
 }
@@ -141,7 +145,7 @@ function piniaTauriPersist(context: PiniaPluginContext) {
 
           if (paths && paths.length > 0) {
             // 仅恢复指定路径
-            paths.forEach((path) => {
+            paths.forEach((path: string) => {
               if (storedState[path] !== undefined) {
                 patchState[path] = storedState[path]
               }
@@ -149,7 +153,7 @@ function piniaTauriPersist(context: PiniaPluginContext) {
           } else if (excludeKeys && excludeKeys.length > 0) {
             // 排除特定键
             patchState = { ...storedState }
-            excludeKeys.forEach((key) => {
+            excludeKeys.forEach((key: string) => {
               delete patchState[key]
             })
           } else {
@@ -204,7 +208,7 @@ function piniaTauriPersist(context: PiniaPluginContext) {
 
         if (paths && paths.length > 0) {
           // 仅保存指定路径
-          paths.forEach((path) => {
+          paths.forEach((path: string) => {
             if (state[path] !== undefined) {
               stateToStore[path] = state[path]
             }
@@ -212,7 +216,7 @@ function piniaTauriPersist(context: PiniaPluginContext) {
         } else if (excludeKeys && excludeKeys.length > 0) {
           // 排除特定键
           stateToStore = { ...JSON.parse(JSON.stringify(state)) }
-          excludeKeys.forEach((key) => {
+          excludeKeys.forEach((key: string) => {
             delete stateToStore[key]
           })
         } else {
@@ -221,7 +225,7 @@ function piniaTauriPersist(context: PiniaPluginContext) {
 
         // 排除高频更新的键（如实时流量数据）
         if (excludeHighFrequencyKeys && excludeHighFrequencyKeys.length > 0) {
-          excludeHighFrequencyKeys.forEach((key) => {
+          excludeHighFrequencyKeys.forEach((key: string) => {
             delete stateToStore[key]
           })
         }

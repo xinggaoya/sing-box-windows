@@ -64,6 +64,7 @@ pub fn run() {
             crate::app::core::kernel_service::start_websocket_relay,
             crate::app::core::kernel_service::is_kernel_running,
             crate::app::core::kernel_service::check_kernel_status,
+            crate::app::core::kernel_service::get_system_uptime,
             // Network - Subscription service commands
             crate::app::network::subscription_service::download_subscription,
             crate::app::network::subscription_service::add_manual_subscription,

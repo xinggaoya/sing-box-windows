@@ -6,7 +6,7 @@ use std::process::{Child, Command};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub struct ProcessManager {
     process: Arc<RwLock<Option<Child>>>,
@@ -19,8 +19,10 @@ impl ProcessManager {
         }
     }
 
-    // 启动进程
+    // 启动进程（带系统环境检查和重试机制）
     pub async fn start(&self) -> Result<()> {
+        info!("🚀 开始启动内核进程...");
+        
         // 验证配置文件有效性
         self.validate_config().await?;
 
@@ -84,7 +86,107 @@ impl ProcessManager {
         let kernel_path = paths::get_kernel_path();
         let kernel_work_dir = paths::get_kernel_work_dir();
 
-        // 启动新进程
+        // 检查系统环境，特别是在开机自启动时
+        self.check_system_environment().await?;
+
+        // 多次尝试启动进程
+        let max_attempts = 3;
+        let mut last_error = ProcessError::StartFailed("未知错误".to_string());
+        
+        for attempt in 1..=max_attempts {
+            info!("🔧 尝试启动内核进程，第 {}/{} 次", attempt, max_attempts);
+            
+            match self.try_start_kernel_process(&kernel_path, &kernel_work_dir).await {
+                Ok(child) => {
+                    // 保存进程句柄
+                    {
+                        let mut process_guard = self.process.write().await;
+                        *process_guard = Some(child);
+                    }
+                    
+                    // 更稳健的启动检查
+                    if self.verify_startup().await {
+                        info!("✅ 内核进程启动成功并验证通过");
+                        return Ok(());
+                    } else {
+                        last_error = ProcessError::StartFailed("内核进程启动后验证失败".to_string());
+                        warn!("❌ 第{}次启动后验证失败", attempt);
+                        
+                        // 清理失败的进程
+                        if let Err(e) = self.cleanup_failed_process().await {
+                            error!("清理失败进程时出错: {}", e);
+                        }
+                    }
+                },
+                Err(e) => {
+                    last_error = e;
+                    error!("❌ 第{}次启动失败: {}", attempt, last_error);
+                }
+            }
+            
+            // 如果不是最后一次尝试，等待后重试
+            if attempt < max_attempts {
+                let delay = Duration::from_secs(2 * attempt as u64);
+                warn!("⏳ 第{}次启动失败，{}秒后重试...", attempt, delay.as_secs());
+                tokio::time::sleep(delay).await;
+            }
+        }
+        
+        Err(last_error)
+    }
+    
+    // 检查系统环境
+    async fn check_system_environment(&self) -> Result<()> {
+        info!("🔍 检查系统环境...");
+        
+        // 检查是否有足够的系统资源
+        #[cfg(windows)]
+        {
+            // 检查系统启动时间，如果是刚启动，可能需要等待更长时间
+            match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+                Ok(uptime) => {
+                    let uptime_minutes = uptime.as_secs() / 60;
+                    if uptime_minutes < 2 {
+                        info!("⏰ 系统刚启动{}分钟，增加启动等待时间", uptime_minutes);
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                    }
+                }
+                Err(e) => {
+                    warn!("无法获取系统启动时间: {}", e);
+                }
+            }
+        }
+        
+        // 检查内核文件是否可执行
+        let kernel_path = paths::get_kernel_path();
+        if !kernel_path.exists() {
+            return Err(ProcessError::ConfigError(format!(
+                "内核文件不存在: {}",
+                kernel_path.to_str().unwrap_or("unknown")
+            )));
+        }
+        
+        // 检查工作目录
+        let kernel_work_dir = paths::get_kernel_work_dir();
+        if !kernel_work_dir.exists() {
+            if let Err(e) = tokio::fs::create_dir_all(&kernel_work_dir).await {
+                return Err(ProcessError::SystemError(format!(
+                    "无法创建工作目录: {}",
+                    e
+                )));
+            }
+        }
+        
+        info!("✅ 系统环境检查完成");
+        Ok(())
+    }
+    
+    // 尝试启动内核进程
+    async fn try_start_kernel_process(
+        &self,
+        kernel_path: &std::path::Path,
+        kernel_work_dir: &std::path::Path,
+    ) -> Result<std::process::Child> {
         let child = Command::new(kernel_path)
             .args(&[
                 "run",
@@ -96,22 +198,46 @@ impl ProcessManager {
             .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
-
-        // 保存进程句柄
-        {
-            let mut process_guard = self.process.write().await;
-            *process_guard = Some(child);
+            
+        Ok(child)
+    }
+    
+    // 验证启动是否成功
+    async fn verify_startup(&self) -> bool {
+        info!("🔍 验证内核启动状态...");
+        
+        // 多次检查，确保真正启动成功
+        for i in 1..=5 {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            
+            if self.is_running().await {
+                info!("✅ 内核状态验证通过（第{}次检查）", i);
+                return true;
+            } else {
+                debug!("⏳ 内核尚未就绪，第{}次检查", i);
+            }
         }
-
-        // 等待一段时间确保内核启动
-        sleep(Duration::from_secs(1)).await;
-
-        // 检查内核是否成功启动
-        if !self.is_running().await {
-            return Err(ProcessError::StartFailed("内核启动失败".to_string()));
+        
+        error!("❌ 内核启动验证失败，多次检查都未通过");
+        false
+    }
+    
+    // 清理失败的进程
+    async fn cleanup_failed_process(&self) -> Result<()> {
+        let mut process_guard = self.process.write().await;
+        if let Some(mut child) = process_guard.take() {
+            if let Err(e) = child.kill() {
+                warn!("清理失败进程时出错: {}", e);
+                // 尝试强制终止
+                #[cfg(windows)]
+                {
+                    let pid = child.id();
+                    if let Err(e) = kill_process_by_pid(pid) {
+                        error!("强制终止进程失败: {}", e);
+                    }
+                }
+            }
         }
-
-        info!("{}", messages::INFO_PROCESS_STARTED);
         Ok(())
     }
 

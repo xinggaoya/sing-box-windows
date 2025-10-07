@@ -171,6 +171,8 @@ export const systemApi = {
 
   restartAsAdmin: () => invoke<void>('restart_as_admin'),
 
+  getSystemUptime: () => invoke<number>('get_system_uptime'),
+
   checkUpdate: (currentVersion?: string, includePrerelease?: boolean) => {
     const version = currentVersion || '1.8.2' // 默认版本
     const includePre = includePrerelease || false

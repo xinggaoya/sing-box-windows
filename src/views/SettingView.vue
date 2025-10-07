@@ -279,6 +279,41 @@
         </div>
       </section>
 
+      <!-- 开发者工具区域 -->
+      <section class="settings-section">
+        <div class="section-header">
+          <div class="section-icon developer-icon">
+            <n-icon size="18"><CodeOutline /></n-icon>
+          </div>
+          <div class="section-info">
+            <h2 class="section-title">{{ t('setting.developer.title') }}</h2>
+          </div>
+        </div>
+
+        <div class="section-content">
+          <div class="settings-grid">
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-title">{{ t('setting.developer.openDevtools') }}</div>
+                <div class="setting-desc">{{ t('setting.developer.description') }}</div>
+              </div>
+              <n-button
+                size="small"
+                @click="handleOpenDevtools"
+                :loading="devtoolsLoading"
+                class="setting-button"
+              >
+                {{ t('setting.developer.openDevtools') }}
+              </n-button>
+            </div>
+          </div>
+
+          <n-alert type="info" :show-icon="false" size="small" class="compact-alert">
+            {{ t('setting.developer.warning') }}
+          </n-alert>
+        </div>
+      </section>
+
       <!-- 关于信息区域 -->
       <section class="settings-section">
         <div class="section-header">
@@ -945,6 +980,10 @@ onUnmounted(() => {
 
 .update-icon {
   background: linear-gradient(135deg, #06b6d4, #0891b2);
+}
+
+.developer-icon {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
 }
 
 .about-icon {

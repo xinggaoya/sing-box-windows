@@ -80,6 +80,15 @@ interface KernelStore {
   initEventListeners: () => void
 }
 
+interface AppStore {
+  isAutostartScenario: boolean
+  delayedKernelStart: (delayMs?: number) => Promise<boolean>
+  setRunningState: (state: boolean) => void
+  autoStartKernel: boolean
+  proxyMode: string
+  switchProxyMode: (mode: string) => Promise<void>
+}
+
 // 消息消费组件
 const MessageConsumer = defineComponent({
   name: 'MessageConsumer',
@@ -238,49 +247,29 @@ async function initializeApp() {
   }
 }
 
-// 简化的内核自动启动函数
+// 简化的内核自动启动函数（增强版本，支持开机自启动检测）
 async function startKernelWithRetry() {
   console.log('🚀 检测到自动启动内核设置，开始启动...')
 
   try {
-    // 等待应用完全初始化
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-
-    // 检查管理员权限和代理模式
-    const isAdmin = await tauriApi.system.checkAdmin()
-    const currentProxyMode = appStore?.proxyMode || 'system'
-
-    console.log(`🔍 自启动检查 - 管理员权限: ${isAdmin}, 当前代理模式: ${currentProxyMode}`)
-
-    // 如果不是管理员权限且当前模式是TUN，则切换为system模式
-    if (!isAdmin && currentProxyMode === 'tun') {
-      console.log('⚠️ 检测到非管理员权限运行且为TUN模式，自动切换为system模式')
-
-      try {
-        // 切换为system模式
-        await tauriApi.proxy.setSystemProxy()
-        if (appStore) {
-          await appStore.switchProxyMode('system')
-        }
-        console.log('✅ 已自动切换为system模式')
-      } catch (error) {
-        console.error('❌ 切换为system模式失败:', error)
-        // 即使切换失败也继续尝试启动内核
+    // 检测是否是开机自启动场景
+    if (appStore?.isAutostartScenario) {
+      console.log('🕐 检测到开机自启动场景，使用延迟启动策略')
+      
+      // 开机自启动场景：延迟10-15秒让系统完全就绪
+      const delay = 10000 + Math.random() * 5000 // 10-15秒随机延迟
+      const success = await appStore.delayedKernelStart(delay)
+      
+      if (success) {
+        console.log('✅ 开机自启动延迟启动内核成功！')
+        return
+      } else {
+        console.warn('⚠️ 开机自启动延迟启动失败，尝试正常启动流程')
       }
     }
 
-    // 加载内核Store
-    const kernelStore = await storeManager.loadStore<KernelStore>('kernel')
-
-    // 初始化事件监听器
-    console.log('🎧 初始化事件监听器...')
-    await kernelStore.initEventListeners()
-
-    // 启动内核（后端已包含完整检查）
-    console.log('🚀 启动内核，后端将进行完整就绪检查...')
-    await kernelStore.startKernel()
-
-    console.log('✅ 内核自动启动成功！')
+    // 正常启动流程
+    await normalKernelStart()
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('❌ 内核自动启动失败:', errorMessage)
@@ -293,6 +282,48 @@ async function startKernelWithRetry() {
     // 提示用户可以手动启动
     console.log('💡 提示：您可以在主页手动启动内核')
   }
+}
+
+// 正常内核启动流程
+async function normalKernelStart() {
+  // 等待应用完全初始化
+  await new Promise((resolve) => setTimeout(resolve, 3000))
+
+  // 检查管理员权限和代理模式
+  const isAdmin = await tauriApi.system.checkAdmin()
+  const currentProxyMode = appStore?.proxyMode || 'system'
+
+  console.log(`🔍 自启动检查 - 管理员权限: ${isAdmin}, 当前代理模式: ${currentProxyMode}`)
+
+  // 如果不是管理员权限且当前模式是TUN，则切换为system模式
+  if (!isAdmin && currentProxyMode === 'tun') {
+    console.log('⚠️ 检测到非管理员权限运行且为TUN模式，自动切换为system模式')
+
+    try {
+      // 切换为system模式
+      await tauriApi.proxy.setSystemProxy()
+      if (appStore) {
+        await appStore.switchProxyMode('system')
+      }
+      console.log('✅ 已自动切换为system模式')
+    } catch (error) {
+      console.error('❌ 切换为system模式失败:', error)
+      // 即使切换失败也继续尝试启动内核
+    }
+  }
+
+  // 加载内核Store
+  const kernelStore = await storeManager.loadStore<KernelStore>('kernel')
+
+  // 初始化事件监听器
+  console.log('🎧 初始化事件监听器...')
+  await kernelStore.initEventListeners()
+
+  // 启动内核（后端已包含完整检查）
+  console.log('🚀 启动内核，后端将进行完整就绪检查...')
+  await kernelStore.startKernel()
+
+  console.log('✅ 内核自动启动成功！')
 }
 
 // 清理所有监听器

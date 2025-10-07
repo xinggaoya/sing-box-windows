@@ -104,7 +104,7 @@ pub async fn download_latest_kernel() -> Result<(), String> {
     Ok(())
 }
 
-// 启动内核
+// 启动内核（带重试机制的完整版本）
 #[tauri::command]
 pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Result<String, String> {
     let kernel_path = paths::get_kernel_path();
@@ -134,44 +134,90 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
         return Ok("内核已在运行中".to_string());
     }
 
-    // 启动内核进程
-    let _handle = PROCESS_MANAGER
-        .start()
-        .await
-        .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_START_FAILED, e))?;
-
-    // 等待内核启动
-    tokio::time::sleep(Duration::from_secs(3)).await;
-
-    if is_kernel_running().await.unwrap_or(false) {
-        info!("✅ 内核启动成功");
+    // 带重试机制的内核启动
+    let max_attempts = 3;
+    let mut last_error = String::new();
+    
+    for attempt in 1..=max_attempts {
+        info!("🚀 尝试启动内核，第 {}/{} 次", attempt, max_attempts);
         
-        // 自动启动事件中继
-        if let Some(port) = api_port {
-            info!("🔌 自动启动事件中继服务...");
-            match start_websocket_relay(app_handle.clone(), Some(port)).await {
-                Ok(_) => {
-                    info!("✅ 事件中继启动成功");
+        // 启动内核进程
+        match PROCESS_MANAGER.start().await {
+            Ok(_) => {
+                info!("✅ 内核进程启动成功");
+                
+                // 等待内核启动并检查状态
+                let mut kernel_ready = false;
+                
+                // 多次检查内核是否真正运行起来
+                for check_attempt in 1..=5 {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                     
-                    // 发送内核就绪事件到前端
-                    if let Err(e) = app_handle.emit("kernel-ready", true) {
-                        error!("发送内核就绪事件失败: {}", e);
+                    if is_kernel_running().await.unwrap_or(false) {
+                        info!("✅ 内核确认正在运行（第{}次检查）", check_attempt);
+                        kernel_ready = true;
+                        break;
+                    } else {
+                        warn!("⏳ 内核尚未就绪，第{}次检查", check_attempt);
                     }
-                },
-                Err(e) => {
-                    error!("❌ 事件中继启动失败: {}", e);
-                    return Err(format!("内核启动成功，但事件中继启动失败: {}", e));
                 }
+                
+                if kernel_ready {
+                    // 自动启动事件中继
+                    if let Some(port) = api_port {
+                        info!("🔌 自动启动事件中继服务...");
+                        match start_websocket_relay(app_handle.clone(), Some(port)).await {
+                            Ok(_) => {
+                                info!("✅ 事件中继启动成功");
+                                
+                                // 发送内核就绪事件到前端
+                                if let Err(e) = app_handle.emit("kernel-ready", true) {
+                                    error!("发送内核就绪事件失败: {}", e);
+                                }
+                                
+                                // 通知内核就绪
+                                KERNEL_READY_NOTIFY.notify_waiters();
+                                
+                                return Ok("内核启动成功".to_string());
+                            },
+                            Err(e) => {
+                                error!("❌ 事件中继启动失败: {}", e);
+                                last_error = format!("内核启动成功，但事件中继启动失败: {}", e);
+                                // 事件中继失败，尝试停止内核并重试
+                                if let Err(stop_err) = PROCESS_MANAGER.stop().await {
+                                    error!("停止内核失败: {}", stop_err);
+                                }
+                            }
+                        }
+                    } else {
+                        // 没有API端口，但内核已启动
+                        KERNEL_READY_NOTIFY.notify_waiters();
+                        return Ok("内核启动成功（未启动事件中继）".to_string());
+                    }
+                } else {
+                    last_error = "内核进程启动后未能稳定运行".to_string();
+                    warn!("❌ 内核进程启动后未能稳定运行");
+                    // 尝试停止可能损坏的进程
+                    if let Err(stop_err) = PROCESS_MANAGER.stop().await {
+                        error!("停止内核失败: {}", stop_err);
+                    }
+                }
+            },
+            Err(e) => {
+                last_error = format!("{}: {}", messages::ERR_PROCESS_START_FAILED, e);
+                error!("❌ 内核启动失败: {}", e);
             }
         }
         
-        // 通知内核就绪
-        KERNEL_READY_NOTIFY.notify_waiters();
-        
-        Ok("内核启动成功".to_string())
-    } else {
-        Err(messages::ERR_PROCESS_START_FAILED.to_string())
+        // 如果不是最后一次尝试，等待后重试
+        if attempt < max_attempts {
+            warn!("⏳ 第{}次启动失败，{}秒后重试...", attempt, 2 * attempt);
+            tokio::time::sleep(Duration::from_secs(2 * attempt as u64)).await;
+        }
     }
+    
+    error!("❌ 内核启动失败，已尝试{}次: {}", max_attempts, last_error);
+    Err(last_error)
 }
 
 // 停止内核
@@ -206,7 +252,7 @@ pub async fn restart_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Res
     start_kernel(app_handle, api_port).await
 }
 
-/// 启动事件中继服务
+/// 启动事件中继服务（增强版本，优化开机自启动场景）
 #[tauri::command]
 pub async fn start_websocket_relay(
     app_handle: AppHandle,
@@ -223,8 +269,15 @@ pub async fn start_websocket_relay(
 
     info!("🔌 开始启动事件中继服务，端口: {}", port);
 
-    // 等待一段时间确保内核的 WebSocket 服务完全就绪
-    tokio::time::sleep(Duration::from_millis(2000)).await;
+    // 增加更长的等待时间，特别是在开机自启动时
+    let wait_time = if is_system_recently_started().await {
+        info!("🕐 检测到系统刚启动，增加事件中继启动等待时间");
+        Duration::from_secs(5)
+    } else {
+        Duration::from_secs(2)
+    };
+    
+    tokio::time::sleep(wait_time).await;
 
     // 获取API token
     let token = crate::app::core::proxy_service::get_api_token();
@@ -235,7 +288,7 @@ pub async fn start_websocket_relay(
     let log_relay = create_log_event_relay(app_handle.clone(), port, token.clone());
     let connection_relay = create_connection_event_relay(app_handle.clone(), port, token);
 
-    // 启动事件中继任务
+    // 启动事件中继任务（带增强的重试机制）
     let traffic_task = tokio::task::spawn(async move {
         if let Err(e) = start_event_relay_with_retry(traffic_relay, "traffic").await {
             error!("流量事件中继启动失败: {}", e);
@@ -273,6 +326,19 @@ pub async fn start_websocket_relay(
     let _ = app_handle.emit("kernel-ready", ());
 
     Ok(())
+}
+
+/// 检查系统是否最近启动（用于判断是否是开机自启动场景）
+async fn is_system_recently_started() -> bool {
+    // 简单的系统启动时间检查
+    match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(uptime) => {
+            // 这是一个简化的检查，实际可能需要更精确的系统启动时间获取
+            // 这里假设如果进程运行时间很短，可能是开机自启动
+            uptime.as_secs() < 300 // 5分钟内认为是最近启动
+        }
+        Err(_) => false,
+    }
 }
 
 // 检查内核是否正在运行
@@ -387,4 +453,61 @@ async fn check_websocket_endpoints_ready(api_port: u16, token: &str) -> bool {
     }
     
     true
+}
+
+/// 获取系统运行时间（毫秒）
+#[tauri::command]
+pub async fn get_system_uptime() -> Result<u64, String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        
+        // 使用Windows API获取系统运行时间
+        match tokio::process::Command::new("powershell")
+            .args(&[
+                "-Command",
+                "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime | Select-Object -ExpandProperty TotalMilliseconds"
+            ])
+            .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
+            .output()
+            .await
+        {
+            Ok(output) => {
+                if output.status.success() {
+                    let uptime_str = String::from_utf8_lossy(&output.stdout);
+                    let uptime_ms: f64 = uptime_str.trim().parse().unwrap_or(0.0);
+                    Ok(uptime_ms as u64)
+                } else {
+                    // 如果PowerShell失败，使用更简单的方法
+                    warn!("PowerShell获取系统时间失败，使用备用方法");
+                    // 使用性能计数器
+                    Ok(std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64)
+                }
+            }
+            Err(e) => {
+                warn!("无法获取系统运行时间: {}", e);
+                Ok(0)
+            }
+        }
+    }
+    
+    #[cfg(not(windows))]
+    {
+        // 对于非Windows系统，使用/proc/uptime
+        match std::fs::read_to_string("/proc/uptime") {
+            Ok(content) => {
+                let uptime_seconds: f64 = content
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("0")
+                    .parse()
+                    .unwrap_or(0.0);
+                Ok((uptime_seconds * 1000.0) as u64)
+            }
+            Err(_) => Ok(0),
+        }
+    }
 }

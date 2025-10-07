@@ -86,7 +86,7 @@ export const useKernelStore = defineStore(
       }
     }
 
-    // 启动内核（完整版本，包含状态检查）
+    // 启动内核（完整版本，包含状态检查和重试机制）
     const startKernel = async () => {
       console.log('🚀 开始启动内核...')
 
@@ -102,11 +102,16 @@ export const useKernelStore = defineStore(
         await ensureDataStoresInitialized()
 
         // 启动内核 - 传递API端口参数，后端会自动启动事件中继
-        await tauriApi.kernel.startKernel(proxyMode, appStore.apiPort)
-        console.log('✅ 内核进程启动成功，等待事件中继就绪...')
+        try {
+          await tauriApi.kernel.startKernel(proxyMode, appStore.apiPort)
+          console.log('✅ 内核进程启动成功，等待事件中继就绪...')
+        } catch (error) {
+          console.error('❌ 内核进程启动失败:', error)
+          throw error
+        }
 
-        // 等待并检查完整状态
-        const isFullyReady = await pollKernelStatus(appStore.apiPort, 10)
+        // 等待并检查完整状态，增加最大尝试次数
+        const isFullyReady = await pollKernelStatus(appStore.apiPort, 15) // 增加到15次尝试
         
         if (isFullyReady) {
           // 设置运行状态
@@ -137,13 +142,45 @@ export const useKernelStore = defineStore(
           errorMessage = error
         }
 
+        // 如果是启动超时，尝试重新启动一次
+        if (errorMessage.includes('超时') || errorMessage.includes('timeout')) {
+          console.log('🔄 检测到启动超时，尝试重新启动...')
+          
+          try {
+            // 先停止可能损坏的进程
+            await tauriApi.kernel.stopKernel()
+            // 等待2秒
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            
+            // 重新启动
+            appStore.setConnectingState(true)
+            const currentProxyMode = appStore.proxyMode || 'manual'
+            await tauriApi.kernel.startKernel(currentProxyMode, appStore.apiPort)
+            
+            // 再次检查状态
+            const retryReady = await pollKernelStatus(appStore.apiPort, 10)
+            if (retryReady) {
+              appStore.setRunningState(true)
+              appStore.setConnectingState(false)
+              console.log('🎉 内核重新启动成功')
+              return true
+            }
+          } catch (retryError) {
+            console.error('❌ 重新启动也失败:', retryError)
+            errorMessage = `${errorMessage}（重新启动也失败：${retryError}）`
+          }
+        }
+
         throw new Error(errorMessage)
       }
     }
 
-    // 轮询检查内核完整状态
+    // 轮询检查内核完整状态（增强版本）
     const pollKernelStatus = async (apiPort: number, maxAttempts: number): Promise<boolean> => {
       console.log(`🔍 开始轮询检查内核状态，最大尝试次数: ${maxAttempts}`)
+      
+      let consecutiveSuccesses = 0
+      const requiredSuccesses = 2 // 需要连续成功2次才认为真正就绪
       
       for (let i = 0; i < maxAttempts; i++) {
         try {
@@ -157,20 +194,34 @@ export const useKernelStore = defineStore(
                               status.websocket_ready
           
           if (isFullyReady) {
-            console.log('✅ 内核完全就绪！')
-            return true
+            consecutiveSuccesses++
+            console.log(`✅ 内核状态检查成功 (${consecutiveSuccesses}/${requiredSuccesses})`)
+            
+            if (consecutiveSuccesses >= requiredSuccesses) {
+              console.log('🎉 内核完全就绪！')
+              return true
+            }
+          } else {
+            consecutiveSuccesses = 0
+            // 显示详细状态
+            console.log(`⏳ 内核未完全就绪: 进程=${status.process_running}, API=${status.api_ready}, WebSocket=${status.websocket_ready}`)
           }
-          
-          // 显示详细状态
-          console.log(`⏳ 内核未完全就绪: 进程=${status.process_running}, API=${status.api_ready}, WebSocket=${status.websocket_ready}`)
-          
         } catch (error) {
+          consecutiveSuccesses = 0
           console.warn(`⚠️ 第 ${i + 1} 次状态检查失败:`, error)
         }
         
-        // 等待1秒再检查
+        // 动态调整等待时间
+        let waitTime = 1000 // 默认1秒
+        if (i >= 10) {
+          waitTime = 2000 // 10次后增加到2秒
+        } else if (i >= 5) {
+          waitTime = 1500 // 5次后增加到1.5秒
+        }
+        
+        // 等待再检查
         if (i < maxAttempts - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          await new Promise(resolve => setTimeout(resolve, waitTime))
         }
       }
       

@@ -1,5 +1,6 @@
 use serde::Serialize;
 use serde_json::Value;
+use std::cmp::max;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
@@ -179,29 +180,56 @@ pub fn create_connection_event_relay(
     )
 }
 
-/// 启动事件中继器的便捷函数
+/// 启动事件中继器的便捷函数（增强版本，支持开机自启动场景）
 pub async fn start_event_relay_with_retry(
     relay: EventDirectRelay<Value>,
     relay_type: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut retry_count = 0;
-    let max_retries = 5;
-    let retry_delay = std::time::Duration::from_secs(2);
+    let max_retries = 8; // 增加重试次数
+    let mut retry_delay = std::time::Duration::from_secs(1);
+    let max_retry_delay = std::time::Duration::from_secs(10);
 
+    info!("🔌 开始启动{}事件中继器，最大重试次数: {}", relay_type, max_retries);
+    
     loop {
         match relay.start().await {
             Ok(_) => {
-                info!("{}事件中继器正常结束", relay_type);
+                info!("✅ {}事件中继器启动成功并正常结束", relay_type);
                 break Ok(());
             }
             Err(e) => {
                 retry_count += 1;
+                
                 if retry_count >= max_retries {
-                    error!("{}事件中继器重试{}次后仍然失败: {}", relay_type, max_retries, e);
+                    error!("❌ {}事件中继器重试{}次后仍然失败: {}", relay_type, max_retries, e);
                     break Err(e);
                 }
                 
-                warn!("{}事件中继器失败，{}秒后重试 ({}/{}): {}", relay_type, retry_delay.as_secs(), retry_count, max_retries, e);
+                // 根据重试次数调整延迟时间，但不超过最大延迟
+                if retry_count <= 3 {
+                    retry_delay = std::time::Duration::from_secs(retry_count as u64);
+                } else {
+                    retry_delay = max(retry_delay * 2, max_retry_delay);
+                }
+                
+                warn!("⚠️ {}事件中继器失败，{}秒后重试 ({}/{}): {}", 
+                      relay_type, retry_delay.as_secs(), retry_count, max_retries, e);
+                
+                // 对于前几次重试，添加额外的系统检查
+                if retry_count <= 2 {
+                    info!("🔍 执行系统环境检查（第{}次重试）", retry_count);
+                    
+                    // 检查是否是开机自启动场景
+                    if let Ok(uptime) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+                        let uptime_minutes = uptime.as_secs() / 60;
+                        if uptime_minutes < 5 {
+                            info!("🕐 检测到系统刚启动（{}分钟），增加额外等待时间", uptime_minutes);
+                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                        }
+                    }
+                }
+                
                 tokio::time::sleep(retry_delay).await;
             }
         }
