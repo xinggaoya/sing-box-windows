@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { getVersion } from '@tauri-apps/api/app'
+import { storageService } from '@/services/backend-storage-service'
 
 // 定义更新信息类型
 interface UpdateInfo {
@@ -56,10 +57,52 @@ export const useUpdateStore = defineStore(
     // 当前版本信息
     const isPrerelease = ref(false) // 当前检测到的版本是否为预发布版本
 
+    // 从后端加载数据
+    const loadFromBackend = async () => {
+      try {
+        console.log('🔄 从后端加载更新配置...')
+        const updateConfig = await storageService.getUpdateConfig()
+        
+        // 更新响应式状态
+        appVersion.value = updateConfig.app_version
+        autoCheckUpdate.value = updateConfig.auto_check_update
+        skipVersion.value = updateConfig.skip_version || ''
+        acceptPrerelease.value = updateConfig.accept_prerelease
+        
+        console.log('🔄 更新配置加载完成：', {
+          appVersion: appVersion.value,
+          autoCheckUpdate: autoCheckUpdate.value,
+          skipVersion: skipVersion.value,
+          acceptPrerelease: acceptPrerelease.value,
+        })
+      } catch (error) {
+        console.error('从后端加载更新配置失败:', error)
+        // 加载失败时获取当前版本
+        await fetchAppVersion()
+      }
+    }
+
+    // 保存配置到后端
+    const saveToBackend = async () => {
+      try {
+        await storageService.updateUpdateConfig({
+          app_version: appVersion.value,
+          auto_check_update: autoCheckUpdate.value,
+          skip_version: skipVersion.value || null,
+          accept_prerelease: acceptPrerelease.value,
+        })
+        console.log('✅ 更新配置已保存到后端')
+      } catch (error) {
+        console.error('保存更新配置到后端失败:', error)
+      }
+    }
+
     // 获取应用版本
     const fetchAppVersion = async () => {
       try {
         appVersion.value = await getVersion()
+        // 保存版本到后端
+        await saveToBackend()
         return appVersion.value
       } catch (error) {
         console.error('获取应用版本失败:', error)
@@ -179,9 +222,10 @@ export const useUpdateStore = defineStore(
     }
 
     // 跳过当前版本
-    const skipCurrentVersion = () => {
+    const skipCurrentVersion = async () => {
       skipVersion.value = latestVersion.value
       hasUpdate.value = false
+      await saveToBackend()
     }
 
     // 重置更新状态
@@ -229,6 +273,23 @@ export const useUpdateStore = defineStore(
       }
     }
 
+    // 设置自动检查更新
+    const setAutoCheckUpdate = async (enabled: boolean) => {
+      autoCheckUpdate.value = enabled
+      await saveToBackend()
+    }
+
+    // 设置接受预发布版本
+    const setAcceptPrerelease = async (accept: boolean) => {
+      acceptPrerelease.value = accept
+      await saveToBackend()
+    }
+
+    // 初始化方法
+    const initializeStore = async () => {
+      await loadFromBackend()
+    }
+
     return {
       // 状态
       appVersion,
@@ -251,13 +312,18 @@ export const useUpdateStore = defineStore(
       skipCurrentVersion,
       resetUpdateState,
       updateProgress,
+      setAutoCheckUpdate,
+      setAcceptPrerelease,
 
       // 计算属性
       formattedFileSize: () => formatFileSize(fileSize.value),
       formattedReleaseDate: () => (releaseDate.value ? formatReleaseDate(releaseDate.value) : ''),
+
+      // 初始化和持久化
+      initializeStore,
+      loadFromBackend,
+      saveToBackend,
     }
   },
-  {
-    persist: true,
-  },
+  // 移除 persist 配置，现在使用后端存储
 )

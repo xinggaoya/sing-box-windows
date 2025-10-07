@@ -6,7 +6,7 @@ import App from './App.vue'
 import router from './router'
 import { usePinia } from '@/stores'
 import i18n from './locales'
-import { storeManager } from './stores/StoreManager'
+import { initializationService } from './services/initialization-service'
 import { globalMemoryManager, webSocketCleaner } from '@/utils/memory-leak-fix'
 
 const app = createApp(App)
@@ -23,8 +23,26 @@ app.use(router)
 // 设置国际化
 app.use(i18n)
 
-// 初始化Store管理器
-storeManager.initialize()
+// 异步初始化应用
+const initializeApp = async () => {
+  try {
+    console.log('🚀 开始应用初始化...')
+    
+    // 使用新的初始化服务
+    await initializationService.initializeApp()
+    
+    console.log('✅ 应用初始化完成，挂载Vue应用')
+    
+    // 应用挂载（在初始化完成后）
+    app.mount('#app')
+    
+  } catch (error) {
+    console.error('❌ 应用初始化失败:', error)
+    
+    // 即使初始化失败，也尝试挂载应用以显示错误页面
+    app.mount('#app')
+  }
+}
 
 // 初始化事件服务（替代WebSocket服务）
 import { eventService } from '@/services/event-service'
@@ -33,15 +51,6 @@ console.log('🔧 Tauri 事件服务已导入')
 // 设置应用关闭时的清理逻辑
 window.addEventListener('beforeunload', async () => {
   console.log('应用关闭，执行清理...')
-
-  // 首先强制保存所有待保存的Store数据
-  try {
-    const { flushAllPendingSaves } = await import('@/stores')
-    await flushAllPendingSaves()
-    console.log('所有待保存数据已强制保存')
-  } catch (error) {
-    console.error('强制保存数据失败:', error)
-  }
 
   // 清理事件服务
   try {
@@ -58,8 +67,8 @@ window.addEventListener('beforeunload', async () => {
   globalMemoryManager.cleanupAllStores()
 })
 
-// 应用挂载
-app.mount('#app')
+// 开始初始化
+initializeApp()
 
 // 应用性能测量（开发环境）
 if (import.meta.env.DEV) {

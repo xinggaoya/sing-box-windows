@@ -23,7 +23,7 @@
         <div class="version-info">
           <span class="version-label">{{ t('setting.kernelVersion') }}</span>
           <span class="version-value">{{
-            formatVersion(kernelStore.version.version) || t('setting.notInstalled')
+            kernelStore.hasVersionInfo() ? formatVersion(kernelStore.getVersionString()) : t('setting.notInstalled')
           }}</span>
         </div>
       </div>
@@ -42,12 +42,12 @@
           </div>
           <div class="section-status">
             <n-tag
-              v-if="kernelStore.version.version"
+              v-if="kernelStore.hasVersionInfo()"
               type="success"
               size="small"
               round
             >
-              {{ formatVersion(kernelStore.version.version) }}
+              {{ formatVersion(kernelStore.getVersionString()) }}
             </n-tag>
             <n-tag v-else type="error" size="small" round>
               {{ t('setting.notInstalled') }}
@@ -60,7 +60,7 @@
 
         <div class="section-content">
           <!-- 状态提醒 -->
-          <div v-if="hasNewVersion || !kernelStore.version.version" class="status-alerts">
+          <div v-if="hasNewVersion || !kernelStore.hasVersionInfo()" class="status-alerts">
             <n-alert
               v-if="hasNewVersion"
               type="warning"
@@ -72,7 +72,7 @@
             </n-alert>
 
             <n-alert
-              v-if="!kernelStore.version.version"
+              v-if="!kernelStore.hasVersionInfo()"
               type="error"
               :show-icon="false"
               size="small"
@@ -110,7 +110,7 @@
                 <n-icon size="14"><DownloadOutline /></n-icon>
               </template>
               {{
-                hasNewVersion ? t('setting.update') : kernelStore.version.version ? t('setting.redownload') : t('setting.download')
+                hasNewVersion ? t('setting.update') : kernelStore.hasVersionInfo() ? t('setting.redownload') : t('setting.download')
               }}
             </n-button>
 
@@ -335,7 +335,7 @@
             <div class="info-item">
               <div class="info-label">{{ t('setting.kernelVersion') }}</div>
               <div class="info-value">
-                {{ formatVersion(kernelStore.version.version) || t('setting.notInstalled') }}
+                {{ kernelStore.hasVersionInfo() ? formatVersion(kernelStore.getVersionString()) : t('setting.notInstalled') }}
               </div>
             </div>
 
@@ -544,8 +544,8 @@ const formatVersion = (version: string) => {
 }
 
 const hasNewVersion = computed(() => {
-  if (!kernelStore.newVersion || !kernelStore.version.version) return false
-  return formatVersion(kernelStore.newVersion) != formatVersion(kernelStore.version.version)
+  if (!kernelStore.newVersion || !kernelStore.hasVersionInfo()) return false
+  return formatVersion(kernelStore.newVersion) != formatVersion(kernelStore.getVersionString())
 })
 
 const downloadTheKernel = async () => {

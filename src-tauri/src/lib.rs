@@ -1,28 +1,19 @@
-use std::sync::Mutex;
+use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tracing_subscriber::{fmt, EnvFilter};
+use app::storage::StorageService;
 
 pub mod app;
 pub mod entity;
 pub mod process;
 pub mod utils;
 
-pub struct AppState {
-    #[allow(dead_code)]
-    token: Mutex<String>,
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     fmt().with_env_filter(EnvFilter::from_default_env()).init();
 
-    let state = AppState {
-        token: Mutex::new(String::new()),
-    };
-
     tauri::Builder::default()
-        .manage(state)
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_autostart::init(
@@ -52,9 +43,34 @@ pub fn run() {
                     window.hide().unwrap();
                 }
             }
+            
+            // 初始化存储服务
+            let storage_service = Arc::new(StorageService::new(app.handle()));
+            app.manage(storage_service);
+            
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Storage service commands
+            crate::app::storage::storage_service::load_state,
+            crate::app::storage::storage_service::save_state,
+            crate::app::storage::storage_service::get_app_config,
+            crate::app::storage::storage_service::update_app_config,
+            crate::app::storage::storage_service::get_theme_config,
+            crate::app::storage::storage_service::update_theme_config,
+            crate::app::storage::storage_service::get_locale_config,
+            crate::app::storage::storage_service::update_locale_config,
+            crate::app::storage::storage_service::get_window_config,
+            crate::app::storage::storage_service::update_window_config,
+            crate::app::storage::storage_service::get_update_config,
+            crate::app::storage::storage_service::update_update_config,
+            crate::app::storage::storage_service::get_subscriptions,
+            crate::app::storage::storage_service::update_subscriptions,
+            crate::app::storage::storage_service::get_kernel_info,
+            crate::app::storage::storage_service::update_kernel_info,
+            crate::app::storage::storage_service::reset_state,
+            crate::app::storage::storage_service::backup_state,
+            crate::app::storage::storage_service::restore_state,
             // Core - Kernel service commands
             crate::app::core::kernel_service::start_kernel,
             crate::app::core::kernel_service::stop_kernel,

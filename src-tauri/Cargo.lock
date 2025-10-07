@@ -3791,6 +3791,7 @@ dependencies = [
  "tauri-plugin-store",
  "tauri-plugin-websocket",
  "tauri-plugin-window-state",
+ "thiserror 1.0.69",
  "tokio",
  "tokio-tungstenite 0.18.0",
  "tracing",

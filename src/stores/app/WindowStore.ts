@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import type { Router } from 'vue-router'
+import { storageService } from '@/services/backend-storage-service'
 
 // 窗口状态类型
 export interface WindowState {
@@ -22,6 +23,42 @@ export const useWindowStore = defineStore(
       lastVisiblePath: '/',
     })
 
+    // 从后端加载数据
+    const loadFromBackend = async () => {
+      try {
+        console.log('🪟 从后端加载窗口配置...')
+        const windowConfig = await storageService.getWindowConfig()
+        
+        // 更新响应式状态
+        windowState.value = {
+          isVisible: windowConfig.is_visible,
+          isFullscreen: windowConfig.is_fullscreen,
+          isMaximized: windowConfig.is_maximized,
+          lastVisiblePath: windowConfig.last_visible_path,
+        }
+        
+        console.log('🪟 窗口配置加载完成：', windowState.value)
+      } catch (error) {
+        console.error('从后端加载窗口配置失败:', error)
+        // 加载失败时使用默认值
+      }
+    }
+
+    // 保存配置到后端
+    const saveToBackend = async () => {
+      try {
+        await storageService.updateWindowConfig({
+          is_visible: windowState.value.isVisible,
+          is_fullscreen: windowState.value.isFullscreen,
+          is_maximized: windowState.value.isMaximized,
+          last_visible_path: windowState.value.lastVisiblePath,
+        })
+        console.log('✅ 窗口配置已保存到后端')
+      } catch (error) {
+        console.error('保存窗口配置到后端失败:', error)
+      }
+    }
+
     // 获取应用窗口
     const getAppWindow = () => Window.getCurrent()
 
@@ -38,6 +75,9 @@ export const useWindowStore = defineStore(
       const appWindow = getAppWindow()
       await appWindow.hide()
       windowState.value.isVisible = false
+      
+      // 保存到后端
+      await saveToBackend()
 
       // 如果提供了router，保存当前路由并切换到空白页
       if (router) {
@@ -57,6 +97,10 @@ export const useWindowStore = defineStore(
       await appWindow.show()
       await appWindow.setFocus()
       windowState.value.isVisible = true
+      
+      // 保存到后端
+      await saveToBackend()
+      
       // 窗口显示事件现在通过Pinia响应式系统处理
       console.log('窗口已显示')
     }
@@ -85,6 +129,9 @@ export const useWindowStore = defineStore(
       }
 
       windowState.value.isFullscreen = !isFullscreen
+      
+      // 保存到后端
+      await saveToBackend()
     }
 
     // 最大化窗口
@@ -92,6 +139,10 @@ export const useWindowStore = defineStore(
       const appWindow = getAppWindow()
       await appWindow.maximize()
       windowState.value.isMaximized = true
+      
+      // 保存到后端
+      await saveToBackend()
+      
       // 窗口最大化事件现在通过Pinia响应式系统处理
       console.log('窗口已最大化')
     }
@@ -101,6 +152,10 @@ export const useWindowStore = defineStore(
       const appWindow = getAppWindow()
       await appWindow.unmaximize()
       windowState.value.isMaximized = false
+      
+      // 保存到后端
+      await saveToBackend()
+      
       // 窗口还原事件现在通过Pinia响应式系统处理
       console.log('窗口已还原')
     }
@@ -130,6 +185,9 @@ export const useWindowStore = defineStore(
         windowState.value.isVisible = isVisible
         windowState.value.isFullscreen = isFullscreen
         windowState.value.isMaximized = isMaximized
+        
+        // 保存到后端
+        await saveToBackend()
       } catch (error) {
         console.error('更新窗口状态失败:', error)
       }
@@ -148,6 +206,17 @@ export const useWindowStore = defineStore(
       }
     }
 
+    // 设置最后可见路径
+    const setLastVisiblePath = async (path: string) => {
+      windowState.value.lastVisiblePath = path
+      await saveToBackend()
+    }
+
+    // 初始化方法
+    const initializeStore = async () => {
+      await loadFromBackend()
+    }
+
     return {
       windowState,
       getAppWindow,
@@ -162,9 +231,11 @@ export const useWindowStore = defineStore(
       getWindowVisible,
       toggleFullScreen,
       saveRouteAndGoBlank,
+      setLastVisiblePath,
+      initializeStore,
+      loadFromBackend,
+      saveToBackend,
     }
   },
-  {
-    persist: true,
-  },
+  // 移除 persist 配置，现在使用后端存储
 )

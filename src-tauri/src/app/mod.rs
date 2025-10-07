@@ -1,5 +1,6 @@
 // App module - Main application services
 pub mod constants;
+pub mod storage;
 
 // Core services
 pub mod core {
@@ -29,6 +30,9 @@ pub use network::subscription_service;
 pub use system::config_service;
 pub use system::system_service;
 pub use system::update_service;
+
+// Re-export storage service
+pub use storage::*;
 
 // Re-export constants for backward compatibility
 pub use constants::common::log;

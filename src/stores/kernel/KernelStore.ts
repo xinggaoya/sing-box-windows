@@ -7,17 +7,7 @@ import { useConnectionStore } from './ConnectionStore'
 import { useTrafficStore } from './TrafficStore'
 import { useLogStore } from './LogStore'
 import { useKernelRuntimeStore } from './KernelRuntimeStore'
-
-// 定义版本信息接口
-export interface VersionInfo {
-  version: string
-  meta: boolean
-  premium: boolean
-  environment?: string
-  tags?: string[]
-  revision?: string
-  cgo?: string
-}
+import { storageService, type VersionInfo } from '@/services/backend-storage-service'
 
 export const useKernelStore = defineStore(
   'kernel',
@@ -26,7 +16,7 @@ export const useKernelStore = defineStore(
     const appStore = useAppStore()
 
     // 版本信息 (需要持久化)
-    const version = ref<VersionInfo>({ version: '', meta: true, premium: true })
+    const version = ref<VersionInfo | null>(null)
     const newVersion = ref('')
 
     // 下载检查定时器
@@ -37,6 +27,41 @@ export const useKernelStore = defineStore(
 
     // 事件监听器状态
     let eventListenersSetup = false
+
+    // 从后端加载数据
+    const loadFromBackend = async () => {
+      try {
+        console.log('🔧 从后端加载内核配置...')
+        const kernelInfo = await storageService.getKernelInfo()
+        
+        // 更新响应式状态
+        version.value = kernelInfo.version
+        newVersion.value = kernelInfo.new_version || ''
+        
+        console.log('🔧 内核配置加载完成：', {
+          version: version.value?.version,
+          newVersion: newVersion.value,
+        })
+      } catch (error) {
+        console.error('从后端加载内核配置失败:', error)
+        // 加载失败时使用默认值
+        version.value = null
+        newVersion.value = ''
+      }
+    }
+
+    // 保存配置到后端
+    const saveToBackend = async () => {
+      try {
+        await storageService.updateKernelInfo({
+          version: version.value,
+          new_version: newVersion.value || null,
+        })
+        console.log('✅ 内核配置已保存到后端')
+      } catch (error) {
+        console.error('保存内核配置到后端失败:', error)
+      }
+    }
 
     // 清理所有定时器
     const clearTimers = () => {
@@ -62,6 +87,10 @@ export const useKernelStore = defineStore(
             meta: true,
             premium: true,
           }
+          
+          // 保存到后端
+          await saveToBackend()
+          
           return true
         }
         return false
@@ -71,12 +100,26 @@ export const useKernelStore = defineStore(
       }
     }
 
+    // 获取版本信息（用于前端兼容）
+    const getVersionString = (): string => {
+      return version.value?.version || ''
+    }
+
+    // 检查是否有版本信息
+    const hasVersionInfo = (): boolean => {
+      return version.value !== null
+    }
+
     // 检查内核版本
     const checkKernelVersion = async () => {
       try {
         const versionInfo = await tauriApi.kernel.checkKernelVersion()
         if (versionInfo) {
           newVersion.value = versionInfo
+          
+          // 保存到后端
+          await saveToBackend()
+          
           return true
         }
         return false
@@ -287,7 +330,7 @@ export const useKernelStore = defineStore(
         }
 
         // 更新IP版本设置
-        appStore.preferIpv6 = useIpv6
+        await appStore.setPreferIpv6(useIpv6)
 
         // 如果之前在运行，则重新启动
         if (needRestart) {
@@ -406,6 +449,9 @@ export const useKernelStore = defineStore(
     // Store初始化方法
     const initializeStore = async () => {
       try {
+        // 先从后端加载配置
+        await loadFromBackend()
+
         await initEventListeners()
 
         // 获取运行时store并初始化
@@ -439,10 +485,11 @@ export const useKernelStore = defineStore(
       initEventListeners,
       cleanupEventListeners,
       initializeStore,
+      loadFromBackend,
+      saveToBackend,
+      getVersionString,
+      hasVersionInfo,
     }
   },
-  {
-    // 现在只包含版本信息，可以安全持久化
-    persist: true,
-  },
+  // 移除 persist 配置，现在使用后端存储
 )

@@ -42,6 +42,12 @@ function registerStoreInitializers() {
     const { useThemeStore } = await import('./app/ThemeStore')
     const store = useThemeStore()
     storeInstances.set('theme', store)
+    // 延迟初始化Store
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore().catch(console.error)
+      }
+    }, 0)
     return store
   })
 
@@ -49,6 +55,12 @@ function registerStoreInitializers() {
     const { useLocaleStore } = await import('./app/LocaleStore')
     const store = useLocaleStore()
     storeInstances.set('locale', store)
+    // 延迟初始化Store
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore().catch(console.error)
+      }
+    }, 0)
     return store
   })
 
@@ -56,6 +68,12 @@ function registerStoreInitializers() {
     const { useWindowStore } = await import('./app/WindowStore')
     const store = useWindowStore()
     storeInstances.set('window', store)
+    // 延迟初始化Store
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore().catch(console.error)
+      }
+    }, 0)
     return store
   })
 
@@ -63,6 +81,12 @@ function registerStoreInitializers() {
     const { useUpdateStore } = await import('./app/UpdateStore')
     const store = useUpdateStore()
     storeInstances.set('update', store)
+    // 延迟初始化Store
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore().catch(console.error)
+      }
+    }, 0)
     return store
   })
 
@@ -148,6 +172,12 @@ function registerStoreInitializers() {
     const { useSubStore } = await import('./subscription/SubStore')
     const store = useSubStore()
     storeInstances.set('subscription', store)
+    // 延迟初始化Store
+    setTimeout(() => {
+      if ('initializeStore' in store && typeof store.initializeStore === 'function') {
+        store.initializeStore().catch(console.error)
+      }
+    }, 0)
     return store
   })
 
