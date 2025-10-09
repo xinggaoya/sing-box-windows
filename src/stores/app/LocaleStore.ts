@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { supportedLocales } from '@/locales'
-import { storageService } from '@/services/backend-storage-service'
+import { DatabaseService } from '@/services/database-service'
+import type { LocaleConfig } from '@/types/database'
 
 // 语言类型
 export type Locale = 'zh-CN' | 'en-US' | 'ru-RU' | 'ja-JP' | 'auto'
@@ -12,30 +13,31 @@ export const useLocaleStore = defineStore(
     // 添加语言设置
     const locale = ref<Locale>('auto')
 
-    // 从后端加载数据
+    // 从数据库加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('🌐 从后端加载语言配置...')
-        const localeConfig = await storageService.getLocaleConfig()
+        console.log('🌐 从数据库加载语言配置...')
+        const localeConfig = await DatabaseService.getLocaleConfig()
         
         // 更新响应式状态
         locale.value = localeConfig.locale as Locale
         
         console.log('🌐 语言配置加载完成：', { locale: locale.value })
       } catch (error) {
-        console.error('从后端加载语言配置失败:', error)
+        console.error('从数据库加载语言配置失败:', error)
         // 加载失败时使用默认值
         locale.value = 'auto'
       }
     }
 
-    // 保存配置到后端
+    // 保存配置到数据库
     const saveToBackend = async () => {
       try {
-        await storageService.updateLocaleConfig(locale.value)
-        console.log('✅ 语言配置已保存到后端')
+        const config: LocaleConfig = { locale: locale.value }
+        await DatabaseService.saveLocaleConfig(config)
+        console.log('✅ 语言配置已保存到数据库')
       } catch (error) {
-        console.error('保存语言配置到后端失败:', error)
+        console.error('保存语言配置到数据库失败:', error)
       }
     }
 
@@ -54,11 +56,7 @@ export const useLocaleStore = defineStore(
     // 语言切换
     const setLocale = async (newLocale: Locale) => {
       locale.value = newLocale
-      
-      // 保存到后端
-      await saveToBackend()
-      
-      // 语言变更事件现在通过Pinia响应式系统处理
+      // 保存会在 watch 中自动处理
       console.log('语言已切换到:', newLocale)
     }
 
@@ -69,9 +67,27 @@ export const useLocaleStore = defineStore(
       return locale ? locale.name : '简体中文'
     })
 
+    // 标记是否正在初始化
+    let isInitializing = false
+    
+    // 监听语言变化并自动保存到数据库
+    watch(
+      locale,
+      async () => {
+        // 初始化期间不保存
+        if (isInitializing) return
+        await saveToBackend()
+      },
+      { immediate: false }
+    )
+
     // 初始化方法
     const initializeStore = async () => {
+      isInitializing = true
       await loadFromBackend()
+      // 等待一下确保数据加载完成
+      await new Promise(resolve => setTimeout(resolve, 100))
+      isInitializing = false
     }
 
     return {

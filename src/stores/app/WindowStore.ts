@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import type { Router } from 'vue-router'
-import { storageService } from '@/services/backend-storage-service'
+import { DatabaseService } from '@/services/database-service'
+import type { WindowConfig } from '@/types/database'
 
 // 窗口状态类型
 export interface WindowState {
@@ -23,39 +24,39 @@ export const useWindowStore = defineStore(
       lastVisiblePath: '/',
     })
 
-    // 从后端加载数据
+    // 从数据库加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('🪟 从后端加载窗口配置...')
-        const windowConfig = await storageService.getWindowConfig()
+        console.log('🪟 从数据库加载窗口配置...')
+        const windowConfig = await DatabaseService.getWindowConfig()
         
         // 更新响应式状态
         windowState.value = {
-          isVisible: windowConfig.is_visible,
-          isFullscreen: windowConfig.is_fullscreen,
+          isVisible: true, // 数据库没有is_visible，默认为true
+          isFullscreen: false, // 数据库没有is_fullscreen，默认为false
           isMaximized: windowConfig.is_maximized,
-          lastVisiblePath: windowConfig.last_visible_path,
+          lastVisiblePath: '/', // 数据库没有last_visible_path，使用默认值
         }
         
         console.log('🪟 窗口配置加载完成：', windowState.value)
       } catch (error) {
-        console.error('从后端加载窗口配置失败:', error)
+        console.error('从数据库加载窗口配置失败:', error)
         // 加载失败时使用默认值
       }
     }
 
-    // 保存配置到后端
+    // 保存配置到数据库
     const saveToBackend = async () => {
       try {
-        await storageService.updateWindowConfig({
-          is_visible: windowState.value.isVisible,
-          is_fullscreen: windowState.value.isFullscreen,
+        const config: WindowConfig = {
           is_maximized: windowState.value.isMaximized,
-          last_visible_path: windowState.value.lastVisiblePath,
-        })
-        console.log('✅ 窗口配置已保存到后端')
+          width: 1000, // 默认宽度
+          height: 700, // 默认高度
+        }
+        await DatabaseService.saveWindowConfig(config)
+        console.log('✅ 窗口配置已保存到数据库')
       } catch (error) {
-        console.error('保存窗口配置到后端失败:', error)
+        console.error('保存窗口配置到数据库失败:', error)
       }
     }
 
@@ -76,7 +77,7 @@ export const useWindowStore = defineStore(
       await appWindow.hide()
       windowState.value.isVisible = false
       
-      // 保存到后端
+      // 保存到数据库
       await saveToBackend()
 
       // 如果提供了router，保存当前路由并切换到空白页
@@ -98,7 +99,7 @@ export const useWindowStore = defineStore(
       await appWindow.setFocus()
       windowState.value.isVisible = true
       
-      // 保存到后端
+      // 保存到数据库
       await saveToBackend()
       
       // 窗口显示事件现在通过Pinia响应式系统处理
@@ -130,7 +131,7 @@ export const useWindowStore = defineStore(
 
       windowState.value.isFullscreen = !isFullscreen
       
-      // 保存到后端
+      // 保存到数据库
       await saveToBackend()
     }
 
@@ -140,7 +141,7 @@ export const useWindowStore = defineStore(
       await appWindow.maximize()
       windowState.value.isMaximized = true
       
-      // 保存到后端
+      // 保存到数据库
       await saveToBackend()
       
       // 窗口最大化事件现在通过Pinia响应式系统处理
@@ -153,7 +154,7 @@ export const useWindowStore = defineStore(
       await appWindow.unmaximize()
       windowState.value.isMaximized = false
       
-      // 保存到后端
+      // 保存到数据库
       await saveToBackend()
       
       // 窗口还原事件现在通过Pinia响应式系统处理
@@ -186,7 +187,7 @@ export const useWindowStore = defineStore(
         windowState.value.isFullscreen = isFullscreen
         windowState.value.isMaximized = isMaximized
         
-        // 保存到后端
+        // 保存到数据库
         await saveToBackend()
       } catch (error) {
         console.error('更新窗口状态失败:', error)
@@ -212,9 +213,26 @@ export const useWindowStore = defineStore(
       await saveToBackend()
     }
 
+    // 标记是否正在初始化
+    let isInitializing = false
+    
+    // 监听窗口状态变化并自动保存到数据库
+    watch(
+      () => windowState.value.isMaximized,
+      async () => {
+        // 初始化期间不保存
+        if (isInitializing) return
+        await saveToBackend()
+      }
+    )
+
     // 初始化方法
     const initializeStore = async () => {
+      isInitializing = true
       await loadFromBackend()
+      // 等待一下确保数据加载完成
+      await new Promise(resolve => setTimeout(resolve, 100))
+      isInitializing = false
     }
 
     return {

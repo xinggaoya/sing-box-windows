@@ -310,15 +310,15 @@ class KernelService {
   /**
    * 监听内核事件
    */
-  onKernelStatusChange(callback: (status: KernelStatus) => void): () => void {
+  async onKernelStatusChange(callback: (status: KernelStatus) => void): Promise<() => void> {
     return eventService.on('kernel-status-changed', callback)
   }
 
-  onKernelReady(callback: () => void): () => void {
+  async onKernelReady(callback: () => void): Promise<() => void> {
     return eventService.on('kernel-ready', callback)
   }
 
-  onKernelError(callback: (error: string) => void): () => void {
+  async onKernelError(callback: (error: string) => void): Promise<() => void> {
     return eventService.on('kernel-error', callback)
   }
 }

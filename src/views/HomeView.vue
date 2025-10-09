@@ -46,7 +46,7 @@
             </n-button>
 
             <n-button
-              v-if="appState.isRunning && !isAdmin && currentProxyMode === 'tun'"
+              v-if="appState.isRunning && !isAdmin && appState.proxyMode === 'tun'"
               type="warning"
               size="small"
               :loading="isRestarting"
@@ -261,7 +261,8 @@ const isStopping = ref(false)
 const isSwitching = ref(false)
 const isRestarting = ref(false)
 const isAdmin = ref(false)
-const currentProxyMode = ref(appState.proxyMode || 'system')
+// 直接从 store 读取，不使用本地 ref
+const currentProxyMode = computed(() => appState.proxyMode)
 const currentNodeProxyMode = ref('rule')
 const targetNodeProxyMode = ref('')
 const showNodeModeChangeModal = ref(false)
@@ -503,7 +504,7 @@ const runKernel = async () => {
     isStarting.value = true
     
     // 检查TUN模式下是否需要管理员权限（保留此逻辑）
-    if (currentProxyMode.value === 'tun') {
+    if (appState.proxyMode === 'tun') {
       const { systemApi } = await import('@/services/tauri-api')
       const currentIsAdmin = await systemApi.checkAdmin()
 
@@ -519,9 +520,9 @@ const runKernel = async () => {
               const { proxyApi } = await import('@/services/tauri-api')
               await proxyApi.setTunProxy()
               
-              appState.setProxyMode('tun')
-              currentProxyMode.value = 'tun'
-              localStorage.setItem('pending-tun-mode', 'true')
+              // 直接更新状态并保存
+              appState.proxyMode = 'tun'
+              await appState.saveToBackend()
               
               message.success(t('notification.tunConfigApplied'))
               await restartAsAdmin()
@@ -539,7 +540,7 @@ const runKernel = async () => {
     const { kernelService } = await import('@/services/kernel-service')
     const result = await kernelService.startKernel({
       config: { 
-        proxy_mode: currentProxyMode.value as any,
+        proxy_mode: appState.proxyMode as any,
         api_port: appState.apiPort,
         proxy_port: appState.proxyPort,
         prefer_ipv6: appState.preferIpv6,
@@ -550,6 +551,9 @@ const runKernel = async () => {
     })
     
     if (result.success) {
+      // 更新应用状态并保存
+      appState.isRunning = true
+      await appState.saveToBackend()
       message.success(t('notification.kernelStarted'))
     } else {
       message.error(result.message || t('notification.startFailed'))
@@ -568,6 +572,9 @@ const stopKernel = async () => {
     const { kernelService } = await import('@/services/kernel-service')
     const result = await kernelService.stopKernel()
     if (result.success) {
+      // 更新应用状态并保存
+      appState.isRunning = false
+      await appState.saveToBackend()
       message.success(t('notification.kernelStopped'))
     } else {
       message.error(result.message || t('notification.stopFailed'))
@@ -581,7 +588,7 @@ const stopKernel = async () => {
 }
 
 const onModeChange = async (value: string) => {
-  if (value === currentProxyMode.value) return
+  if (appState.proxyMode === value) return
 
   const showMessage = (type: 'success' | 'info' | 'error', content: string) => {
     switch (type) {
@@ -617,9 +624,9 @@ const onModeChange = async (value: string) => {
               message.info(t('notification.applyingTunMode'))
               await tauriApi.proxy.setTunProxy()
 
-              // 设置应用状态
-              await appState.switchProxyMode('tun')
-              currentProxyMode.value = 'tun'
+              // 直接更新 AppStore 状态并保存到数据库
+              appState.proxyMode = 'tun'
+              await appState.saveToBackend()
 
               // 设置挂起的TUN模式标记，重启后会应用（配置已经修改好了）
               localStorage.setItem('pending-tun-mode', 'true')
@@ -631,8 +638,8 @@ const onModeChange = async (value: string) => {
             }
           },
           onNegativeClick: () => {
-            // 取消操作，恢复之前的选择
-            currentProxyMode.value = appState.proxyMode
+            // 取消操作，AppStore 状态会自动保持原样
+            console.log('用户取消了TUN模式切换')
           },
         })
         return // 直接返回，不继续执行切换操作
@@ -646,7 +653,10 @@ const onModeChange = async (value: string) => {
     // 统一使用 proxyService.switchMode 方法切换所有模式
     if (value === 'system' || value === 'manual' || value === 'tun') {
       needClose = await proxyService.switchMode(value, showMessage)
-      currentProxyMode.value = value
+      
+      // 直接更新 AppStore 状态并保存到数据库
+      appState.proxyMode = value
+      await appState.saveToBackend()
       modeChanged = true
 
       // 根据不同模式显示不同的提示信息
@@ -838,21 +848,18 @@ const confirmNodeProxyModeChange = async () => {
   }
 }
 
-// 监听器
-watch(
-  () => appState.proxyMode,
-  (newMode) => {
-    if (newMode !== currentProxyMode.value) {
-      currentProxyMode.value = newMode
-    }
-  },
-)
+// 监听器 - 移除不需要的监听器，因为现在直接使用 computed
+// watch(
+//   () => appState.proxyMode,
+//   (newMode) => {
+//     if (newMode !== currentProxyMode.value) {
+//       currentProxyMode.value = newMode
+//     }
+//   },
+// )
 
 // 生命周期
 onMounted(async () => {
-  // 更新当前代理模式
-  currentProxyMode.value = appState.proxyMode
-
   // 获取节点代理模式
   await getCurrentNodeProxyMode()
 
@@ -864,7 +871,7 @@ onMounted(async () => {
 
   // 检查是否有挂起的TUN模式切换（重启后需要应用）
   const pendingTunMode = localStorage.getItem('pending-tun-mode')
-  if (pendingTunMode === 'true' && currentProxyMode.value === 'tun') {
+  if (pendingTunMode === 'true' && appState.proxyMode === 'tun') {
     localStorage.removeItem('pending-tun-mode')
     console.log('检测到挂起的TUN模式切换，准备应用配置')
 
@@ -887,8 +894,17 @@ onMounted(async () => {
       setupListeners()
     } else if (!isActive) {
       // 不在当前页面时清理监听器，减少资源占用
-      trafficStore.cleanupListeners()
-      connectionStore.cleanupListeners()
+      // 使用setTimeout延迟清理，避免快速切换时的重复调用
+      setTimeout(() => {
+        if (!isRouteActive.value) { // 再次确认已经离开页面
+          try {
+            trafficStore.cleanupListeners()
+            connectionStore.cleanupListeners()
+          } catch (error) {
+            console.error('清理主页监听器时出错:', error)
+          }
+        }
+      }, 100)
     }
   })
 
@@ -900,8 +916,16 @@ onMounted(async () => {
         setupListeners()
       } else if (!isRunning) {
         // 内核停止时清理监听器
-        trafficStore.cleanupListeners()
-        connectionStore.cleanupListeners()
+        setTimeout(() => {
+          if (!appState.isRunning) { // 再次确认内核已经停止
+            try {
+              trafficStore.cleanupListeners()
+              connectionStore.cleanupListeners()
+            } catch (error) {
+              console.error('清理内核停止监听器时出错:', error)
+            }
+          }
+        }, 100)
       }
     },
   )

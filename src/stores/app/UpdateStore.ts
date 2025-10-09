@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { getVersion } from '@tauri-apps/api/app'
-import { storageService } from '@/services/backend-storage-service'
+import { DatabaseService } from '@/services/database-service'
+import type { UpdateConfig } from '@/types/database'
 
 // 定义更新信息类型
 interface UpdateInfo {
@@ -52,48 +53,49 @@ export const useUpdateStore = defineStore(
     // 用户设置
     const autoCheckUpdate = ref(true)
     const skipVersion = ref('')
-    const acceptPrerelease = ref(false) // 是否接收预发布版本
+    const acceptPrerelease = ref(false) // 是否接收预发布版本（保留，但不同步到数据库）
 
     // 当前版本信息
     const isPrerelease = ref(false) // 当前检测到的版本是否为预发布版本
 
-    // 从后端加载数据
+    // 从数据库加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('🔄 从后端加载更新配置...')
-        const updateConfig = await storageService.getUpdateConfig()
+        console.log('🔄 从数据库加载更新配置...')
+        const updateConfig = await DatabaseService.getUpdateConfig()
         
         // 更新响应式状态
-        appVersion.value = updateConfig.app_version
-        autoCheckUpdate.value = updateConfig.auto_check_update
+        autoCheckUpdate.value = updateConfig.auto_check
         skipVersion.value = updateConfig.skip_version || ''
-        acceptPrerelease.value = updateConfig.accept_prerelease
+        
+        // 获取当前版本
+        await fetchAppVersion()
         
         console.log('🔄 更新配置加载完成：', {
           appVersion: appVersion.value,
           autoCheckUpdate: autoCheckUpdate.value,
           skipVersion: skipVersion.value,
-          acceptPrerelease: acceptPrerelease.value,
         })
       } catch (error) {
-        console.error('从后端加载更新配置失败:', error)
+        console.error('从数据库加载更新配置失败:', error)
         // 加载失败时获取当前版本
         await fetchAppVersion()
       }
     }
 
-    // 保存配置到后端
+    // 保存配置到数据库
     const saveToBackend = async () => {
       try {
-        await storageService.updateUpdateConfig({
-          app_version: appVersion.value,
-          auto_check_update: autoCheckUpdate.value,
+        const config: UpdateConfig = {
+          auto_check: autoCheckUpdate.value,
+          last_check: Math.floor(Date.now() / 1000),
+          last_version: appVersion.value,
           skip_version: skipVersion.value || null,
-          accept_prerelease: acceptPrerelease.value,
-        })
-        console.log('✅ 更新配置已保存到后端')
+        }
+        await DatabaseService.saveUpdateConfig(config)
+        console.log('✅ 更新配置已保存到数据库')
       } catch (error) {
-        console.error('保存更新配置到后端失败:', error)
+        console.error('保存更新配置到数据库失败:', error)
       }
     }
 
@@ -276,18 +278,36 @@ export const useUpdateStore = defineStore(
     // 设置自动检查更新
     const setAutoCheckUpdate = async (enabled: boolean) => {
       autoCheckUpdate.value = enabled
-      await saveToBackend()
+      // 保存会在 watch 中自动处理
     }
 
     // 设置接受预发布版本
     const setAcceptPrerelease = async (accept: boolean) => {
       acceptPrerelease.value = accept
-      await saveToBackend()
+      // 注意：这个字段不同步到数据库，所以不需要自动保存
     }
+
+    // 标记是否正在初始化
+    let isInitializing = false
+    
+    // 监听更新配置变化并自动保存到数据库
+    watch(
+      [autoCheckUpdate, skipVersion],
+      async () => {
+        // 初始化期间不保存
+        if (isInitializing) return
+        await saveToBackend()
+      },
+      { deep: true }
+    )
 
     // 初始化方法
     const initializeStore = async () => {
+      isInitializing = true
       await loadFromBackend()
+      // 等待一下确保数据加载完成
+      await new Promise(resolve => setTimeout(resolve, 100))
+      isInitializing = false
     }
 
     return {

@@ -178,8 +178,13 @@ export const useLogStore = defineStore(
       console.log('🧹 开始清理日志Store监听器')
 
       if (eventListenersSetup) {
-        eventService.removeEventListener('log-data')
-        eventListenersSetup = false
+        try {
+          eventService.removeEventListener('log-data')
+        } catch (error) {
+          console.error('清理日志监听器时出错:', error)
+        } finally {
+          eventListenersSetup = false
+        }
       }
 
       // 清理定期清理定时器
@@ -252,9 +257,5 @@ export const useLogStore = defineStore(
       initializeStore,
       cleanupStore,
     }
-  },
-  {
-    // 日志数据不需要持久化存储 - 应用重启时重置日志
-    persist: false,
   },
 )

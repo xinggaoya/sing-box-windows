@@ -41,6 +41,8 @@ winapi = { version = "0.3", features = ["wininet"] }
 serde = { version = "1.0.214", features = ["derive"] }
 tauri-plugin-store = "2"
 thiserror = "1.0"
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"

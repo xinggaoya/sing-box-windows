@@ -164,10 +164,14 @@ export const useConnectionStore = defineStore(
     const cleanupEventListeners = () => {
       if (!eventListenersSetup) return
 
-      eventService.removeEventListener('connections-data')
-      eventService.removeEventListener('memory-data')
-
-      eventListenersSetup = false
+      try {
+        eventService.removeEventListener('connections-data')
+        eventService.removeEventListener('memory-data')
+      } catch (error) {
+        console.error('清理连接监听器时出错:', error)
+      } finally {
+        eventListenersSetup = false
+      }
     }
 
     // 重置连接数据
@@ -338,9 +342,5 @@ export const useConnectionStore = defineStore(
       initializeStore,
       cleanupStore,
     }
-  },
-  {
-    // 连接数据不需要持久化存储 - 实时数据应在应用重启时重置
-    persist: false,
   },
 )

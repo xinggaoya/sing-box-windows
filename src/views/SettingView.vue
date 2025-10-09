@@ -419,6 +419,7 @@ import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useUpdateStore } from '@/stores/app/UpdateStore'
 import { useLocaleStore } from '@/stores/app/LocaleStore'
+import type { Locale } from '@/stores/app/LocaleStore'
 import { useRouter } from 'vue-router'
 import {
   DownloadOutline,
@@ -435,7 +436,6 @@ import { listen } from '@tauri-apps/api/event'
 import { tauriApi } from '@/services/tauri-api'
 import { appDataDir } from '@tauri-apps/api/path'
 import { supportedLocales } from '@/locales'
-import { Locale } from '@/stores/app/LocaleStore'
 import { useI18n } from 'vue-i18n'
 import mitt from '@/utils/mitt'
 import i18n from '@/locales'
@@ -578,6 +578,9 @@ const downloadTheKernel = async () => {
 // 开机自启动设置
 const onAutoStartChange = async (value: boolean) => {
   try {
+    // 先更新 AppStore 状态并保存到数据库
+    await appStore.toggleAutoStart(value)
+    
     if (value) {
       await enable()
       notification.success({
@@ -600,6 +603,9 @@ const onAutoStartChange = async (value: boolean) => {
 
 const onIpVersionChange = async (value: boolean) => {
   try {
+    // 先更新 AppStore 状态并保存到数据库
+    await appStore.setPreferIpv6(value)
+    
     await tauriApi.proxy.toggleIpVersion(value)
     // 切换后重启内核
     if (appStore.isRunning) {
@@ -732,11 +738,13 @@ const savePortSettings = async () => {
       return
     }
 
-    // 更新端口设置
+    // 更新端口设置到配置文件
     await tauriApi.config.updateSingboxPorts(tempProxyPort.value, tempApiPort.value)
 
-    // 更新应用状态
-    appStore.updatePorts(tempProxyPort.value, tempApiPort.value)
+    // 直接更新 AppStore 状态并保存到数据库
+    appStore.proxyPort = tempProxyPort.value
+    appStore.apiPort = tempApiPort.value
+    await appStore.saveToBackend()
 
     // 是否需要重启
     if (appStore.isRunning) {

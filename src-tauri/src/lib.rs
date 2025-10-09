@@ -2,7 +2,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tracing_subscriber::{fmt, EnvFilter};
-use app::storage::StorageService;
+use app::storage::EnhancedStorageService;
 
 pub mod app;
 pub mod entity;
@@ -44,38 +44,42 @@ pub fn run() {
                 }
             }
             
-            // 初始化存储服务
-            let storage_service = Arc::new(StorageService::new(app.handle()));
-            app.manage(storage_service);
+            // 初始化增强版存储服务（数据库）
+            let enhanced_storage = std::sync::Mutex::new(None as Option<Arc<EnhancedStorageService>>);
+            app.manage(enhanced_storage);
+
+            // 异步初始化数据库服务
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                match EnhancedStorageService::new(&app_handle).await {
+                    Ok(service) => {
+                        if let Ok(mut enhanced_storage) = app_handle.state::<std::sync::Mutex<Option<Arc<EnhancedStorageService>>>>().lock() {
+                            *enhanced_storage = Some(Arc::new(service));
+                        }
+                        tracing::info!("Enhanced storage service initialized successfully");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to initialize enhanced storage service: {}", e);
+                    }
+                }
+            });
             
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // Storage service commands
-            crate::app::storage::storage_service::load_state,
-            crate::app::storage::storage_service::save_state,
-            crate::app::storage::storage_service::get_app_config,
-            crate::app::storage::storage_service::update_app_config,
-            crate::app::storage::storage_service::get_theme_config,
-            crate::app::storage::storage_service::update_theme_config,
-            crate::app::storage::storage_service::get_locale_config,
-            crate::app::storage::storage_service::update_locale_config,
-            crate::app::storage::storage_service::get_window_config,
-            crate::app::storage::storage_service::update_window_config,
-            crate::app::storage::storage_service::get_update_config,
-            crate::app::storage::storage_service::update_update_config,
-            crate::app::storage::storage_service::get_subscriptions,
-            crate::app::storage::storage_service::update_subscriptions,
-            crate::app::storage::storage_service::get_kernel_info,
-            crate::app::storage::storage_service::update_kernel_info,
-            crate::app::storage::storage_service::reset_state,
-            crate::app::storage::storage_service::backup_state,
-            crate::app::storage::storage_service::restore_state,
-            // Core - Kernel manager commands (暂时注释，有问题需要解决)
-            // crate::app::core::kernel_manager::kernel_start,
-            // crate::app::core::kernel_manager::kernel_stop,
-            // crate::app::core::kernel_manager::kernel_get_status,
-            // crate::app::core::kernel_manager::kernel_get_version,
+            // Enhanced Storage service commands (数据库)
+            crate::app::storage::enhanced_storage_service::db_get_app_config,
+            crate::app::storage::enhanced_storage_service::db_save_app_config,
+            crate::app::storage::enhanced_storage_service::db_get_theme_config,
+            crate::app::storage::enhanced_storage_service::db_save_theme_config,
+            crate::app::storage::enhanced_storage_service::db_get_locale_config,
+            crate::app::storage::enhanced_storage_service::db_save_locale_config,
+            crate::app::storage::enhanced_storage_service::db_get_window_config,
+            crate::app::storage::enhanced_storage_service::db_save_window_config,
+            crate::app::storage::enhanced_storage_service::db_get_update_config,
+            crate::app::storage::enhanced_storage_service::db_save_update_config,
+            crate::app::storage::enhanced_storage_service::db_get_subscriptions,
+            crate::app::storage::enhanced_storage_service::db_save_subscriptions,
             // Core - Kernel service commands (legacy)
             crate::app::core::kernel_service::start_kernel,
             crate::app::core::kernel_service::stop_kernel,

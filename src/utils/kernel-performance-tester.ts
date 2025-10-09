@@ -126,7 +126,8 @@ class KernelPerformanceTester {
       try {
         await kernelService.startKernel({ config: { proxy_mode: 'invalid' as any } })
         return 'unexpected_success'
-      } catch (_error) {
+      } catch (error) {
+        console.warn('Expected error caught:', error)
         return 'expected_error'
       }
     })

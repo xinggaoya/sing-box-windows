@@ -1,6 +1,7 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { storageService, type Subscription } from '@/services/backend-storage-service'
+import { DatabaseService } from '@/services/database-service'
+import type { Subscription } from '@/types/database'
 
 // 为了前端兼容性，创建一个适配器接口
 interface FrontendSubscription {
@@ -19,7 +20,7 @@ export const useSubStore = defineStore(
     const list = ref<FrontendSubscription[]>([])
     const activeIndex = ref<number | null>(null)
 
-    // 从后端格式转换为前端格式
+    // 从数据库格式转换为前端格式
     const convertToFrontendFormat = (backendSubs: Subscription[]): FrontendSubscription[] => {
       return backendSubs.map(sub => ({
         name: sub.name,
@@ -32,7 +33,7 @@ export const useSubStore = defineStore(
       }))
     }
 
-    // 从前端格式转换为后端格式
+    // 从前端格式转换为数据库格式
     const convertToBackendFormat = (frontendSubs: FrontendSubscription[]): Subscription[] => {
       return frontendSubs.map(sub => ({
         name: sub.name,
@@ -45,30 +46,30 @@ export const useSubStore = defineStore(
       }))
     }
 
-    // 从后端加载数据
+    // 从数据库加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('📄 从后端加载订阅配置...')
-        const subscriptions = await storageService.getSubscriptions()
+        console.log('📄 从数据库加载订阅配置...')
+        const subscriptions = await DatabaseService.getSubscriptions()
         
         // 更新响应式状态
         list.value = convertToFrontendFormat(subscriptions)
         
         console.log('📄 订阅配置加载完成：', { count: list.value.length })
       } catch (error) {
-        console.error('从后端加载订阅配置失败:', error)
+        console.error('从数据库加载订阅配置失败:', error)
         // 加载失败时使用默认值
         list.value = []
       }
     }
 
-    // 保存配置到后端
+    // 保存配置到数据库
     const saveToBackend = async () => {
       try {
-        await storageService.updateSubscriptions(convertToBackendFormat(list.value))
-        console.log('✅ 订阅配置已保存到后端')
+        await DatabaseService.saveSubscriptions(convertToBackendFormat(list.value))
+        console.log('✅ 订阅配置已保存到数据库')
       } catch (error) {
-        console.error('保存订阅配置到后端失败:', error)
+        console.error('保存订阅配置到数据库失败:', error)
       }
     }
 
@@ -88,15 +89,14 @@ export const useSubStore = defineStore(
         useOriginalConfig,
       })
 
-      // 保存到后端
-      await saveToBackend()
+      // 保存会在 watch 中自动处理
     }
 
     // 更新订阅
     const update = async (index: number, updates: Partial<FrontendSubscription>) => {
       if (index >= 0 && index < list.value.length) {
         list.value[index] = { ...list.value[index], ...updates }
-        await saveToBackend()
+        // 保存会在 watch 中自动处理
       }
     }
 
@@ -114,7 +114,7 @@ export const useSubStore = defineStore(
           }
         }
         
-        await saveToBackend()
+        // 保存会在 watch 中自动处理
       }
     }
 
@@ -131,7 +131,7 @@ export const useSubStore = defineStore(
           ...item,
           isLoading: false
         }))
-        await saveToBackend()
+        // 保存会在 watch 中自动处理
       }
     }
 
@@ -139,7 +139,7 @@ export const useSubStore = defineStore(
     const setLoadingState = async (index: number, loading: boolean) => {
       if (index >= 0 && index < list.value.length) {
         list.value[index].isLoading = loading
-        await saveToBackend()
+        // 保存会在 watch 中自动处理
       }
     }
 
@@ -148,7 +148,7 @@ export const useSubStore = defineStore(
       if (index >= 0 && index < list.value.length) {
         list.value[index].lastUpdate = Date.now()
         list.value[index].isLoading = false
-        await saveToBackend()
+        // 保存会在 watch 中自动处理
       }
     }
 
@@ -156,7 +156,7 @@ export const useSubStore = defineStore(
     const clear = async () => {
       list.value = []
       activeIndex.value = null
-      await saveToBackend()
+      // 保存会在 watch 中自动处理
     }
 
     // 获取当前激活的订阅
@@ -167,9 +167,27 @@ export const useSubStore = defineStore(
       return null
     }
 
+    // 标记是否正在初始化
+    let isInitializing = false
+    
+    // 监听订阅列表变化并自动保存到数据库
+    watch(
+      list,
+      async () => {
+        // 初始化期间不保存
+        if (isInitializing) return
+        await saveToBackend()
+      },
+      { deep: true }
+    )
+
     // 初始化方法
     const initializeStore = async () => {
+      isInitializing = true
       await loadFromBackend()
+      // 等待一下确保数据加载完成
+      await new Promise(resolve => setTimeout(resolve, 100))
+      isInitializing = false
     }
 
     return {

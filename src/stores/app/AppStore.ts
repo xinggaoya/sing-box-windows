@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
 import { useMessage } from 'naive-ui'
 import { config, tauriApi } from '@/services/tauri-api'
-import { storageService, type AppConfig } from '@/services/backend-storage-service'
+import { DatabaseService } from '@/services/database-service'
+import type { AppConfig } from '@/types/database'
 
 // 代理模式类型
 export type ProxyMode = 'system' | 'tun' | 'manual'
@@ -86,8 +87,8 @@ export const useAppStore = defineStore(
     // 从后端加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('📋 从后端加载应用配置...')
-        const appConfig = await storageService.getAppConfig()
+        console.log('📋 从数据库加载应用配置...')
+        const appConfig = await DatabaseService.getAppConfig()
         
         // 更新响应式状态
         proxyMode.value = appConfig.proxy_mode as ProxyMode
@@ -95,7 +96,7 @@ export const useAppStore = defineStore(
         preferIpv6.value = appConfig.prefer_ipv6
         proxyPort.value = appConfig.proxy_port
         apiPort.value = appConfig.api_port
-        trayInstanceId.value = appConfig.tray_instance_id
+        trayInstanceId.value = appConfig.tray_instance_id || null
         
         console.log('📋 应用配置加载完成：', {
           proxyMode: proxyMode.value,
@@ -108,16 +109,16 @@ export const useAppStore = defineStore(
         
         markDataRestored()
       } catch (error) {
-        console.error('从后端加载应用配置失败:', error)
+        console.error('从数据库加载应用配置失败:', error)
         // 加载失败时使用默认值
         markDataRestored()
       }
     }
 
-    // 保存配置到后端
+    // 保存配置到数据库
     const saveToBackend = async () => {
       try {
-        const config: Partial<AppConfig> = {
+        const config: AppConfig = {
           proxy_mode: proxyMode.value,
           auto_start_kernel: autoStartKernel.value,
           prefer_ipv6: preferIpv6.value,
@@ -126,10 +127,10 @@ export const useAppStore = defineStore(
           tray_instance_id: trayInstanceId.value,
         }
         
-        await storageService.updateAppConfig(config)
-        console.log('✅ 应用配置已保存到后端')
+        await DatabaseService.saveAppConfig(config)
+        console.log('✅ 应用配置已保存到数据库')
       } catch (error) {
-        console.error('保存应用配置到后端失败:', error)
+        console.error('保存应用配置到数据库失败:', error)
       }
     }
 
@@ -182,8 +183,24 @@ export const useAppStore = defineStore(
       }
     }
 
+    // 标记是否正在初始化
+    let isInitializing = false
+    
+    // 监听应用配置变化并自动保存到数据库
+    watch(
+      [proxyMode, autoStartKernel, preferIpv6, proxyPort, apiPort, trayInstanceId],
+      async () => {
+        // 初始化期间不保存
+        if (isInitializing) return
+        await saveToBackend()
+      },
+      { deep: true }
+    )
+
     // Store初始化方法
     const initializeStore = async () => {
+      isInitializing = true
+      
       // 初始化数据恢复Promise
       initializeDataRestore()
 
@@ -194,7 +211,11 @@ export const useAppStore = defineStore(
       await detectAutostartScenario()
 
       // WebSocket连接状态管理现在由后端直接处理，无需前端监听
-      console.log('✅ AppStore初始化完成 - 使用后端存储')
+      console.log('✅ AppStore初始化完成 - 使用数据库存储')
+      
+      // 等待一下确保所有数据都加载完成
+      await new Promise(resolve => setTimeout(resolve, 100))
+      isInitializing = false
     }
 
     // 检测开机自启动场景
@@ -227,8 +248,8 @@ export const useAppStore = defineStore(
         // 使用Tauri命令获取系统启动时间
         const uptime = await tauriApi.system.getSystemUptime()
         return Math.floor(uptime / 1000) // 转换为秒
-      } catch (_error) {
-        console.warn('无法获取系统运行时间，使用应用启动时间估算')
+      } catch (error) {
+        console.warn('无法获取系统运行时间，使用应用启动时间估算:', error)
         // 如果无法获取系统时间，使用性能时间估算
         return Math.floor(performance.now() / 1000)
       }
@@ -349,24 +370,21 @@ export const useAppStore = defineStore(
       // 更新状态
       proxyMode.value = targetMode
 
-      // 保存到后端
-      await saveToBackend()
-
-      // 代理模式变更事件现在通过Pinia响应式系统处理
+      // 保存会在 watch 中自动处理
       console.log('代理模式已切换到:', targetMode)
     }
 
     // 设置代理模式
     const setProxyMode = async (mode: 'system' | 'tun' | 'manual') => {
       proxyMode.value = mode
-      await saveToBackend()
+      // 保存会在 watch 中自动处理
     }
 
     // 更新端口配置
     const updatePorts = async (newProxyPort: number, newApiPort: number) => {
       proxyPort.value = newProxyPort
       apiPort.value = newApiPort
-      await saveToBackend()
+      // 保存会在 watch 中自动处理
     }
 
     // 同步端口配置到sing-box配置文件
@@ -383,13 +401,13 @@ export const useAppStore = defineStore(
     // 设置IPv6偏好
     const setPreferIpv6 = async (prefer: boolean) => {
       preferIpv6.value = prefer
-      await saveToBackend()
+      // 保存会在 watch 中自动处理
     }
 
     // 设置托盘实例ID
     const setTrayInstanceId = async (instanceId: string | null) => {
       trayInstanceId.value = instanceId
-      await saveToBackend()
+      // 保存会在 watch 中自动处理
     }
 
     return {

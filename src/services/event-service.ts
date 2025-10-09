@@ -77,12 +77,11 @@ export class EventService {
   /**
    * 通用事件监听方法
    */
-  public on(eventName: string, callback: (data: any) => void): () => void {
-    listen(eventName, (event) => {
+  public async on(eventName: string, callback: (data: any) => void): Promise<() => void> {
+    const unlisten = await listen(eventName, (event) => {
       callback(event.payload)
-    }).then(unlisten => {
-      this.eventListeners.set(eventName, unlisten)
     })
+    this.eventListeners.set(eventName, unlisten)
     
     // 返回取消监听的函数
     return () => {
@@ -96,8 +95,14 @@ export class EventService {
   public removeEventListener(eventName: string) {
     const unlisten = this.eventListeners.get(eventName)
     if (unlisten) {
-      unlisten()
-      this.eventListeners.delete(eventName)
+      try {
+        unlisten()
+        this.eventListeners.delete(eventName)
+      } catch (error) {
+        console.error(`移除事件监听器失败 ${eventName}:`, error)
+        // 即使出错也要从Map中删除，避免重复尝试
+        this.eventListeners.delete(eventName)
+      }
     }
   }
 
@@ -105,8 +110,16 @@ export class EventService {
    * 移除所有事件监听器
    */
   public removeAllEventListeners() {
-    this.eventListeners.forEach((unlisten) => {
-      unlisten()
+    const eventNames = Array.from(this.eventListeners.keys())
+    eventNames.forEach((eventName) => {
+      const unlisten = this.eventListeners.get(eventName)
+      if (unlisten) {
+        try {
+          unlisten()
+        } catch (error) {
+          console.error(`移除事件监听器失败 ${eventName}:`, error)
+        }
+      }
     })
     this.eventListeners.clear()
   }

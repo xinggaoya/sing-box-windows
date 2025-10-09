@@ -101,8 +101,13 @@ export const useTrafficStore = defineStore(
     const cleanupEventListeners = () => {
       if (!eventListenersSetup) return
 
-      eventService.removeEventListener('traffic-data')
-      eventListenersSetup = false
+      try {
+        eventService.removeEventListener('traffic-data')
+      } catch (error) {
+        console.error('清理流量监听器时出错:', error)
+      } finally {
+        eventListenersSetup = false
+      }
     }
 
     // 重置流量统计
@@ -197,9 +202,5 @@ export const useTrafficStore = defineStore(
       initializeStore,
       cleanupStore,
     }
-  },
-  {
-    // 流量数据不需要持久化存储 - 实时数据应在应用重启时重置
-    persist: false,
   },
 )

@@ -115,8 +115,4 @@ export const useKernelRuntimeStore = defineStore(
       cleanupStore,
     }
   },
-  {
-    // 完全禁用持久化 - 这是临时运行时数据
-    persist: false,
-  },
 )
