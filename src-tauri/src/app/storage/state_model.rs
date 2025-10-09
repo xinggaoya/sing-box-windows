@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {

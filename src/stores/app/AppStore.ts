@@ -213,6 +213,27 @@ export const useAppStore = defineStore(
       // WebSocket连接状态管理现在由后端直接处理，无需前端监听
       console.log('✅ AppStore初始化完成 - 使用数据库存储')
       
+      // 检查是否需要自动启动内核
+      if (autoStartKernel.value) {
+        console.log('🚀 检测到自动启动内核设置，开始启动内核...')
+        
+        if (isAutostartScenario.value) {
+          // 开机自启动场景，延迟启动避免资源竞争
+          console.log('🕐 开机自启动场景，使用延迟启动')
+          await delayedKernelStart(10000) // 延迟10秒
+        } else {
+          // 正常启动，立即启动
+          console.log('🖥️ 正常启动场景，立即启动内核')
+          try {
+            const { useKernelStore } = await import('../kernel/KernelStore')
+            const kernelStore = useKernelStore()
+            await kernelStore.startKernel()
+          } catch (error) {
+            console.error('自动启动内核失败:', error)
+          }
+        }
+      }
+
       // 等待一下确保所有数据都加载完成
       await new Promise(resolve => setTimeout(resolve, 100))
       isInitializing = false

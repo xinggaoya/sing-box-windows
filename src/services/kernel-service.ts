@@ -330,7 +330,9 @@ class KernelService {
    * 监听内核事件
    */
   async onKernelStatusChange(callback: (status: KernelStatus) => void): Promise<() => void> {
-    return eventService.on('kernel-status-changed', callback)
+    return eventService.on('kernel-status-changed', (data: unknown) => {
+      callback(data as KernelStatus)
+    })
   }
 
   async onKernelReady(callback: () => void): Promise<() => void> {
@@ -338,7 +340,9 @@ class KernelService {
   }
 
   async onKernelError(callback: (error: string) => void): Promise<() => void> {
-    return eventService.on('kernel-error', callback)
+    return eventService.on('kernel-error', (data: unknown) => {
+      callback(data as string)
+    })
   }
 }
 

@@ -27,7 +27,7 @@ export class EventService {
   /**
    * 监听流量数据事件
    */
-  public async onTrafficData(callback: (data: any) => void) {
+  public async onTrafficData(callback: (data: unknown) => void) {
     const unlisten = await listen('traffic-data', (event) => {
       callback(event.payload)
     })
@@ -37,7 +37,7 @@ export class EventService {
   /**
    * 监听内存数据事件
    */
-  public async onMemoryData(callback: (data: any) => void) {
+  public async onMemoryData(callback: (data: unknown) => void) {
     const unlisten = await listen('memory-data', (event) => {
       callback(event.payload)
     })
@@ -47,7 +47,7 @@ export class EventService {
   /**
    * 监听日志数据事件
    */
-  public async onLogData(callback: (data: any) => void) {
+  public async onLogData(callback: (data: unknown) => void) {
     const unlisten = await listen('log-data', (event) => {
       callback(event.payload)
     })
@@ -57,7 +57,7 @@ export class EventService {
   /**
    * 监听连接数据事件
    */
-  public async onConnectionsData(callback: (data: any) => void) {
+  public async onConnectionsData(callback: (data: unknown) => void) {
     const unlisten = await listen('connections-data', (event) => {
       callback(event.payload)
     })
@@ -77,7 +77,7 @@ export class EventService {
   /**
    * 通用事件监听方法
    */
-  public async on(eventName: string, callback: (data: any) => void): Promise<() => void> {
+  public async on(eventName: string, callback: (data: unknown) => void): Promise<() => void> {
     const unlisten = await listen(eventName, (event) => {
       callback(event.payload)
     })

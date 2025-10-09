@@ -18,7 +18,7 @@ interface ProxiesData {
 // 内核相关接口 (重构版本)
 export const kernelApi = {
   // 新的内核管理接口
-  startKernel: async (options?: { config?: any; forceRestart?: boolean; timeoutMs?: number }) => {
+  startKernel: async (options?: { config?: { proxy_mode: string; api_port: number; proxy_port: number; prefer_ipv6: boolean; auto_start: boolean }; forceRestart?: boolean; timeoutMs?: number }) => {
     const appStore = useAppStore()
     await appStore.waitForDataRestore()
     return invoke<{ success: boolean; message: string }>('kernel_start', { 

@@ -110,7 +110,7 @@ export class InitializationService {
     const coreStoreStatus: Record<string, boolean> = {}
 
     for (const storeType of coreStoreTypes) {
-      coreStoreStatus[storeType] = storeManager.isStoreLoaded(storeType as any)
+      coreStoreStatus[storeType] = storeManager.isStoreLoaded(storeType as 'app' | 'theme' | 'locale' | 'window' | 'update')
     }
 
     return {

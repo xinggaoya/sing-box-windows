@@ -460,8 +460,6 @@ async fn check_websocket_endpoints_ready(api_port: u16, token: &str) -> bool {
 pub async fn get_system_uptime() -> Result<u64, String> {
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        
         // 使用Windows API获取系统运行时间
         match tokio::process::Command::new("powershell")
             .args(&[

@@ -421,7 +421,7 @@ onUnmounted(() => {
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
     if (gl) {
       // 强制丢失WebGL上下文以释放GPU内存
-      const loseContext = (gl as any).getExtension('WEBGL_lose_context')
+      const loseContext = (gl as WebGLRenderingContext).getExtension('WEBGL_lose_context')
       if (loseContext) {
         loseContext.loseContext()
       }
