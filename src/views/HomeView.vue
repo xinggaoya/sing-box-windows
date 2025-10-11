@@ -261,6 +261,50 @@ const isStopping = ref(false)
 const isSwitching = ref(false)
 const isRestarting = ref(false)
 const isAdmin = ref(false)
+
+// 消息去重管理
+const lastMessageRef = ref<{
+  type: 'success' | 'error' | 'info'
+  content: string
+  timestamp: number
+} | null>(null)
+
+// 显示带去重的消息
+const showMessage = (type: 'success' | 'error' | 'info', content: string, duration = 3000) => {
+  const now = Date.now()
+
+  // 检查是否是相同的消息，如果是则跳过（2秒内的重复消息）
+  if (lastMessageRef.value &&
+      lastMessageRef.value.type === type &&
+      lastMessageRef.value.content === content &&
+      (now - lastMessageRef.value.timestamp) < 2000) {
+    console.log('跳过重复消息:', `${type}:${content}`)
+    return
+  }
+
+  // 记录消息
+  lastMessageRef.value = {
+    type,
+    content,
+    timestamp: now
+  }
+
+  // 显示消息，使用正确的 Naive UI API
+  if (type === 'success') {
+    message.success(content, { duration })
+  } else if (type === 'error') {
+    message.error(content, { duration })
+  } else if (type === 'info') {
+    message.info(content, { duration })
+  }
+
+  // 设置定时器清理记录（比消息显示稍长一点）
+  setTimeout(() => {
+    if (lastMessageRef.value?.content === content) {
+      lastMessageRef.value = null
+    }
+  }, duration + 500)
+}
 // 直接从 store 读取，不使用本地 ref
 const currentProxyMode = computed(() => appState.proxyMode)
 const currentNodeProxyMode = ref('rule')
@@ -516,18 +560,18 @@ const runKernel = async () => {
           negativeText: t('common.cancel'),
           onPositiveClick: async () => {
             try {
-              message.info(t('notification.applyingTunMode'))
+              showMessage('info', t('notification.applyingTunMode'))
               const { proxyApi } = await import('@/services/tauri-api')
               await proxyApi.setTunProxy()
-              
+
               // 直接更新状态并保存
               appState.proxyMode = 'tun'
               await appState.saveToBackend()
-              
-              message.success(t('notification.tunConfigApplied'))
+
+              showMessage('success', t('notification.tunConfigApplied'))
               await restartAsAdmin()
             } catch (error) {
-              message.error(`${t('notification.restartFailed')}: ${error}`)
+              showMessage('error', `${t('notification.restartFailed')}: ${error}`)
             }
           },
         })
@@ -554,13 +598,13 @@ const runKernel = async () => {
       // 更新应用状态并保存
       appState.isRunning = true
       await appState.saveToBackend()
-      message.success(t('notification.kernelStarted'))
+      showMessage('success', t('notification.kernelStarted'))
     } else {
-      message.error(result.message || t('notification.startFailed'))
+      showMessage('error', result.message || t('notification.startFailed'))
     }
   } catch (error) {
     console.error('启动内核异常:', error)
-    message.error(`${t('notification.startFailed')}: ${error}`)
+    showMessage('error', `${t('notification.startFailed')}: ${error}`)
   } finally {
     isStarting.value = false
   }
@@ -575,13 +619,13 @@ const stopKernel = async () => {
       // 更新应用状态并保存
       appState.isRunning = false
       await appState.saveToBackend()
-      message.success(t('notification.kernelStopped'))
+      showMessage('success', t('notification.kernelStopped'))
     } else {
-      message.error(result.message || t('notification.stopFailed'))
+      showMessage('error', result.message || t('notification.stopFailed'))
     }
   } catch (error) {
     console.error('停止内核异常:', error)
-    message.error(`${t('notification.stopFailed')}: ${error}`)
+    showMessage('error', `${t('notification.stopFailed')}: ${error}`)
   } finally {
     isStopping.value = false
   }
@@ -590,18 +634,9 @@ const stopKernel = async () => {
 const onModeChange = async (value: string) => {
   if (appState.proxyMode === value) return
 
-  const showMessage = (type: 'success' | 'info' | 'error', content: string) => {
-    switch (type) {
-      case 'success':
-        message.success(content)
-        break
-      case 'info':
-        message.info(content)
-        break
-      case 'error':
-        message.error(content)
-        break
-    }
+  // 这个函数已被上面的 showMessage 函数替代
+  const showLegacyMessage = (type: 'success' | 'info' | 'error', content: string) => {
+    showMessage(type, content)
   }
 
   try {
@@ -621,7 +656,7 @@ const onModeChange = async (value: string) => {
           onPositiveClick: async () => {
             try {
               // 先调用API修改配置为TUN模式
-              message.info(t('notification.applyingTunMode'))
+              showMessage('info', t('notification.applyingTunMode'))
               await tauriApi.proxy.setTunProxy()
 
               // 直接更新 AppStore 状态并保存到数据库
@@ -631,10 +666,10 @@ const onModeChange = async (value: string) => {
               // 设置挂起的TUN模式标记，重启后会应用（配置已经修改好了）
               localStorage.setItem('pending-tun-mode', 'true')
 
-              message.success(t('notification.tunConfigApplied'))
+              showMessage('success', t('notification.tunConfigApplied'))
               await restartAsAdmin()
             } catch (error) {
-              message.error(`${t('notification.restartFailed')}: ${error}`)
+              showMessage('error', `${t('notification.restartFailed')}: ${error}`)
             }
           },
           onNegativeClick: () => {
@@ -681,7 +716,7 @@ const onModeChange = async (value: string) => {
       await appWindow.close()
     }
   } catch (error) {
-    message.error(error as string)
+    showMessage('error', error as string)
   } finally {
     isSwitching.value = false
   }
@@ -703,7 +738,7 @@ const restartAsAdmin = async () => {
   try {
     await tauriApi.system.restartAsAdmin()
   } catch (error) {
-    message.error(`${t('notification.restartFailed')}: ${error}`)
+    showMessage('error', `${t('notification.restartFailed')}: ${error}`)
     isRestarting.value = false
   }
 }
@@ -828,12 +863,12 @@ const confirmNodeProxyModeChange = async () => {
     // 5. 使用nextTick确保DOM更新
     await nextTick()
 
-    message.success(
+    showMessage('success',
       t('proxy.modeChangeSuccess', { mode: getNodeProxyModeText(currentNodeProxyMode.value) }),
     )
   } catch (error) {
     console.error('代理模式切换失败:', error)
-    message.error(`${t('proxy.modeChangeError')}: ${error}`)
+    showMessage('error', `${t('proxy.modeChangeError')}: ${error}`)
     // 出错时也尝试获取当前状态，避免界面状态不一致
     try {
       await getCurrentNodeProxyMode()
@@ -879,10 +914,10 @@ onMounted(async () => {
     if (isAdmin.value && !appState.isRunning) {
       setTimeout(async () => {
         try {
-          message.info(t('notification.applyingTunMode'))
+          showMessage('info', t('notification.applyingTunMode'))
           await runKernel()
         } catch (error) {
-          message.error(`${t('notification.tunModeApplyFailed')}: ${error}`)
+          showMessage('error', `${t('notification.tunModeApplyFailed')}: ${error}`)
         }
       }, 1000) // 延迟1秒确保界面初始化完成
     }

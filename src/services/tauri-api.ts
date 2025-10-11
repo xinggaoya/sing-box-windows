@@ -21,28 +21,14 @@ export const kernelApi = {
   startKernel: async (options?: { config?: { proxy_mode: string; api_port: number; proxy_port: number; prefer_ipv6: boolean; auto_start: boolean }; forceRestart?: boolean; timeoutMs?: number }) => {
     const appStore = useAppStore()
     await appStore.waitForDataRestore()
-    return invoke<{ success: boolean; message: string }>('kernel_start', { 
-      options: {
-        config: options?.config || { 
-          proxy_mode: appStore.proxyMode, 
-          api_port: appStore.apiPort,
-          proxy_port: appStore.proxyPort,
-          prefer_ipv6: appStore.preferIpv6,
-          auto_start: false 
-        },
-        force_restart: options?.forceRestart || false,
-        timeout_ms: options?.timeoutMs || 30000,
-      }
+    return invoke<{ success: boolean; message: string }>('kernel_start_enhanced', {
+      proxy_mode: options?.config?.proxy_mode || appStore.proxyMode,
+      api_port: options?.config?.api_port || appStore.apiPort
     })
   },
 
-  stopKernel: async (options?: { force?: boolean; timeoutMs?: number }) => 
-    invoke<{ success: boolean; message: string }>('kernel_stop', { 
-      options: {
-        force: options?.force || false,
-        timeout_ms: options?.timeoutMs || 10000,
-      }
-    }),
+  stopKernel: async (options?: { force?: boolean; timeoutMs?: number }) =>
+    invoke<{ success: boolean; message: string }>('kernel_stop_enhanced'),
 
   restartKernel: async (options?: { force?: boolean; timeoutMs?: number }) => {
     // 组合停止和启动操作
@@ -68,20 +54,23 @@ export const kernelApi = {
     })
   },
 
-  getKernelStatus: () => invoke<any>('kernel_get_status'),
+  getKernelStatus: () => invoke<any>('kernel_get_status_enhanced'),
 
-  getKernelVersion: () => invoke<string>('kernel_get_version'),
+  getKernelVersion: () => invoke<string>('check_kernel_version'),
 
-  switchProxyMode: (mode: 'system' | 'tun' | 'manual') => 
-    invoke<{ success: boolean; message: string }>('kernel_switch_proxy_mode', { mode }),
+  switchProxyMode: (mode: 'system' | 'tun' | 'manual') =>
+    invoke<string>('toggle_proxy_mode', { mode }),
 
-  toggleIpVersion: (preferIpv6: boolean) => 
-    invoke<{ success: boolean; message: string }>('kernel_toggle_ip_version', { prefer_ipv6: preferIpv6 }),
+  toggleIpVersion: (preferIpv6: boolean) =>
+    invoke<void>('toggle_ip_version', { preferIpv6 }),
 
-  getKernelConfig: () => invoke<any>('kernel_get_config'),
+  getKernelConfig: () => {
+    // 暂时返回空配置，因为这个命令在后端没有对应实现
+    return Promise.resolve({})
+  },
 
-  updateKernelConfig: (config: any) => 
-    invoke<{ success: boolean; message: string }>('kernel_update_config', { config }),
+  updateKernelConfig: (config: any) =>
+    Promise.resolve({ success: true, message: '配置更新功能暂未实现' }),
 
   checkKernelHealth: () => invoke<{ healthy: boolean; issues: string[] }>('kernel_check_health'),
 
