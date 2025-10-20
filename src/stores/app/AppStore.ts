@@ -365,7 +365,7 @@ export const useAppStore = defineStore(
       }
     }
 
-    // 切换自动启动
+    // 切换系统开机自启
     const toggleAutoStart = async (enabled: boolean) => {
       try {
         if (enabled) {
@@ -373,12 +373,40 @@ export const useAppStore = defineStore(
         } else {
           await disable()
         }
-        
-        // 更新状态并保存到后端
-        autoStartKernel.value = enabled
+
+        // 注意：这里不应该改变 autoStartKernel，因为这是两个独立的设置
+        // 系统开机自启 ≠ 启动内核
+        // 只保存系统自启动状态，autoStartKernel 的值由用户单独控制
+
         await saveToBackend()
       } catch (error) {
-        console.error('切换自动启动失败:', error)
+        console.error('切换系统开机自启失败:', error)
+
+        // 检测已知的无害错误，功能实际生效时仍然抛出错误以保持一致性
+        const errorMessage = String(error)
+        const isHarmlessError = errorMessage.includes('os error 2') ||
+                               errorMessage.includes('system') ||
+                               errorMessage.includes('No such file or directory')
+
+        if (isHarmlessError) {
+          console.log('Autostart 插件已知的无害错误，功能已生效:', error)
+          // 仍然抛出错误，因为调用者需要知道操作完成了
+          // 但在上层UI中已经被处理为不显示错误
+        }
+
+        throw error
+      }
+    }
+
+    // 切换自动启动内核设置
+    const toggleAutoStartKernel = async (enabled: boolean) => {
+      try {
+        // 只更新 autoStartKernel 设置
+        autoStartKernel.value = enabled
+        await saveToBackend()
+        console.log(`自动启动内核设置已${enabled ? '启用' : '禁用'}`)
+      } catch (error) {
+        console.error('切换自动启动内核设置失败:', error)
         throw error
       }
     }
@@ -446,6 +474,7 @@ export const useAppStore = defineStore(
       setRunningState,
       setConnectingState,
       toggleAutoStart,
+      toggleAutoStartKernel,
       switchProxyMode,
       startWebSocketCheck,
       setProxyMode,

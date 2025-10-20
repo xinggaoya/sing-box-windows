@@ -334,6 +334,12 @@ export default {
       app: 'Start with System',
       kernel: 'Start Kernel',
     },
+    kernelAutoStart: {
+      enabled: 'Auto Start Kernel Enabled',
+      disabled: 'Auto Start Kernel Disabled',
+      enableSuccess: 'Kernel will start automatically when application starts',
+      disableSuccess: 'Kernel will not start automatically when application starts',
+    },
     advanced: {
       title: 'Advanced',
       reset: 'Reset All Settings',

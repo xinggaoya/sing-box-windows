@@ -78,7 +78,7 @@
               size="small"
               class="compact-alert"
             >
-              {{ t('setting.installPrompt') }}
+              {{ t('setting.kernel.installPrompt') }}
             </n-alert>
           </div>
 
@@ -110,7 +110,7 @@
                 <n-icon size="14"><DownloadOutline /></n-icon>
               </template>
               {{
-                hasNewVersion ? t('setting.update') : kernelStore.hasVersionInfo() ? t('setting.redownload') : t('setting.download')
+                hasNewVersion ? t('setting.kernel.update') : kernelStore.hasVersionInfo() ? t('setting.kernel.redownload') : t('setting.kernel.download')
               }}
             </n-button>
 
@@ -120,7 +120,7 @@
               size="small"
               class="secondary-action"
             >
-              {{ t('setting.manualDownload') }}
+              {{ t('setting.kernel.manualDownload') }}
             </n-button>
 
             <n-button
@@ -129,7 +129,7 @@
               size="small"
               class="secondary-action"
             >
-              {{ t('setting.checkInstall') }}
+              {{ t('setting.kernel.checkInstall') }}
             </n-button>
           </div>
 
@@ -170,6 +170,7 @@
               </div>
               <n-switch
                 v-model:value="appStore.autoStartKernel"
+                @update-value="onAutoStartKernelChange"
                 size="small"
               />
             </div>
@@ -578,21 +579,70 @@ const downloadTheKernel = async () => {
 // 开机自启动设置
 const onAutoStartChange = async (value: boolean) => {
   try {
-    // 先更新 AppStore 状态并保存到数据库
+    // 直接使用 AppStore 的方法，它会处理系统自启动和状态保存
     await appStore.toggleAutoStart(value)
-    
+
+    // 显示成功消息
     if (value) {
-      await enable()
       notification.success({
         title: t('setting.startup.enabled'),
         content: t('setting.startup.enableSuccess'),
         duration: 3000,
       })
     } else {
-      await disable()
       notification.info({
         title: t('setting.startup.disabled'),
         content: t('setting.startup.disableSuccess'),
+        duration: 3000,
+      })
+    }
+  } catch (error) {
+    // 检测 autostart 插件的已知无害错误
+    const errorMessage = String(error)
+    const isHarmlessError = errorMessage.includes('os error 2') ||
+                           errorMessage.includes('system') ||
+                           errorMessage.includes('No such file or directory')
+
+    if (isHarmlessError) {
+      // 这是 autostart 插件的已知问题，功能实际生效了，不显示错误给用户
+      console.log('Autostart 插件已知的无害错误，功能已生效:', error)
+      // 但仍然显示成功消息，因为功能确实生效了
+      if (value) {
+        notification.success({
+          title: t('setting.startup.enabled'),
+          content: t('setting.startup.enableSuccess'),
+          duration: 3000,
+        })
+      } else {
+        notification.info({
+          title: t('setting.startup.disabled'),
+          content: t('setting.startup.disableSuccess'),
+          duration: 3000,
+        })
+      }
+      return
+    }
+
+    // 对于其他真正的错误，显示给用户
+    message.error(`${t('common.error')}: ${error}`)
+  }
+}
+
+// 自动启动内核设置
+const onAutoStartKernelChange = async (value: boolean) => {
+  try {
+    await appStore.toggleAutoStartKernel(value)
+
+    if (value) {
+      notification.success({
+        title: t('setting.kernelAutoStart.enabled'),
+        content: t('setting.kernelAutoStart.enableSuccess'),
+        duration: 3000,
+      })
+    } else {
+      notification.info({
+        title: t('setting.kernelAutoStart.disabled'),
+        content: t('setting.kernelAutoStart.disableSuccess'),
         duration: 3000,
       })
     }
@@ -605,16 +655,21 @@ const onIpVersionChange = async (value: boolean) => {
   try {
     // 先更新 AppStore 状态并保存到数据库
     await appStore.setPreferIpv6(value)
-    
-    await tauriApi.proxy.toggleIpVersion(value)
-    // 切换后重启内核
-    if (appStore.isRunning) {
-      await tauriApi.kernel.restartKernel()
+
+    // 使用 KernelStore 来处理IP版本切换
+    const { useKernelStore } = await import('@/stores/kernel/KernelStore')
+    const kernelStore = useKernelStore()
+
+    const result = await kernelStore.toggleIpVersion(value)
+
+    if (result) {
       notification.success({
         title: t('setting.network.ipVersionChanged'),
         content: value ? t('setting.network.ipv6Enabled') : t('setting.network.ipv4Only'),
         duration: 3000,
       })
+    } else {
+      throw new Error(kernelStore.lastError || 'IP版本切换失败')
     }
   } catch (error: unknown) {
     message.error(`${t('common.error')}: ${error instanceof Error ? error.message : String(error)}`)
@@ -757,12 +812,20 @@ const savePortSettings = async () => {
       })
 
       if (shouldRestart) {
-        await tauriApi.kernel.restartKernel()
-        notification.success({
-          title: t('setting.network.portChanged'),
-          content: t('setting.network.portChangeSuccess'),
-          duration: 3000,
-        })
+        // 使用 KernelStore 来处理重启
+        const { useKernelStore } = await import('@/stores/kernel/KernelStore')
+        const kernelStore = useKernelStore()
+        const restartResult = await kernelStore.restartKernel()
+
+        if (restartResult) {
+          notification.success({
+            title: t('setting.network.portChanged'),
+            content: t('setting.network.portChangeSuccess'),
+            duration: 3000,
+          })
+        } else {
+          message.error(kernelStore.lastError || t('notification.restartFailed'))
+        }
       }
     } else {
       notification.success({

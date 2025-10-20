@@ -546,7 +546,14 @@ const getStatusSubtitle = () => {
 const runKernel = async () => {
   try {
     isStarting.value = true
-    
+
+    // 等待数据恢复完成，确保配置已加载
+    const dataRestored = await appState.waitForDataRestore(5000)
+    if (!dataRestored) {
+      showMessage('error', t('notification.configLoadFailed'))
+      return
+    }
+
     // 检查TUN模式下是否需要管理员权限（保留此逻辑）
     if (appState.proxyMode === 'tun') {
       const { systemApi } = await import('@/services/tauri-api')
@@ -580,27 +587,20 @@ const runKernel = async () => {
       }
     }
 
-    // 直接使用 kernelService 而不是 kernelStore
-    const { kernelService } = await import('@/services/kernel-service')
-    const result = await kernelService.startKernel({
-      config: { 
-        proxy_mode: appState.proxyMode as any,
-        api_port: appState.apiPort,
-        proxy_port: appState.proxyPort,
-        prefer_ipv6: appState.preferIpv6,
-        auto_start: false 
-      },
-      forceRestart: false,
-      timeoutMs: 30000
-    })
-    
-    if (result.success) {
-      // 更新应用状态并保存
-      appState.isRunning = true
-      await appState.saveToBackend()
+    // 使用 KernelStore 来管理内核启动，确保状态一致性
+    const { useKernelStore } = await import('@/stores/kernel/KernelStore')
+    const kernelStore = useKernelStore()
+
+    // 首先同步配置
+    await kernelStore.syncConfig()
+
+    // 启动内核
+    const result = await kernelStore.startKernel()
+
+    if (result) {
       showMessage('success', t('notification.kernelStarted'))
     } else {
-      showMessage('error', result.message || t('notification.startFailed'))
+      showMessage('error', kernelStore.lastError || t('notification.startFailed'))
     }
   } catch (error) {
     console.error('启动内核异常:', error)
@@ -613,15 +613,17 @@ const runKernel = async () => {
 const stopKernel = async () => {
   try {
     isStopping.value = true
-    const { kernelService } = await import('@/services/kernel-service')
-    const result = await kernelService.stopKernel()
-    if (result.success) {
-      // 更新应用状态并保存
-      appState.isRunning = false
-      await appState.saveToBackend()
+
+    // 使用 KernelStore 来管理内核停止，确保状态一致性
+    const { useKernelStore } = await import('@/stores/kernel/KernelStore')
+    const kernelStore = useKernelStore()
+
+    const result = await kernelStore.stopKernel()
+
+    if (result) {
       showMessage('success', t('notification.kernelStopped'))
     } else {
-      showMessage('error', result.message || t('notification.stopFailed'))
+      showMessage('error', kernelStore.lastError || t('notification.stopFailed'))
     }
   } catch (error) {
     console.error('停止内核异常:', error)
@@ -707,8 +709,14 @@ const onModeChange = async (value: string) => {
     // 如果内核正在运行且模式已改变，一定要重启内核
     if (appState.isRunning && modeChanged) {
       showMessage('info', t('notification.restartingKernel'))
-      await kernelStore.restartKernel()
-      showMessage('success', t('notification.kernelRestarted'))
+      const { useKernelStore } = await import('@/stores/kernel/KernelStore')
+      const kernelStoreInstance = useKernelStore()
+      const restartResult = await kernelStoreInstance.restartKernel()
+      if (restartResult) {
+        showMessage('success', t('notification.kernelRestarted'))
+      } else {
+        showMessage('error', kernelStoreInstance.lastError || t('notification.restartFailed'))
+      }
     }
 
     if (needClose) {
@@ -850,7 +858,10 @@ const confirmNodeProxyModeChange = async () => {
 
     // 2. 重启内核以应用新配置
     console.log('正在重启内核...')
-    await kernelStore.restartKernel()
+    const restartResult = await kernelStore.restartKernel()
+    if (!restartResult) {
+      throw new Error(kernelStore.lastError || '重启内核失败')
+    }
 
     // 3. 内核重启后，从后端重新获取当前代理模式状态，确保前后端状态同步
     console.log('正在同步代理模式状态...')

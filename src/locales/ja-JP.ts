@@ -335,6 +335,12 @@ export default {
       app: 'システム起動時に開始',
       kernel: 'カーネル開始',
     },
+    kernelAutoStart: {
+      enabled: 'カーネル自動開始が有効です',
+      disabled: 'カーネル自動開始が無効です',
+      enableSuccess: 'アプリケーション起動時にカーネルが自動的に開始されます',
+      disableSuccess: 'アプリケーション起動時にカーネルは自動的に開始されません',
+    },
     advanced: {
       title: '詳細設定',
       reset: 'すべての設定をリセット',
