@@ -1,10 +1,31 @@
-use crate::app::constants::{messages, process};
+use crate::app::constants::messages;
+
+#[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+
 use tauri::Manager;
 
-// 以管理员权限重启
+// 以管理员权限重启 (跨平台实现)
 #[tauri::command]
 pub fn restart_as_admin(app_handle: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        restart_as_admin_windows(app_handle)
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        restart_as_admin_linux(app_handle)
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        Err("当前平台不支持管理员权限提升".to_string())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn restart_as_admin_windows(app_handle: tauri::AppHandle) -> Result<(), String> {
     // 检查当前是否已经有管理员权限
     if check_admin() {
         return Ok(());
@@ -77,9 +98,69 @@ pub fn restart_as_admin(app_handle: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
-// 检查是否有管理员权限 - 使用Windows API的方式
+#[cfg(target_os = "linux")]
+fn restart_as_admin_linux(app_handle: tauri::AppHandle) -> Result<(), String> {
+    // 检查当前是否已经有root权限
+    if check_admin() {
+        return Ok(());
+    }
+
+    // 获取当前可执行文件路径
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("{}: {}", messages::ERR_GET_EXE_PATH_FAILED, e))?;
+
+    // 确保文件存在
+    if !current_exe.exists() {
+        return Err(format!("找不到程序可执行文件: {}", current_exe.display()));
+    }
+
+    // 使用pkexec或gksu进行权限提升
+    let sudo_commands = vec!["pkexec", "gksu", "kdesudo"];
+
+    for sudo_cmd in sudo_commands {
+        if which::which(sudo_cmd).is_ok() {
+            let result = std::process::Command::new(sudo_cmd)
+                .arg(&current_exe)
+                .spawn();
+
+            match result {
+                Ok(_) => {
+                    // 启动成功，退出当前进程
+                    app_handle.exit(0);
+                    return Ok(());
+                }
+                Err(e) => {
+                    eprintln!("尝试使用 {} 提权失败: {}", sudo_cmd, e);
+                    continue;
+                }
+            }
+        }
+    }
+
+    Err("未找到可用的权限提升工具 (pkexec, gksu, kdesudo)".to_string())
+}
+
+// 检查是否有管理员权限 - 跨平台实现
 #[tauri::command]
 pub fn check_admin() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        check_admin_windows()
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        check_admin_linux()
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        false // 其他平台默认返回false
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn check_admin_windows() -> bool {
     // 尝试执行一个需要管理员权限的操作，例如查询系统会话
     let result = std::process::Command::new("net")
         .arg("session")
@@ -89,6 +170,18 @@ pub fn check_admin() -> bool {
     match result {
         Ok(output) => output.status.success(),
         Err(_) => false,
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn check_admin_linux() -> bool {
+    // 检查当前用户是否为root
+    match std::env::var("USER") {
+        Ok(user) => user == "root",
+        Err(_) => {
+            // 备用方法：检查是否为root用户
+            nix::unistd::getuid().is_root()
+        }
     }
 }
 

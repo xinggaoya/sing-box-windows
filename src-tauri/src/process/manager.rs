@@ -1,6 +1,8 @@
 use super::{ProcessError, Result};
 use crate::app::constants::{messages, paths};
 use crate::utils::proxy_util::disable_system_proxy;
+
+#[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use std::process::{Child, Command};
 use std::sync::Arc;
@@ -26,7 +28,7 @@ impl ProcessManager {
         // 验证配置文件有效性
         self.validate_config().await?;
 
-        // 先检查本地是否有sing-box.exe进程在运行，如果有则先终止
+        // 先检查本地是否有sing-box进程在运行，如果有则先终止
         if let Err(e) = self.kill_existing_processes().await {
             warn!("终止已有sing-box进程失败: {}", e);
         }
@@ -187,16 +189,19 @@ impl ProcessManager {
         kernel_path: &std::path::Path,
         kernel_work_dir: &std::path::Path,
     ) -> Result<std::process::Child> {
-        let child = Command::new(kernel_path)
-            .args(&[
-                "run",
-                "-D",
-                kernel_work_dir.to_str().ok_or_else(|| {
-                    ProcessError::StartFailed("工作目录路径包含无效字符".to_string())
-                })?,
-            ])
-            .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
-            .spawn()
+        let mut cmd = Command::new(kernel_path);
+        cmd.args(&[
+            "run",
+            "-D",
+            kernel_work_dir.to_str().ok_or_else(|| {
+                ProcessError::StartFailed("工作目录路径包含无效字符".to_string())
+            })?,
+        ]);
+
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
+
+        let child = cmd.spawn()
             .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
             
         Ok(child)
@@ -245,7 +250,7 @@ impl ProcessManager {
     async fn kill_existing_processes(&self) -> std::io::Result<()> {
         info!("检查系统中是否有sing-box进程在运行");
 
-        #[cfg(windows)]
+        #[cfg(target_os = "windows")]
         {
             // 使用异步进程命令
             let output = tokio::process::Command::new("tasklist")
@@ -278,6 +283,47 @@ impl ProcessManager {
                 sleep(Duration::from_millis(500)).await;
             } else {
                 info!("未发现已有sing-box.exe进程");
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // 获取我们的内核目录，只检测从该目录运行的内核进程
+            let kernel_path = crate::app::constants::paths::get_kernel_path();
+            let kernel_dir = kernel_path.parent().unwrap_or_else(|| std::path::Path::new("/nonexistent"));
+
+            info!("检查内核进程，内核目录: {:?}", kernel_dir);
+
+            // 更精确的检测：只匹配从我们内核目录运行的 sing-box 进程
+            if let Ok(output) = tokio::process::Command::new("pgrep")
+                .args(&["-f", &format!("sing-box.*{}", kernel_dir.display())])
+                .output()
+                .await
+            {
+                if output.status.success() && !output.stdout.is_empty() {
+                    let pids = String::from_utf8_lossy(&output.stdout);
+                    info!("发现已有的sing-box内核进程，PIDs: {}", pids.trim());
+
+                    // 使用精确匹配终止我们的内核进程
+                    let kill_output = tokio::process::Command::new("pkill")
+                        .args(&["-f", &format!("sing-box.*{}", kernel_dir.display())])
+                        .output()
+                        .await?;
+
+                    if kill_output.status.success() {
+                        info!("成功终止已有的sing-box内核进程");
+                    } else {
+                        let error = String::from_utf8_lossy(&kill_output.stderr);
+                        warn!("终止sing-box内核进程可能失败: {}", error);
+                    }
+
+                    // 等待一段时间确保进程完全终止
+                    sleep(Duration::from_millis(500)).await;
+                } else {
+                    info!("未发现已有的sing-box内核进程");
+                }
+            } else {
+                warn!("无法检查sing-box内核进程状态");
             }
         }
 
@@ -413,6 +459,22 @@ fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
         let output = Command::new("taskkill")
             .args(&["/F", "/PID", &pid.to_string()])
             .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
+            .output()?;
+
+        if output.status.success() {
+            info!("成功使用PID {}强制终止进程", pid);
+        } else {
+            let error = String::from_utf8_lossy(&output.stderr);
+            warn!("使用PID {}强制终止进程失败: {}", pid, error);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+
+        let output = Command::new("kill")
+            .args(&["-9", &pid.to_string()])
             .output()?;
 
         if output.status.success() {

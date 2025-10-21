@@ -11,6 +11,11 @@ pub fn get_work_dir_sync() -> String {
         std::env::var("LOCALAPPDATA")
             .map(|p| PathBuf::from(p).join("sing-box-windows"))
             .unwrap_or_else(|_| PathBuf::from(r"C:\ProgramData\sing-box-windows"))
+    } else if cfg!(target_os = "linux") {
+        // Linux: ~/.local/share/sing-box-windows
+        dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("sing-box-windows")
     } else {
         // 其他系统使用默认缓存目录
         dirs::cache_dir()
@@ -33,6 +38,11 @@ pub async fn get_work_dir() -> String {
         std::env::var("LOCALAPPDATA")
             .map(|p| PathBuf::from(p).join("sing-box-windows"))
             .unwrap_or_else(|_| PathBuf::from(r"C:\ProgramData\sing-box-windows"))
+    } else if cfg!(target_os = "linux") {
+        // Linux: ~/.local/share/sing-box-windows
+        dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("sing-box-windows")
     } else {
         // 其他系统使用默认缓存目录
         dirs::cache_dir()

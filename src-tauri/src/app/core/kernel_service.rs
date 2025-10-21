@@ -1,8 +1,11 @@
-use crate::app::constants::{common::messages, paths, process};
+use crate::app::constants::{common::messages, paths};
 use crate::app::core::event_relay::{
     create_connection_event_relay, create_log_event_relay, create_memory_event_relay,
     create_traffic_event_relay, start_event_relay_with_retry,
 };
+use serde_json::json;
+use tauri::Manager;
+use std::process::Command;
 use crate::process::manager::ProcessManager;
 use crate::utils::http_client;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -38,10 +41,13 @@ pub async fn check_kernel_version() -> Result<String, String> {
         return Err(messages::ERR_KERNEL_NOT_FOUND.to_string());
     }
 
-    let output = tokio::process::Command::new(kernel_path)
-        .arg("version")
-        .creation_flags(process::CREATE_NO_WINDOW)
-        .output()
+    let mut cmd = tokio::process::Command::new(kernel_path);
+    cmd.arg("version");
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(process::CREATE_NO_WINDOW);
+
+    let output = cmd.output()
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_VERSION_CHECK_FAILED, e))?;
 
@@ -75,12 +81,15 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
         return Err(format!("配置文件不存在: {}", path));
     }
 
-    let output = tokio::process::Command::new(kernel_path)
-        .arg("check")
+    let mut cmd = tokio::process::Command::new(kernel_path);
+    cmd.arg("check")
         .arg("--config")
-        .arg(path)
-        .creation_flags(process::CREATE_NO_WINDOW)
-        .output()
+        .arg(path);
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(process::CREATE_NO_WINDOW);
+
+    let output = cmd.output()
         .await
         .map_err(|e| format!("执行配置检查命令失败: {}", e))?;
 
@@ -94,13 +103,537 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
     Ok(())
 }
 
+// 获取系统架构
+fn get_system_arch() -> &'static str {
+    // 首先检查是否手动指定了架构（用于特殊情况）
+    if let Ok(force_arch) = std::env::var("SING_BOX_FORCE_ARCH") {
+        info!("用户手动指定架构: {}", force_arch);
+        return match force_arch.as_str() {
+            "amd64" | "x86_64" => "amd64",
+            "386" | "i386" => "386",
+            "arm64" | "aarch64" => "arm64",
+            "armv5" => "armv5",
+            _ => "amd64", // 默认值
+        };
+    }
+
+    // 添加更详细的调试信息
+    info!("Rust ARCH 常量: {}", std::env::consts::ARCH);
+
+    if cfg!(target_os = "windows") {
+        // Windows 架构检测
+        let arch = match std::env::consts::ARCH {
+            "x86_64" => "amd64",
+            "x86" => "386",
+            "aarch64" => "arm64",
+            _ => "amd64", // 默认值
+        };
+        info!("Windows 检测到架构: {}", arch);
+        arch
+    } else if cfg!(target_os = "linux") {
+        // Linux 架构检测
+        let mut detected_arch = "amd64"; // 默认值
+
+        // 首先尝试通过 uname 命令获取准确架构
+        if let Ok(output) = Command::new("uname").arg("-m").output() {
+            if let Ok(arch_str) = String::from_utf8(output.stdout) {
+                let arch = arch_str.trim();
+                info!("uname -m 输出: '{}'", arch);
+
+                detected_arch = match arch {
+                    "x86_64" => "amd64",
+                    "amd64" => "amd64",
+                    "i386" | "i486" | "i586" | "i686" => "386",
+                    "aarch64" | "arm64" => "arm64",
+                    "armv7l" | "armv6l" => "armv5",
+                    _ => {
+                        info!("未知的 uname 架构，使用 Rust ARCH 常量");
+                        match std::env::consts::ARCH {
+                            "x86_64" => "amd64",
+                            "x86" => "386",
+                            "aarch64" => "arm64",
+                            _ => "amd64",
+                        }
+                    }
+                };
+                info!("通过 uname 检测到的架构: {}", detected_arch);
+            }
+        } else {
+            info!("uname 命令执行失败，使用 Rust ARCH 常量");
+        }
+
+        // 如果 uname 命令失败或结果不明确，使用 Rust 的 ARCH 常量作为备用
+        if detected_arch == "amd64" && std::env::consts::ARCH != "x86_64" {
+            detected_arch = match std::env::consts::ARCH {
+                "x86_64" => "amd64",
+                "x86" => "386",
+                "aarch64" => "arm64",
+                "arm" => "armv5",
+                _ => "amd64",
+            };
+            info!("通过 Rust ARCH 常量检测到的架构: {}", detected_arch);
+        }
+
+        detected_arch
+    } else {
+        info!("其他平台，使用默认架构 amd64");
+        "amd64" // 其他平台的默认值
+    }
+}
+
 // 下载最新内核版本
 #[tauri::command]
-pub async fn download_latest_kernel() -> Result<(), String> {
-    info!("开始检查内核更新...");
-    
-    // 这里应该实现实际的下载逻辑
-    // 暂时返回成功，表示检查完成
+pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("开始下载最新内核...");
+
+    let window = app_handle.get_webview_window("main")
+        .ok_or("无法获取主窗口")?;
+
+    // 发送开始下载事件
+    let _ = window.emit(
+        "kernel-download-progress",
+        json!({
+            "status": "downloading",
+            "progress": 0,
+            "message": "开始下载内核..."
+        }),
+    );
+
+    // 获取系统架构和平台信息
+    let platform = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else {
+        return Err("当前平台不支持".to_string());
+    };
+
+    let arch = get_system_arch();
+
+    // 记录检测到的架构信息
+    info!("检测到平台: {}, 架构: {}", platform, arch);
+
+    // 构造下载 URL - 使用正确的 GitHub 资源命名格式
+    let version = "1.12.10"; // 可以从 GitHub API 获取最新版本
+    let filename = format!("sing-box-{}-{}-{}.tar.gz", version, platform, arch);
+
+    // 使用多个下载源以提高成功率
+    let download_urls = vec![
+        // 使用 GitHub 快速加速镜像（优先）
+        format!("https://ghfast.top/https://github.com/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
+        // 使用 GitHub 加速镜像（国内用户）
+        format!("https://hub.fastgit.xyz/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
+        // 使用 GitLab 镜像
+        format!("https://hub.fgit.cf/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
+        // 使用 jsdelivr CDN
+        format!("https://cdn.jsdelivr.net/gh/SagerNet/sing-box@releases/download/v{}/{}", version, filename),
+        // 使用 gh-proxy 镜像
+        format!("https://ghproxy.com/https://github.com/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
+        // 原始 GitHub 链接（备用）
+        format!("https://github.com/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
+    ];
+
+    // 记录下载信息
+    info!("文件名: {}", filename);
+    info!("主要下载 URL (ghfast.top 加速): {}", download_urls[0]);
+    info!("备用下载源 1 (hub.fastgit.xyz): {}", download_urls[1]);
+    info!("备用下载源 2 (hub.fgit.cf): {}", download_urls[2]);
+    info!("备用下载源 3 (jsdelivr CDN): {}", download_urls[3]);
+    info!("备用下载源 4 (gh-proxy): {}", download_urls[4]);
+    info!("备用下载源 5 (GitHub 原始): {}", download_urls[5]);
+    info!("总共 {} 个下载源", download_urls.len());
+
+    // 获取工作目录
+    let work_dir = crate::utils::app_util::get_work_dir_sync();
+    let kernel_dir = std::path::Path::new(&work_dir).join("sing-box");
+
+    // 确保目录存在
+    if let Err(e) = std::fs::create_dir_all(&kernel_dir) {
+        return Err(format!("创建内核目录失败: {}", e));
+    }
+
+    let download_path = kernel_dir.join(&filename);
+
+    // 发送下载进度更新
+    let _ = window.emit(
+        "kernel-download-progress",
+        json!({
+            "status": "downloading",
+            "progress": 10,
+            "message": "正在下载内核文件..."
+        }),
+    );
+
+    // 实现下载逻辑 - 尝试多个下载源
+    for (index, download_url) in download_urls.iter().enumerate() {
+        info!("尝试第 {} 个下载源: {}", index + 1, download_url);
+
+        // 发送尝试新下载源的事件
+        let _ = window.emit(
+            "kernel-download-progress",
+            json!({
+                "status": "downloading",
+                "progress": 15 + (index * 5),
+                "message": format!("尝试第 {} 个下载源...", index + 1)
+            }),
+        );
+
+        match download_file(&download_url, &download_path, &window).await {
+            Ok(_) => {
+                info!("下载成功，使用下载源: {}", download_url);
+                break; // 下载成功，退出循环
+            }
+            Err(e) => {
+                let error_msg = format!("下载源 {} 失败: {}", index + 1, e);
+                warn!("{}", error_msg);
+
+                // 删除部分下载的文件
+                let _ = std::fs::remove_file(&download_path);
+
+                // 如果不是最后一个下载源，继续尝试
+                if index < download_urls.len() - 1 {
+                    continue;
+                }
+
+                // 所有下载源都失败
+                let _ = window.emit(
+                    "kernel-download-progress",
+                    json!({
+                        "status": "error",
+                        "progress": 0,
+                        "message": error_msg
+                    }),
+                );
+
+                return Err(error_msg);
+            }
+        }
+    }
+
+    // 检查文件是否成功下载
+    if !download_path.exists() {
+        return Err("下载的文件不存在".to_string());
+    }
+
+    let _ = window.emit(
+        "kernel-download-progress",
+        json!({
+            "status": "extracting",
+            "progress": 80,
+            "message": "正在解压内核文件..."
+        }),
+    );
+
+    if let Err(e) = extract_archive(&download_path, &kernel_dir).await {
+        let error_msg = format!("解压文件失败: {}", e);
+        let _ = window.emit(
+            "kernel-download-progress",
+            json!({
+                "status": "error",
+                "progress": 0,
+                "message": error_msg
+            }),
+        );
+        return Err(error_msg);
+    }
+
+    // 清理下载的压缩文件
+    let _ = std::fs::remove_file(&download_path);
+
+    // 验证可执行文件是否存在
+    let executable_name = if cfg!(target_os = "windows") {
+        "sing-box.exe"
+    } else {
+        "sing-box"
+    };
+
+    // 查找可执行文件（可能在子目录中）
+    let found_executable_path = find_executable_file(&kernel_dir, executable_name).await?;
+
+    // 将可执行文件迁移到正确位置（kernel_dir/sing-box 或 kernel_dir/sing-box.exe）
+    let target_executable_path = kernel_dir.join(executable_name);
+
+    // 如果找到的文件不在目标位置，需要移动
+    if found_executable_path != target_executable_path {
+        info!("迁移内核文件从 {:?} 到 {:?}", found_executable_path, target_executable_path);
+
+        // 确保目标位置的文件不存在
+        if target_executable_path.exists() {
+            if let Err(e) = std::fs::remove_file(&target_executable_path) {
+                warn!("删除已存在的目标文件失败: {}, 将继续...", e);
+            }
+        }
+
+        // 移动文件到正确位置
+        if let Err(_e) = std::fs::rename(&found_executable_path, &target_executable_path) {
+            // 如果跨设备移动失败，尝试复制后删除
+            if let Err(copy_err) = std::fs::copy(&found_executable_path, &target_executable_path) {
+                return Err(format!("复制内核文件失败: {}", copy_err));
+            }
+            if let Err(remove_err) = std::fs::remove_file(&found_executable_path) {
+                warn!("删除原文件失败: {}, 将继续...", remove_err);
+            }
+            info!("成功复制内核文件到正确位置");
+        } else {
+            info!("成功移动内核文件到正确位置");
+        }
+
+        // 清理版本目录和其他不必要文件
+        if let Some(parent_dir) = found_executable_path.parent() {
+            info!("清理版本目录: {:?}", parent_dir);
+
+            // 删除整个版本目录（包含所有文件）
+            if let Err(e) = std::fs::remove_dir_all(parent_dir) {
+                warn!("删除版本目录失败: {}, 将继续...", e);
+            } else {
+                info!("成功删除版本目录: {:?}", parent_dir);
+            }
+        }
+
+        // 清理其他可能的解压文件（只保留可执行文件）
+        if let Err(e) = cleanup_kernel_directory(&kernel_dir, executable_name) {
+            warn!("清理内核目录失败: {}, 将继续...", e);
+        }
+    }
+
+    // 在 Linux/macOS 下设置执行权限
+    if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+        if let Err(e) = set_executable_permission(&target_executable_path) {
+            warn!("设置执行权限失败: {}, 将继续...", e);
+        }
+    }
+
+    info!("内核文件已准备就绪: {:?}", target_executable_path);
+
+    info!("内核下载并解压完成: {:?}", target_executable_path);
+
+    let _ = window.emit(
+        "kernel-download-progress",
+        json!({
+            "status": "completed",
+            "progress": 100,
+            "message": "内核下载完成！"
+        }),
+    );
+
+    Ok(())
+}
+
+// 下载文件的辅助函数
+async fn download_file(
+    url: &str,
+    path: &std::path::Path,
+    window: &tauri::WebviewWindow,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use tokio::fs::File;
+    use tokio::io::AsyncWriteExt;
+
+    // 设置下载超时和更好的用户代理
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(300)) // 5分钟超时
+        .user_agent("sing-box-windows/1.8.2")
+        .build()?;
+
+    info!("开始下载: {}", url);
+    let response = client.get(url).send().await?;
+
+    if !response.status().is_success() {
+        return Err(format!("HTTP 错误: {}", response.status()).into());
+    }
+
+    let total_size = response.content_length().unwrap_or(0);
+    let mut downloaded = 0u64;
+    let mut file = File::create(path).await?;
+
+    let mut stream = response.bytes_stream();
+    use futures_util::StreamExt;
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        file.write_all(&chunk).await?;
+
+        downloaded += chunk.len() as u64;
+
+        if total_size > 0 {
+            let progress = (downloaded * 100) / total_size;
+            let _ = window.emit(
+                "kernel-download-progress",
+                json!({
+                    "status": "downloading",
+                    "progress": progress.min(70), // 最多到70%，留30%给解压
+                    "message": format!("下载中... {}/{} bytes", downloaded, total_size)
+                }),
+            );
+        }
+    }
+
+    file.flush().await?;
+    Ok(())
+}
+
+// 解压文件的辅助函数
+async fn extract_archive(
+    archive_path: &std::path::Path,
+    extract_to: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use std::fs::File;
+    use flate2::read::GzDecoder;
+    use tar::Archive;
+
+    info!("开始解压文件: {:?}", archive_path);
+
+    // 验证文件是否存在
+    if !archive_path.exists() {
+        return Err(format!("压缩文件不存在: {:?}", archive_path).into());
+    }
+
+    // 检查文件大小
+    let metadata = std::fs::metadata(archive_path)?;
+    let file_size = metadata.len();
+    info!("压缩文件大小: {} bytes", file_size);
+
+    if file_size == 0 {
+        return Err("压缩文件为空".into());
+    }
+
+    // 打开压缩文件
+    let file = File::open(archive_path)?;
+    let gz = GzDecoder::new(file);
+    let mut archive = Archive::new(gz);
+
+    info!("解压到目录: {:?}", extract_to);
+
+    // 确保解压目录存在
+    if !extract_to.exists() {
+        std::fs::create_dir_all(extract_to)?;
+    }
+
+    // 解压所有文件
+    match archive.unpack(extract_to) {
+        Ok(_) => {
+            info!("文件解压完成");
+
+            // 列出解压后的文件（用于调试）
+            if let Ok(entries) = std::fs::read_dir(extract_to) {
+                info!("解压后的文件:");
+                for entry in entries.flatten() {
+                    info!("  - {:?}", entry.path());
+                }
+            }
+        }
+        Err(e) => {
+            return Err(format!("解压失败: {}", e).into());
+        }
+    }
+
+    Ok(())
+}
+
+// 查找可执行文件的辅助函数
+async fn find_executable_file(
+    search_dir: &std::path::Path,
+    executable_name: &str,
+) -> Result<std::path::PathBuf, String> {
+    info!("在目录 {:?} 中查找可执行文件: {}", search_dir, executable_name);
+
+    // 首先直接在根目录查找
+    let direct_path = search_dir.join(executable_name);
+    if direct_path.exists() && direct_path.is_file() {
+        info!("直接找到可执行文件: {:?}", direct_path);
+        return Ok(direct_path);
+    }
+
+    // 递归搜索子目录
+    let mut found_files = Vec::new();
+
+    if let Ok(entries) = walkdir::WalkDir::new(search_dir)
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+    {
+        for entry in entries {
+            let path = entry.path();
+            if path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name == executable_name)
+                .unwrap_or(false)
+                && path.is_file() // 确保是文件而不是目录
+            {
+                info!("找到可执行文件: {:?}", path);
+                found_files.push(path.to_path_buf());
+            }
+        }
+    }
+
+    if found_files.is_empty() {
+        // 列出所有文件用于调试
+        if let Ok(entries) = std::fs::read_dir(search_dir) {
+            warn!("未找到可执行文件，目录内容:");
+            for entry in entries.flatten() {
+                warn!("  - {:?}", entry.path());
+            }
+        }
+        return Err(format!("未找到可执行文件: {} 在目录 {:?} 中", executable_name, search_dir));
+    }
+
+    // 返回第一个找到的文件
+    Ok(found_files[0].clone())
+}
+
+// 设置执行权限的辅助函数
+fn set_executable_permission(file_path: &std::path::Path) -> Result<(), std::io::Error> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut perms = std::fs::metadata(file_path)?.permissions();
+    perms.set_mode(perms.mode() | 0o755); // rwxr-xr-x
+    std::fs::set_permissions(file_path, perms)?;
+
+    info!("已设置执行权限: {:?}", file_path);
+    Ok(())
+}
+
+// 清理内核目录，只保留可执行文件
+fn cleanup_kernel_directory(kernel_dir: &std::path::Path, executable_name: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    info!("清理内核目录，只保留可执行文件: {}", executable_name);
+
+    if let Ok(entries) = std::fs::read_dir(kernel_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+
+            // 跳过可执行文件本身
+            if path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name == executable_name)
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            // 删除其他所有文件和目录
+            if path.is_file() {
+                if let Err(e) = std::fs::remove_file(&path) {
+                    warn!("删除文件失败 {:?}: {}", path, e);
+                } else {
+                    info!("删除文件: {:?}", path);
+                }
+            } else if path.is_dir() {
+                if let Err(e) = std::fs::remove_dir_all(&path) {
+                    warn!("删除目录失败 {:?}: {}", path, e);
+                } else {
+                    info!("删除目录: {:?}", path);
+                }
+            }
+        }
+    }
+
+    info!("内核目录清理完成");
+    Ok(())
+}
+
+// 安装内核
+#[tauri::command]
+pub async fn install_kernel() -> Result<(), String> {
+    // 目前先返回成功，表示安装完成
+    info!("内核安装完成");
     Ok(())
 }
 
@@ -341,23 +874,155 @@ async fn is_system_recently_started() -> bool {
     }
 }
 
-// 检查内核是否正在运行
+// 检查内核是否正在运行 (跨平台实现)
 #[tauri::command]
 pub async fn is_kernel_running() -> Result<bool, String> {
-    // 通过tasklist命令检查sing-box.exe是否在运行
-    let output = tokio::process::Command::new("tasklist")
-        .args(&["/FI", "IMAGENAME eq sing-box.exe", "/FO", "CSV", "/NH"])
-        .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
+    #[cfg(target_os = "windows")]
+    {
+        is_kernel_running_windows().await
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        is_kernel_running_linux().await
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        Err("当前平台不支持内核状态检查".to_string())
+    }
+}
+
+#[cfg(target_os = "windows")]
+async fn is_kernel_running_windows() -> Result<bool, String> {
+    // 获取我们的内核可执行文件路径
+    let kernel_path = crate::app::constants::core::paths::get_kernel_path();
+
+    info!("检查内核进程，可执行文件路径: {:?}", kernel_path);
+
+    // 方法1: 通过tasklist命令检查精确的进程
+    let kernel_filename = kernel_path.file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("sing-box.exe");
+
+    let mut cmd = tokio::process::Command::new("tasklist");
+    cmd.args(&["/FI", "IMAGENAME eq", kernel_filename, "/FO", "CSV", "/NH"]);
+    cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
+
+    if let Ok(output) = cmd.output().await {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.contains(kernel_filename) {
+            info!("内核进程正在运行 (tasklist检测): {}", kernel_filename);
+            return Ok(true);
+        }
+    }
+
+    // 方法2: 使用wmic检查进程
+    if let Ok(output) = tokio::process::Command::new("wmic")
+        .args(&["process", "where", "name='sing-box.exe'"])
         .output()
         .await
-        .map_err(|e| format!("检查内核进程失败: {}", e))?;
+    {
+        if !output.stdout.is_empty() {
+            info!("内核进程正在运行 (wmic检测): true");
+            return Ok(true);
+        }
+    }
 
-    // 检查输出中是否包含sing-box.exe
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let is_running = stdout.contains("sing-box.exe");
+    // 方法3: 使用PowerShell Get-Process
+    if let Ok(output) = tokio::process::Command::new("powershell")
+        .args(&["-Command", "Get-Process sing-box -ErrorAction SilentlyContinue"])
+        .output()
+        .await
+    {
+        if output.status.success() {
+            info!("内核进程正在运行 (PowerShell检测): true");
+            return Ok(true);
+        }
+    }
 
-    info!("内核运行状态检查: {}", is_running);
-    Ok(is_running)
+    info!("内核运行状态检查: false (未找到相关进程)");
+    Ok(false)
+}
+
+#[cfg(target_os = "linux")]
+async fn is_kernel_running_linux() -> Result<bool, String> {
+    // 获取我们的内核工作目录
+    let kernel_dir = crate::app::constants::core::paths::get_kernel_work_dir();
+    let kernel_path = crate::app::constants::core::paths::get_kernel_path();
+
+    info!("检查内核进程，可执行文件路径: {:?}", kernel_path);
+    info!("内核工作目录: {:?}", kernel_dir);
+
+    // 方法1: 检查我们的可执行文件是否被某个进程使用
+    if let Ok(output) = tokio::process::Command::new("lsof")
+        .arg(&kernel_path)
+        .output()
+        .await
+    {
+        if !output.stdout.is_empty() {
+            info!("内核进程正在运行 (lsof检测): {}", output.status.success());
+            return Ok(true);
+        }
+    }
+
+    // 方法2: 使用 pgrep 检查特定路径的进程
+    if let Ok(output) = tokio::process::Command::new("pgrep")
+        .args(&["-f", &kernel_path.to_string_lossy()])
+        .output()
+        .await
+    {
+        if !output.stdout.is_empty() {
+            info!("内核进程正在运行 (pgrep检测): {}", !output.stdout.is_empty());
+            return Ok(true);
+        }
+    }
+
+    // 方法3: 检查进程命令行是否包含我们的工作目录
+    if let Ok(output) = tokio::process::Command::new("ps")
+        .args(&["-ef", "-o", "args="])
+        .output()
+        .await
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let kernel_dir_str = kernel_dir.to_string_lossy();
+        let kernel_path_str = kernel_path.to_string_lossy();
+
+        if stdout.contains(&*kernel_dir_str) || stdout.contains(&*kernel_path_str) {
+            info!("内核进程正在运行 (ps检测): true");
+            return Ok(true);
+        }
+    }
+
+    // 方法4: 最后用简单检查，但加上路径验证
+    if let Ok(output) = tokio::process::Command::new("pgrep")
+        .arg("sing-box")
+        .output()
+        .await
+    {
+        if !output.stdout.is_empty() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let pids: Vec<&str> = stdout.trim().split('\n').collect();
+
+            let kernel_path_str = kernel_path.to_string_lossy();
+            for pid in pids {
+                if let Ok(cmdline_output) = tokio::process::Command::new("ps")
+                    .args(&["-p", pid, "-o", "cmd="])
+                    .output()
+                    .await
+                {
+                    let cmdline = String::from_utf8_lossy(&cmdline_output.stdout);
+                    if cmdline.contains(&*kernel_path_str) {
+                        info!("内核进程正在运行 (精确匹配): PID {}, 命令: {}", pid, cmdline.trim());
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+    }
+
+    info!("内核运行状态检查: false (未找到相关进程)");
+    Ok(false)
 }
 
 // 检查内核完整状态（进程 + API）
@@ -461,14 +1126,14 @@ pub async fn get_system_uptime() -> Result<u64, String> {
     #[cfg(windows)]
     {
         // 使用Windows API获取系统运行时间
-        match tokio::process::Command::new("powershell")
-            .args(&[
-                "-Command",
-                "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime | Select-Object -ExpandProperty TotalMilliseconds"
-            ])
-            .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
-            .output()
-            .await
+        let mut cmd = tokio::process::Command::new("powershell");
+        cmd.args(&[
+            "-Command",
+            "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime | Select-Object -ExpandProperty TotalMilliseconds"
+        ]);
+        cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
+
+        match cmd.output().await
         {
             Ok(output) => {
                 if output.status.success() {

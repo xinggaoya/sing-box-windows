@@ -15,7 +15,12 @@
     "format": "prettier --write src/",
     "tauri": "tauri",
     "tauri dev": "tauri dev",
-    "tauri build": "tauri build"
+    "tauri build": "tauri build",
+    "tauri build:linux": "tauri build --target x86_64-unknown-linux-gnu",
+    "tauri build:linux:deb": "tauri build --target x86_64-unknown-linux-gnu -- --bundle deb",
+    "tauri build:linux:appimage": "tauri build --target x86_64-unknown-linux-gnu -- --bundle appimage",
+    "tauri build:windows": "tauri build --target x86_64-pc-windows-msi",
+    "tauri build:all": "pnpm tauri build:windows && pnpm tauri build:linux:deb && pnpm tauri build:linux:appimage"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",

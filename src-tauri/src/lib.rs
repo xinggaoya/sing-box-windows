@@ -11,7 +11,21 @@ pub mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    fmt().with_env_filter(EnvFilter::from_default_env()).init();
+    // 设置默认的 debug 日志级别
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| {
+            // 使用 RUST_LOG 环境变量，或者默认启用 debug 级别
+            std::env::set_var("RUST_LOG", "debug,sing_box_windows=debug,tauri=info");
+            EnvFilter::from_default_env()
+        });
+
+    fmt()
+        .with_env_filter(env_filter)
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_file(true)
+        .with_line_number(true)
+        .init();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -31,7 +45,7 @@ pub fn run() {
             // if cfg!(debug_assertions) {
             //     app.handle().plugin(
             //         tauri_plugin_log::Builder::default()
-            //             .level("info")
+            //             .level("debug")
             //             .build(),
             //     )?;
             // }
@@ -85,6 +99,7 @@ pub fn run() {
             crate::app::core::kernel_service::stop_kernel,
             crate::app::core::kernel_service::restart_kernel,
             crate::app::core::kernel_service::download_latest_kernel,
+            crate::app::core::kernel_service::install_kernel,
             crate::app::core::kernel_service::check_kernel_version,
             crate::app::core::kernel_service::start_websocket_relay,
             crate::app::core::kernel_service::is_kernel_running,
@@ -110,6 +125,8 @@ pub fn run() {
             crate::app::system::system_service::is_devtools_open,
             // System - Update service commands
             crate::app::system::update_service::check_update,
+            crate::app::system::update_service::download_update,
+            crate::app::system::update_service::install_update,
             crate::app::system::update_service::download_and_install_update,
             // System - Config service commands
             crate::app::system::config_service::update_singbox_ports,

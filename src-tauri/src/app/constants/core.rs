@@ -5,6 +5,7 @@
 /// 进程相关常量
 pub mod process {
     /// Windows 创建进程时隐藏控制台窗口的标志
+    #[cfg(target_os = "windows")]
     pub const CREATE_NO_WINDOW: u32 = 0x08000000;
 
     /// 进程超时和延迟常量（秒）
@@ -22,9 +23,14 @@ pub mod paths {
     /// 获取 Sing-Box 可执行文件路径
     pub fn get_kernel_path() -> PathBuf {
         let work_dir = get_work_dir_sync();
+        let exe_name = if cfg!(target_os = "windows") {
+            "sing-box.exe"
+        } else {
+            "sing-box"
+        };
         PathBuf::from(&work_dir)
             .join("sing-box")
-            .join("sing-box.exe")
+            .join(exe_name)
     }
 
     /// 获取 Sing-Box 工作目录

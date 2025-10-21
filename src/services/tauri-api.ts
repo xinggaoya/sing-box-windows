@@ -83,7 +83,7 @@ export const kernelApi = {
   },
   getKernelRunningState: () => invoke<boolean>('is_kernel_running'),
   getApiToken: () => invoke<string>('get_api_token'),
-  downloadKernel: (window: any) => invoke<void>('download_kernel', { window }),
+  downloadKernel: () => invoke<void>('download_kernel'),
   installKernel: () => invoke<void>('install_kernel')
 }
 
@@ -220,17 +220,17 @@ export const systemApi = {
     })
   },
 
-  downloadUpdate: (window: any) => invoke<void>('download_update', { window }),
+  downloadUpdate: () => invoke<void>('download_update'),
 
-  installUpdate: (downloadPath: string, window: any) => 
-    invoke<void>('install_update', { downloadPath, window }),
+  installUpdate: (downloadPath: string) =>
+    invoke<void>('install_update', { downloadPath }),
 
-  downloadAndInstallUpdate: async (window: any) => {
-    await systemApi.downloadUpdate(window)
+  downloadAndInstallUpdate: async () => {
+    await systemApi.downloadUpdate()
     console.warn('downloadAndInstallUpdate 只触发了下载，安装需要手动完成')
   },
 
-  downloadLatestKernel: (window: any) => invoke<void>('download_latest_kernel', { window }),
+  downloadLatestKernel: () => invoke<void>('download_latest_kernel'),
 
   openDirectory: (path: string) => invoke<void>('open_directory', { path }),
 

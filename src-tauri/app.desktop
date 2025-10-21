@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=sing-box-windows
+Comment=基于 Tauri 2.0 + Vue 3 的现代化代理客户端
+Exec=sing-box-windows
+Icon=cn.moncn.app
+Terminal=false
+Categories=Network;Proxy;
+Keywords=proxy;network;sing-box;vpn;client;
+StartupNotify=true
+StartupWMClass=sing-box-windows
+MimeType=

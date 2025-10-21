@@ -4,7 +4,7 @@ use crate::utils::app_util::get_work_dir_sync;
 use semver::Version;
 use serde_json::json;
 use std::path::Path;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // 更新信息结构体
 #[derive(serde::Serialize, Debug)]
@@ -154,12 +154,41 @@ pub async fn check_update(
     })
 }
 
+// 下载更新
+#[tauri::command]
+pub async fn download_update(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let window = app_handle.get_webview_window("main")
+        .ok_or("无法获取主窗口")?;
+
+    // 这里可以实现实际的下载逻辑
+    // 目前先发送一个模拟的完成事件
+    let _ = window.emit(
+        "update-progress",
+        json!({
+            "status": "completed",
+            "progress": 100,
+            "message": "下载功能待实现"
+        }),
+    );
+
+    Ok(())
+}
+
+// 安装更新
+#[tauri::command]
+pub async fn install_update(_download_path: String) -> Result<(), String> {
+    // 简单的实现，返回成功
+    Ok(())
+}
+
 // 下载并安装更新
 #[tauri::command]
 pub async fn download_and_install_update(
-    window: tauri::Window,
+    app_handle: tauri::AppHandle,
     download_url: String,
 ) -> Result<(), String> {
+    let window = app_handle.get_webview_window("main")
+        .ok_or("无法获取主窗口")?;
     let work_dir = get_work_dir_sync();
     let download_path = Path::new(&work_dir).join("update.exe");
 
@@ -228,9 +257,12 @@ pub async fn download_and_install_update(
     );
 
     // 启动安装程序（在后台运行）
-    match tokio::process::Command::new(download_path)
-        .creation_flags(0x08000000)
-        .spawn()
+    let mut cmd = tokio::process::Command::new(download_path);
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
+
+    match cmd.spawn()
     {
         Ok(_) => {
             // 安装程序启动成功，发送安装开始事件

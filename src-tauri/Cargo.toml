@@ -31,13 +31,22 @@ reqwest = { version = "0", features = ["json", "stream", "rustls-tls"] }
 dirs = "5.0.1"
 tokio = { version = "1", features = ["full"] }
 futures-util = "0.3"
+futures = "0.3"
 tokio-tungstenite = { version = "0.18", features = ["rustls-tls-webpki-roots"] }
 url = "2"
 urlencoding = "2.1"
 zip = { version = "0.5.13" }
+flate2 = "1.0"
+tar = "0.4"
+walkdir = "2.3"
 lazy_static = "1.4.0"
+[target.'cfg(windows)'.dependencies]
 winreg = "0.52.0"
 winapi = { version = "0.3", features = ["wininet"] }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.29", features = ["user"] }
+which = "7.0"
 serde = { version = "1.0.214", features = ["derive"] }
 tauri-plugin-store = "2"
 thiserror = "1.0"

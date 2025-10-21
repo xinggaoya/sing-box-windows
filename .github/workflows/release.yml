@@ -5,7 +5,7 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  release-windows:
     name: Release - Windows
     permissions:
       contents: write
@@ -100,5 +100,95 @@ jobs:
             - ✅ This version has passed automated builds and basic tests
             - 🔄 Will be converted to stable release after sufficient testing
             - 📝 Detailed changelog is auto-generated below
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-linux:
+    name: Release - Linux
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies (ubuntu only)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build the app
+        run: pnpm tauri build:linux:deb
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage
+          path: src-tauri/target/release/bundle/appimage/sing-box-windows_*.AppImage*
+
+      - name: Upload Debian package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: src-tauri/target/release/bundle/deb/sing-box-windows_*.deb*
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          files: |
+            src-tauri/target/release/bundle/appimage/sing-box-windows_*.AppImage*
+            src-tauri/target/release/bundle/deb/sing-box-windows_*.deb*
+          body: |
+            ## 🚀 sing-box-windows Linux 版本发布
+
+            感谢使用 sing-box-windows Linux 版本！
+
+            ### 📦 安装说明
+
+            #### AppImage (推荐)
+            1. 下载 `.AppImage` 文件
+            2. 添加执行权限：`chmod +x sing-box-windows_*.AppImage`
+            3. 双击运行或在终端执行
+
+            #### Debian/Ubuntu
+            1. 下载 `.deb` 文件
+            2. 安装：`sudo dpkg -i sing-box-windows_*.deb`
+            3. 如有依赖问题：`sudo apt-get install -f`
+
+            ### ✨ 功能特性
+            - 🎯 基于 Tauri 2.0 + Vue 3 的现代化界面
+            - 🔧 完整的代理管理和路由规则配置
+            - 📊 实时流量监控和连接状态显示
+            - 🌐 多协议支持和订阅管理
+            - 🖥️ 完全适配 Linux 桌面环境
+
+            ### 🔧 系统要求
+            - Linux (x64) with GTK 3
+            - libwebkit2gtk-4.1-0, libssl3, libgtk-3-0
+
+            ### 📚 更多信息
+            - 项目主页: [GitHub](https://github.com/xinggaoya/sing-box-windows)
+            - 问题反馈: [Issues](https://github.com/xinggaoya/sing-box-windows/issues)
+
+            ---
+            **感谢您的支持！🙏**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

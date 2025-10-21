@@ -369,7 +369,7 @@ export default {
       installFailed: 'No valid kernel file detected',
       manualDownloadTitle: 'Manual Download Instructions',
       manualDownloadGuide:
-        'Please follow these steps:\n1. Visit https://github.com/SagerNet/sing-box/releases/latest\n2. Download the corresponding system version of sing-box\n3. Place the extracted sing-box.exe in the following directory:\nUser Directory/AppData/Local/sing-box-windows/sing-box/\n\nAfter completion, click the "Check Installation" button to verify if the installation is successful.',
+        'Please follow these steps:\n1. Visit https://github.com/SagerNet/sing-box/releases/latest\n2. Download the corresponding system version of sing-box\n3. Place the extracted executable file in the following directory:\nWindows: User Directory/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: User Directory/.local/share/sing-box-windows/sing-box/sing-box\n\nAfter completion, click the "Check Installation" button to verify if the installation is successful.',
     },
     startup: {
       title: 'Startup Settings',

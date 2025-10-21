@@ -563,14 +563,11 @@ const downloadTheKernel = async () => {
       duration: 3000,
     })
 
-    await tauriApi.system.downloadLatestKernel(window)
-
-    // 下载成功后更新版本信息
-    await kernelStore.updateVersion()
+    await tauriApi.system.downloadLatestKernel()
+    // 注意：版本信息更新现在由事件监听器处理，以避免重复操作
   } catch (error) {
     downloadError.value = error as string
     message.error(error as string)
-  } finally {
     downloading.value = false
     loading.value = false
   }
@@ -704,9 +701,13 @@ const checkManualInstall = async () => {
   }
 }
 
-// 监听下载进度事件
+// 存储事件监听器的清理函数
+let kernelDownloadUnlisten: (() => void) | null = null
+let updateProgressUnlisten: (() => void) | null = null
+
+// 监听内核下载进度事件
 listen(
-  'download-progress',
+  'kernel-download-progress',
   (event: { payload: { status: string; progress: number; message: string } }) => {
     const { status, progress, message: msg } = event.payload
     downloadProgress.value = progress
@@ -718,9 +719,15 @@ listen(
       message.success(t('setting.kernel.downloadComplete'))
       // 更新版本信息
       kernelStore.updateVersion()
+    } else if (status === 'error') {
+      downloading.value = false
+      downloadError.value = msg
+      message.error(t('setting.kernel.downloadFailed'))
     }
   },
-)
+).then((unlisten) => {
+  kernelDownloadUnlisten = unlisten
+})
 
 // 监听应用更新进度事件
 listen(
@@ -729,7 +736,9 @@ listen(
     const { status, progress, message: msg } = event.payload
     updateStore.updateProgress(status, progress, msg)
   },
-)
+).then((unlisten) => {
+  updateProgressUnlisten = unlisten
+})
 
 // 切换语言
 const handleChangeLanguage = async (value: string) => {
@@ -898,6 +907,16 @@ onMounted(() => {
 // 清理事件监听器
 onUnmounted(() => {
   window.removeEventListener('resize', updateMobileStatus)
+
+  // 清理事件监听器
+  if (kernelDownloadUnlisten) {
+    kernelDownloadUnlisten()
+    kernelDownloadUnlisten = null
+  }
+  if (updateProgressUnlisten) {
+    updateProgressUnlisten()
+    updateProgressUnlisten = null
+  }
 })
 </script>
 
