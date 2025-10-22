@@ -1,8 +1,7 @@
-use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tracing_subscriber::{fmt, EnvFilter};
-use app::storage::EnhancedStorageService;
+// use app::storage::EnhancedStorageService; // 暂时禁用数据库存储
 
 pub mod app;
 pub mod entity;
@@ -28,7 +27,7 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_store::Builder::new().build())
+        // .plugin(tauri_plugin_store::Builder::new().build()) // 暂时禁用 store 插件
         .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -58,42 +57,42 @@ pub fn run() {
                 }
             }
             
-            // 初始化增强版存储服务（数据库）
-            let enhanced_storage = std::sync::Mutex::new(None as Option<Arc<EnhancedStorageService>>);
-            app.manage(enhanced_storage);
-
-            // 异步初始化数据库服务
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                match EnhancedStorageService::new(&app_handle).await {
-                    Ok(service) => {
-                        if let Ok(mut enhanced_storage) = app_handle.state::<std::sync::Mutex<Option<Arc<EnhancedStorageService>>>>().lock() {
-                            *enhanced_storage = Some(Arc::new(service));
-                        }
-                        tracing::info!("Enhanced storage service initialized successfully");
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to initialize enhanced storage service: {}", e);
-                    }
-                }
-            });
+            // TODO: 重新启用增强版存储服务（数据库）
+            // let enhanced_storage = std::sync::Mutex::new(None as Option<Arc<EnhancedStorageService>>);
+            // app.manage(enhanced_storage);
+            //
+            // // 异步初始化数据库服务
+            // let app_handle = app.handle().clone();
+            // tauri::async_runtime::spawn(async move {
+            //     match EnhancedStorageService::new(&app_handle).await {
+            //         Ok(service) => {
+            //             if let Ok(mut enhanced_storage) = app_handle.state::<std::sync::Mutex<Option<Arc<EnhancedStorageService>>>>().lock() {
+            //                 *enhanced_storage = Some(Arc::new(service));
+            //             }
+            //             tracing::info!("Enhanced storage service initialized successfully");
+            //         }
+            //         Err(e) => {
+            //             tracing::error!("Failed to initialize enhanced storage service: {}", e);
+            //         }
+            //     }
+            // });
             
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // Enhanced Storage service commands (数据库)
-            crate::app::storage::enhanced_storage_service::db_get_app_config,
-            crate::app::storage::enhanced_storage_service::db_save_app_config,
-            crate::app::storage::enhanced_storage_service::db_get_theme_config,
-            crate::app::storage::enhanced_storage_service::db_save_theme_config,
-            crate::app::storage::enhanced_storage_service::db_get_locale_config,
-            crate::app::storage::enhanced_storage_service::db_save_locale_config,
-            crate::app::storage::enhanced_storage_service::db_get_window_config,
-            crate::app::storage::enhanced_storage_service::db_save_window_config,
-            crate::app::storage::enhanced_storage_service::db_get_update_config,
-            crate::app::storage::enhanced_storage_service::db_save_update_config,
-            crate::app::storage::enhanced_storage_service::db_get_subscriptions,
-            crate::app::storage::enhanced_storage_service::db_save_subscriptions,
+            // TODO: 重新启用 Enhanced Storage service commands (数据库)
+            // crate::app::storage::enhanced_storage_service::db_get_app_config,
+            // crate::app::storage::enhanced_storage_service::db_save_app_config,
+            // crate::app::storage::enhanced_storage_service::db_get_theme_config,
+            // crate::app::storage::enhanced_storage_service::db_save_theme_config,
+            // crate::app::storage::enhanced_storage_service::db_get_locale_config,
+            // crate::app::storage::enhanced_storage_service::db_save_locale_config,
+            // crate::app::storage::enhanced_storage_service::db_get_window_config,
+            // crate::app::storage::enhanced_storage_service::db_save_window_config,
+            // crate::app::storage::enhanced_storage_service::db_get_update_config,
+            // crate::app::storage::enhanced_storage_service::db_save_update_config,
+            // crate::app::storage::enhanced_storage_service::db_get_subscriptions,
+            // crate::app::storage::enhanced_storage_service::db_save_subscriptions,
             // Core - Kernel service commands (legacy)
             crate::app::core::kernel_service::start_kernel,
             crate::app::core::kernel_service::stop_kernel,

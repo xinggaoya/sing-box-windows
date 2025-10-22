@@ -199,7 +199,7 @@ impl ProcessManager {
         ]);
 
         #[cfg(target_os = "windows")]
-        cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
+        cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
         let child = cmd.spawn()
             .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;

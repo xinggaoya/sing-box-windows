@@ -27,7 +27,7 @@ export const kernelApi = {
     })
   },
 
-  stopKernel: async (options?: { force?: boolean; timeoutMs?: number }) =>
+  stopKernel: async (_options?: { force?: boolean; timeoutMs?: number }) =>
     invoke<{ success: boolean; message: string }>('kernel_stop_enhanced'),
 
   restartKernel: async (options?: { force?: boolean; timeoutMs?: number }) => {
@@ -69,7 +69,7 @@ export const kernelApi = {
     return Promise.resolve({})
   },
 
-  updateKernelConfig: (config: any) =>
+  updateKernelConfig: (_config: any) =>
     Promise.resolve({ success: true, message: '配置更新功能暂未实现' }),
 
   checkKernelHealth: () => invoke<{ healthy: boolean; issues: string[] }>('kernel_check_health'),

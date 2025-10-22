@@ -45,7 +45,7 @@ pub async fn check_kernel_version() -> Result<String, String> {
     cmd.arg("version");
 
     #[cfg(target_os = "windows")]
-    cmd.creation_flags(process::CREATE_NO_WINDOW);
+    cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
     let output = cmd.output()
         .await
@@ -87,7 +87,7 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
         .arg(path);
 
     #[cfg(target_os = "windows")]
-    cmd.creation_flags(process::CREATE_NO_WINDOW);
+    cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
     let output = cmd.output()
         .await
@@ -579,7 +579,8 @@ async fn find_executable_file(
     Ok(found_files[0].clone())
 }
 
-// 设置执行权限的辅助函数
+// 设置执行权限的辅助函数（跨平台兼容）
+#[cfg(unix)]
 fn set_executable_permission(file_path: &std::path::Path) -> Result<(), std::io::Error> {
     use std::os::unix::fs::PermissionsExt;
 
@@ -588,6 +589,12 @@ fn set_executable_permission(file_path: &std::path::Path) -> Result<(), std::io:
     std::fs::set_permissions(file_path, perms)?;
 
     info!("已设置执行权限: {:?}", file_path);
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn set_executable_permission(_file_path: &std::path::Path) -> Result<(), std::io::Error> {
+    // Windows 系统下不需要设置执行权限
     Ok(())
 }
 
@@ -1131,7 +1138,7 @@ pub async fn get_system_uptime() -> Result<u64, String> {
             "-Command",
             "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime | Select-Object -ExpandProperty TotalMilliseconds"
         ]);
-        cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
+        cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
         match cmd.output().await
         {

@@ -59,7 +59,7 @@ fn restart_as_admin_windows(app_handle: tauri::AppHandle) -> Result<(), String> 
     // 运行VBS脚本
     let result = std::process::Command::new("wscript")
         .arg(vbs_path.to_str().unwrap())
-        .creation_flags(process::CREATE_NO_WINDOW)
+        .creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW)
         .spawn();
 
     match result {
@@ -79,7 +79,7 @@ fn restart_as_admin_windows(app_handle: tauri::AppHandle) -> Result<(), String> 
                     "runas",
                     current_exe.to_str().unwrap(),
                 ])
-                .creation_flags(process::CREATE_NO_WINDOW)
+                .creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW)
                 .spawn();
 
             match result {
@@ -164,7 +164,7 @@ fn check_admin_windows() -> bool {
     // 尝试执行一个需要管理员权限的操作，例如查询系统会话
     let result = std::process::Command::new("net")
         .arg("session")
-        .creation_flags(process::CREATE_NO_WINDOW)
+        .creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW)
         .output();
 
     match result {

@@ -19,6 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 serde_json = "1.0"
+serde = { version = "1.0.214", features = ["derive"] }
 # 日志
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "local-time"] }
@@ -47,7 +48,8 @@ winapi = { version = "0.3", features = ["wininet"] }
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29", features = ["user"] }
 which = "7.0"
-serde = { version = "1.0.214", features = ["derive"] }
+
+# 通用依赖（所有平台）
 tauri-plugin-store = "2"
 thiserror = "1.0"
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }

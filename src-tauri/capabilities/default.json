@@ -22,7 +22,6 @@
     "autostart:allow-is-enabled",
     "core:window:allow-set-focus",
     "core:window:allow-unmaximize",
-    "websocket:default",
-    "store:default"
+    "websocket:default"
   ]
 }

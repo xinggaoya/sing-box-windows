@@ -8,7 +8,6 @@
   "permissions": [
     "autostart:default",
     "window-state:default",
-    "websocket:default",
-    "store:default"
+    "websocket:default"
   ]
 }

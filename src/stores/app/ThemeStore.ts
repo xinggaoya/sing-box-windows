@@ -76,6 +76,12 @@ export const useThemeStore = defineStore(
       // 保存已在 watch 中处理
     }
 
+    // 设置主题模式
+    const setTheme = async (mode: 'light' | 'dark') => {
+      isDark.value = mode === 'dark'
+      // 保存已在 watch 中处理
+    }
+
     // 初始化方法
     const initializeStore = async () => {
       await loadFromBackend()
@@ -86,6 +92,7 @@ export const useThemeStore = defineStore(
       theme,
       toggleTheme,
       setDarkMode,
+      setTheme,
       initializeStore,
       loadFromBackend,
       saveToBackend,
