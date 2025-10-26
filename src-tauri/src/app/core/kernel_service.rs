@@ -914,6 +914,8 @@ async fn is_kernel_running_windows() -> Result<bool, String> {
 
     let mut cmd = tokio::process::Command::new("tasklist");
     cmd.args(&["/FI", "IMAGENAME eq", kernel_filename, "/FO", "CSV", "/NH"]);
+
+    #[cfg(target_os = "windows")]
     cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
 
     if let Ok(output) = cmd.output().await {
@@ -925,26 +927,34 @@ async fn is_kernel_running_windows() -> Result<bool, String> {
     }
 
     // 方法2: 使用wmic检查进程
-    if let Ok(output) = tokio::process::Command::new("wmic")
-        .args(&["process", "where", "name='sing-box.exe'"])
-        .output()
-        .await
     {
-        if !output.stdout.is_empty() {
-            info!("内核进程正在运行 (wmic检测): true");
-            return Ok(true);
+        let mut cmd = tokio::process::Command::new("wmic");
+        cmd.args(&["process", "where", "name='sing-box.exe'"]);
+
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
+
+        if let Ok(output) = cmd.output().await {
+            if !output.stdout.is_empty() {
+                info!("内核进程正在运行 (wmic检测): true");
+                return Ok(true);
+            }
         }
     }
 
     // 方法3: 使用PowerShell Get-Process
-    if let Ok(output) = tokio::process::Command::new("powershell")
-        .args(&["-Command", "Get-Process sing-box -ErrorAction SilentlyContinue"])
-        .output()
-        .await
     {
-        if output.status.success() {
-            info!("内核进程正在运行 (PowerShell检测): true");
-            return Ok(true);
+        let mut cmd = tokio::process::Command::new("powershell");
+        cmd.args(&["-Command", "Get-Process sing-box -ErrorAction SilentlyContinue"]);
+
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
+
+        if let Ok(output) = cmd.output().await {
+            if output.status.success() {
+                info!("内核进程正在运行 (PowerShell检测): true");
+                return Ok(true);
+            }
         }
     }
 
@@ -1138,7 +1148,9 @@ pub async fn get_system_uptime() -> Result<u64, String> {
             "-Command",
             "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime | Select-Object -ExpandProperty TotalMilliseconds"
         ]);
-        cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
+
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
 
         match cmd.output().await
         {

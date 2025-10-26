@@ -253,11 +253,13 @@ impl ProcessManager {
         #[cfg(target_os = "windows")]
         {
             // 使用异步进程命令
-            let output = tokio::process::Command::new("tasklist")
-                .args(&["/FI", "IMAGENAME eq sing-box.exe", "/FO", "CSV", "/NH"])
-                .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
-                .output()
-                .await?;
+            let mut cmd = tokio::process::Command::new("tasklist");
+            cmd.args(&["/FI", "IMAGENAME eq sing-box.exe", "/FO", "CSV", "/NH"]);
+
+            #[cfg(target_os = "windows")]
+            cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
+
+            let output = cmd.output().await?;
 
             let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -266,11 +268,13 @@ impl ProcessManager {
                 info!("发现已有sing-box.exe进程，正在终止");
 
                 // 使用异步进程命令终止所有sing-box.exe进程
-                let kill_output = tokio::process::Command::new("taskkill")
-                    .args(&["/F", "/IM", "sing-box.exe"])
-                    .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
-                    .output()
-                    .await?;
+                let mut cmd = tokio::process::Command::new("taskkill");
+                cmd.args(&["/F", "/IM", "sing-box.exe"]);
+
+                #[cfg(target_os = "windows")]
+                cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
+
+                let kill_output = cmd.output().await?;
 
                 if kill_output.status.success() {
                     info!("成功终止所有sing-box.exe进程");

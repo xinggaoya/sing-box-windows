@@ -260,7 +260,7 @@ pub async fn download_and_install_update(
     let mut cmd = tokio::process::Command::new(download_path);
 
     #[cfg(target_os = "windows")]
-    cmd.creation_flags(0x08000000);
+    cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
     match cmd.spawn()
     {
