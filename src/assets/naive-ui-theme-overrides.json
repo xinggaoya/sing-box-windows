@@ -1,28 +1,29 @@
 {
     "common": {
-        "primaryColor": "#4080FF",
-        "primaryColorHover": "#6699FF",
-        "primaryColorPressed": "#2266DD",
-        "primaryColorSuppl": "#2266DD",
-        "infoColor": "#909399",
-        "infoColorHover": "#A6A9AD",
-        "infoColorPressed": "#7B7E83",
-        "infoColorSuppl": "#7B7E83",
-        "successColor": "#00B42A",
-        "successColorHover": "#20C040",
-        "successColorPressed": "#009A1A",
-        "successColorSuppl": "#009A1A",
-        "warningColor": "#FF7D00",
-        "warningColorHover": "#FF952B",
-        "warningColorPressed": "#D66600",
-        "warningColorSuppl": "#D66600",
-        "errorColor": "#F53F3F",
-        "errorColorHover": "#F76560",
-        "errorColorPressed": "#CB2A2A",
-        "errorColorSuppl": "#CB2A2A",
+        "primaryColor": "#5b4cfd",
+        "primaryColorHover": "#7b6dfd",
+        "primaryColorPressed": "#4b3ced",
+        "primaryColorSuppl": "#6b5dfd",
+        "infoColor": "#64748b",
+        "infoColorHover": "#94a3b8",
+        "infoColorPressed": "#475569",
+        "infoColorSuppl": "#475569",
+        "successColor": "#10b981",
+        "successColorHover": "#34d399",
+        "successColorPressed": "#059669",
+        "successColorSuppl": "#059669",
+        "warningColor": "#f59e0b",
+        "warningColorHover": "#fbbf24",
+        "warningColorPressed": "#d97706",
+        "warningColorSuppl": "#d97706",
+        "errorColor": "#ef4444",
+        "errorColorHover": "#f87171",
+        "errorColorPressed": "#dc2626",
+        "errorColorSuppl": "#dc2626",
         "borderRadius": "12px",
         "borderRadiusSmall": "8px",
-        "fontFamily": "Lato, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif",
+        "borderRadiusMedium": "10px",
+        "fontFamily": "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif",
         "fontSize": "14px",
         "fontWeight": "400",
         "fontWeightStrong": "600",
@@ -38,7 +39,8 @@
     },
     "Button": {
         "borderRadius": "12px",
-        "borderRadiusSmall": "10px",
+        "borderRadiusSmall": "8px",
+        "borderRadiusMedium": "10px",
         "borderRadiusLarge": "14px",
         "paddingTiny": "0 12px",
         "paddingSmall": "0 16px",
@@ -47,29 +49,29 @@
         "paddingRound": "0 18px",
         "fontWeight": "600",
         "fontWeightStrong": "700",
-        "textColor": "#1f2937",
-        "textColorHover": "#1f2937",
-        "textColorPressed": "#1f2937",
-        "textColorFocus": "#1f2937",
+        "textColor": "#1e293b",
+        "textColorHover": "#1e293b",
+        "textColorPressed": "#1e293b",
+        "textColorFocus": "#1e293b",
         "textColorDisabled": "#9ca3af",
-        "border": "2px solid rgba(229, 231, 235, 0.5)",
-        "borderHover": "2px solid rgba(64, 128, 255, 0.3)",
-        "borderPressed": "2px solid #4080FF",
-        "borderFocus": "2px solid #4080FF",
+        "border": "2px solid rgba(91, 76, 253, 0.1)",
+        "borderHover": "2px solid rgba(91, 76, 253, 0.3)",
+        "borderPressed": "2px solid #5b4cfd",
+        "borderFocus": "2px solid #5b4cfd",
         "borderDisabled": "2px solid rgba(229, 231, 235, 0.3)",
-        "rippleColor": "rgba(64, 128, 255, 0.1)",
+        "rippleColor": "rgba(91, 76, 253, 0.1)",
         "opacityDisabled": "0.5"
     },
     "Card": {
         "borderRadius": "16px",
-        "paddingMedium": "20px 24px",
-        "paddingLarge": "24px 28px",
-        "paddingSmall": "16px 20px",
-        "paddingHuge": "28px 32px",
+        "paddingMedium": "24px 28px",
+        "paddingLarge": "28px 32px",
+        "paddingSmall": "20px 24px",
+        "paddingHuge": "32px 36px",
         "titleFontWeight": "700",
-        "titleTextColor": "#1f2937",
-        "borderColor": "rgba(255, 255, 255, 0.08)",
-        "actionColor": "rgba(255, 255, 255, 0.05)"
+        "titleTextColor": "#1e293b",
+        "borderColor": "rgba(229, 231, 235, 0.1)",
+        "actionColor": "rgba(244, 114, 182, 0.05)"
     },
     "Input": {
         "borderRadius": "12px",
@@ -80,12 +82,12 @@
         "heightLarge": "44px",
         "heightSmall": "36px",
         "border": "2px solid rgba(229, 231, 235, 0.5)",
-        "borderHover": "2px solid rgba(64, 128, 255, 0.3)",
-        "borderFocus": "2px solid #4080FF",
-        "borderError": "2px solid #F53F3F",
-        "borderWarning": "2px solid #FF7D00",
-        "boxShadowFocus": "0 0 0 3px rgba(64, 128, 255, 0.1)",
-        "caretColor": "#4080FF"
+        "borderHover": "2px solid rgba(91, 76, 253, 0.3)",
+        "borderFocus": "2px solid #5b4cfd",
+        "borderError": "2px solid #ef4444",
+        "borderWarning": "2px solid #f59e0b",
+        "boxShadowFocus": "0 0 0 3px rgba(91, 76, 253, 0.1)",
+        "caretColor": "#5b4cfd"
     },
     "Select": {
         "borderRadius": "12px",
@@ -107,10 +109,10 @@
         "buttonWidthMedium": "20px",
         "buttonWidthLarge": "24px",
         "buttonWidthSmall": "16px",
-        "railColorActive": "#4080FF",
-        "railColor": "rgba(156, 163, 175, 0.3)",
+        "railColorActive": "#5b4cfd",
+        "railColor": "rgba(148, 163, 184, 0.3)",
         "buttonBoxShadow": "0 2px 8px rgba(0, 0, 0, 0.12)",
-        "buttonBoxShadowActive": "0 2px 12px rgba(64, 128, 255, 0.3)"
+        "buttonBoxShadowActive": "0 2px 12px rgba(91, 76, 253, 0.3)"
     },
     "Tag": {
         "borderRadius": "8px",
@@ -182,7 +184,7 @@
         "tabPaddingMedium": "12px 16px",
         "tabPaddingLarge": "14px 20px",
         "tabFontWeight": "600",
-        "tabTextColorActiveBar": "#4080FF"
+        "tabTextColorActiveBar": "#5b4cfd"
     },
     "Progress": {
         "borderRadius": "10px",
@@ -197,6 +199,13 @@
         "dotBoxShadow": "0 2px 8px rgba(0, 0, 0, 0.12)"
     },
     "Spin": {
-        "colorPrimary": "#4080FF"
+        "colorPrimary": "#5b4cfd"
+    },
+    "Layout": {
+        "headerHeight": "48px",
+        "siderBorderColor": "transparent",
+        "color": "transparent",
+        "siderColor": "rgba(255, 255, 255, 0.95)",
+        "contentColor": "transparent"
     }
 }

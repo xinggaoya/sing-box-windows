@@ -1,37 +1,39 @@
 <template>
-  <div class="ultra-proxy">
-    <!-- 紧凑工具栏 -->
-    <div class="proxy-toolbar">
-      <div class="toolbar-left">
-        <div class="toolbar-icon">
-          <n-icon size="18">
-            <SwapHorizontalOutline />
-          </n-icon>
-        </div>
-        <div class="toolbar-info">
-          <span class="toolbar-title">{{ t('proxy.title') }}</span>
-          <span class="toolbar-stats">{{ proxyGroups.length }} {{ t('proxy.nodeCount') }}</span>
-        </div>
-      </div>
+  <div class="modern-proxy">
+    <!-- 工具栏区域 -->
+    <div class="toolbar-section">
+      <n-card class="toolbar-card" :bordered="false">
+        <div class="toolbar-content">
+          <div class="toolbar-left">
+            <div class="toolbar-icon">
+              <n-icon size="20"><SwapHorizontalOutline /></n-icon>
+            </div>
+            <div class="toolbar-info">
+              <h2 class="toolbar-title">{{ t('proxy.title') }}</h2>
+              <p class="toolbar-subtitle">{{ proxyGroups.length }} {{ t('proxy.nodeCount') }}</p>
+            </div>
+          </div>
 
-      <div class="toolbar-right">
-        <n-button
-          @click="init"
-          :loading="isLoading"
-          type="primary"
-          size="small"
-          class="refresh-btn"
-        >
-          <template #icon>
-            <n-icon size="14"><RefreshOutline /></n-icon>
-          </template>
-          {{ t('common.refresh') }}
-        </n-button>
-      </div>
+          <div class="toolbar-actions">
+            <n-button
+              @click="init"
+              :loading="isLoading"
+              type="primary"
+              size="medium"
+              class="refresh-btn"
+            >
+              <template #icon>
+                <n-icon size="16"><RefreshOutline /></n-icon>
+              </template>
+              {{ t('common.refresh') }}
+            </n-button>
+          </div>
+        </div>
+      </n-card>
     </div>
 
-    <!-- 主内容区 -->
-    <div class="proxy-content">
+    <!-- 主内容区域 -->
+    <div class="content-section">
       <n-spin :show="isLoading" class="loading-container">
         <template #description>
           <span class="loading-text">{{ t('proxy.loadingInfo') }}</span>
@@ -40,12 +42,16 @@
         <!-- 空状态 -->
         <div v-if="proxyGroups.length === 0 && !isLoading" class="empty-state">
           <div class="empty-icon">
-            <n-icon size="32">
-              <GlobeOutline />
-            </n-icon>
+            <n-icon size="48"><GlobeOutline /></n-icon>
           </div>
-          <div class="empty-title">{{ t('proxy.noProxyGroups') }}</div>
-          <div class="empty-desc">{{ t('proxy.checkConfigOrRefresh') }}</div>
+          <h3 class="empty-title">{{ t('proxy.noProxyGroups') }}</h3>
+          <p class="empty-description">{{ t('proxy.checkConfigOrRefresh') }}</p>
+          <n-button @click="init" type="primary" size="medium">
+            <template #icon>
+              <n-icon size="16"><RefreshOutline /></n-icon>
+            </template>
+            {{ t('common.refresh') }}
+          </n-button>
         </div>
 
         <!-- 代理组列表 -->
@@ -58,20 +64,20 @@
             <!-- 组头部 -->
             <div class="group-header" @click="toggleGroup(group.name)">
               <div class="group-info">
-                <div class="group-title">
-                  <span>{{ group.name }}</span>
+                <div class="group-main">
+                  <h3 class="group-name">{{ group.name }}</h3>
                   <div class="group-badges">
-                    <n-tag size="small" type="info" round>
+                    <n-tag size="small" type="info" round :bordered="false">
                       {{ group.all.length }} {{ t('proxy.nodes') }}
                     </n-tag>
-                    <n-tag size="small" type="default" round>
+                    <n-tag size="small" type="default" round :bordered="false">
                       {{ group.type }}
                     </n-tag>
                   </div>
                 </div>
                 <div class="group-current">
                   <span class="current-label">{{ t('proxy.currentLabel') }}:</span>
-                  <n-tag type="success" size="small" round>
+                  <n-tag type="success" size="small" round :bordered="false">
                     {{ group.now }}
                   </n-tag>
                 </div>
@@ -86,12 +92,12 @@
                   class="test-btn"
                 >
                   <template #icon>
-                    <n-icon size="12"><SpeedometerOutline /></n-icon>
+                    <n-icon size="14"><SpeedometerOutline /></n-icon>
                   </template>
                   {{ t('proxy.testNode') }}
                 </n-button>
                 <div class="expand-icon" :class="{ expanded: expandedGroups.includes(group.name) }">
-                  <n-icon size="16">
+                  <n-icon size="18">
                     <ChevronDownOutline />
                   </n-icon>
                 </div>
@@ -114,10 +120,10 @@
                   >
                     <!-- 节点状态指示器 -->
                     <div class="node-status" :class="getNodeStatusType(proxy)">
-                      <n-icon v-if="group.now === proxy" size="12">
+                      <n-icon v-if="group.now === proxy" size="16">
                         <CheckmarkCircleOutline />
                       </n-icon>
-                      <n-icon v-else-if="testingNodes[proxy]" size="12" class="spin">
+                      <n-icon v-else-if="testingNodes[proxy]" size="16" class="spin">
                         <RefreshOutline />
                       </n-icon>
                       <div v-else class="status-dot"></div>
@@ -132,7 +138,7 @@
                     </div>
 
                     <!-- 活跃指示线 -->
-                    <div v-if="group.now === proxy" class="active-line"></div>
+                    <div v-if="group.now === proxy" class="active-indicator"></div>
                   </div>
                 </div>
               </div>
@@ -191,6 +197,10 @@ interface TestNodeResult {
 }
 
 // 状态定义
+defineOptions({
+  name: 'ProxyView'
+})
+
 const message = useMessage()
 const isLoading = ref(false)
 const { width } = useWindowSize()
@@ -419,89 +429,110 @@ const changeProxy = async (group: string, proxy: string) => {
 </script>
 
 <style scoped>
-.ultra-proxy {
+.modern-proxy {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   min-height: 100%;
-  font-size: 13px;
+  animation: fadeIn 0.4s ease-out;
 }
 
-/* 紧凑工具栏 */
-.proxy-toolbar {
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 工具栏区域 */
+.toolbar-section {
+  margin-bottom: 4px;
+}
+
+.toolbar-card {
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  transition: all 0.3s ease;
+}
+
+.toolbar-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.08)"');
+}
+
+.toolbar-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
-  backdrop-filter: blur(12px);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  border-radius: 10px;
-  box-shadow: 0 2px 8px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
-  transition: all 0.2s var(--ease-out);
-}
-
-.proxy-toolbar:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(0, 0, 0, 0.08)"');
+  gap: 20px;
+  padding: 4px;
 }
 
 .toolbar-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
+  flex: 1;
 }
 
 .toolbar-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #5b4cfd, #7c3aed);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(91, 76, 253, 0.3);
 }
 
 .toolbar-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .toolbar-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--n-text-color);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--n-text-color-1);
+  margin: 0;
+  letter-spacing: -0.02em;
 }
 
-.toolbar-stats {
-  font-size: 11px;
+.toolbar-subtitle {
+  font-size: 13px;
   color: var(--n-text-color-3);
+  margin: 0;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .refresh-btn {
-  height: 28px;
-  min-width: 60px;
-  border-radius: 6px;
-  font-weight: 500;
+  min-width: 100px;
+  height: 40px;
+  font-weight: 600;
+  border-radius: 10px;
 }
 
-/* 主内容区 */
-.proxy-content {
+/* 主内容区域 */
+.content-section {
   flex: 1;
 }
 
 .loading-container {
-  min-height: 200px;
+  min-height: 300px;
 }
 
 .loading-text {
-  color: var(--n-text-color-2);
-  font-size: 12px;
+  color: var(--n-text-color-3);
+  font-size: 14px;
 }
 
 /* 空状态 */
@@ -510,52 +541,55 @@ const changeProxy = async (group: string, proxy: string) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
+  padding: 60px 16px;
   text-align: center;
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
-  backdrop-filter: blur(12px);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  border-radius: 12px;
-  margin: 8px 0;
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  border-radius: 16px;
+  margin: 0 4px;
 }
 
 .empty-icon {
-  color: var(--n-text-color-3);
+  color: var(--n-text-color-disabled);
   margin-bottom: 12px;
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 .empty-title {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
-  color: var(--n-text-color-2);
-  margin-bottom: 6px;
+  color: var(--n-text-color-1);
+  margin: 0 0 8px 0;
 }
 
-.empty-desc {
-  font-size: 12px;
+.empty-description {
+  font-size: 14px;
   color: var(--n-text-color-3);
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+  max-width: 300px;
 }
 
 /* 代理组列表 */
 .proxy-groups {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
 }
 
 .proxy-group {
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
-  backdrop-filter: blur(12px);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  border-radius: 10px;
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  border-radius: 16px;
   overflow: hidden;
-  transition: all 0.2s var(--ease-out);
+  transition: all 0.3s ease;
 }
 
 .proxy-group:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.08)"');
 }
 
 /* 组头部 */
@@ -563,49 +597,51 @@ const changeProxy = async (group: string, proxy: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 16px;
   cursor: pointer;
   user-select: none;
-  transition: all 0.2s var(--ease-out);
+  transition: all 0.2s ease;
 }
 
 .group-header:hover {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.02)"');
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
 }
 
 .group-info {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
 }
 
-.group-title {
+.group-main {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-.group-title span {
-  font-size: 14px;
+.group-name {
+  font-size: 18px;
   font-weight: 600;
-  color: var(--n-text-color);
+  color: var(--n-text-color-1);
+  margin: 0;
 }
 
 .group-badges {
   display: flex;
-  gap: 4px;
+  gap: 8px;
 }
 
 .group-current {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .current-label {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--n-text-color-3);
   font-weight: 500;
 }
@@ -613,26 +649,26 @@ const changeProxy = async (group: string, proxy: string) => {
 .group-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .test-btn {
-  height: 24px;
-  min-width: 50px;
-  border-radius: 5px;
-  font-size: 11px;
+  height: 32px;
+  min-width: 80px;
+  font-size: 13px;
   font-weight: 500;
+  border-radius: 8px;
 }
 
 .expand-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.04)"');
-  transition: all 0.2s var(--ease-out);
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  transition: all 0.2s ease;
   color: var(--n-text-color-2);
 }
 
@@ -641,8 +677,8 @@ const changeProxy = async (group: string, proxy: string) => {
 }
 
 .expand-icon:hover {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
-  color: var(--n-text-color);
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)"');
+  color: var(--n-text-color-1);
 }
 
 /* 节点容器 */
@@ -653,29 +689,29 @@ const changeProxy = async (group: string, proxy: string) => {
 .nodes-grid {
   display: grid;
   grid-template-columns: repeat(var(--grid-columns), 1fr);
-  gap: 8px;
+  gap: 12px;
 }
 
 /* 节点卡片 */
 .node-card {
   position: relative;
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.4)" : "rgba(255, 255, 255, 0.6)"');
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.03)"');
-  border-radius: 8px;
-  padding: 10px;
-  min-height: 56px;
+  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 72px;
   cursor: pointer;
-  transition: all 0.2s var(--ease-out);
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   overflow: hidden;
 }
 
 .node-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
-  border-color: var(--n-primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.08)"');
+  border-color: #5b4cfd;
 }
 
 .node-card.node-active {
@@ -690,19 +726,19 @@ const changeProxy = async (group: string, proxy: string) => {
 
 /* 节点状态指示器 */
 .node-status {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.2s var(--ease-out);
+  transition: all 0.2s ease;
 }
 
 .node-status.success {
   background: rgba(34, 197, 94, 0.2);
-  color: #16a34a;
+  color: #10b981;
 }
 
 .node-status.info {
@@ -729,11 +765,15 @@ const changeProxy = async (group: string, proxy: string) => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--n-text-color-3);
+  background: currentColor;
 }
 
 .spin {
   animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* 节点信息 */
@@ -742,22 +782,22 @@ const changeProxy = async (group: string, proxy: string) => {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .node-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--n-text-color);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--n-text-color-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.2;
+  line-height: 1.3;
 }
 
 .node-delay {
   cursor: pointer;
-  transition: all 0.15s var(--ease-out);
+  transition: all 0.15s ease;
 }
 
 .node-delay:hover {
@@ -765,7 +805,7 @@ const changeProxy = async (group: string, proxy: string) => {
 }
 
 .delay-value {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--n-text-color-2);
   white-space: nowrap;
@@ -774,25 +814,20 @@ const changeProxy = async (group: string, proxy: string) => {
 }
 
 /* 活跃指示线 */
-.active-line {
+.active-indicator {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 4px;
   background: linear-gradient(180deg, #10b981, #059669);
   border-radius: 0 2px 2px 0;
 }
 
 /* 动画 */
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* 展开动画 */
 .group-expand-enter-active,
 .group-expand-leave-active {
-  transition: all 0.3s var(--ease-out);
+  transition: all 0.3s ease;
   overflow: hidden;
 }
 
@@ -800,63 +835,133 @@ const changeProxy = async (group: string, proxy: string) => {
 .group-expand-leave-to {
   max-height: 0;
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-10px);
 }
 
 .group-expand-enter-to,
 .group-expand-leave-from {
-  max-height: 500px;
+  max-height: 1000px;
   opacity: 1;
   transform: translateY(0);
 }
 
 /* 响应式设计 */
-@media (max-width: 768px) {
-  .proxy-toolbar {
-    padding: 10px 12px;
-  }
-
-  .group-header {
-    padding: 10px 12px;
-  }
-
-  .group-title {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .nodes-container {
-    padding: 0 12px 12px;
-  }
-
+@media (max-width: 1024px) {
   .nodes-grid {
-    gap: 6px;
+    gap: 10px;
   }
 
   .node-card {
-    min-height: 52px;
-    padding: 8px;
+    min-height: 68px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .modern-proxy {
+    gap: 16px;
+  }
+
+  .toolbar-content {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .toolbar-left {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .group-header {
+    padding: 16px;
+  }
+
+  .group-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .group-current {
+    align-self: flex-start;
+  }
+
+  .nodes-container {
+    padding: 0 16px 16px;
+  }
+
+  .nodes-grid {
+    gap: 8px;
+  }
+
+  .node-card {
+    min-height: 64px;
+    padding: 12px;
+  }
+
+  .node-name {
+    font-size: 13px;
+  }
+
+  .delay-value {
+    font-size: 11px;
   }
 }
 
 @media (max-width: 480px) {
-  .group-current {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+  .group-actions {
+    gap: 8px;
   }
 
-  .group-actions {
-    gap: 6px;
+  .test-btn {
+    min-width: 70px;
+    font-size: 12px;
+  }
+
+  .expand-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .node-card {
+    min-height: 60px;
+    padding: 10px;
+  }
+
+  .node-status {
+    width: 20px;
+    height: 20px;
   }
 
   .node-name {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .delay-value {
-    font-size: 9px;
+    font-size: 10px;
   }
+}
+
+/* 优化Naive UI组件 */
+:deep(.n-card) {
+  border-radius: 16px;
+}
+
+:deep(.n-card__content) {
+  padding: 24px;
+}
+
+:deep(.n-button) {
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+:deep(.n-tag) {
+  font-weight: 500;
+}
+
+:deep(.n-spin-container) {
+  min-height: 300px;
 }
 </style>

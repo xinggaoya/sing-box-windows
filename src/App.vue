@@ -77,7 +77,6 @@ interface TrayStore {
 
 interface KernelStore {
   startKernel: () => Promise<void>
-  initEventListeners: () => void
 }
 
 interface AppStore {
@@ -315,9 +314,8 @@ async function normalKernelStart() {
   // 加载内核Store
   const kernelStore = await storeManager.loadStore<KernelStore>('kernel')
 
-  // 初始化事件监听器
-  console.log('🎧 初始化事件监听器...')
-  await kernelStore.initEventListeners()
+  // 初始化事件监听器（现在由各个Store自动管理）
+  console.log('🎧 事件监听器将由各个Store自动初始化...')
 
   // 启动内核（后端已包含完整检查）
   console.log('🚀 启动内核，后端将进行完整就绪检查...')

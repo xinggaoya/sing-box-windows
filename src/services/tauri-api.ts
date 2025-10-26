@@ -58,7 +58,23 @@ export const kernelApi = {
 
   getKernelVersion: () => invoke<string>('check_kernel_version'),
 
-  switchProxyMode: (mode: 'system' | 'tun' | 'manual') =>
+  switchProxyMode: async (mode: 'system' | 'tun' | 'manual') => {
+    const appStore = useAppStore()
+    const port = appStore.proxyPort
+
+    switch (mode) {
+      case 'system':
+        return invoke<string>('set_system_proxy', { port })
+      case 'tun':
+        return invoke<string>('set_tun_proxy', { port })
+      case 'manual':
+        return invoke<string>('set_manual_proxy', { port })
+      default:
+        return Promise.reject('无效的代理模式')
+    }
+  },
+
+  switchNodeProxyMode: (mode: 'global' | 'rule') =>
     invoke<string>('toggle_proxy_mode', { mode }),
 
   toggleIpVersion: (preferIpv6: boolean) =>

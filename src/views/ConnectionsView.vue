@@ -1,248 +1,271 @@
 <template>
-  <div class="ultra-connections">
-    <!-- 紧凑工具栏 -->
-    <div class="connections-toolbar">
-      <div class="toolbar-left">
-        <div class="toolbar-icon">
-          <n-icon size="16">
-            <LinkOutline />
-          </n-icon>
-        </div>
-        <div class="toolbar-info">
-          <span class="toolbar-title">{{ t('connections.title') }}</span>
-          <span class="toolbar-stats">{{ connections.length }} {{ t('connections.totalCount', { count: connections.length }) }}</span>
-        </div>
-      </div>
-
-      <div class="toolbar-right">
-        <n-button
-          @click="refreshConnections"
-          :loading="loading"
-          type="primary"
-          size="small"
-          class="refresh-btn"
-        >
-          <template #icon>
-            <n-icon size="12"><RefreshOutline /></n-icon>
-          </template>
-          {{ t('common.refresh') }}
-        </n-button>
-      </div>
-    </div>
-
-    <!-- 统计面板 -->
-    <div class="stats-panel">
-      <div class="stat-orb active-orb">
-        <div class="orb-icon">
-          <n-icon size="14"><LinkOutline /></n-icon>
-        </div>
-        <div class="orb-content">
-          <div class="orb-value">
-            <n-number-animation ref="activeCountRef" :from="0" :to="connections.length" />
+  <div class="connections-page">
+    <!-- 页面标题和统计 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <n-icon size="20">
+              <LinkOutline />
+            </n-icon>
           </div>
-          <div class="orb-label">{{ t('connections.activeConnections') }}</div>
+          <div class="header-info">
+            <h1 class="page-title">{{ t('connections.title') }}</h1>
+            <p class="page-subtitle">{{ t('connections.subtitle') }}</p>
+          </div>
         </div>
-      </div>
-
-      <div class="stat-orb upload-orb">
-        <div class="orb-icon">
-          <n-icon size="14"><ArrowUpOutline /></n-icon>
-        </div>
-        <div class="orb-content">
-          <div class="orb-value">{{ formatBytes(connectionsTotal.upload) }}</div>
-          <div class="orb-label">{{ t('home.traffic.uploadTotal') }}</div>
-        </div>
-      </div>
-
-      <div class="stat-orb download-orb">
-        <div class="orb-icon">
-          <n-icon size="14"><ArrowDownOutline /></n-icon>
-        </div>
-        <div class="orb-content">
-          <div class="orb-value">{{ formatBytes(connectionsTotal.download) }}</div>
-          <div class="orb-label">{{ t('home.traffic.downloadTotal') }}</div>
-        </div>
-      </div>
-
-      <div class="stat-orb filtered-orb">
-        <div class="orb-icon">
-          <n-icon size="14"><HardwareChipOutline /></n-icon>
-        </div>
-        <div class="orb-content">
-          <div class="orb-value">{{ filteredConnections.length }}</div>
-          <div class="orb-label">{{ t('connections.matchedConnections') }}</div>
+        <div class="header-actions">
+          <n-button
+            @click="refreshConnections"
+            :loading="loading"
+            type="primary"
+            size="medium"
+            class="refresh-btn"
+          >
+            <template #icon>
+              <n-icon size="16">
+                <RefreshOutline />
+              </n-icon>
+            </template>
+            {{ t('common.refresh') }}
+          </n-button>
         </div>
       </div>
     </div>
 
-    <!-- 连接内容区域 -->
-    <div class="connections-content">
-      <!-- 搜索筛选区域 -->
-      <div class="search-section">
-        <div class="search-input-group">
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <n-card class="stat-card active-card" :bordered="false">
+        <div class="stat-content">
+          <div class="stat-icon">
+            <n-icon size="24">
+              <LinkOutline />
+            </n-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">
+              <n-number-animation ref="activeCountRef" :from="0" :to="connections.length" />
+            </div>
+            <div class="stat-label">{{ t('connections.activeConnections') }}</div>
+          </div>
+        </div>
+      </n-card>
+
+      <n-card class="stat-card upload-card" :bordered="false">
+        <div class="stat-content">
+          <div class="stat-icon">
+            <n-icon size="24">
+              <ArrowUpOutline />
+            </n-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ formatBytes(connectionsTotal.upload) }}</div>
+            <div class="stat-label">{{ t('home.traffic.uploadTotal') }}</div>
+          </div>
+        </div>
+      </n-card>
+
+      <n-card class="stat-card download-card" :bordered="false">
+        <div class="stat-content">
+          <div class="stat-icon">
+            <n-icon size="24">
+              <ArrowDownOutline />
+            </n-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ formatBytes(connectionsTotal.download) }}</div>
+            <div class="stat-label">{{ t('home.traffic.downloadTotal') }}</div>
+          </div>
+        </div>
+      </n-card>
+
+      <n-card class="stat-card filtered-card" :bordered="false">
+        <div class="stat-content">
+          <div class="stat-icon">
+            <n-icon size="24">
+              <FilterOutline />
+            </n-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ filteredConnections.length }}</div>
+            <div class="stat-label">{{ t('connections.matchedConnections') }}</div>
+          </div>
+        </div>
+      </n-card>
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <n-card class="filter-card" :bordered="false">
+      <div class="filter-content">
+        <div class="filter-row">
           <n-input
             v-model:value="searchQuery"
             :placeholder="t('connections.searchPlaceholder')"
             clearable
-            size="small"
+            size="medium"
             class="search-input"
           >
             <template #prefix>
-              <n-icon size="14">
+              <n-icon size="16">
                 <SearchOutline />
               </n-icon>
             </template>
           </n-input>
-
-          <div class="filter-selects">
-            <n-select
-              v-model:value="networkFilter"
-              :options="networkOptions"
-              :placeholder="t('connections.networkTypeFilter')"
-              clearable
-              size="small"
-              class="filter-select"
-            />
-            <n-select
-              v-model:value="ruleFilter"
-              :options="ruleOptions"
-              :placeholder="t('connections.ruleFilter')"
-              clearable
-              size="small"
-              class="filter-select"
-            />
-          </div>
         </div>
-
-        <div class="filter-tags" v-if="searchQuery || networkFilter || ruleFilter">
-          <n-tag v-if="searchQuery" size="tiny" round class="filter-tag">
+        <div class="filter-row">
+          <n-select
+            v-model:value="networkFilter"
+            :options="networkOptions"
+            :placeholder="t('connections.networkTypeFilter')"
+            clearable
+            size="medium"
+            class="filter-select"
+          />
+          <n-select
+            v-model:value="ruleFilter"
+            :options="ruleOptions"
+            :placeholder="t('connections.ruleFilter')"
+            clearable
+            size="medium"
+            class="filter-select"
+          />
+        </div>
+        <div class="active-filters" v-if="searchQuery || networkFilter || ruleFilter">
+          <n-tag v-if="searchQuery" size="small" round closable @close="searchQuery = ''">
             {{ t('common.search') }}: {{ searchQuery }}
           </n-tag>
-          <n-tag v-if="networkFilter" size="tiny" round class="filter-tag">
+          <n-tag v-if="networkFilter" size="small" round closable @close="networkFilter = null">
             {{ t('connections.networkTypeFilter') }}: {{ networkFilter }}
           </n-tag>
-          <n-tag v-if="ruleFilter" size="tiny" round class="filter-tag">
+          <n-tag v-if="ruleFilter" size="small" round closable @close="ruleFilter = null">
             {{ t('connections.ruleFilter') }}: {{ ruleFilter }}
           </n-tag>
         </div>
       </div>
+    </n-card>
 
-      <!-- 连接列表 -->
-      <div class="connections-list">
-        <n-spin :show="loading">
-          <div v-if="filteredConnections.length > 0" class="connections-grid">
-            <div
-              v-for="(conn, index) in filteredConnections"
-              :key="conn.id"
-              class="connection-item"
-              :class="{ 'connection-highlight': isConnectionHighlighted(conn) }"
-            >
-              <!-- 连接ID -->
+    <!-- 连接列表 -->
+    <n-card class="connections-card" :bordered="false">
+      <n-spin :show="loading">
+        <div v-if="filteredConnections.length > 0" class="connections-grid">
+          <div
+            v-for="(conn, index) in filteredConnections"
+            :key="conn.id"
+            class="connection-item"
+            :class="{ 'connection-highlight': isConnectionHighlighted(conn) }"
+          >
+            <!-- 连接头部 -->
+            <div class="connection-header">
               <div class="connection-id">
-                <div class="id-badge">
+                <n-tag size="small" :type="getNetworkTagType(conn.metadata.network)">
                   {{ getConnectionShortId(conn.id) }}
-                </div>
+                </n-tag>
               </div>
-
-              <!-- 时间 -->
               <div class="connection-time">
-                <div class="time-text">
-                  {{ formatConnectionTime(conn.start) }}
+                {{ formatConnectionTime(conn.start) }}
+              </div>
+            </div>
+
+            <!-- 连接详情 -->
+            <div class="connection-details">
+              <div class="connection-row">
+                <div class="detail-item">
+                  <div class="detail-label">{{ t('connections.source') }}</div>
+                  <div class="detail-value" :title="getSourceText(conn)">
+                    {{ getSourceText(conn) }}
+                  </div>
+                </div>
+                <div class="detail-item">
+                  <div class="detail-label">{{ t('connections.destination') }}</div>
+                  <div class="detail-value" :title="getDestinationText(conn)">
+                    {{ getDestinationText(conn) }}
+                  </div>
                 </div>
               </div>
 
-              <!-- 网络类型 -->
-              <div class="connection-network">
-                <div class="network-badge" :class="getNetworkClass(conn.metadata.network)">
-                  {{ conn.metadata.network?.toUpperCase() }}
+              <div class="connection-row">
+                <div class="detail-item">
+                  <div class="detail-label">{{ t('connections.rule') }}</div>
+                  <div class="detail-value">
+                    <n-tag size="small" :type="getRuleTagType(conn.rule)">
+                      {{ conn.rule }}
+                    </n-tag>
+                  </div>
                 </div>
-              </div>
-
-              <!-- 源地址 -->
-              <div class="connection-source">
-                <div class="source-text" :title="getSourceText(conn)">
-                  {{ getSourceText(conn) }}
-                </div>
-              </div>
-
-              <!-- 目标地址 -->
-              <div class="connection-destination">
-                <div class="dest-text" :title="getDestinationText(conn)">
-                  {{ getDestinationText(conn) }}
-                </div>
-              </div>
-
-              <!-- 规则 -->
-              <div class="connection-rule">
-                <div class="rule-badge" :class="getRuleClass(conn.rule)">
-                  {{ conn.rule }}
-                </div>
-              </div>
-
-              <!-- 流量 -->
-              <div class="connection-traffic">
-                <div class="traffic-info">
-                  <div class="traffic-upload">↑{{ formatBytes(conn.upload) }}</div>
-                  <div class="traffic-download">↓{{ formatBytes(conn.download) }}</div>
+                <div class="detail-item">
+                  <div class="detail-label">{{ t('connections.traffic') }}</div>
+                  <div class="detail-value traffic-value">
+                    <span class="upload">↑{{ formatBytes(conn.upload) }}</span>
+                    <span class="download">↓{{ formatBytes(conn.download) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- 空状态 -->
-          <div v-else class="empty-state">
-            <div class="empty-icon">
-              <n-icon size="32">
-                <LinkOutline />
+            <!-- 连接状态指示器 -->
+            <div class="connection-indicator" :class="getNetworkClass(conn.metadata.network)"></div>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else class="empty-state">
+          <div class="empty-icon">
+            <n-icon size="48">
+              <LinkOutline />
+            </n-icon>
+          </div>
+          <div class="empty-title">
+            {{
+              searchQuery || networkFilter || ruleFilter
+                ? t('connections.noMatchingConnections2')
+                : t('connections.noActiveConnections')
+            }}
+          </div>
+          <div class="empty-desc">
+            {{
+              searchQuery || networkFilter || ruleFilter
+                ? t('connections.adjustSearchOrFilters')
+                : t('connections.refreshConnections')
+            }}
+          </div>
+          <n-button
+            v-if="!searchQuery && !networkFilter && !ruleFilter"
+            @click="refreshConnections"
+            type="primary"
+            size="large"
+            class="empty-btn"
+          >
+            <template #icon>
+              <n-icon size="18">
+                <RefreshOutline />
               </n-icon>
-            </div>
-            <div class="empty-title">
-              {{
-                searchQuery || networkFilter || ruleFilter
-                  ? t('connections.noMatchingConnections2')
-                  : t('connections.noActiveConnections')
-              }}
-            </div>
-            <div class="empty-desc">
-              {{
-                searchQuery || networkFilter || ruleFilter
-                  ? t('connections.adjustSearchOrFilters')
-                  : t('connections.refreshConnections')
-              }}
-            </div>
-            <n-button
-              v-if="!searchQuery && !networkFilter && !ruleFilter"
-              @click="refreshConnections"
-              type="primary"
-              size="medium"
-              class="empty-btn"
-            >
-              <template #icon>
-                <n-icon size="14"><RefreshOutline /></n-icon>
-              </template>
-              {{ t('connections.refreshConnections') }}
-            </n-button>
-          </div>
-        </n-spin>
-      </div>
-    </div>
+            </template>
+            {{ t('connections.refreshConnections') }}
+          </n-button>
+        </div>
+      </n-spin>
+    </n-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, h, computed, watch } from 'vue'
-import { useMessage, NTag, DataTableColumns, NSpace, NTooltip, NText, SelectOption } from 'naive-ui'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { useMessage } from 'naive-ui'
 import {
   RefreshOutline,
   SearchOutline,
   LinkOutline,
   ArrowUpOutline,
   ArrowDownOutline,
-  HardwareChipOutline,
+  FilterOutline,
 } from '@vicons/ionicons5'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/app/ThemeStore'
+
+defineOptions({
+  name: 'ConnectionsView'
+})
 
 const message = useMessage()
 const loading = ref(false)
@@ -354,364 +377,6 @@ const formatBytes = (bytes: number) => {
   return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i]
 }
 
-// 格式化时间
-const formatTime = (timeString: string) => {
-  try {
-    const date = new Date(timeString)
-    return date.toLocaleString()
-  } catch (e) {
-    return timeString
-  }
-}
-
-// 定义表格列
-const columns: DataTableColumns<Connection> = [
-  {
-    title: t('connections.unknown'),
-    key: 'id',
-    width: 100,
-    ellipsis: {
-      tooltip: true,
-    },
-    render(row: Connection) {
-      // 高亮搜索关键字
-      if (searchQuery.value && row.id.toLowerCase().includes(searchQuery.value.toLowerCase())) {
-        const index = row.id.toLowerCase().indexOf(searchQuery.value.toLowerCase())
-        const beforeMatch = row.id.substring(0, index)
-        const match = row.id.substring(index, index + searchQuery.value.length)
-        const afterMatch = row.id.substring(index + searchQuery.value.length)
-
-        return h('div', {}, [
-          beforeMatch,
-          h(
-            'span',
-            { style: { backgroundColor: 'rgba(var(--primary-color), 0.1)', fontWeight: 'bold' } },
-            match,
-          ),
-          afterMatch,
-        ])
-      }
-      return row.id
-    },
-  },
-  {
-    title: t('connections.startTime'),
-    key: 'start',
-    width: 160,
-    render(row: Connection) {
-      return formatTime(row.start)
-    },
-  },
-  {
-    title: t('connections.networkType'),
-    key: 'network',
-    width: 120,
-    render(row: Connection) {
-      const { network, type } = row.metadata
-      return h(
-        NSpace,
-        { vertical: true, size: 'small' },
-        {
-          default: () => [
-            h(
-              NTag,
-              {
-                type: network === 'tcp' ? 'info' : 'warning',
-                size: 'small',
-                bordered: false,
-              },
-              {
-                default: () =>
-                  typeof network === 'string'
-                    ? network.toUpperCase()
-                    : String(network).toUpperCase(),
-              },
-            ),
-            h(
-              NTag,
-              {
-                type: 'default',
-                size: 'small',
-                bordered: false,
-              },
-              { default: () => (typeof type === 'string' ? type : String(type)) },
-            ),
-          ],
-        },
-      )
-    },
-  },
-  {
-    title: t('connections.source'),
-    key: 'source',
-    width: 200,
-    render(row: Connection) {
-      const { sourceIP, sourcePort } = row.metadata
-      const sourceText = `${sourceIP}:${sourcePort}`
-
-      // 高亮搜索关键字
-      if (searchQuery.value && sourceText.toLowerCase().includes(searchQuery.value.toLowerCase())) {
-        const index = sourceText.toLowerCase().indexOf(searchQuery.value.toLowerCase())
-        const beforeMatch = sourceText.substring(0, index)
-        const match = sourceText.substring(index, index + searchQuery.value.length)
-        const afterMatch = sourceText.substring(index + searchQuery.value.length)
-
-        return h(
-          NTooltip,
-          {},
-          {
-            trigger: () =>
-              h('div', {}, [
-                beforeMatch,
-                h(
-                  'span',
-                  {
-                    style: {
-                      backgroundColor: 'rgba(var(--primary-color), 0.1)',
-                      fontWeight: 'bold',
-                    },
-                  },
-                  match,
-                ),
-                afterMatch,
-              ]),
-            default: () =>
-              h('div', {}, [
-                h('div', {}, `${t('connections.ip')}: ${sourceIP}`),
-                h('div', {}, `${t('connections.port')}: ${sourcePort}`),
-              ]),
-          },
-        )
-      }
-
-      return h(
-        NTooltip,
-        {},
-        {
-          trigger: () => sourceText,
-          default: () =>
-            h('div', {}, [
-              h('div', {}, `${t('connections.ip')}: ${sourceIP}`),
-              h('div', {}, `${t('connections.port')}: ${sourcePort}`),
-            ]),
-        },
-      )
-    },
-  },
-  {
-    title: t('connections.destination'),
-    key: 'destination',
-    width: 200,
-    render(row: Connection) {
-      const { destinationIP, destinationPort, host } = row.metadata
-      const destText = host || `${destinationIP}:${destinationPort}`
-
-      // 高亮搜索关键字
-      if (searchQuery.value && destText.toLowerCase().includes(searchQuery.value.toLowerCase())) {
-        const index = destText.toLowerCase().indexOf(searchQuery.value.toLowerCase())
-        const beforeMatch = destText.substring(0, index)
-        const match = destText.substring(index, index + searchQuery.value.length)
-        const afterMatch = destText.substring(index + searchQuery.value.length)
-
-        return h(
-          NTooltip,
-          {},
-          {
-            trigger: () =>
-              h('div', {}, [
-                beforeMatch,
-                h(
-                  'span',
-                  {
-                    style: {
-                      backgroundColor: 'rgba(var(--primary-color), 0.1)',
-                      fontWeight: 'bold',
-                    },
-                  },
-                  match,
-                ),
-                afterMatch,
-              ]),
-            default: () =>
-              h('div', {}, [
-                host ? h('div', {}, `${t('connections.host')}: ${host}`) : null,
-                h('div', {}, `${t('connections.ip')}: ${destinationIP}`),
-                h('div', {}, `${t('connections.port')}: ${destinationPort}`),
-              ]),
-          },
-        )
-      }
-
-      return h(
-        NTooltip,
-        {},
-        {
-          trigger: () => destText,
-          default: () =>
-            h('div', {}, [
-              host ? h('div', {}, `${t('connections.host')}: ${host}`) : null,
-              h('div', {}, `${t('connections.ip')}: ${destinationIP}`),
-              h('div', {}, `${t('connections.port')}: ${destinationPort}`),
-            ]),
-        },
-      )
-    },
-  },
-  {
-    title: t('connections.rule'),
-    key: 'rule',
-    width: 160,
-    render(row: Connection) {
-      // 高亮搜索关键字
-      if (
-        searchQuery.value &&
-        row.rule &&
-        String(row.rule).toLowerCase().includes(searchQuery.value.toLowerCase())
-      ) {
-        const index = String(row.rule).toLowerCase().indexOf(searchQuery.value.toLowerCase())
-        const beforeMatch = row.rule.substring(0, index)
-        const match = row.rule.substring(index, index + searchQuery.value.length)
-        const afterMatch = row.rule.substring(index + searchQuery.value.length)
-
-        return h(
-          NSpace,
-          { vertical: true, size: 'small' },
-          {
-            default: () => [
-              h(
-                NTag,
-                {
-                  type: 'success',
-                  size: 'small',
-                  bordered: false,
-                },
-                {
-                  default: () =>
-                    h('div', {}, [
-                      beforeMatch,
-                      h(
-                        'span',
-                        {
-                          style: {
-                            backgroundColor: 'rgba(var(--primary-color), 0.1)',
-                            fontWeight: 'bold',
-                          },
-                        },
-                        match,
-                      ),
-                      afterMatch,
-                    ]),
-                },
-              ),
-              row.rulePayload
-                ? h(NText, { depth: 3, size: 'small' }, { default: () => row.rulePayload })
-                : null,
-            ],
-          },
-        )
-      }
-
-      return h(
-        NSpace,
-        { vertical: true, size: 'small' },
-        {
-          default: () => [
-            h(
-              NTag,
-              {
-                type: 'success',
-                size: 'small',
-                bordered: false,
-              },
-              { default: () => row.rule },
-            ),
-            row.rulePayload
-              ? h(NText, { depth: 3, size: 'small' }, { default: () => row.rulePayload })
-              : null,
-          ],
-        },
-      )
-    },
-  },
-  {
-    title: t('connections.process'),
-    key: 'process',
-    ellipsis: {
-      tooltip: true,
-    },
-    render(row: Connection) {
-      const processPath = row.metadata.processPath || t('connections.unknown')
-
-      // 高亮搜索关键字
-      if (
-        searchQuery.value &&
-        processPath.toLowerCase().includes(searchQuery.value.toLowerCase())
-      ) {
-        const index = processPath.toLowerCase().indexOf(searchQuery.value.toLowerCase())
-        const beforeMatch = processPath.substring(0, index)
-        const match = processPath.substring(index, index + searchQuery.value.length)
-        const afterMatch = processPath.substring(index + searchQuery.value.length)
-
-        return h('div', {}, [
-          beforeMatch,
-          h(
-            'span',
-            { style: { backgroundColor: 'rgba(var(--primary-color), 0.1)', fontWeight: 'bold' } },
-            match,
-          ),
-          afterMatch,
-        ])
-      }
-
-      return processPath
-    },
-  },
-  {
-    title: t('connections.traffic'),
-    key: 'traffic',
-    width: 160,
-    render(row: Connection) {
-      return h(
-        NSpace,
-        { vertical: true, size: 'small' },
-        {
-          default: () => [
-            h(
-              NSpace,
-              { align: 'center', size: 'small' },
-              {
-                default: () => [
-                  h(
-                    NTag,
-                    { type: 'error', size: 'small', bordered: false },
-                    { default: () => '↑' },
-                  ),
-                  h(NText, {}, { default: () => formatBytes(row.upload) }),
-                ],
-              },
-            ),
-            h(
-              NSpace,
-              { align: 'center', size: 'small' },
-              {
-                default: () => [
-                  h(NTag, { type: 'info', size: 'small', bordered: false }, { default: () => '↓' }),
-                  h(NText, {}, { default: () => formatBytes(row.download) }),
-                ],
-              },
-            ),
-          ],
-        },
-      )
-    },
-  },
-]
-
-// 分页设置
-const pagination = {
-  pageSize: 15,
-}
-
 // 辅助方法
 const getConnectionShortId = (id: string): string => {
   if (!id) return 'N/A'
@@ -754,12 +419,18 @@ const getNetworkClass = (network: string): string => {
   return 'network-other'
 }
 
-const getRuleClass = (rule: string): string => {
-  if (!rule) return 'rule-default'
-  if (rule.includes('direct')) return 'rule-direct'
-  if (rule.includes('proxy')) return 'rule-proxy'
-  if (rule.includes('reject')) return 'rule-reject'
-  return 'rule-normal'
+const getNetworkTagType = (network: string): 'info' | 'warning' | 'default' => {
+  if (network === 'tcp') return 'info'
+  if (network === 'udp') return 'warning'
+  return 'default'
+}
+
+const getRuleTagType = (rule: string): 'success' | 'error' | 'info' | 'warning' => {
+  if (!rule) return 'default'
+  if (rule.includes('direct')) return 'success'
+  if (rule.includes('proxy')) return 'info'
+  if (rule.includes('reject')) return 'error'
+  return 'warning'
 }
 
 const isConnectionHighlighted = (conn: Connection): boolean => {
@@ -809,476 +480,346 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.ultra-connections {
+.connections-page {
   padding: 16px;
-  background: var(--n-color-embedded);
-  min-height: calc(100vh - 36px);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  animation: slideFadeIn 0.4s ease-out;
+  min-height: calc(100vh - 48px);
+  background: v-bind('themeStore.isDark ? "#18181b" : "#f8fafc"');
 }
 
-/* 紧凑工具栏 */
-.connections-toolbar {
-  background: var(--n-card-color);
-  border-radius: 12px;
-  padding: 12px 16px;
+/* 页面标题 */
+.page-header {
+  margin-bottom: 24px;
+}
+
+.header-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: var(--n-box-shadow-1);
-  border: 1px solid var(--n-border-color);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 16px;
+  padding: 24px 28px;
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
 }
 
-.toolbar-left {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
-.toolbar-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
+.header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 4px 12px rgba(0, 180, 42, 0.3);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
-.toolbar-info {
+.header-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
-.toolbar-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--n-text-color-1);
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
-.toolbar-stats {
-  font-size: 0.75rem;
-  color: var(--n-text-color-3);
+.page-subtitle {
+  font-size: 14px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
   margin: 0;
+  font-weight: 400;
 }
 
-.toolbar-right {
+.header-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
 }
 
 .refresh-btn {
-  height: 32px;
-  padding: 0 12px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-radius: 8px;
+  height: 42px;
+  padding: 0 16px;
+  font-weight: 600;
+  border-radius: 10px;
   transition: all 0.2s ease;
 }
 
 .refresh-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 180, 42, 0.3);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
-/* 统计面板 */
-.stats-panel {
+/* 统计卡片 */
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  background: var(--n-card-color);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: var(--n-box-shadow-1);
-  border: 1px solid var(--n-border-color);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
 }
 
-.stat-orb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  position: relative;
+.stat-card {
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
+  transition: all 0.3s ease;
   overflow: hidden;
+  position: relative;
 }
 
-.stat-orb:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.stat-orb::before {
+.stat-card::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  border-radius: 8px 8px 0 0;
+  height: 3px;
 }
 
-.active-orb::before {
-  background: linear-gradient(90deg, #00b42a 0%, #009a1a 100%);
+.active-card::before {
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
 }
 
-.upload-orb::before {
-  background: linear-gradient(90deg, #f53f3f 0%, #cb2a2a 100%);
+.upload-card::before {
+  background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
 }
 
-.download-orb::before {
-  background: linear-gradient(90deg, #4080ff 0%, #2266dd 100%);
+.download-card::before {
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
 }
 
-.filtered-orb::before {
-  background: linear-gradient(90deg, #ff9500 0%, #ff6200 100%);
+.filtered-card::before {
+  background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
 }
 
-.orb-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.15)" : "rgba(0, 0, 0, 0.1)"');
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-weight: 500;
+  flex-shrink: 0;
 }
 
-.active-orb .orb-icon {
-  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
+.active-card .stat-icon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
-.upload-orb .orb-icon {
-  background: linear-gradient(135deg, #f53f3f 0%, #cb2a2a 100%);
+.upload-card .stat-icon {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 
-.download-orb .orb-icon {
-  background: linear-gradient(135deg, #4080ff 0%, #2266dd 100%);
+.download-card .stat-icon {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
-.filtered-orb .orb-icon {
-  background: linear-gradient(135deg, #ff9500 0%, #ff6200 100%);
+.filtered-card .stat-icon {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
 }
 
-.orb-content {
+.stat-info {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
-.orb-value {
-  font-size: 1rem;
+.stat-value {
+  font-size: 24px;
   font-weight: 700;
-  color: var(--n-text-color-1);
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
   line-height: 1.2;
+  margin-bottom: 4px;
 }
 
-.orb-label {
-  font-size: 0.7rem;
-  color: var(--n-text-color-3);
+.stat-label {
+  font-size: 13px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
   font-weight: 500;
 }
 
-/* 连接内容区域 */
-.connections-content {
-  flex: 1;
+/* 筛选卡片 */
+.filter-card {
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
+  margin-bottom: 24px;
+}
+
+.filter-content {
+  padding: 8px;
+}
+
+.filter-row {
   display: flex;
-  flex-direction: column;
   gap: 16px;
-  min-height: 0;
+  margin-bottom: 16px;
 }
 
-/* 搜索筛选区域 */
-.search-section {
-  background: var(--n-card-color);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: var(--n-box-shadow-1);
-  border: 1px solid var(--n-border-color);
-}
-
-.search-input-group {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
+.filter-row:last-child {
+  margin-bottom: 0;
 }
 
 .search-input {
   flex: 1;
-  min-width: 280px;
-}
-
-.search-input :deep(.n-input) {
-  border-radius: 8px;
-  border: 1px solid var(--n-border-color);
-  transition: all 0.2s ease;
-}
-
-.search-input :deep(.n-input:hover) {
-  border-color: #00b42a;
-}
-
-.search-input :deep(.n-input.n-input--focus) {
-  border-color: #00b42a;
-  box-shadow: 0 0 0 2px rgba(0, 180, 42, 0.1);
-}
-
-.filter-selects {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .filter-select {
-  min-width: 140px;
+  flex: 1;
+  min-width: 200px;
 }
 
-.filter-select :deep(.n-base-selection) {
-  border-radius: 8px;
-  border: 1px solid var(--n-border-color);
-  transition: all 0.2s ease;
-}
-
-.filter-select :deep(.n-base-selection:hover) {
-  border-color: #00b42a;
-}
-
-.filter-select :deep(.n-base-selection.n-base-selection--focus) {
-  border-color: #00b42a;
-  box-shadow: 0 0 0 2px rgba(0, 180, 42, 0.1);
-}
-
-.filter-tags {
+.active-filters {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
 }
 
-.filter-tag {
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-/* 连接列表 */
-.connections-list {
-  flex: 1;
-  background: var(--n-card-color);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: var(--n-box-shadow-1);
-  border: 1px solid var(--n-border-color);
-  min-height: 0;
+/* 连接卡片 */
+.connections-card {
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
 }
 
 .connections-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
 }
 
 .connection-item {
-  display: grid;
-  grid-template-columns: 60px 50px 60px 120px 140px 100px 100px;
-  gap: 8px;
-  align-items: center;
-  padding: 10px 12px;
-  background: var(--n-color-embedded);
-  border-radius: 8px;
-  border: 1px solid var(--n-border-color);
-  transition: all 0.2s ease;
-  cursor: pointer;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.02)" : "rgba(0, 0, 0, 0.02)"');
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 }
 
 .connection-item:hover {
-  background: var(--n-color-embedded-modal);
-  border-color: #00b42a;
-  transform: translateX(2px);
-  box-shadow: 0 2px 8px rgba(0, 180, 42, 0.1);
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.04)"');
+  border-color: v-bind('themeStore.isDark ? "rgba(91, 76, 253, 0.3)" : "rgba(91, 76, 253, 0.2)"');
+  transform: translateX(4px);
 }
 
-.connection-item::before {
-  content: '';
+.connection-highlight {
+  background: rgba(91, 76, 253, 0.05);
+  border-color: rgba(91, 76, 253, 0.3);
+}
+
+.connection-indicator {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
   width: 3px;
-  background: transparent;
-  transition: background 0.2s ease;
-}
-
-.connection-item:hover::before {
-  background: #00b42a;
-}
-
-.connection-highlight {
-  background: rgba(0, 180, 42, 0.05);
-  border-color: rgba(0, 180, 42, 0.2);
-}
-
-.connection-highlight::before {
-  background: #00b42a;
-}
-
-.connection-id {
-  display: flex;
-  align-items: center;
-}
-
-.id-badge {
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  background: rgba(107, 114, 128, 0.1);
-  color: var(--n-text-color-2);
-  text-align: center;
-  white-space: nowrap;
-}
-
-.connection-time {
-  display: flex;
-  align-items: center;
-}
-
-.time-text {
-  font-size: 0.75rem;
-  color: var(--n-text-color-2);
-  font-weight: 500;
-}
-
-.connection-network {
-  display: flex;
-  align-items: center;
-}
-
-.network-badge {
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  text-align: center;
-  white-space: nowrap;
 }
 
 .network-tcp {
-  background: rgba(64, 128, 255, 0.1);
-  color: #4080ff;
-  border: 1px solid rgba(64, 128, 255, 0.2);
+  background: #3b82f6;
 }
 
 .network-udp {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: #f59e0b;
 }
 
 .network-other {
-  background: rgba(107, 114, 128, 0.1);
-  color: #6b7280;
-  border: 1px solid rgba(107, 114, 128, 0.2);
+  background: #6b7280;
 }
 
-.connection-source,
-.connection-destination {
-  flex: 1;
-  min-width: 0;
-}
-
-.source-text,
-.dest-text {
-  font-size: 0.75rem;
-  color: var(--n-text-color-1);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.connection-rule {
+.connection-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 12px;
 }
 
-.rule-badge {
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-size: 0.7rem;
+.connection-time {
+  font-size: 12px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
   font-weight: 500;
-  text-align: center;
-  white-space: nowrap;
 }
 
-.rule-direct {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-.rule-proxy {
-  background: rgba(64, 128, 255, 0.1);
-  color: #4080ff;
-  border: 1px solid rgba(64, 128, 255, 0.2);
-}
-
-.rule-reject {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.rule-normal {
-  background: rgba(107, 114, 128, 0.1);
-  color: #6b7280;
-  border: 1px solid rgba(107, 114, 128, 0.2);
-}
-
-.rule-default {
-  background: rgba(107, 114, 128, 0.1);
-  color: #6b7280;
-  border: 1px solid rgba(107, 114, 128, 0.2);
-}
-
-.connection-traffic {
-  display: flex;
-  align-items: center;
-}
-
-.traffic-info {
+.connection-details {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 12px;
 }
 
-.traffic-upload,
-.traffic-download {
-  font-size: 0.7rem;
+.connection-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
   font-weight: 500;
-  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.traffic-upload {
-  color: #f53f3f;
+.detail-value {
+  font-size: 13px;
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.traffic-download {
-  color: #4080ff;
+.traffic-value {
+  display: flex;
+  gap: 8px;
+}
+
+.traffic-value .upload {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.traffic-value .download {
+  color: #3b82f6;
+  font-weight: 600;
 }
 
 /* 空状态 */
@@ -1287,217 +828,137 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
-  padding: 40px 20px;
+  min-height: 400px;
+  padding: 40px 16px;
   text-align: center;
 }
 
 .empty-icon {
-  color: var(--n-text-color-disabled);
-  margin-bottom: 16px;
-  opacity: 0.5;
+  color: v-bind('themeStore.isDark ? "#4b5563" : "#9ca3af"');
+  margin-bottom: 12px;
+  opacity: 0.6;
 }
 
 .empty-title {
-  font-size: 1.125rem;
+  font-size: 20px;
   font-weight: 600;
-  color: var(--n-text-color-1);
-  margin: 0 0 8px 0;
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
+  margin: 0 0 12px 0;
 }
 
 .empty-desc {
-  font-size: 0.875rem;
-  color: var(--n-text-color-3);
-  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  margin: 0 0 24px 0;
   line-height: 1.5;
-  max-width: 300px;
+  max-width: 400px;
 }
 
 .empty-btn {
-  height: 36px;
-  padding: 0 16px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-radius: 8px;
+  height: 42px;
+  padding: 0 24px;
+  font-weight: 600;
+  border-radius: 10px;
   transition: all 0.2s ease;
 }
 
 .empty-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 180, 42, 0.3);
-}
-
-/* 动画效果 */
-@keyframes slideFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 /* 响应式设计 */
-@media (max-width: 1024px) {
-  .stats-panel {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 @media (max-width: 768px) {
-  .ultra-connections {
-    padding: 12px;
+  .connections-page {
+    padding: 16px;
+  }
+
+  .header-content {
+    flex-direction: column;
+    gap: 20px;
+    padding: 16px;
+  }
+
+  .header-left {
+    width: 100%;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .stat-content {
+    padding: 16px;
     gap: 12px;
   }
 
-  .connections-toolbar {
-    padding: 10px 12px;
+  .stat-icon {
+    width: 40px;
+    height: 40px;
   }
 
-  .toolbar-icon {
-    width: 28px;
-    height: 28px;
+  .stat-value {
+    font-size: 20px;
   }
 
-  .toolbar-title {
-    font-size: 0.875rem;
-  }
-
-  .toolbar-stats {
-    font-size: 0.7rem;
-  }
-
-  .stats-panel {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    padding: 12px;
-  }
-
-  .stat-orb {
-    padding: 8px;
+  .filter-row {
     flex-direction: column;
-    text-align: center;
-    gap: 4px;
+    gap: 12px;
   }
 
-  .orb-icon {
-    width: 24px;
-    height: 24px;
+  .connection-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
-  .orb-value {
-    font-size: 0.875rem;
-  }
-
-  .orb-label {
-    font-size: 0.65rem;
-  }
-
-  .search-input-group {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .search-input {
-    min-width: unset;
-  }
-
-  .filter-selects {
-    justify-content: space-between;
-  }
-
-  .filter-select {
-    flex: 1;
-    min-width: 120px;
-  }
-
-  .connection-item {
-    grid-template-columns: 50px 40px 50px 1fr 80px 80px;
-    gap: 6px;
-    padding: 8px 10px;
-  }
-
-  .connection-time {
-    display: none;
-  }
-
-  .source-text,
-  .dest-text {
-    font-size: 0.7rem;
+  .detail-value {
+    white-space: normal;
+    line-height: 1.4;
   }
 }
 
 @media (max-width: 480px) {
-  .ultra-connections {
-    padding: 8px;
-    gap: 8px;
-  }
-
-  .connections-toolbar {
-    padding: 8px 10px;
-  }
-
-  .toolbar-left {
-    gap: 8px;
-  }
-
-  .toolbar-icon {
-    width: 24px;
-    height: 24px;
-  }
-
-  .toolbar-title {
-    font-size: 0.8rem;
-  }
-
-  .search-section {
+  .connections-page {
     padding: 12px;
   }
 
-  .connections-list {
-    padding: 12px;
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 
-  .stats-panel {
-    grid-template-columns: repeat(2, 1fr);
+  .header-content {
+    padding: 16px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
   }
 
   .connection-item {
-    grid-template-columns: 1fr;
-    gap: 4px;
-    padding: 8px 10px;
-  }
-
-  .connection-id,
-  .connection-network,
-  .connection-rule,
-  .connection-traffic {
-    display: none;
-  }
-
-  .source-text,
-  .dest-text {
-    font-size: 0.8rem;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
-    line-height: 1.4;
+    padding: 12px;
   }
 
   .empty-state {
-    padding: 32px 16px;
-    min-height: 250px;
+    padding: 40px 16px;
+    min-height: 300px;
   }
 
   .empty-title {
-    font-size: 1rem;
+    font-size: 18px;
   }
 
   .empty-desc {
-    font-size: 0.8rem;
+    font-size: 13px;
   }
 }
 
@@ -1506,15 +967,16 @@ onUnmounted(() => {
   min-height: 200px;
 }
 
-:deep(.n-input__input-el) {
-  font-size: 0.875rem !important;
+:deep(.n-input) {
+  border-radius: 10px;
 }
 
-:deep(.n-base-selection-label) {
-  font-size: 0.875rem !important;
+:deep(.n-base-selection) {
+  border-radius: 10px;
 }
 
-:deep(.n-button__content) {
-  font-size: 0.875rem !important;
+:deep(.n-tag) {
+  border-radius: 6px;
+  font-weight: 500;
 }
 </style>

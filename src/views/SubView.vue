@@ -1,216 +1,196 @@
 <template>
-  <div class="ultra-sub">
-    <!-- 紧凑工具栏 -->
-    <div class="sub-toolbar">
-      <div class="toolbar-left">
-        <div class="toolbar-icon">
-          <n-icon size="16">
-            <LinkOutline />
-          </n-icon>
+  <div class="subscription-container">
+    <!-- 页面标题区域 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <n-icon size="24">
+              <LinkOutline />
+            </n-icon>
+          </div>
+          <div class="header-info">
+            <h1 class="page-title">{{ t('sub.title') }}</h1>
+            <p class="page-subtitle">{{ t('sub.subtitle') }}</p>
+          </div>
         </div>
-        <div class="toolbar-info">
-          <span class="toolbar-title">{{ t('sub.title') }}</span>
-          <span class="toolbar-stats">{{ subStore.list.length }} {{ t('sub.count') }}</span>
+        <div class="header-right">
+          <div class="stats-info">
+            <div class="stat-item">
+              <span class="stat-label">{{ t('sub.total') }}</span>
+              <span class="stat-value">{{ subStore.list.length }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">{{ t('sub.active') }}</span>
+              <span class="stat-value">{{ subStore.activeIndex >= 0 ? 1 : 0 }}</span>
+            </div>
+          </div>
+          <n-button
+            @click="showAddModal = true"
+            type="primary"
+            size="medium"
+            class="add-button"
+          >
+            <template #icon>
+              <n-icon size="16">
+                <AddOutline />
+              </n-icon>
+            </template>
+            {{ t('sub.add') }}
+          </n-button>
         </div>
-      </div>
-
-      <div class="toolbar-right">
-        <n-button
-          @click="showAddModal = true"
-          type="primary"
-          size="small"
-          class="add-btn"
-        >
-          <template #icon>
-            <n-icon size="12"><AddOutline /></n-icon>
-          </template>
-          {{ t('sub.add') }}
-        </n-button>
       </div>
     </div>
 
-    <!-- 订阅列表 -->
-    <div class="sub-content">
-      <!-- 有订阅时显示列表 -->
-      <div v-if="subStore.list.length" class="subscription-list">
-        <div
-          v-for="(item, index) in subStore.list"
-          :key="`sub-${index}`"
-          class="subscription-item"
-          :class="{
-            'item-active': subStore.activeIndex === index,
-            'item-loading': item.isLoading,
-          }"
+    <!-- 订阅内容区域 -->
+    <div class="subscription-content">
+      <!-- 有订阅时显示卡片网格 -->
+      <div v-if="subStore.list.length" class="subscription-grid">
+        <n-grid
+          :cols="24"
+          :x-gap="12"
+          :y-gap="12"
+          responsive="screen"
         >
-          <!-- 左侧信息 -->
-          <div class="item-info">
-            <div class="item-header">
-              <div class="item-icon" :class="{ 'icon-active': subStore.activeIndex === index }">
-                <n-icon size="14">
-                  <LinkOutline />
-                </n-icon>
+          <n-grid-item
+            v-for="(item, index) in subStore.list"
+            :key="`sub-${index}`"
+            :span="24"
+            :s="24"
+            :m="12"
+            :l="8"
+            :xl="6"
+            :xxl="6"
+          >
+            <n-card
+              class="subscription-card"
+              :class="{
+                'card-active': subStore.activeIndex === index,
+                'card-loading': item.isLoading,
+              }"
+              :bordered="false"
+              hoverable
+            >
+              <!-- 卡片头部 -->
+              <div class="card-header">
+                <div class="card-icon" :class="{ 'icon-active': subStore.activeIndex === index }">
+                  <n-icon size="20">
+                    <LinkOutline />
+                  </n-icon>
+                </div>
+                <div class="card-info">
+                  <h3 class="card-title" :title="item.name">{{ item.name }}</h3>
+                  <div class="card-meta">
+                    <n-tag v-if="item.isManual" size="small" type="warning" round>
+                      {{ t('sub.manual') }}
+                    </n-tag>
+                    <n-tag v-else size="small" type="info" round>
+                      {{ t('sub.urlSubscription') }}
+                    </n-tag>
+                    <div v-if="subStore.activeIndex === index" class="active-badge">
+                      <n-icon size="12">
+                        <CheckmarkCircleOutline />
+                      </n-icon>
+                      <span>{{ t('sub.inUse') }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-actions">
+                  <n-dropdown trigger="hover" placement="bottom-end" :options="getDropdownOptions(index)">
+                    <n-button quaternary circle size="small" class="more-button">
+                      <n-icon size="16">
+                        <EllipsisVerticalOutline />
+                      </n-icon>
+                    </n-button>
+                  </n-dropdown>
+                </div>
               </div>
-              <div class="item-title-section">
-                <div class="item-name" :title="item.name">{{ item.name }}</div>
-                <div class="item-meta">
-                  <n-tag v-if="item.isManual" size="tiny" type="warning" round>
-                    {{ t('sub.manual') }}
-                  </n-tag>
-                  <n-tag v-else size="tiny" type="info" round>
-                    {{ t('sub.urlSubscription') }}
-                  </n-tag>
-                  <div v-if="subStore.activeIndex === index" class="active-indicator">
-                    <n-icon size="10">
-                      <CheckmarkCircleOutline />
+
+              <!-- 卡片内容 -->
+              <div class="card-body">
+                <!-- URL/内容预览 -->
+                <div class="content-preview">
+                  <div class="preview-text" :title="item.url || t('sub.manualContent')">
+                    <n-icon size="14" class="preview-icon">
+                      <GlobeOutline />
                     </n-icon>
-                    <span>{{ t('sub.inUse') }}</span>
+                    <span>{{ item.url || t('sub.manualContent') }}</span>
+                  </div>
+                  <div class="update-info">
+                    <n-icon size="12" class="time-icon">
+                      <TimeOutline />
+                    </n-icon>
+                    <span>{{ item.lastUpdate ? formatTime(item.lastUpdate) : t('sub.neverUsed') }}</span>
+                  </div>
+                </div>
+
+                <!-- 配置选项 -->
+                <div class="config-options">
+                  <div class="option-item">
+                    <span class="option-label">{{ t('sub.useOriginalConfig') }}</span>
+                    <n-tag
+                      :type="item.useOriginalConfig ? 'success' : 'default'"
+                      size="small"
+                      round
+                    >
+                      {{ item.useOriginalConfig ? t('sub.useOriginal') : t('sub.useExtractedNodes') }}
+                    </n-tag>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- URL/内容预览 -->
-            <div class="item-preview">
-              <div class="preview-text" :title="item.url || t('sub.manualContent')">
-                {{ item.url || t('sub.manualContent') }}
+              <!-- 卡片底部 -->
+              <div class="card-footer">
+                <n-button
+                  @click="useSubscription(item.url, index)"
+                  :loading="item.isLoading"
+                  :type="subStore.activeIndex === index ? 'success' : 'primary'"
+                  block
+                  size="medium"
+                >
+                  <template #icon>
+                    <n-icon size="16">
+                      <CheckmarkCircleOutline v-if="subStore.activeIndex === index" />
+                      <PlayCircleOutline v-else />
+                    </n-icon>
+                  </template>
+                  {{ subStore.activeIndex === index ? t('sub.useAgain') : t('sub.use') }}
+                </n-button>
               </div>
-              <div class="update-time">
-                {{ item.lastUpdate ? formatTime(item.lastUpdate) : t('sub.neverUsed') }}
+
+              <!-- 加载遮罩 -->
+              <div v-if="item.isLoading" class="loading-overlay">
+                <n-spin size="large" />
               </div>
-            </div>
-          </div>
-
-          <!-- 右侧操作 -->
-          <div class="item-actions">
-            <div class="action-group">
-              <n-tooltip trigger="hover" placement="top">
-                <template #trigger>
-                  <n-button
-                    @click="copyUrl(item.url)"
-                    size="tiny"
-                    quaternary
-                    circle
-                    class="action-btn"
-                  >
-                    <n-icon size="12">
-                      <CopyOutline />
-                    </n-icon>
-                  </n-button>
-                </template>
-                {{ t('sub.copyLink') }}
-              </n-tooltip>
-
-              <n-tooltip trigger="hover" placement="top">
-                <template #trigger>
-                  <n-button
-                    @click="handleEdit(index, item)"
-                    size="tiny"
-                    quaternary
-                    circle
-                    class="action-btn"
-                  >
-                    <n-icon size="12">
-                      <CreateOutline />
-                    </n-icon>
-                  </n-button>
-                </template>
-                {{ t('sub.edit') }}
-              </n-tooltip>
-
-              <n-tooltip
-                v-if="subStore.activeIndex === index"
-                trigger="hover"
-                placement="top"
-              >
-                <template #trigger>
-                  <n-button
-                    @click="editCurrentConfig()"
-                    size="tiny"
-                    quaternary
-                    circle
-                    class="action-btn"
-                  >
-                    <n-icon size="12">
-                      <CodeOutline />
-                    </n-icon>
-                  </n-button>
-                </template>
-                {{ t('sub.editConfig') }}
-              </n-tooltip>
-
-              <n-popconfirm
-                @positive-click="deleteSubscription(index)"
-                :positive-text="t('common.delete')"
-                :negative-text="t('common.cancel')"
-                placement="top"
-              >
-                <template #trigger>
-                  <n-tooltip trigger="hover" placement="top">
-                    <template #trigger>
-                      <n-button
-                        size="tiny"
-                        quaternary
-                        circle
-                        type="error"
-                        :disabled="subStore.activeIndex === index"
-                        class="action-btn delete-btn"
-                      >
-                        <n-icon size="12">
-                          <TrashOutline />
-                        </n-icon>
-                      </n-button>
-                    </template>
-                    {{ t('common.delete') }}
-                  </n-tooltip>
-                </template>
-                {{ t('sub.deleteConfirm') }}
-              </n-popconfirm>
-            </div>
-
-            <n-button
-              @click="useSubscription(item.url, index)"
-              :loading="item.isLoading"
-              :type="subStore.activeIndex === index ? 'success' : 'primary'"
-              size="small"
-              class="use-btn"
-            >
-              <template #icon>
-                <n-icon size="12">
-                  <CheckmarkCircleOutline v-if="subStore.activeIndex === index" />
-                  <PlayCircleOutline v-else />
-                </n-icon>
-              </template>
-              {{ subStore.activeIndex === index ? t('sub.useAgain') : t('sub.use') }}
-            </n-button>
-          </div>
-
-          <!-- 加载遮罩 -->
-          <div v-if="item.isLoading" class="loading-overlay">
-            <n-spin size="small" />
-          </div>
-        </div>
+            </n-card>
+          </n-grid-item>
+        </n-grid>
       </div>
 
       <!-- 空状态 -->
       <div v-else class="empty-state">
-        <div class="empty-icon">
-          <n-icon size="40">
-            <LinkOutline />
-          </n-icon>
+        <div class="empty-content">
+          <div class="empty-icon">
+            <n-icon size="64">
+              <LinkOutline />
+            </n-icon>
+          </div>
+          <h3 class="empty-title">{{ t('sub.noSubs') }}</h3>
+          <p class="empty-description">{{ t('sub.noSubscriptionsYet') }}</p>
+          <n-button
+            @click="showAddModal = true"
+            type="primary"
+            size="large"
+            class="empty-action"
+          >
+            <template #icon>
+              <n-icon size="18">
+                <AddOutline />
+              </n-icon>
+            </template>
+            {{ t('sub.addFirstSubscription') }}
+          </n-button>
         </div>
-        <div class="empty-title">{{ t('sub.noSubs') }}</div>
-        <div class="empty-desc">{{ t('sub.noSubscriptionsYet') }}</div>
-        <n-button
-          @click="showAddModal = true"
-          type="primary"
-          size="medium"
-          class="empty-btn"
-        >
-          <template #icon>
-            <n-icon size="14"><AddOutline /></n-icon>
-          </template>
-          {{ t('sub.noSubscriptionsYet') }}
-        </n-button>
       </div>
     </div>
 
@@ -221,72 +201,73 @@
       preset="dialog"
       :title="editIndex === null ? t('sub.add') : t('sub.edit')"
       :bordered="false"
-      style="width: 480px"
-      class="compact-modal"
+      class="modern-modal"
+      :style="{ width: '600px' }"
     >
-      <n-form
-        ref="formRef"
-        :model="formValue"
-        :rules="rules"
-        label-placement="left"
-        label-width="60"
-        require-mark-placement="right-hanging"
-        size="small"
-        class="subscription-form"
-      >
-        <n-form-item :label="t('sub.name')" path="name">
-          <n-input
-            v-model:value="formValue.name"
-            :placeholder="t('sub.namePlaceholder')"
-            @keydown.enter.prevent
-            class="form-input"
-          />
-        </n-form-item>
+      <div class="modal-content">
+        <n-form
+          ref="formRef"
+          :model="formValue"
+          :rules="rules"
+          label-placement="left"
+          label-width="80"
+          require-mark-placement="right-hanging"
+          size="medium"
+          class="subscription-form"
+        >
+          <n-form-item :label="t('sub.name')" path="name">
+            <n-input
+              v-model:value="formValue.name"
+              :placeholder="t('sub.namePlaceholder')"
+              @keydown.enter.prevent
+              class="form-input"
+            />
+          </n-form-item>
 
-        <n-tabs type="segment" animated v-model:value="activeTab" class="sub-tabs" size="small">
-          <n-tab-pane name="url" :tab="t('sub.urlSubscription')">
-            <n-form-item label="URL" path="url" class="tab-form-item">
-              <n-input
-                v-model:value="formValue.url"
-                type="textarea"
-                :placeholder="t('sub.urlPlaceholder')"
-                :autosize="{ minRows: 3, maxRows: 4 }"
-                class="form-input"
-              />
-            </n-form-item>
-          </n-tab-pane>
-          <n-tab-pane name="manual" :tab="t('sub.manualConfig')">
-            <n-form-item :label="t('sub.content')" path="manualContent" class="tab-form-item">
-              <n-input
-                v-model:value="formValue.manualContent"
-                type="textarea"
-                :placeholder="t('sub.manualContentPlaceholder')"
-                :autosize="{ minRows: 6, maxRows: 15 }"
-                class="form-input code-input"
-              />
-            </n-form-item>
-          </n-tab-pane>
-        </n-tabs>
+          <n-tabs type="segment" animated v-model:value="activeTab" class="sub-tabs">
+            <n-tab-pane name="url" :tab="t('sub.urlSubscription')">
+              <n-form-item label="URL" path="url" class="tab-form-item">
+                <n-input
+                  v-model:value="formValue.url"
+                  type="textarea"
+                  :placeholder="t('sub.urlPlaceholder')"
+                  :autosize="{ minRows: 3, maxRows: 5 }"
+                  class="form-input"
+                />
+              </n-form-item>
+            </n-tab-pane>
+            <n-tab-pane name="manual" :tab="t('sub.manualConfig')">
+              <n-form-item :label="t('sub.content')" path="manualContent" class="tab-form-item">
+                <n-input
+                  v-model:value="formValue.manualContent"
+                  type="textarea"
+                  :placeholder="t('sub.manualContentPlaceholder')"
+                  :autosize="{ minRows: 8, maxRows: 20 }"
+                  class="form-input code-input"
+                />
+              </n-form-item>
+            </n-tab-pane>
+          </n-tabs>
 
-        <n-form-item :label="t('sub.useOriginalConfig')" label-placement="left" class="switch-item">
-          <n-space align="center">
-            <n-switch v-model:value="formValue.useOriginalConfig" size="small" />
-            <n-text depth="3" style="font-size: 12px">
-              {{
-                formValue.useOriginalConfig
-                  ? t('sub.useOriginal')
-                  : t('sub.useExtractedNodes')
-              }}
-            </n-text>
-          </n-space>
-        </n-form-item>
-      </n-form>
+          <n-form-item :label="t('sub.useOriginalConfig')" label-placement="left" class="switch-item">
+            <n-space align="center">
+              <n-switch v-model:value="formValue.useOriginalConfig" size="medium" />
+              <n-text depth="3" style="font-size: 13px">
+                {{
+                  formValue.useOriginalConfig
+                    ? t('sub.useOriginal')
+                    : t('sub.useExtractedNodes')
+                }}
+              </n-text>
+            </n-space>
+          </n-form-item>
+        </n-form>
+      </div>
 
       <template #action>
         <n-space justify="end" size="medium">
-          <n-button size="small" @click="handleCancel">{{ t('common.cancel') }}</n-button>
+          <n-button @click="handleCancel">{{ t('common.cancel') }}</n-button>
           <n-button
-            size="small"
             type="primary"
             @click="handleConfirm"
             :loading="isLoading"
@@ -304,24 +285,23 @@
       preset="dialog"
       :title="t('sub.editCurrentConfig')"
       :bordered="false"
-      style="width: 640px"
-      class="compact-modal config-modal"
+      class="modern-modal config-modal"
+      :style="{ width: '800px' }"
     >
       <div class="config-editor">
         <n-input
           v-model:value="currentConfig"
           type="textarea"
           :placeholder="t('sub.configContentPlaceholder')"
-          :autosize="{ minRows: 15, maxRows: 25 }"
+          :autosize="{ minRows: 20, maxRows: 30 }"
           class="config-input"
         />
       </div>
 
       <template #action>
         <n-space justify="end" size="medium">
-          <n-button size="small" @click="showConfigModal = false">{{ t('common.cancel') }}</n-button>
+          <n-button @click="showConfigModal = false">{{ t('common.cancel') }}</n-button>
           <n-button
-            size="small"
             type="primary"
             @click="saveCurrentConfig"
             :loading="isConfigLoading"
@@ -336,7 +316,7 @@
 
 <script setup lang="ts">
 import { useMessage } from 'naive-ui'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, h } from 'vue'
 import { useSubStore } from '@/stores/subscription/SubStore'
 import {
   AddOutline,
@@ -347,13 +327,19 @@ import {
   CheckmarkCircleOutline,
   PlayCircleOutline,
   CodeOutline,
+  EllipsisVerticalOutline,
+  GlobeOutline,
+  TimeOutline,
 } from '@vicons/ionicons5'
-import type { FormInst, FormRules } from 'naive-ui'
-import { useWindowSize } from '@vueuse/core'
+import type { FormInst, FormRules, DropdownOption } from 'naive-ui'
 import { tauriApi } from '@/services/tauri-api'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
 import { useThemeStore } from '@/stores/app/ThemeStore'
+
+defineOptions({
+  name: 'SubscriptionPage'
+})
 
 interface Subscription {
   name: string
@@ -425,6 +411,48 @@ const rules: FormRules = {
   ],
 }
 
+// 获取下拉菜单选项
+const getDropdownOptions = (index: number): DropdownOption[] => [
+  {
+    label: t('sub.copyLink'),
+    key: 'copy',
+    icon: () => h('span', { class: 'dropdown-icon' }, [h(CopyOutline)]),
+    props: {
+      onClick: () => copyUrl(subStore.list[index].url),
+    },
+  },
+  {
+    label: t('sub.edit'),
+    key: 'edit',
+    icon: () => h('span', { class: 'dropdown-icon' }, [h(CreateOutline)]),
+    props: {
+      onClick: () => handleEdit(index, subStore.list[index]),
+    },
+  },
+  {
+    label: t('sub.editConfig'),
+    key: 'edit-config',
+    icon: () => h('span', { class: 'dropdown-icon' }, [h(CodeOutline)]),
+    show: subStore.activeIndex === index,
+    props: {
+      onClick: editCurrentConfig,
+    },
+  },
+  {
+    type: 'divider',
+    key: 'divider1',
+  },
+  {
+    label: t('common.delete'),
+    key: 'delete',
+    icon: () => h('span', { class: 'dropdown-icon delete-icon' }, [h(TrashOutline)]),
+    disabled: subStore.activeIndex === index,
+    props: {
+      onClick: () => deleteSubscription(index),
+    },
+  },
+]
+
 const resetForm = () => {
   formValue.value = {
     name: '',
@@ -435,6 +463,7 @@ const resetForm = () => {
     useOriginalConfig: false,
   }
   editIndex.value = null
+  activeTab.value = 'url'
 }
 
 const handleEdit = (index: number, item: Subscription) => {
@@ -631,252 +660,303 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.ultra-sub {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 100%;
-  font-size: 13px;
+.subscription-container {
+  padding: 16px;
+  background: transparent;
+  min-height: 100vh;
+  animation: fadeInUp 0.4s ease-out;
 }
 
-/* 紧凑工具栏 */
-.sub-toolbar {
+/* 页面标题区域 */
+.page-header {
+  margin-bottom: 24px;
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 16px;
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 4px 20px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.03)"');
+  padding: 16px 20px;
+  transition: all 0.3s ease;
+}
+
+.page-header:hover {
+  box-shadow: 0 8px 32px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.15)" : "rgba(0, 0, 0, 0.08)"');
+}
+
+.header-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
-  backdrop-filter: blur(12px);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  border-radius: 10px;
-  box-shadow: 0 2px 8px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
-  transition: all 0.2s var(--ease-out);
 }
 
-.sub-toolbar:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.25)" : "rgba(0, 0, 0, 0.08)"');
-}
-
-.toolbar-left {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
 }
 
-.toolbar-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #10b981, #059669);
+.header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-  flex-shrink: 0;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+  transition: all 0.3s ease;
 }
 
-.toolbar-info {
+.header-icon:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(16, 185, 129, 0.4);
+}
+
+.header-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
-.toolbar-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--n-text-color);
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
+  margin: 0;
+  letter-spacing: -0.02em;
 }
 
-.toolbar-stats {
-  font-size: 11px;
-  color: var(--n-text-color-3);
+.page-subtitle {
+  font-size: 0.9rem;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  margin: 0;
+  font-weight: 400;
 }
 
-.add-btn {
-  height: 28px;
-  min-width: 60px;
-  border-radius: 6px;
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.stats-info {
+  display: flex;
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
+  border-radius: 8px;
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
+}
+
+.add-button {
+  height: 40px;
+  padding: 0 16px;
   font-weight: 500;
 }
 
-/* 主内容区 */
-.sub-content {
-  flex: 1;
+/* 订阅内容区域 */
+.subscription-content {
+  min-height: calc(100vh - 200px);
 }
 
-/* 订阅列表 */
-.subscription-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* 订阅网格 */
+.subscription-grid {
+  min-height: 100%;
 }
 
-/* 订阅项 */
-.subscription-item {
+/* 订阅卡片 */
+.subscription-card {
+  height: 100%;
+  transition: all 0.3s ease;
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
   position: relative;
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
-  backdrop-filter: blur(12px);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  border-radius: 10px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  transition: all 0.2s var(--ease-out);
-  min-height: 72px;
+  overflow: hidden;
 }
 
-.subscription-item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"');
+.subscription-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.15)" : "rgba(0, 0, 0, 0.1)"');
 }
 
-.subscription-item.item-active {
-  background: v-bind('themeStore.isDark ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.1)"');
+.subscription-card.card-active {
   border-color: #10b981;
+  background: v-bind('themeStore.isDark ? "rgba(16, 185, 129, 0.05)" : "rgba(16, 185, 129, 0.03)"');
 }
 
-.subscription-item.item-loading {
+.subscription-card.card-loading {
   pointer-events: none;
   opacity: 0.7;
 }
 
-/* 项目信息 */
-.item-info {
-  flex: 1;
-  min-width: 0;
+/* 卡片头部 */
+.card-header {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
 }
 
-.item-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.item-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+.card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s var(--ease-out);
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
-.item-icon.icon-active {
+.card-icon.icon-active {
   background: rgba(16, 185, 129, 0.2);
   color: #10b981;
 }
 
-.item-title-section {
+.card-info {
   flex: 1;
   min-width: 0;
 }
 
-.item-name {
-  font-size: 13px;
+.card-title {
+  font-size: 1rem;
   font-weight: 600;
-  color: var(--n-text-color);
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
+  margin: 0 0 4px 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 2px;
 }
 
-.item-meta {
+.card-meta {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
 
-.active-indicator {
+.active-badge {
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 1px 4px;
+  gap: 4px;
+  padding: 2px 8px;
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
-  border-radius: 4px;
-  font-size: 9px;
+  border-radius: 12px;
+  font-size: 0.7rem;
   font-weight: 600;
+}
+
+.card-actions {
   flex-shrink: 0;
 }
 
-/* 预览信息 */
-.item-preview {
+.more-button {
+  transition: all 0.2s ease;
+}
+
+.more-button:hover {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+}
+
+/* 卡片内容 */
+.card-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.content-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .preview-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  font-size: 10px;
-  color: var(--n-text-color-3);
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.02)"');
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
-  padding: 2px 6px;
-  border-radius: 4px;
-  max-width: 300px;
 }
 
-.update-time {
-  font-size: 9px;
-  color: var(--n-text-color-3);
-  font-weight: 500;
-}
-
-/* 项目操作 */
-.item-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+.preview-icon {
   flex-shrink: 0;
 }
 
-.action-group {
+.update-info {
   display: flex;
+  align-items: center;
   gap: 4px;
-}
-
-.action-btn {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  transition: all 0.15s var(--ease-out);
-}
-
-.action-btn:hover {
-  transform: scale(1.1);
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.action-btn.delete-btn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
-
-.use-btn {
-  height: 24px;
-  min-width: 50px;
-  border-radius: 5px;
-  font-size: 11px;
+  font-size: 0.7rem;
+  color: v-bind('themeStore.isDark ? "#6b7280" : "#9ca3af"');
   font-weight: 500;
+}
+
+.time-icon {
+  flex-shrink: 0;
+}
+
+.config-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.02)"');
+  border-radius: 6px;
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+}
+
+.option-label {
+  font-size: 0.8rem;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  font-weight: 500;
+}
+
+/* 卡片底部 */
+.card-footer {
+  padding-top: 12px;
+  border-top: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
 }
 
 /* 加载遮罩 */
@@ -887,8 +967,8 @@ onMounted(() => {
   right: 0;
   bottom: 0;
   background: v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.6)" : "rgba(255, 255, 255, 0.8)"');
-  backdrop-filter: blur(2px);
-  border-radius: 10px;
+  backdrop-filter: blur(4px);
+  border-radius: inherit;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -897,55 +977,72 @@ onMounted(() => {
 /* 空状态 */
 .empty-state {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.empty-content {
+  display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
   text-align: center;
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
-  backdrop-filter: blur(12px);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  border-radius: 12px;
-  margin: 8px 0;
+  padding: 40px 16px;
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  border-radius: 16px;
+  box-shadow: 0 4px 20px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.03)"');
+  transition: all 0.3s ease;
+}
+
+.empty-content:hover {
+  box-shadow: 0 8px 32px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.15)" : "rgba(0, 0, 0, 0.08)"');
 }
 
 .empty-icon {
-  color: var(--n-text-color-3);
-  margin-bottom: 12px;
-  opacity: 0.5;
+  color: v-bind('themeStore.isDark ? "#6b7280" : "#9ca3af"');
+  margin-bottom: 16px;
+  opacity: 0.6;
 }
 
 .empty-title {
-  font-size: 16px;
+  font-size: 1.2rem;
   font-weight: 600;
-  color: var(--n-text-color-2);
-  margin-bottom: 6px;
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
+  margin: 0 0 8px 0;
 }
 
-.empty-desc {
-  font-size: 12px;
-  color: var(--n-text-color-3);
-  margin-bottom: 16px;
+.empty-description {
+  font-size: 0.9rem;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  margin: 0 0 24px 0;
+  max-width: 400px;
 }
 
-.empty-btn {
-  height: 32px;
-  min-width: 100px;
-  border-radius: 6px;
+.empty-action {
+  height: 40px;
+  padding: 0 24px;
   font-weight: 500;
 }
 
-/* 对话框样式 */
-.compact-modal {
-  border-radius: 12px;
+/* 模态框样式 */
+.modern-modal {
+  border-radius: 16px;
+}
+
+.modal-content {
+  padding: 8px 0;
 }
 
 .subscription-form {
-  margin-top: 16px;
+  margin-top: 8px;
 }
 
 .sub-tabs {
-  margin: 12px 0;
+  margin: 16px 0;
 }
 
 .tab-form-item {
@@ -953,20 +1050,19 @@ onMounted(() => {
 }
 
 .form-input {
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: 8px;
 }
 
 .code-input {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  font-size: 12px;
+  font-size: 13px;
   background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
 }
 
 .switch-item {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--n-border-color);
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
 }
 
 /* 配置编辑器 */
@@ -976,74 +1072,203 @@ onMounted(() => {
 
 .config-input {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  font-size: 12px;
+  font-size: 13px;
   background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
   border-radius: 8px;
 }
 
+/* 下拉菜单样式 */
+:deep(.n-dropdown-menu) {
+  border-radius: 8px;
+}
+
+:deep(.n-dropdown-option) {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.dropdown-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+}
+
+.delete-icon {
+  color: #ef4444;
+}
+
+/* 动画效果 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .sub-toolbar {
-    padding: 10px 12px;
+  .subscription-container {
+    padding: 16px;
   }
 
-  .subscription-item {
-    padding: 10px 12px;
-    min-height: 64px;
+  .page-header {
+    padding: 16px 20px;
+    margin-bottom: 20px;
   }
 
-  .item-header {
-    flex-wrap: wrap;
-    gap: 6px;
+  .header-content {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
   }
 
-  .item-actions {
-    align-items: center;
-    gap: 4px;
+  .header-left {
+    gap: 12px;
   }
 
-  .action-group {
-    order: 2;
+  .header-icon {
+    width: 40px;
+    height: 40px;
   }
 
-  .use-btn {
-    order: 1;
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .header-right {
+    width: 100%;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .stats-info {
+    justify-content: center;
+  }
+
+  .add-button {
+    width: 100%;
+  }
+
+  .card-header {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .card-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .card-title {
+    font-size: 0.9rem;
   }
 
   .preview-text {
-    max-width: 200px;
+    font-size: 0.7rem;
+  }
+
+  .empty-content {
+    padding: 40px 16px;
+  }
+
+  .empty-title {
+    font-size: 1.1rem;
+  }
+
+  .empty-description {
+    font-size: 0.85rem;
   }
 }
 
 @media (max-width: 480px) {
-  .subscription-item {
-    flex-direction: column;
-    align-items: stretch;
+  .subscription-container {
+    padding: 12px;
+  }
+
+  .page-header {
+    padding: 12px 16px;
+    margin-bottom: 16px;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .page-title {
+    font-size: 1.1rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.8rem;
+  }
+
+  .stats-info {
+    gap: 12px;
+  }
+
+  .stat-item {
+    padding: 6px 12px;
+  }
+
+  .stat-value {
+    font-size: 1rem;
+  }
+
+  .card-header {
     gap: 8px;
-    padding: 8px 10px;
-    min-height: auto;
   }
 
-  .item-info {
-    gap: 4px;
+  .card-icon {
+    width: 32px;
+    height: 32px;
   }
 
-  .item-actions {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .action-group {
-    order: 1;
-  }
-
-  .use-btn {
-    order: 2;
+  .card-title {
+    font-size: 0.85rem;
   }
 
   .preview-text {
-    max-width: none;
+    font-size: 0.65rem;
   }
+
+  .update-info {
+    font-size: 0.65rem;
+  }
+
+  .option-item {
+    padding: 4px 8px;
+  }
+
+  .option-label {
+    font-size: 0.7rem;
+  }
+}
+
+/* 深色主题优化 */
+:deep(.n-card) {
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
+:deep(.n-card .n-card-header) {
+  padding: 0;
+}
+
+:deep(.n-card .n-card-body) {
+  padding: 16px;
 }
 </style>

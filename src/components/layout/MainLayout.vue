@@ -1,115 +1,128 @@
 <template>
   <n-config-provider :theme="theme" :theme-overrides="themeOverrides">
-    <n-layout class="ultra-modern-layout" position="absolute">
-      <!-- 超紧凑顶部栏 - 集成窗口控制 -->
-      <n-layout-header class="ultra-header" :style="{ height: '36px' }">
+    <n-layout class="modern-layout" position="absolute">
+      <!-- 现代化顶部栏 -->
+      <n-layout-header class="modern-header" :style="{ height: '48px' }">
         <div class="header-content" data-tauri-drag-region>
-          <!-- 左侧：动态状态指示器 -->
-          <div class="header-left">
-            <div class="app-logo-mini" @click="onSelect('home')" data-tauri-drag-region="false">
-              <img :src="logo" alt="Logo" class="logo-img" />
+          <!-- 左侧：品牌区域 -->
+          <div class="header-brand">
+            <div class="brand-logo" @click="onSelect('home')" data-tauri-drag-region="false">
+              <div class="logo-container">
+                <img :src="logo" alt="App Logo" class="logo-image" :class="{ 'logo-active': appStore.isRunning }" />
+              </div>
             </div>
-            <div class="status-indicator-mini" :class="statusClass">
-              <div class="pulse-dot"></div>
+            <div class="brand-info">
+              <h1 class="app-title">{{ t('common.appName') }}</h1>
+              <div class="status-badge" :class="statusClass">
+                <div class="status-dot"></div>
+                <span class="status-text">{{ appStore.isRunning ? t('status.running') : t('status.stopped') }}</span>
+              </div>
             </div>
-            <span class="app-title-mini">{{ t('common.appName') }}</span>
           </div>
 
           <!-- 右侧：窗口控制 -->
-          <div class="header-controls">
-            <button class="control-btn minimize" @click="windowStore.minimizeWindow">
-              <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
-            </button>
-            <button class="control-btn maximize" @click="windowStore.toggleMaximize">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <rect x="1" y="1" width="8" height="8" stroke="currentColor" stroke-width="1"/>
+          <div class="window-controls">
+            <button class="window-btn minimize" @click="windowStore.minimizeWindow">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <rect x="2" y="5.5" width="8" height="1" rx="0.5" fill="currentColor"/>
               </svg>
             </button>
-            <button class="control-btn close" @click="() => windowStore.hideWindow(router)">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <button class="window-btn maximize" @click="windowStore.toggleMaximize">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <rect x="2" y="2" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+              </svg>
+            </button>
+            <button class="window-btn close" @click="() => windowStore.hideWindow(router)">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               </svg>
             </button>
           </div>
         </div>
       </n-layout-header>
 
-      <!-- 主内容区 - 优化空间利用 -->
-      <n-layout has-sider position="absolute" style="top: 36px" class="main-container">
-        <!-- 超薄侧边栏 -->
+      <!-- 主内容区域 -->
+      <n-layout has-sider position="absolute" style="top: 48px" class="main-container">
+        <!-- 现代化侧边栏 -->
         <n-layout-sider
-          class="ultra-sider"
-          :width="180"
+          class="modern-sider"
+          :width="200"
           :collapsed-width="56"
           :collapsed="collapsed"
           collapse-mode="width"
           :native-scrollbar="false"
+          :show-trigger="false"
         >
           <div class="sider-content">
-            <!-- 精简Logo区域 -->
-            <div class="logo-section-compact">
-              <div class="logo-container" @click="onSelect('home')">
-                <div class="logo-icon" :class="{ active: appStore.isRunning }">
-                  <div class="logo-core"></div>
-                  <div class="logo-ring" v-if="appStore.isRunning"></div>
-                </div>
+            <!-- 导航区域 -->
+            <div class="nav-section">
+              <div class="nav-header" v-if="!collapsed">
+                <span class="nav-title">{{ t('nav.navigation') }}</span>
               </div>
-              <transition name="fade-slide">
-                <div v-if="!collapsed" class="status-text">
-                  <span class="status-label">{{ appStore.isRunning ? t('status.running') : t('status.stopped') }}</span>
-                </div>
-              </transition>
-            </div>
 
-            <!-- 垂直导航菜单 -->
-            <div class="nav-section-compact">
-              <div
-                v-for="item in menuItems"
-                :key="item.key"
-                class="nav-item-compact"
-                :class="{
-                  'nav-active': currentMenu === item.key,
-                  'nav-disabled': item.disabled,
-                }"
-                @click="!item.disabled && onSelect(item.key)"
-              >
-                <div class="nav-icon-compact">
-                  <n-icon :size="18" :component="item.icon" />
-                </div>
-                <transition name="fade-slide">
-                  <span v-if="!collapsed" class="nav-text">{{ item.label }}</span>
-                </transition>
-                <div class="nav-glow"></div>
+              <div class="nav-menu">
+                <div
+                  v-for="item in menuItems"
+                  :key="item.key"
+                  class="nav-item"
+                  :class="{
+                    'nav-active': currentMenu === item.key,
+                    'nav-disabled': item.disabled,
+                  }"
+                  @click="!item.disabled && onSelect(item.key)"
+                >
+                  <div class="nav-icon-wrapper">
+                    <n-icon :size="20" :component="item.icon" />
+                  </div>
+                  <transition name="nav-text">
+                    <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
+                  </transition>
+                  </div>
               </div>
             </div>
 
             <!-- 底部工具区 -->
             <div class="tools-section">
-              <div class="tool-item" @click="themeStore.toggleTheme">
-                <n-icon :size="16">
-                  <MoonOutline v-if="themeStore.isDark" />
-                  <SunnyOutline v-else />
-                </n-icon>
-                <transition name="fade-slide">
-                  <span v-if="!collapsed" class="tool-text">{{ themeStore.isDark ? t('setting.theme.dark') : t('setting.theme.light') }}</span>
-                </transition>
-              </div>
-              <div class="divider" v-if="!collapsed"></div>
-              <div class="tool-item" @click="collapsed = !collapsed">
-                <n-icon :size="16">
-                  <ChevronBackOutline v-if="!collapsed" />
-                  <ChevronForwardOutline v-else />
-                </n-icon>
+              <div class="tool-group">
+                <div class="tool-item" @click="themeStore.toggleTheme">
+                  <div class="tool-icon">
+                    <n-icon :size="18">
+                      <MoonOutline v-if="themeStore.isDark" />
+                      <SunnyOutline v-else />
+                    </n-icon>
+                  </div>
+                  <transition name="nav-text">
+                    <span v-if="!collapsed" class="tool-label">
+                      {{ themeStore.isDark ? t('setting.theme.dark') : t('setting.theme.light') }}
+                    </span>
+                  </transition>
+                </div>
+
+                <div class="tool-divider" v-if="!collapsed"></div>
+
+                <div class="tool-item collapse-toggle" @click="collapsed = !collapsed">
+                  <div class="tool-icon">
+                    <n-icon :size="18">
+                      <ChevronBackOutline v-if="!collapsed" />
+                      <ChevronForwardOutline v-else />
+                    </n-icon>
+                  </div>
+                  <transition name="nav-text">
+                    <span v-if="!collapsed" class="tool-label">
+                      {{ collapsed ? t('nav.expand') : t('nav.collapse') }}
+                    </span>
+                  </transition>
+                </div>
               </div>
             </div>
           </div>
         </n-layout-sider>
 
-        <!-- 优化内容区域 -->
-        <n-layout-content class="ultra-content">
-          <div class="content-wrapper-compact">
+        <!-- 内容区域 -->
+        <n-layout-content class="modern-content">
+          <div class="content-wrapper">
             <router-view v-slot="{ Component }">
-              <transition name="page-fade" mode="default">
+              <transition name="page-transition" mode="out-in">
                 <component :is="Component" :key="$route.path" />
               </transition>
             </router-view>
@@ -118,69 +131,92 @@
       </n-layout>
     </n-layout>
   </n-config-provider>
-
-  <!-- 全局更新弹窗 -->
-  <update-modal
-    v-model:show="showUpdateModal"
-    :latest-version="updateModalData.latestVersion"
-    :current-version="updateModalData.currentVersion"
-    :download-url="updateModalData.downloadUrl"
-    :release-notes="updateModalData.releaseNotes"
-    :release-date="updateModalData.releaseDate"
-    :file-size="updateModalData.fileSize"
-    @update="handleGlobalUpdate"
-    @cancel="handleGlobalCancel"
-    @skip="handleGlobalSkip"
-  />
 </template>
 
-<script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
-import { darkTheme, useNotification, type GlobalThemeOverrides } from 'naive-ui'
-import {
-  HomeOutline,
-  SettingsOutline,
-  SwapHorizontalOutline,
-  DocumentTextOutline,
-  MoonOutline,
-  SunnyOutline,
-  AtCircleOutline,
-  FilterOutline,
-  LinkOutline,
-  RemoveOutline,
-  CloseOutline,
-  CropOutline,
-  SquareOutline,
-  ChevronBackOutline,
-  ChevronForwardOutline,
-} from '@vicons/ionicons5'
-import { Window } from '@tauri-apps/api/window'
-import { useAppStore } from '@/stores/app/AppStore'
+<script lang="ts" setup>
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useThemeStore } from '@/stores/app/ThemeStore'
+import { useLocaleStore } from '@/stores/app/LocaleStore'
+import { useAppStore } from '@/stores'
 import { useWindowStore } from '@/stores/app/WindowStore'
 import { useUpdateStore } from '@/stores/app/UpdateStore'
 import { useI18n } from 'vue-i18n'
-import mitt from '@/utils/mitt'
-import type { UpdateModalData } from '@/utils/mitt'
-import UpdateModal from '@/components/UpdateModal.vue'
+import { darkTheme, type GlobalThemeOverrides } from 'naive-ui'
+import {
+  HomeOutline,
+  SwapHorizontalOutline,
+  LinkOutline,
+  AnalyticsOutline,
+  DocumentTextOutline,
+  SettingsOutline,
+  FolderOutline,
+  MoonOutline,
+  SunnyOutline,
+  ChevronBackOutline,
+  ChevronForwardOutline,
+} from '@vicons/ionicons5'
+import { useMessage } from 'naive-ui'
+import mitt from 'mitt'
 import logo from '@/assets/icon.png'
 
+defineOptions({
+  name: 'MainLayout'
+})
+
 const router = useRouter()
-const appWindow = Window.getCurrent()
-const appStore = useAppStore()
+const route = useRoute()
+const collapsed = ref(false)
+const message = useMessage()
+const mittInstance = mitt()
+
+// Store实例
 const themeStore = useThemeStore()
+const localeStore = useLocaleStore()
+const appStore = useAppStore()
 const windowStore = useWindowStore()
 const updateStore = useUpdateStore()
-const notification = useNotification()
 const { t } = useI18n()
-
-// 响应式状态
-const collapsed = ref(false)
-const currentMenu = ref('home')
 
 // 主题配置
 const theme = computed(() => (themeStore.isDark ? darkTheme : null))
+
+const themeOverrides = computed<GlobalThemeOverrides>(() => ({
+  common: {
+    primaryColor: '#5b4cfd',
+    primaryColorHover: '#7b6dfd',
+    primaryColorPressed: '#4b3ced',
+    primaryColorSuppl: '#6b5dfd',
+    borderRadius: '12px',
+    borderRadiusSmall: '8px',
+    borderRadiusMedium: '10px',
+    fontSize: '14px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  },
+  Layout: {
+    headerHeight: '48px',
+    siderBorderColor: 'transparent',
+    color: 'transparent',
+    siderColor: themeStore.isDark ? 'rgba(24, 24, 28, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+    contentColor: 'transparent',
+  },
+  Card: {
+    borderRadius: '16px',
+    color: themeStore.isDark ? 'rgba(24, 24, 28, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+    borderColor: 'transparent',
+  },
+  Button: {
+    borderRadiusSmall: '8px',
+    borderRadiusMedium: '10px',
+    heightSmall: '32px',
+    heightMedium: '36px',
+    heightLarge: '42px',
+    fontSizeSmall: '13px',
+    fontSizeMedium: '14px',
+    fontSizeLarge: '15px',
+    fontWeight: '500',
+  },
+}))
 
 // 状态类计算
 const statusClass = computed(() => {
@@ -188,41 +224,23 @@ const statusClass = computed(() => {
   return 'status-stopped'
 })
 
-const themeOverrides = computed<GlobalThemeOverrides>(() => ({
-  common: {
-    borderRadius: '8px',
-    borderRadiusSmall: '6px',
-    borderRadiusMedium: '8px',
-    primaryColor: '#6366f1',
-    primaryColorHover: '#818cf8',
-    primaryColorPressed: '#4f46e5',
-    primaryColorSuppl: '#818cf8',
-    fontSize: '13px',
-  },
-  Layout: {
-    headerHeight: '36px',
-    headerBorderColor: 'transparent',
-    siderBorderColor: 'transparent',
-    color: 'transparent',
-    siderColor: themeStore.isDark ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-    contentColor: 'transparent',
-  },
-  Card: {
-    borderRadius: '12px',
-    color: themeStore.isDark ? 'rgba(17, 24, 39, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-    borderColor: 'transparent',
-  },
-  Button: {
-    borderRadiusSmall: '6px',
-    borderRadiusMedium: '8px',
-    heightSmall: '28px',
-    heightMedium: '32px',
-    heightLarge: '36px',
-    fontSizeSmall: '12px',
-    fontSizeMedium: '13px',
-    fontSizeLarge: '14px',
-  },
-}))
+// 当前菜单
+const currentMenu = computed(() => {
+  const path = route.path
+  if (path === '/' || path === '/home') return 'home'
+
+  // 处理路由path到菜单key的反向映射
+  const pathToMenuMap: Record<string, string> = {
+    '/log': 'logs',
+    '/sub': 'subscription',
+    '/setting': 'settings',
+    '/connections': 'connections',
+    '/proxy': 'proxy',
+    '/rules': 'rules'
+  }
+
+  return pathToMenuMap[path] || path.slice(1)
+})
 
 // 菜单配置
 const menuItems = computed(() => [
@@ -236,190 +254,94 @@ const menuItems = computed(() => [
     label: t('nav.proxy'),
     key: 'proxy',
     icon: SwapHorizontalOutline,
-    disabled: !appStore.isRunning,
-  },
-  {
-    label: t('nav.sub'),
-    key: 'sub',
-    icon: AtCircleOutline,
     disabled: false,
-  },
-  {
-    label: t('nav.rules'),
-    key: 'rules',
-    icon: FilterOutline,
-    disabled: !appStore.isRunning,
   },
   {
     label: t('nav.connections'),
     key: 'connections',
     icon: LinkOutline,
-    disabled: !appStore.isRunning,
+    disabled: false,
   },
   {
-    label: t('nav.log'),
-    key: 'log',
+    label: t('nav.logs'),
+    key: 'logs',
     icon: DocumentTextOutline,
     disabled: false,
   },
   {
-    label: t('nav.setting'),
-    key: 'setting',
+    label: t('nav.rules'),
+    key: 'rules',
+    icon: AnalyticsOutline,
+    disabled: false,
+  },
+  {
+    label: t('nav.subscription'),
+    key: 'subscription',
+    icon: FolderOutline,
+    disabled: false,
+  },
+  {
+    label: t('nav.settings'),
+    key: 'settings',
     icon: SettingsOutline,
     disabled: false,
   },
 ])
 
-// 路由映射
-const routeMap: Record<string, string> = {
-  home: '/',
-  proxy: '/proxy',
-  sub: '/sub',
-  rules: '/rules',
-  connections: '/connections',
-  log: '/log',
-  setting: '/setting',
-}
-
-// 导航选择
-function onSelect(key: string) {
-  currentMenu.value = key
-  router.push(routeMap[key])
-}
-
-// 更新弹窗相关
-const showUpdateModal = ref(false)
-const updateModalData = ref<UpdateModalData>({
-  show: false,
-  latestVersion: '',
-  currentVersion: '',
-  downloadUrl: '',
-  releaseNotes: '',
-  releaseDate: '',
-  fileSize: 0,
-})
-
-const handleShowUpdateModal = (data: UpdateModalData) => {
-  updateModalData.value = { ...data }
-  showUpdateModal.value = true
-}
-
-const handleGlobalUpdate = async () => {
-  try {
-    notification.info({
-      title: t('setting.update.downloading'),
-      content: t('setting.update.downloadingDescription'),
-      duration: 3000,
-    })
-    await updateStore.downloadAndInstallUpdate()
-  } catch (error) {
-    notification.error({
-      title: t('setting.update.updateError'),
-      content: String(error),
-      duration: 5000,
-    })
-  }
-}
-
-const handleGlobalCancel = () => {
-  showUpdateModal.value = false
-}
-
-const handleGlobalSkip = () => {
-  updateStore.skipCurrentVersion()
-  showUpdateModal.value = false
-}
-
-// 监听托盘模式变化
-const isLowPowerMode = ref(false)
-
-// 优化GPU使用的样式切换
-const toggleGPUPerformance = (enable: boolean) => {
-  const root = document.documentElement
-  if (enable) {
-    // 高性能模式：启用GPU加速和动画
-    root.style.setProperty('--gpu-acceleration', 'auto')
-    root.style.setProperty('--animation-duration', '0.2s')
-    console.log('🚀 启用GPU高性能模式')
+// 导航选择处理
+const onSelect = (key: string) => {
+  if (key === 'home') {
+    router.push('/')
   } else {
-    // 低功耗模式：禁用GPU加速
-    root.style.setProperty('--gpu-acceleration', 'none')
-    root.style.setProperty('--animation-duration', '0s')
-    console.log('🔋 启用低功耗模式')
+    // 处理菜单key和路由path的映射关系
+    const routeMap: Record<string, string> = {
+      logs: '/log',
+      subscription: '/sub',
+      settings: '/setting',
+      connections: '/connections',
+      proxy: '/proxy',
+      rules: '/rules'
+    }
+    const routePath = routeMap[key] || `/${key}`
+    router.push(routePath)
   }
 }
 
-// 生命周期
-onMounted(async () => {
-  await updateStore.fetchAppVersion()
-  mitt.on('show-update-modal', handleShowUpdateModal)
+// 事件监听器
+const handleShowUpdateModal = () => {
+  // 处理更新模态框显示
+}
 
-  await appWindow.listen('tauri://close-requested', async () => {
-    await windowStore.hideWindow(router)
-  })
-
-  // 根据当前路由设置选中项
-  const path = router.currentRoute.value.path
-  const menuKey = Object.entries(routeMap).find(([_, route]) => route === path)?.[0]
-  if (menuKey) {
-    currentMenu.value = menuKey
+onMounted(() => {
+  // 自动启动内核逻辑
+  if (appStore.autoStartKernel && !appStore.isRunning) {
+    // 可以在这里添加自动启动逻辑
   }
 
-  // 监听内存清理请求
-  mitt.on('memory-cleanup-requested', () => {
-    console.log('🧹 MainLayout响应内存清理请求')
-    isLowPowerMode.value = true
-    toggleGPUPerformance(false)
-  })
-
-  // 监听窗口显示事件
-  mitt.on('window-show', () => {
-    console.log('🪟 窗口显示，恢复GPU性能')
-    isLowPowerMode.value = false
-    toggleGPUPerformance(true)
-  })
-
-  // 监听窗口最小化事件
-  mitt.on('window-minimize', () => {
-    console.log('🪟 窗口最小化，降低GPU性能')
-    isLowPowerMode.value = true
-    toggleGPUPerformance(false)
-  })
+  // 设置事件监听器
+  mittInstance.on('show-update-modal', handleShowUpdateModal)
 })
 
-onBeforeUnmount(() => {
-  mitt.off('show-update-modal', handleShowUpdateModal)
-  mitt.off('memory-cleanup-requested')
-  mitt.off('window-show')
-  mitt.off('window-minimize')
+onUnmounted(() => {
+  mittInstance.off('show-update-modal', handleShowUpdateModal)
 })
 </script>
 
 <style scoped>
-/* 超现代化布局样式 */
-.ultra-modern-layout {
-  background: v-bind('themeStore.isDark ? "#0f0f10" : "#fafafa"');
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', sans-serif;
-  font-size: 13px;
-  /* 优化GPU使用 */
-  transform: translateZ(0);
-  will-change: auto;
-  backface-visibility: hidden;
+/* 现代化布局样式 */
+.modern-layout {
+  background: v-bind('themeStore.isDark ? "#18181b" : "#f8fafc"');
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* 超紧凑顶部栏 */
-.ultra-header {
-  /* 减少GPU占用的背景效果 */
-  backdrop-filter: blur(8px) saturate(120%);
-  -webkit-backdrop-filter: blur(8px) saturate(120%);
-  background: v-bind('themeStore.isDark ? "rgba(15, 15, 16, 0.9)" : "rgba(255, 255, 255, 0.85)"');
-  border-bottom: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+/* 现代化顶部栏 */
+.modern-header {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
+  border-bottom: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 1px 3px 0 v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
   z-index: 1000;
-  box-shadow: 0 1px 0 0 v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.02)"');
-  /* GPU优化 */
-  will-change: auto;
-  transform: translateZ(0);
-  contain: layout style paint;
 }
 
 .header-content {
@@ -427,276 +349,289 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
+  padding: 0 20px;
   user-select: none;
 }
 
-.header-left {
+.header-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
 }
 
-.app-logo-mini {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
+.brand-logo {
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s ease;
 }
 
-.logo-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 4px;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+.brand-logo:hover {
+  transform: scale(1.05);
 }
 
-.app-logo-mini:hover .logo-img {
-  transform: scale(1.1);
-}
-
-.app-logo-mini:active {
-  transform: scale(0.95);
-}
-
-.status-indicator-mini {
-  position: relative;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+.logo-container {
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.status-indicator-mini.status-running {
-  background: linear-gradient(135deg, #10b981, #059669);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+.logo-image {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  position: relative;
+  object-fit: contain;
 }
 
-.status-indicator-mini.status-stopped {
-  background: v-bind('themeStore.isDark ? "#374151" : "#d1d5db"');
+.logo-image.logo-active {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
 }
 
-.pulse-dot {
+.logo-image.logo-active::before {
+  content: '';
   position: absolute;
-  width: 6px;
-  height: 6px;
-  background: white;
-  border-radius: 50%;
-  animation: pulse 2s ease-in-out infinite;
+  inset: -2px;
+  background: linear-gradient(135deg, #10b981, #059669, #10b981);
+  border-radius: 10px;
+  opacity: 0.3;
+  animation: logo-glow 2s ease-in-out infinite;
+  z-index: -1;
 }
 
-.status-running .pulse-dot {
-  animation: pulse-green 2s ease-in-out infinite;
+@keyframes logo-glow {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.1); opacity: 0.1; }
 }
 
-@keyframes pulse-green {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.1); }
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.app-title-mini {
-  font-size: 13px;
+.app-title {
+  font-size: 16px;
   font-weight: 600;
-  color: v-bind('themeStore.isDark ? "#f3f4f6" : "#111827"');
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
+  margin: 0;
   letter-spacing: -0.02em;
 }
 
-.header-controls {
+.status-badge {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
-.control-btn {
-  width: 28px;
-  height: 28px;
+.status-badge.status-running {
+  background: v-bind('themeStore.isDark ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.1)"');
+  color: #10b981;
+}
+
+.status-badge.status-stopped {
+  background: v-bind('themeStore.isDark ? "rgba(107, 114, 128, 0.15)" : "rgba(107, 114, 128, 0.1)"');
+  color: #6b7280;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-running .status-dot {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.2); }
+}
+
+.window-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.window-btn {
+  width: 32px;
+  height: 32px;
   border: none;
   background: transparent;
-  border-radius: 6px;
-  color: v-bind('themeStore.isDark ? "#9ca3af" : "#6b7280"');
+  border-radius: 8px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: 10px;
+  transition: all 0.15s ease;
 }
 
-.control-btn:hover {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)"');
-  color: v-bind('themeStore.isDark ? "#e5e7eb" : "#374151"');
+.window-btn:hover {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  color: v-bind('themeStore.isDark ? "#cbd5e1" : "#475569"');
 }
 
-.control-btn.close:hover {
+.window-btn.close:hover {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
 }
 
 /* 主容器 */
 .main-container {
-  background: v-bind('themeStore.isDark ? "#0f0f10" : "#fafafa"');
+  background: v-bind('themeStore.isDark ? "#18181b" : "#f8fafc"');
 }
 
-/* 超薄侧边栏 */
-.ultra-sider {
-  /* 减少GPU占用的背景效果 */
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.97)" : "rgba(255, 255, 255, 0.97)"') !important;
-  border-right: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  /* 减少动画复杂度 */
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  box-shadow: 2px 0 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.15)" : "rgba(0, 0, 0, 0.03)"');
-  /* GPU优化 */
-  will-change: auto;
-  transform: translateZ(0);
-  contain: layout style paint;
+/* 现代化侧边栏 */
+.modern-sider {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"') !important;
+  border-right: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 4px 0 24px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.03)"');
 }
 
 .sider-content {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 16px 8px;
-  gap: 20px;
+  padding: 20px 12px;
+  gap: 24px;
 }
 
-/* 精简Logo区域 */
-.logo-section-compact {
+/* 导航区域 */
+.nav-section {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
+  gap: 16px;
 }
 
-.logo-container {
-  cursor: pointer;
-  position: relative;
+.nav-header {
+  padding: 0 12px;
+  margin-bottom: 8px;
 }
 
-.logo-icon {
-  width: 32px;
-  height: 32px;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.logo-core {
-  width: 20px;
-  height: 20px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  border-radius: 6px;
-  position: relative;
-  z-index: 2;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.logo-ring {
-  position: absolute;
-  width: 32px;
-  height: 32px;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, #6366f1, #8b5cf6, #ec4899, #6366f1);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 1px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 1px));
-  /* 减少动画频率以节省GPU资源 */
-  animation: rotate 6s linear infinite;
-  /* GPU优化 */
-  will-change: transform;
-  transform: translateZ(0);
-}
-
-.logo-icon.active .logo-core {
-  background: linear-gradient(135deg, #10b981, #059669);
-  box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);
-}
-
-.logo-icon:hover .logo-core {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-}
-
-@keyframes rotate {
-  to { transform: rotate(360deg); }
-}
-
-.status-text {
-  text-align: center;
-}
-
-.status-label {
+.nav-title {
   font-size: 11px;
-  font-weight: 500;
-  color: v-bind('themeStore.isDark ? "#9ca3af" : "#6b7280"');
+  font-weight: 600;
+  color: v-bind('themeStore.isDark ? "#64748b" : "#94a3b8"');
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-/* 垂直导航菜单 */
-.nav-section-compact {
-  flex: 1;
+.nav-menu {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.nav-item-compact {
+.nav-item {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: v-bind('themeStore.isDark ? "#9ca3af" : "#6b7280"');
-  font-size: 13px;
+  transition: all 0.2s ease;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  font-size: 14px;
   font-weight: 500;
-  min-height: 36px;
+  min-height: 44px;
 }
 
-.nav-item-compact:hover:not(.nav-disabled) {
+.nav-item:hover:not(.nav-disabled) {
   background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  color: v-bind('themeStore.isDark ? "#e5e7eb" : "#374151"');
+  color: v-bind('themeStore.isDark ? "#cbd5e1" : "#475569"');
   transform: translateX(2px);
 }
 
-.nav-item-compact.nav-active {
-  background: v-bind('themeStore.isDark ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.1)"');
-  color: #6366f1;
+.nav-item.nav-active {
+  background: v-bind('themeStore.isDark ? "rgba(91, 76, 253, 0.15)" : "rgba(91, 76, 253, 0.1)"');
+  color: #5b4cfd;
   font-weight: 600;
 }
 
-.nav-item-compact.nav-active::before {
+.nav-item.nav-active::before {
   content: '';
   position: absolute;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 20px;
-  background: linear-gradient(180deg, #6366f1, #8b5cf6);
+  height: 24px;
+  background: linear-gradient(180deg, #5b4cfd, #7c3aed);
   border-radius: 0 2px 2px 0;
 }
 
-.nav-item-compact.nav-disabled {
+.nav-item.nav-disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
 
-.nav-icon-compact {
+.nav-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.nav-label {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+
+/* 底部工具区 */
+.tools-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+}
+
+.tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tool-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 40px;
+}
+
+.tool-item:hover {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
+  color: v-bind('themeStore.isDark ? "#cbd5e1" : "#475569"');
+}
+
+.tool-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -705,7 +640,7 @@ onBeforeUnmount(() => {
   height: 20px;
 }
 
-.nav-text {
+.tool-label {
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -714,115 +649,97 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 
-.nav-glow {
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  background: radial-gradient(circle at center, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  pointer-events: none;
-}
-
-.nav-item-compact.nav-active .nav-glow {
-  opacity: 1;
-}
-
-/* 底部工具区 */
-.tools-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 12px;
-  border-top: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-}
-
-.tool-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: v-bind('themeStore.isDark ? "#9ca3af" : "#6b7280"');
-  font-size: 12px;
-  min-height: 32px;
-}
-
-.tool-item:hover {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  color: v-bind('themeStore.isDark ? "#e5e7eb" : "#374151"');
-}
-
-.tool-text {
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.divider {
+.tool-divider {
   height: 1px;
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"');
-  margin: 4px 0;
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  margin: 8px 12px;
 }
 
-/* 优化内容区域 */
-.ultra-content {
-  padding: 16px;
+/* 内容区域 */
+.modern-content {
+  padding: 20px;
   overflow: auto;
 }
 
-.content-wrapper-compact {
-  max-width: 1200px;
+.content-wrapper {
+  max-width: 1400px;
   margin: 0 auto;
   height: 100%;
-  min-height: calc(100vh - 36px);
+  min-height: calc(100vh - 48px);
 }
 
-/* 页面切换动画 - 优化版 */
-.page-fade-enter-active {
-  transition: all 0.15s ease-out;
+/* 页面切换动画 */
+.page-transition-enter-active,
+.page-transition-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.page-fade-leave-active {
-  transition: none;
-}
-
-.page-fade-enter-from {
+.page-transition-enter-from {
   opacity: 0;
-  transform: translateY(4px);
+  transform: translateY(8px);
 }
 
-.page-fade-leave-to {
-  opacity: 1;
+.page-transition-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
-/* 侧边栏动画 */
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+.nav-text-enter-active,
+.nav-text-leave-active {
+  transition: all 0.2s ease;
 }
 
-.fade-slide-enter-from,
-.fade-slide-leave-to {
+.nav-text-enter-from,
+.nav-text-leave-to {
   opacity: 0;
   transform: translateX(-8px);
 }
 
 /* 折叠状态优化 */
-.ultra-sider[collapsed] .sider-content {
-  padding: 16px 4px;
+.modern-sider[collapsed] .sider-content {
+  padding: 20px 8px;
 }
 
-.ultra-sider[collapsed] .nav-item-compact {
+.modern-sider[collapsed] .nav-item {
   justify-content: center;
-  padding: 8px;
+  padding: 10px;
 }
 
-.ultra-sider[collapsed] .tool-item {
+.modern-sider[collapsed] .tool-item {
   justify-content: center;
-  padding: 8px;
+  padding: 10px;
+}
+
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .modern-sider {
+    position: fixed;
+    height: 100%;
+    z-index: 999;
+  }
+
+  .content-wrapper {
+    padding: 16px;
+  }
+
+  .header-content {
+    padding: 0 16px;
+  }
+
+  .brand-info {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-content {
+    padding: 16px;
+  }
+
+  .content-wrapper {
+    padding: 0;
+  }
 }
 
 /* 滚动条美化 */
@@ -830,55 +747,20 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
-:deep(.n-layout-sider-scroll-container) {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+:deep(.n-scrollbar-rail) {
+  background: transparent !important;
 }
 
-:deep(.n-layout-sider-scroll-container::-webkit-scrollbar) {
-  display: none;
+:deep(.n-scrollbar-rail--scrollable) {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.04)"') !important;
 }
 
-/* 暗黑模式下的特殊效果 */
-.ultra-modern-layout :deep(.n-card) {
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"') !important;
-  backdrop-filter: blur(8px) saturate(180%);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"') !important;
-  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.05)"') !important;
+:deep(.n-scrollbar-bar) {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.2)" : "rgba(0, 0, 0, 0.2)"') !important;
+  border-radius: 4px;
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .ultra-sider {
-    position: fixed;
-    height: 100%;
-    z-index: 999;
-  }
-
-  .content-wrapper-compact {
-    padding: 12px;
-  }
-}
-
-/* 微交互效果 */
-.nav-item-compact:active {
-  transform: scale(0.98) translateX(2px);
-}
-
-.tool-item:active {
-  transform: scale(0.98);
-}
-
-/* 玻璃态效果增强 */
-@media (prefers-reduced-motion: no-preference) {
-  .ultra-header {
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-  }
-
-  .ultra-sider {
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-  }
+:deep(.n-scrollbar-bar:hover) {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"') !important;
 }
 </style>

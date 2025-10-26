@@ -1,206 +1,198 @@
 <template>
-  <div class="ultra-logs">
-    <!-- 紧凑工具栏 -->
-    <div class="logs-toolbar">
-      <div class="toolbar-left">
-        <div class="toolbar-icon">
-          <n-icon size="16">
-            <DocumentTextOutline />
-          </n-icon>
+  <div class="logs-page">
+    <!-- 页面标题和统计 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <n-icon size="20">
+              <DocumentTextOutline />
+            </n-icon>
+          </div>
+          <div class="header-info">
+            <h1 class="page-title">{{ t('log.title') }}</h1>
+            <p class="page-subtitle">{{ t('log.subtitle') }}</p>
+          </div>
         </div>
-        <div class="toolbar-info">
-          <span class="toolbar-title">{{ t('log.title') }}</span>
-          <span class="toolbar-stats">{{ displayedLogs.length }}/{{ totalLogs }} {{ t('log.records') }}</span>
-        </div>
-      </div>
-
-      <div class="toolbar-right">
-        <div class="toolbar-controls">
+        <div class="header-actions">
           <n-switch
             v-model:value="autoScroll"
-            size="small"
+            size="medium"
             class="auto-scroll-switch"
           >
             <template #checked>{{ t('log.autoScroll') }}</template>
             <template #unchecked>{{ t('log.manualScroll') }}</template>
           </n-switch>
-
-          <n-select
-            v-model:value="filterType"
-            :options="logTypeOptions"
-            :placeholder="t('log.level')"
-            clearable
-            size="small"
-            class="log-filter-select"
-          />
-
-          <n-button-group size="small">
-            <n-tooltip trigger="hover" placement="top">
-              <template #trigger>
-                <n-button
-                  type="error"
-                  @click="clearLogs"
-                  :disabled="!displayedLogs.length"
-                  class="action-btn clear-btn"
-                >
-                  <template #icon>
-                    <n-icon size="14"><TrashOutline /></n-icon>
-                  </template>
-                </n-button>
-              </template>
-              {{ t('log.clear') }}
-            </n-tooltip>
-
-            <n-tooltip trigger="hover" placement="top">
-              <template #trigger>
-                <n-button
-                  type="info"
-                  @click="copyLogs"
-                  :disabled="!displayedLogs.length"
-                  class="action-btn copy-btn"
-                >
-                  <template #icon>
-                    <n-icon size="14"><CopyOutline /></n-icon>
-                  </template>
-                </n-button>
-              </template>
-              {{ t('log.copy') }}
-            </n-tooltip>
-
-            <n-tooltip trigger="hover" placement="top">
-              <template #trigger>
-                <n-button
-                  type="success"
-                  @click="exportLogs"
-                  :disabled="!displayedLogs.length"
-                  class="action-btn export-btn"
-                >
-                  <template #icon>
-                    <n-icon size="14"><DownloadOutline /></n-icon>
-                  </template>
-                </n-button>
-              </template>
-              {{ t('log.export') }}
-            </n-tooltip>
-          </n-button-group>
         </div>
       </div>
     </div>
 
-    <!-- 统计面板 -->
-    <div class="stats-panel">
-      <div
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <n-card
         v-for="(count, type) in logTypeCounts"
         :key="type"
-        class="stat-orb"
-        :class="`orb-${type}`"
+        class="stat-card"
+        :class="`${type}-card`"
+        :bordered="false"
       >
-        <div class="orb-icon">
-          <n-icon size="14">
-            <InformationCircleOutline v-if="type === 'info'" />
-            <WarningOutline v-else-if="type === 'warning'" />
-            <AlertCircleOutline v-else-if="type === 'error'" />
-            <CheckmarkCircleOutline v-else-if="type === 'success'" />
-          </n-icon>
+        <div class="stat-content">
+          <div class="stat-icon">
+            <n-icon size="24">
+              <InformationCircleOutline v-if="type === 'info'" />
+              <WarningOutline v-else-if="type === 'warning'" />
+              <AlertCircleOutline v-else-if="type === 'error'" />
+              <CheckmarkCircleOutline v-else-if="type === 'success'" />
+              <DocumentTextOutline v-else />
+            </n-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ count }}</div>
+            <div class="stat-label">{{ getLogTypeLabel(type) }}</div>
+          </div>
         </div>
-        <div class="orb-content">
-          <div class="orb-value">{{ count }}</div>
-          <div class="orb-label">{{ t(`log.types.${type}`) }}</div>
-        </div>
-      </div>
+      </n-card>
     </div>
 
-    <!-- 日志内容区域 -->
-    <div class="logs-content">
-      <!-- 搜索区域 -->
-      <div class="search-section">
-        <div class="search-input-group">
+    <!-- 搜索和筛选 -->
+    <n-card class="filter-card" :bordered="false">
+      <div class="filter-content">
+        <div class="filter-row">
           <n-input
             v-model:value="searchQuery"
             :placeholder="t('log.searchLogs')"
             clearable
-            size="small"
+            size="medium"
             class="search-input"
           >
             <template #prefix>
-              <n-icon size="14">
+              <n-icon size="16">
                 <SearchOutline />
               </n-icon>
             </template>
           </n-input>
-
-          <div class="search-stats">
-            <n-tag v-if="totalLogs > 0" type="info" size="tiny" round>
-              {{ t('log.totalCount', { count: totalLogs }) }}
-            </n-tag>
-            <n-tag v-if="(searchQuery || filterType) && displayedLogs.length > 0" type="success" size="tiny" round>
-              {{ t('log.matchCount', { count: displayedLogs.length }) }}
-            </n-tag>
-          </div>
+          <n-select
+            v-model:value="filterType"
+            :options="logTypeOptions"
+            :placeholder="t('log.filterType')"
+            clearable
+            size="medium"
+            class="filter-select"
+          />
+        </div>
+        <div class="filter-actions">
+          <n-button-group>
+            <n-button
+              @click="clearLogs"
+              :disabled="!displayedLogs.length"
+              type="error"
+              size="medium"
+            >
+              <template #icon>
+                <n-icon size="16">
+                  <TrashOutline />
+                </n-icon>
+              </template>
+              {{ t('log.clear') }}
+            </n-button>
+            <n-button
+              @click="copyLogs"
+              :disabled="!displayedLogs.length"
+              type="info"
+              size="medium"
+            >
+              <template #icon>
+                <n-icon size="16">
+                  <CopyOutline />
+                </n-icon>
+              </template>
+              {{ t('log.copy') }}
+            </n-button>
+            <n-button
+              @click="exportLogs"
+              :disabled="!displayedLogs.length"
+              type="success"
+              size="medium"
+            >
+              <template #icon>
+                <n-icon size="16">
+                  <DownloadOutline />
+                </n-icon>
+              </template>
+              {{ t('log.export') }}
+            </n-button>
+          </n-button-group>
         </div>
       </div>
+    </n-card>
 
-      <!-- 日志列表 -->
-      <div class="logs-list">
-        <div v-if="displayedLogs.length" class="logs-container">
-          <n-virtual-list
-            ref="virtualListRef"
-            class="log-virtual-list"
-            :items="formattedLogs"
-            :item-size="60"
-            :show-scrollbar="true"
-            @scroll="handleVirtualScroll"
+    <!-- 日志列表 -->
+    <n-card class="logs-card" :bordered="false">
+      <div class="logs-content">
+        <div class="logs-header">
+          <div class="logs-info">
+            <span class="logs-count">
+              {{ displayedLogs.length }}/{{ totalLogs }} {{ t('log.records') }}
+            </span>
+            <span class="logs-time" v-if="displayedLogs.length > 0">
+              {{ getLatestLogTime() }}
+            </span>
+          </div>
+        </div>
+
+        <div v-if="displayedLogs.length > 0" class="logs-list">
+          <div
+            v-for="(log, index) in displayedLogs"
+            :key="log.key"
+            class="log-item"
+            :class="`log-${log.type}`"
           >
-            <template #default="{ item }">
-              <div class="log-item" :key="item.key" :class="`log-item-${item.type}`">
-                <div class="log-indicator"></div>
-                <div class="log-content">
-                  <div class="log-header">
-                    <div class="log-type-badge" :class="`type-${item.type}`">
-                      {{ t(`log.types.${item.type}`) }}
-                    </div>
-                    <div class="log-time">{{ formatTime(item.timestamp, true) }}</div>
-                  </div>
-                  <div class="log-message">
-                    <template
-                      v-if="searchQuery && item.payload.toLowerCase().includes(searchQuery.toLowerCase())"
-                    >
-                      <highlight-text :text="item.payload" :keyword="searchQuery" />
-                    </template>
-                    <template v-else>
-                      {{ item.payload }}
-                    </template>
-                  </div>
-                </div>
+            <div class="log-header">
+              <div class="log-time">
+                {{ formatLogTime(log.timestamp) }}
               </div>
-            </template>
-          </n-virtual-list>
+              <div class="log-type">
+                <n-tag :type="getLogTagType(log.type)" size="small">
+                  {{ getLogTypeLabel(log.type) }}
+                </n-tag>
+              </div>
+            </div>
+            <div class="log-content">
+              <HighlightText
+                v-if="searchQuery"
+                :text="log.payload"
+                :keyword="searchQuery"
+              />
+              <span v-else class="log-text">{{ log.payload }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- 空状态 -->
         <div v-else class="empty-state">
           <div class="empty-icon">
-            <n-icon size="32">
+            <n-icon size="48">
               <DocumentTextOutline />
             </n-icon>
           </div>
           <div class="empty-title">
-            {{
-              searchActive && !displayedLogs.length
-                ? t('log.noSearchResults')
-                : t('log.noLogs')
-            }}
+            {{ searchQuery ? t('log.noSearchResults') : t('log.noLogs') }}
           </div>
           <div class="empty-desc">
-            {{
-              searchActive && !displayedLogs.length
-                ? t('log.adjustSearchFilters')
-                : t('log.noLogRecords')
-            }}
+            {{ searchQuery ? t('log.adjustSearchFilters') : t('log.noLogsDesc') }}
           </div>
+          <n-button
+            v-if="searchQuery"
+            @click="searchQuery = ''"
+            type="primary"
+            size="large"
+            class="empty-btn"
+          >
+            {{ t('log.clearSearch') }}
+          </n-button>
         </div>
       </div>
-    </div>
+    </n-card>
   </div>
 </template>
 
@@ -219,8 +211,12 @@ import {
   AlertCircleOutline,
   CheckmarkCircleOutline,
 } from '@vicons/ionicons5'
-import type { VirtualListInst } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
+import { useThemeStore } from '@/stores/app/ThemeStore'
+
+defineOptions({
+  name: 'LogView'
+})
 
 interface Log {
   type: string
@@ -247,220 +243,108 @@ const HighlightText = defineComponent({
   },
   setup(props) {
     return () => {
-      if (!props.keyword) return h('span', {}, props.text)
+      if (!props.keyword) {
+        return props.text
+      }
 
-      const keyword = props.keyword.toLowerCase()
-      const text = props.text
-      const parts = []
-      let lastIndex = 0
+      const parts = props.text.split(new RegExp(`(${props.keyword})`, 'gi'))
 
-      let index = text.toLowerCase().indexOf(keyword)
-      while (index !== -1) {
-        // 添加前面的文本
-        if (index > lastIndex) {
-          parts.push(h('span', {}, text.substring(lastIndex, index)))
+      return h('span', {}, parts.map((part, index) => {
+        if (part.toLowerCase() === props.keyword.toLowerCase()) {
+          return h('mark', {
+            key: index,
+            style: {
+              backgroundColor: 'rgba(91, 76, 253, 0.2)',
+              color: '#5b4cfd',
+              padding: '2px 4px',
+              borderRadius: '4px',
+              fontWeight: '600'
+            }
+          }, part)
         }
-
-        // 添加高亮部分
-        parts.push(
-          h(
-            'span',
-            {
-              style: {
-                backgroundColor: 'rgba(var(--primary-color), 0.1)',
-                fontWeight: 'bold',
-                padding: '0 2px',
-                borderRadius: '2px',
-              },
-            },
-            text.substring(index, index + keyword.length),
-          ),
-        )
-
-        lastIndex = index + keyword.length
-        index = text.toLowerCase().indexOf(keyword, lastIndex)
-      }
-
-      // 添加剩余部分
-      if (lastIndex < text.length) {
-        parts.push(h('span', {}, text.substring(lastIndex)))
-      }
-
-      return h('span', {}, parts)
+        return h('span', { key: index }, part)
+      }))
     }
-  },
+  }
 })
 
-const message = useMessage()
 const logStore = useLogStore()
-const virtualListRef = ref<VirtualListInst | null>(null)
-const autoScroll = ref(true)
-const filterType = ref<string | null>(null)
-const searchQuery = ref('')
-const displayedLogs = ref<Log[]>([])
 const { t } = useI18n()
+const message = useMessage()
+const themeStore = useThemeStore()
 
-// 判断是否处于搜索状态
-const searchActive = computed(() => {
-  return searchQuery.value.length > 0
-})
+// 响应式数据
+const searchQuery = ref('')
+const filterType = ref<string | null>(null)
+const autoScroll = ref(true)
+const logListRef = ref()
 
-// 格式化日志数据，添加key属性以适配虚拟列表
+// 计算属性
+const logs = computed(() => logStore.logs)
+const totalLogs = computed(() => logs.value.length)
+
+// 格式化日志数据
 const formattedLogs = computed<FormattedLog[]>(() => {
-  return displayedLogs.value.map((log, index) => ({
+  return logs.value.map((log, index) => ({
     ...log,
     key: `${log.timestamp}-${index}`,
   }))
 })
 
-// 统计各日志类型的数量
-const logTypeCounts = computed(() => {
-  const counts: Record<string, number> = {
-    info: 0,
-    warning: 0,
-    error: 0,
-    success: 0,
-  }
-
-  logStore.logs.forEach((log) => {
-    if (counts[log.type] !== undefined) {
-      counts[log.type]++
-    }
-  })
-
-  return counts
-})
-
-// 处理虚拟列表的滚动事件
-const handleVirtualScroll = (e: Event) => {
-  const target = e.target as HTMLElement
-  if (!target) return
-
-  const { scrollTop, scrollHeight, clientHeight } = target
-
-  // 如果用户向上滚动超过一定距离，关闭自动滚动
-  if (scrollHeight - scrollTop - clientHeight > 100) {
-    autoScroll.value = false
-  }
-}
-
-// 更新显示的日志 - 确保此函数在watch之前定义
-const updateDisplayedLogs = () => {
-  let filtered = [...logStore.logs]
+// 筛选后的日志
+const displayedLogs = computed<FormattedLog[]>(() => {
+  let filteredLogs = formattedLogs.value
 
   // 按类型筛选
   if (filterType.value) {
-    filtered = filtered.filter((log) => log.type === filterType.value)
+    filteredLogs = filteredLogs.filter((log) => log.type === filterType.value)
   }
 
-  // 按搜索关键词筛选
+  // 按关键词搜索
   if (searchQuery.value) {
-    filtered = filtered.filter((log) =>
-      log.payload.toLowerCase().includes(searchQuery.value.toLowerCase()),
+    const query = searchQuery.value.toLowerCase()
+    filteredLogs = filteredLogs.filter((log) =>
+      log.payload.toLowerCase().includes(query)
     )
   }
 
-  displayedLogs.value = filtered
-}
+  return filteredLogs
+})
 
-// 滚动到底部
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (virtualListRef.value) {
-      // 使用虚拟列表组件提供的scrollTo方法滚动到最底部
-      virtualListRef.value.scrollTo({ index: displayedLogs.value.length - 1 })
-    }
+// 日志类型统计
+const logTypeCounts = computed(() => {
+  const counts: Record<string, number> = {}
+  displayedLogs.value.forEach((log) => {
+    counts[log.type] = (counts[log.type] || 0) + 1
   })
-}
+  return counts
+})
 
-// 监听日志变化 - 现在updateDisplayedLogs已在上方定义
-watch(
-  () => logStore.logs,
-  async (newLogs) => {
-    updateDisplayedLogs()
-    if (autoScroll.value) {
-      await nextTick()
-      scrollToBottom()
-    }
-  },
-  { deep: true },
-)
+// 日志类型选项
+const logTypeOptions = computed(() => {
+  const types = new Set<string>()
+  logs.value.forEach((log) => {
+    types.add(log.type)
+  })
+  return Array.from(types).map((type) => ({
+    label: getLogTypeLabel(type),
+    value: type,
+  }))
+})
 
-// 监听筛选条件变化
-watch(
-  [filterType, searchQuery],
-  () => {
-    updateDisplayedLogs()
-    nextTick(() => {
-      if (autoScroll.value) {
-        scrollToBottom()
-      }
-    })
-  },
-  { immediate: true },
-)
-
-// 监听自动滚动状态变化
-watch(autoScroll, (newValue) => {
-  if (newValue) {
-    scrollToBottom()
+// 辅助方法
+const getLogTypeLabel = (type: string): string => {
+  const typeMap: Record<string, string> = {
+    info: t('log.types.info'),
+    warning: t('log.types.warning'),
+    error: t('log.types.error'),
+    success: t('log.types.success'),
   }
-})
-
-// 计算总日志数
-const totalLogs = computed(() => {
-  return logStore.logs.length
-})
-
-const logTypeOptions = [
-  { label: t('log.types.all'), value: null },
-  { label: t('log.types.info'), value: 'info' },
-  { label: t('log.types.warning'), value: 'warning' },
-  { label: t('log.types.error'), value: 'error' },
-  { label: t('log.types.success'), value: 'success' },
-]
-
-const clearLogs = () => {
-  // 使用store提供的方法清空日志
-  logStore.clearLogs()
-  displayedLogs.value = []
-  message.success(t('log.clearedSuccess'))
+  return typeMap[type] || type.toUpperCase()
 }
 
-const copyLogs = () => {
-  const logText = displayedLogs.value
-    .map((log) => `[${formatTime(log.timestamp)}] [${t(`log.types.${log.type}`)}] ${log.payload}`)
-    .join('\n')
-  navigator.clipboard.writeText(logText)
-  message.success(t('log.copiedSuccess'))
-}
-
-const exportLogs = () => {
-  const logText = displayedLogs.value
-    .map((log) => `[${formatTime(log.timestamp)}] [${t(`log.types.${log.type}`)}] ${log.payload}`)
-    .join('\n')
-  const blob = new Blob([logText], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `sing-box-logs-${formatTime(Date.now(), true).replace(/:/g, '-')}.txt`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-  message.success(t('log.exportedSuccess'))
-}
-
-const formatTime = (timestamp: number, showSeconds = false) => {
-  const date = new Date(timestamp)
-  const hours = date.getHours().toString().padStart(2, '0')
-  const minutes = date.getMinutes().toString().padStart(2, '0')
-  const seconds = date.getSeconds().toString().padStart(2, '0')
-  return showSeconds ? `${hours}:${minutes}:${seconds}` : `${hours}:${minutes}`
-}
-
-const getLogTagType = (type: string): 'success' | 'warning' | 'error' | 'info' => {
-  const typeMap: Record<string, 'success' | 'warning' | 'error' | 'info'> = {
+const getLogTagType = (type: string): 'info' | 'warning' | 'error' | 'success' => {
+  const typeMap: Record<string, 'info' | 'warning' | 'error' | 'success'> = {
     info: 'info',
     warning: 'warning',
     error: 'error',
@@ -469,443 +353,386 @@ const getLogTagType = (type: string): 'success' | 'warning' | 'error' | 'info' =
   return typeMap[type] || 'info'
 }
 
-const getLogClass = (type: string): string => {
-  return `log-${type}`
+const formatLogTime = (timestamp: number): string => {
+  return new Date(timestamp).toLocaleTimeString()
 }
 
-const getLogColor = (type: string): string => {
-  const colorMap: Record<string, string> = {
-    info: '#2080f0',
-    warning: '#f0a020',
-    error: '#d03050',
-    success: '#18a058',
-  }
-  return colorMap[type] || '#909399'
+const getLatestLogTime = (): string => {
+  if (displayedLogs.value.length === 0) return ''
+  const latestLog = displayedLogs.value[0]
+  return t('log.latestAt', { time: formatLogTime(latestLog.timestamp) })
 }
 
-onMounted(async () => {
-  // 设置日志监听器
-  await logStore.setupLogListener()
+// 操作方法
+const clearLogs = () => {
+  logStore.clearLogs()
+  message.success(t('log.clearedSuccess'))
+}
 
-  updateDisplayedLogs()
-  nextTick(() => {
-    if (autoScroll.value) {
-      scrollToBottom()
-    }
+const copyLogs = () => {
+  const logText = displayedLogs.value
+    .map((log) => `[${formatLogTime(log.timestamp)}] [${log.type.toUpperCase()}] ${log.payload}`)
+    .join('\n')
+
+  navigator.clipboard.writeText(logText).then(() => {
+    message.success(t('log.copiedSuccess'))
+  }).catch(() => {
+    message.error(t('log.copyFailed'))
   })
+}
+
+const exportLogs = () => {
+  const logText = displayedLogs.value
+    .map((log) => `[${new Date(log.timestamp).toISOString()}] [${log.type.toUpperCase()}] ${log.payload}`)
+    .join('\n')
+
+  const blob = new Blob([logText], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `logs-${new Date().toISOString().split('T')[0]}.txt`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+
+  message.success(t('log.exportedSuccess'))
+}
+
+// 监听新日志，自动滚动到底部
+watch(
+  () => displayedLogs.value.length,
+  async () => {
+    if (autoScroll.value) {
+      await nextTick()
+      if (logListRef.value) {
+        logListRef.value.scrollTo({ top: 999999, behavior: 'smooth' })
+      }
+    }
+  }
+)
+
+// 生命周期
+onMounted(() => {
+  logStore.setupEventListeners()
 })
 
-// 组件卸载时清理日志监听器
 onUnmounted(() => {
   logStore.cleanupListeners()
 })
 </script>
 
 <style scoped>
-.ultra-logs {
+.logs-page {
   padding: 16px;
-  background: var(--n-color-embedded);
-  min-height: calc(100vh - 36px);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  animation: slideFadeIn 0.4s ease-out;
+  min-height: calc(100vh - 48px);
+  background: v-bind('themeStore.isDark ? "#18181b" : "#f8fafc"');
 }
 
-/* 紧凑工具栏 */
-.logs-toolbar {
-  background: var(--n-card-color);
-  border-radius: 12px;
-  padding: 12px 16px;
+/* 页面标题 */
+.page-header {
+  margin-bottom: 24px;
+}
+
+.header-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: var(--n-box-shadow-1);
-  border: 1px solid var(--n-border-color);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 16px;
+  padding: 24px 28px;
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
 }
 
-.toolbar-left {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
-.toolbar-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #ff7d00 0%, #d66600 100%);
+.header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 4px 12px rgba(255, 125, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
-.toolbar-info {
+.header-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
-.toolbar-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--n-text-color-1);
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
-.toolbar-stats {
-  font-size: 0.75rem;
-  color: var(--n-text-color-3);
+.page-subtitle {
+  font-size: 14px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
   margin: 0;
+  font-weight: 400;
 }
 
-.toolbar-right {
+.header-actions {
   display: flex;
+  gap: 16px;
   align-items: center;
-}
-
-.toolbar-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .auto-scroll-switch {
-  min-width: 60px;
+  font-weight: 500;
 }
 
-.log-filter-select {
-  min-width: 100px;
-}
-
-.action-btn {
-  height: 28px;
-  padding: 0 8px;
-  font-size: 0.75rem;
-  transition: all 0.2s ease;
-}
-
-.action-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.clear-btn:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(245, 63, 63, 0.3);
-}
-
-.copy-btn:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(64, 128, 255, 0.3);
-}
-
-.export-btn:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(0, 180, 42, 0.3);
-}
-
-/* 统计面板 */
-.stats-panel {
+/* 统计卡片 */
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  background: var(--n-card-color);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: var(--n-box-shadow-1);
-  border: 1px solid var(--n-border-color);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
 }
 
-.stat-orb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  position: relative;
+.stat-card {
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
+  transition: all 0.3s ease;
   overflow: hidden;
+  position: relative;
 }
 
-.stat-orb:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.stat-orb::before {
+.stat-card::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  border-radius: 8px 8px 0 0;
+  height: 3px;
 }
 
-.orb-info::before {
-  background: linear-gradient(90deg, #909399 0%, #7b7e83 100%);
+.info-card::before {
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
 }
 
-.orb-warning::before {
-  background: linear-gradient(90deg, #ff7d00 0%, #d66600 100%);
+.warning-card::before {
+  background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
 }
 
-.orb-error::before {
-  background: linear-gradient(90deg, #f53f3f 0%, #cb2a2a 100%);
+.error-card::before {
+  background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
 }
 
-.orb-success::before {
-  background: linear-gradient(90deg, #00b42a 0%, #009a1a 100%);
+.success-card::before {
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
 }
 
-.orb-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.15)" : "rgba(0, 0, 0, 0.1)"');
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-weight: 500;
+  flex-shrink: 0;
 }
 
-.orb-info .orb-icon {
-  background: linear-gradient(135deg, #909399 0%, #7b7e83 100%);
+.info-card .stat-icon {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
-.orb-warning .orb-icon {
-  background: linear-gradient(135deg, #ff7d00 0%, #d66600 100%);
+.warning-card .stat-icon {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
 }
 
-.orb-error .orb-icon {
-  background: linear-gradient(135deg, #f53f3f 0%, #cb2a2a 100%);
+.error-card .stat-icon {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 
-.orb-success .orb-icon {
-  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
+.success-card .stat-icon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
-.orb-content {
+.stat-info {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
-.orb-value {
-  font-size: 1rem;
+.stat-value {
+  font-size: 24px;
   font-weight: 700;
-  color: var(--n-text-color-1);
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
   line-height: 1.2;
+  margin-bottom: 4px;
 }
 
-.orb-label {
-  font-size: 0.7rem;
-  color: var(--n-text-color-3);
+.stat-label {
+  font-size: 13px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
   font-weight: 500;
 }
 
-/* 日志内容区域 */
-.logs-content {
-  flex: 1;
+/* 筛选卡片 */
+.filter-card {
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
+  margin-bottom: 24px;
+}
+
+.filter-content {
+  padding: 8px;
+}
+
+.filter-row {
   display: flex;
-  flex-direction: column;
   gap: 16px;
-  min-height: 0;
+  margin-bottom: 16px;
 }
 
-/* 搜索区域 */
-.search-section {
-  background: var(--n-card-color);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: var(--n-box-shadow-1);
-  border: 1px solid var(--n-border-color);
-}
-
-.search-input-group {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+.filter-row:last-child {
+  margin-bottom: 0;
 }
 
 .search-input {
   flex: 1;
-  min-width: 280px;
 }
 
-.search-input :deep(.n-input) {
-  border-radius: 8px;
-  border: 1px solid var(--n-border-color);
-  transition: all 0.2s ease;
+.filter-select {
+  width: 200px;
 }
 
-.search-input :deep(.n-input:hover) {
-  border-color: #ff7d00;
-}
-
-.search-input :deep(.n-input.n-input--focus) {
-  border-color: #ff7d00;
-  box-shadow: 0 0 0 2px rgba(255, 125, 0, 0.1);
-}
-
-.search-stats {
+.filter-actions {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* 日志卡片 */
+.logs-card {
+  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
+}
+
+.logs-content {
+  padding: 8px;
+}
+
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+}
+
+.logs-info {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.logs-count {
+  font-size: 14px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  font-weight: 500;
+}
+
+.logs-time {
+  font-size: 12px;
+  color: v-bind('themeStore.isDark ? "#64748b" : "#94a3b8"');
 }
 
 /* 日志列表 */
 .logs-list {
-  flex: 1;
-  background: var(--n-card-color);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: var(--n-box-shadow-1);
-  border: 1px solid var(--n-border-color);
-  min-height: 0;
-}
-
-.logs-container {
-  height: 100%;
-  min-height: 300px;
-}
-
-.log-virtual-list {
-  height: 100%;
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 8px;
 }
 
 .log-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  background: var(--n-color-embedded);
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.02)" : "rgba(0, 0, 0, 0.02)"');
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
   border-radius: 8px;
+  padding: 12px 16px;
   margin-bottom: 8px;
-  border: 1px solid var(--n-border-color);
   transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
+  border-left: 3px solid transparent;
 }
 
 .log-item:hover {
-  background: var(--n-color-embedded-modal);
-  border-color: #ff7d00;
-  transform: translateX(2px);
-  box-shadow: 0 2px 8px rgba(255, 125, 0, 0.1);
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.04)"');
 }
 
-.log-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: transparent;
-  transition: background 0.2s ease;
+.log-item.log-info {
+  border-left-color: #3b82f6;
 }
 
-.log-item:hover::before {
-  background: #ff7d00;
+.log-item.log-warning {
+  border-left-color: #f59e0b;
 }
 
-.log-indicator {
-  width: 4px;
-  border-radius: 2px;
-  flex-shrink: 0;
-  margin-top: 2px;
+.log-item.log-error {
+  border-left-color: #ef4444;
 }
 
-.log-item-info .log-indicator {
-  background: linear-gradient(135deg, #909399 0%, #7b7e83 100%);
-}
-
-.log-item-warning .log-indicator {
-  background: linear-gradient(135deg, #ff7d00 0%, #d66600 100%);
-}
-
-.log-item-error .log-indicator {
-  background: linear-gradient(135deg, #f53f3f 0%, #cb2a2a 100%);
-}
-
-.log-item-success .log-indicator {
-  background: linear-gradient(135deg, #00b42a 0%, #009a1a 100%);
-}
-
-.log-content {
-  flex: 1;
-  min-width: 0;
+.log-item.log-success {
+  border-left-color: #10b981;
 }
 
 .log-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.log-type-badge {
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.type-info {
-  background: rgba(144, 147, 153, 0.1);
-  color: #7b7e83;
-  border: 1px solid rgba(144, 147, 153, 0.2);
-}
-
-.type-warning {
-  background: rgba(255, 125, 0, 0.1);
-  color: #d66600;
-  border: 1px solid rgba(255, 125, 0, 0.2);
-}
-
-.type-error {
-  background: rgba(245, 63, 63, 0.1);
-  color: #cb2a2a;
-  border: 1px solid rgba(245, 63, 63, 0.2);
-}
-
-.type-success {
-  background: rgba(0, 180, 42, 0.1);
-  color: #009a1a;
-  border: 1px solid rgba(0, 180, 42, 0.2);
+  margin-bottom: 8px;
 }
 
 .log-time {
-  font-size: 0.7rem;
-  color: var(--n-text-color-3);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 12px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
   font-weight: 500;
-  background: var(--n-color-embedded-modal);
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
-.log-message {
-  font-size: 0.8rem;
+.log-content {
+  font-size: 13px;
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
   line-height: 1.5;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  color: var(--n-text-color-1);
-  word-break: break-word;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  word-break: break-all;
 }
 
-/* 高亮标记 */
-.log-message :deep(span[style*="background"]) {
-  background: rgba(255, 125, 0, 0.2) !important;
-  color: var(--n-text-color-1) !important;
-  padding: 1px 2px;
-  border-radius: 2px;
-  font-weight: 600;
+.log-text {
+  white-space: pre-wrap;
 }
 
 /* 空状态 */
@@ -914,185 +741,104 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
-  padding: 40px 20px;
+  min-height: 400px;
+  padding: 40px 16px;
   text-align: center;
 }
 
 .empty-icon {
-  color: var(--n-text-color-disabled);
-  margin-bottom: 16px;
-  opacity: 0.5;
+  color: v-bind('themeStore.isDark ? "#4b5563" : "#9ca3af"');
+  margin-bottom: 12px;
+  opacity: 0.6;
 }
 
 .empty-title {
-  font-size: 1.125rem;
+  font-size: 20px;
   font-weight: 600;
-  color: var(--n-text-color-1);
-  margin: 0 0 8px 0;
+  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
+  margin: 0 0 12px 0;
 }
 
 .empty-desc {
-  font-size: 0.875rem;
-  color: var(--n-text-color-3);
-  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  margin: 0 0 24px 0;
   line-height: 1.5;
-  max-width: 300px;
+  max-width: 400px;
 }
 
-/* 动画效果 */
-@keyframes slideFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.empty-btn {
+  height: 42px;
+  padding: 0 24px;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.empty-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 /* 响应式设计 */
-@media (max-width: 1024px) {
-  .stats-panel {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 @media (max-width: 768px) {
-  .ultra-logs {
-    padding: 12px;
+  .logs-page {
+    padding: 16px;
+  }
+
+  .header-content {
+    flex-direction: column;
+    gap: 20px;
+    padding: 16px;
+  }
+
+  .header-left {
+    width: 100%;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .stat-content {
+    padding: 16px;
     gap: 12px;
   }
 
-  .logs-toolbar {
-    padding: 10px 12px;
+  .stat-icon {
+    width: 40px;
+    height: 40px;
   }
 
-  .toolbar-icon {
-    width: 28px;
-    height: 28px;
+  .stat-value {
+    font-size: 20px;
   }
 
-  .toolbar-title {
-    font-size: 0.875rem;
-  }
-
-  .toolbar-stats {
-    font-size: 0.7rem;
-  }
-
-  .toolbar-controls {
-    gap: 6px;
-  }
-
-  .auto-scroll-switch {
-    min-width: 50px;
-  }
-
-  .log-filter-select {
-    min-width: 80px;
-  }
-
-  .action-btn {
-    padding: 0 6px;
-    font-size: 0.7rem;
-  }
-
-  .stats-panel {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    padding: 12px;
-  }
-
-  .stat-orb {
-    padding: 8px;
+  .filter-row {
     flex-direction: column;
-    text-align: center;
-    gap: 4px;
+    gap: 12px;
   }
 
-  .orb-icon {
-    width: 24px;
-    height: 24px;
+  .filter-select {
+    width: 100%;
   }
 
-  .orb-value {
-    font-size: 0.875rem;
-  }
-
-  .orb-label {
-    font-size: 0.65rem;
-  }
-
-  .search-input-group {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .search-input {
-    min-width: unset;
-  }
-
-  .log-item {
-    padding: 10px;
-    gap: 8px;
-  }
-
-  .log-type-badge {
-    font-size: 0.65rem;
-    padding: 1px 4px;
-  }
-
-  .log-time {
-    font-size: 0.65rem;
-    padding: 1px 4px;
-  }
-
-  .log-message {
-    font-size: 0.75rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .ultra-logs {
-    padding: 8px;
-    gap: 8px;
-  }
-
-  .logs-toolbar {
-    padding: 8px 10px;
-  }
-
-  .toolbar-left {
-    gap: 8px;
-  }
-
-  .toolbar-icon {
-    width: 24px;
-    height: 24px;
-  }
-
-  .toolbar-title {
-    font-size: 0.8rem;
-  }
-
-  .toolbar-controls {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
-  .search-section {
-    padding: 12px;
+  .filter-actions {
+    justify-content: center;
   }
 
   .logs-list {
-    padding: 12px;
+    max-height: 400px;
   }
 
-  .stats-panel {
-    grid-template-columns: repeat(2, 1fr);
+  .log-item {
+    padding: 10px 12px;
   }
 
   .log-header {
@@ -1100,62 +846,99 @@ onUnmounted(() => {
     align-items: flex-start;
     gap: 4px;
   }
+}
 
-  .log-type-badge {
-    font-size: 0.6rem;
+@media (max-width: 480px) {
+  .logs-page {
+    padding: 12px;
   }
 
-  .log-message {
-    font-size: 0.7rem;
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header-content {
+    padding: 16px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+  }
+
+  .log-item {
+    padding: 8px 10px;
+  }
+
+  .log-content {
+    font-size: 12px;
   }
 
   .empty-state {
-    padding: 32px 16px;
-    min-height: 250px;
+    padding: 40px 16px;
+    min-height: 300px;
   }
 
   .empty-title {
-    font-size: 1rem;
+    font-size: 18px;
   }
 
   .empty-desc {
-    font-size: 0.8rem;
+    font-size: 13px;
   }
 }
 
-/* Naive UI 组件优化 */
-:deep(.n-spin-container) {
-  min-height: 200px;
-}
-
-:deep(.n-input__input-el) {
-  font-size: 0.875rem !important;
-}
-
-:deep(.n-base-selection-label) {
-  font-size: 0.875rem !important;
-}
-
-:deep(.n-button__content) {
-  font-size: 0.75rem !important;
-}
-
-:deep(.n-scrollbar-rail) {
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.05);
-}
-
-:deep(.n-scrollbar-rail--vertical) {
+/* 滚动条美化 */
+.logs-list::-webkit-scrollbar {
   width: 6px;
 }
 
-:deep(.n-scrollbar-content) {
-  border-radius: 6px;
-  background: rgba(255, 125, 0, 0.3);
-  transition: all 0.2s ease;
+.logs-list::-webkit-scrollbar-track {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.04)"');
+  border-radius: 3px;
 }
 
-:deep(.n-scrollbar-content:hover) {
-  background: rgba(255, 125, 0, 0.5);
+.logs-list::-webkit-scrollbar-thumb {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.2)" : "rgba(0, 0, 0, 0.2)"');
+  border-radius: 3px;
+}
+
+.logs-list::-webkit-scrollbar-thumb:hover {
+  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"');
+}
+
+/* Naive UI 组件优化 */
+:deep(.n-input) {
+  border-radius: 10px;
+}
+
+:deep(.n-base-selection) {
+  border-radius: 10px;
+}
+
+:deep(.n-tag) {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+:deep(.n-button) {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+:deep(.n-switch) {
+  font-weight: 500;
+}
+
+/* 高亮样式 */
+mark {
+  background: rgba(91, 76, 253, 0.2) !important;
+  color: #5b4cfd !important;
+  padding: 2px 4px !important;
+  border-radius: 4px !important;
+  font-weight: 600 !important;
 }
 </style>
