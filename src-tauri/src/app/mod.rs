@@ -1,6 +1,6 @@
 // App module - Main application services
 pub mod constants;
-// pub mod storage; // 暂时禁用存储模块
+pub mod storage; // 重新启用存储模块
 
 // Core services
 pub mod core {
@@ -32,7 +32,7 @@ pub use system::system_service;
 pub use system::update_service;
 
 // Re-export storage service
-// pub use storage::*; // 暂时禁用存储模块
+pub use storage::*; // 重新启用存储模块
 
 // Re-export constants for backward compatibility
 pub use constants::common::log;
