@@ -419,7 +419,21 @@ export default {
     },
   },
 
-  // 通知消息
+  // トレイメニュー
+  tray: {
+    kernel: 'カーネル',
+    show: 'ウィンドウを表示',
+    start: 'カーネルを起動',
+    stop: 'カーネルを停止',
+    quit: 'アプリケーションを終了',
+  },
+
+  // プロキシ関連
+  proxy: {
+    currentMode: '現在のモード',
+  },
+
+  // 通知メッセージ
   notification: {
     proxyModeChanged: 'プロキシモードが変更されました',
     proxyModeChangeFailed: 'プロキシモードの変更に失敗しました',

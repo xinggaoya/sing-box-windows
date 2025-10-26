@@ -419,6 +419,20 @@ export default {
     },
   },
 
+  // Tray menu
+  tray: {
+    kernel: 'Kernel',
+    show: 'Show Window',
+    start: 'Start Kernel',
+    stop: 'Stop Kernel',
+    quit: 'Quit Application',
+  },
+
+  // Proxy related
+  proxy: {
+    currentMode: 'Current Mode',
+  },
+
   // Notification messages
   notification: {
     proxyModeChanged: 'Proxy mode changed',

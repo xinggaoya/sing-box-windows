@@ -419,7 +419,21 @@ export default {
     },
   },
 
-  // 通知消息
+  // Меню трея
+  tray: {
+    kernel: 'Ядро',
+    show: 'Показать окно',
+    start: 'Запустить ядро',
+    stop: 'Остановить ядро',
+    quit: 'Выйти из приложения',
+  },
+
+  // Прокси связанные
+  proxy: {
+    currentMode: 'Текущий режим',
+  },
+
+  // Уведомления
   notification: {
     proxyModeChanged: 'Режим прокси изменен',
     proxyModeChangeFailed: 'Ошибка изменения режима прокси',

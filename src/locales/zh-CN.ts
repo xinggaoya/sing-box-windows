@@ -419,6 +419,20 @@ export default {
     },
   },
 
+  // 托盘菜单
+  tray: {
+    kernel: '内核',
+    show: '显示窗口',
+    start: '启动内核',
+    stop: '停止内核',
+    quit: '退出应用',
+  },
+
+  // 代理相关
+  proxy: {
+    currentMode: '当前模式',
+  },
+
   // 通知消息
   notification: {
     proxyModeChanged: '代理模式已更改',
