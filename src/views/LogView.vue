@@ -414,7 +414,7 @@ watch(
 
 // 生命周期
 onMounted(() => {
-  logStore.setupEventListeners()
+  logStore.setupLogListener()
 })
 
 onUnmounted(() => {

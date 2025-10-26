@@ -22,7 +22,7 @@
             </div>
             <div class="stat-item">
               <span class="stat-label">{{ t('sub.active') }}</span>
-              <span class="stat-value">{{ subStore.activeIndex >= 0 ? 1 : 0 }}</span>
+              <span class="stat-value">{{ (subStore.activeIndex !== null && subStore.activeIndex >= 0) ? 1 : 0 }}</span>
             </div>
           </div>
           <n-button

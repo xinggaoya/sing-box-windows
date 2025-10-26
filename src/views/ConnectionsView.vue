@@ -426,7 +426,7 @@ const getNetworkTagType = (network: string): 'info' | 'warning' | 'default' => {
 }
 
 const getRuleTagType = (rule: string): 'success' | 'error' | 'info' | 'warning' => {
-  if (!rule) return 'default'
+  if (!rule) return 'info'
   if (rule.includes('direct')) return 'success'
   if (rule.includes('proxy')) return 'info'
   if (rule.includes('reject')) return 'error'
