@@ -419,6 +419,11 @@ const runKernel = async () => {
     const result = await kernelApi.startKernel()
     if (result.success) {
       message.success(t('home.startSuccess'))
+
+      // 启动成功后等待片刻再刷新状态
+      setTimeout(async () => {
+        await refreshKernelStatus()
+      }, 1000)
     } else {
       message.error(result.message || t('home.startFailed'))
     }
@@ -439,12 +444,23 @@ const stopKernel = async () => {
     const result = await kernelApi.stopKernel()
     if (result.success) {
       message.success(t('home.stopSuccess'))
+
+      // 停止成功后立即刷新状态
+      await refreshKernelStatus()
     } else {
       message.error(result.message || t('home.stopFailed'))
     }
   } catch (error) {
     console.error('停止内核失败:', error)
-    message.error(t('home.stopFailed'))
+    // 检查错误消息，如果包含"成功"字样，则显示成功
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (errorMsg.includes('成功') || errorMsg.includes('success')) {
+      message.success(t('home.stopSuccess'))
+      // 即使出错也尝试刷新状态
+      await refreshKernelStatus()
+    } else {
+      message.error(t('home.stopFailed'))
+    }
   } finally {
     isStopping.value = false
   }
@@ -508,6 +524,24 @@ const handleNodeProxyModeChange = async (mode: string) => {
   } catch (error) {
     console.error('切换节点代理模式失败:', error)
     message.error(t('home.nodeModeChangeFailed'))
+  }
+}
+
+// 刷新内核状态
+const refreshKernelStatus = async () => {
+  try {
+    console.log('🔄 刷新内核状态...')
+
+    // 强制刷新状态
+    const { kernelService } = await import('@/services/kernel-service')
+    const newStatus = await kernelService.forceRefreshStatus()
+
+    console.log('📊 内核状态已更新:', newStatus)
+
+    // 更新 store 状态
+    await kernelStore.syncStatus()
+  } catch (error) {
+    console.error('刷新内核状态失败:', error)
   }
 }
 

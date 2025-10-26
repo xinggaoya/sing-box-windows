@@ -429,7 +429,7 @@ export default {
   },
 
   // 代理相关
-  proxy: {
+  proxyMode: {
     currentMode: '当前模式',
   },
 

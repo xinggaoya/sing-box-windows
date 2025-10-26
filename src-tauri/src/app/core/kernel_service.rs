@@ -1186,62 +1186,83 @@ pub async fn get_system_uptime() -> Result<u64, String> {
 
 /// 重构版本的启动命令 - 增强版
 #[tauri::command]
-pub async fn kernel_start_enhanced(app_handle: AppHandle, proxy_mode: Option<String>, api_port: Option<u16>) -> Result<String, String> {
+pub async fn kernel_start_enhanced(app_handle: AppHandle, proxy_mode: Option<String>, api_port: Option<u16>) -> Result<serde_json::Value, String> {
     info!("🚀 启动内核增强版，代理模式: {:?}, API端口: {:?}", proxy_mode, api_port);
-    
+
     // 检查内核是否已在运行
     if is_kernel_running().await.unwrap_or(false) {
         info!("内核已在运行中");
-        return Ok("内核已在运行中".to_string());
+        return Ok(serde_json::json!({
+            "success": true,
+            "message": "内核已在运行中".to_string()
+        }));
     }
 
     // 启动内核进程
     match PROCESS_MANAGER.start().await {
         Ok(_) => {
             info!("✅ 内核进程启动成功");
-            
+
             // 如果提供了API端口，尝试启动事件中继
             if let Some(port) = api_port {
                 info!("🔌 启动事件中继服务，端口: {}", port);
                 match start_websocket_relay(app_handle.clone(), Some(port)).await {
                     Ok(_) => {
                         info!("✅ 事件中继启动成功");
-                        
+
                         // 发送内核就绪事件
                         let _ = app_handle.emit("kernel-ready", ());
-                        
-                        Ok("内核启动成功，事件中继已启动".to_string())
+
+                        Ok(serde_json::json!({
+                            "success": true,
+                            "message": "内核启动成功，事件中继已启动".to_string()
+                        }))
                     }
                     Err(e) => {
                         warn!("⚠️ 事件中继启动失败: {}, 但内核进程已启动", e);
-                        
+
                         // 即使事件中继失败，内核也已经启动了
                         let _ = app_handle.emit("kernel-ready", ());
-                        
-                        Ok("内核启动成功，但事件中继启动失败".to_string())
+
+                        Ok(serde_json::json!({
+                            "success": true,
+                            "message": "内核启动成功，但事件中继启动失败".to_string()
+                        }))
                     }
                 }
             } else {
                 // 没有提供API端口，只发送内核就绪事件
                 let _ = app_handle.emit("kernel-ready", ());
-                Ok("内核启动成功".to_string())
+                Ok(serde_json::json!({
+                    "success": true,
+                    "message": "内核启动成功".to_string()
+                }))
             }
         }
         Err(e) => {
             error!("❌ 内核启动失败: {}", e);
-            Err(format!("内核启动失败: {}", e))
+            Ok(serde_json::json!({
+                "success": false,
+                "message": format!("内核启动失败: {}", e)
+            }))
         }
     }
 }
 
 /// 重构版本的停止命令 - 增强版
 #[tauri::command]
-pub async fn kernel_stop_enhanced() -> Result<String, String> {
+pub async fn kernel_stop_enhanced() -> Result<serde_json::Value, String> {
     info!("🛑 停止内核增强版");
-    
+
     match stop_kernel().await {
-        Ok(_) => Ok("内核停止成功".to_string()),
-        Err(e) => Err(format!("内核停止失败: {}", e)),
+        Ok(_) => Ok(serde_json::json!({
+            "success": true,
+            "message": "内核停止成功".to_string()
+        })),
+        Err(e) => Ok(serde_json::json!({
+            "success": false,
+            "message": format!("内核停止失败: {}", e)
+        })),
     }
 }
 
@@ -1250,37 +1271,58 @@ pub async fn kernel_stop_enhanced() -> Result<String, String> {
 pub async fn kernel_get_status_enhanced(api_port: Option<u16>) -> Result<serde_json::Value, String> {
     // 使用传递的端口或默认端口12081（与AppStore默认值保持一致）
     let port = api_port.unwrap_or(12081);
-    
+
     let process_running = is_kernel_running().await?;
     let mut api_ready = false;
     let mut websocket_ready = false;
-    
+    let mut error = None;
+
     if process_running {
         // 检查API状态
         let client = http_client::get_client();
         let api_url = format!("http://127.0.0.1:{}/version", port);
-        
+
         api_ready = match client.get(&api_url).timeout(Duration::from_secs(2)).send().await {
             Ok(response) if response.status().is_success() => true,
-            _ => false,
+            Ok(response) => {
+                error = Some(format!("API返回错误状态码: {}", response.status()));
+                false
+            },
+            Err(e) => {
+                error = Some(format!("API连接失败: {}", e));
+                false
+            }
         };
-        
+
         // 检查WebSocket状态（简化版）
         if api_ready {
             let token = crate::app::core::proxy_service::get_api_token();
             let url_str = format!("ws://127.0.0.1:{}/traffic?token={}", port, token);
-            
-            websocket_ready = tokio_tungstenite::connect_async(&url_str).await.is_ok();
+
+            // 使用超时连接WebSocket
+            websocket_ready = tokio::time::timeout(
+                Duration::from_secs(3),
+                tokio_tungstenite::connect_async(&url_str)
+            ).await.is_ok();
+
+            if !websocket_ready && error.is_none() {
+                error = Some("WebSocket连接失败".to_string());
+            }
+        }
+
+        // 如果进程运行但API不可用，提供详细错误信息
+        if !api_ready && error.is_none() {
+            error = Some("内核进程运行中但API服务不可用".to_string());
         }
     }
-    
+
     Ok(serde_json::json!({
         "process_running": process_running,
         "api_ready": api_ready,
         "websocket_ready": websocket_ready,
         "uptime_ms": 0,
         "version": null,
-        "error": null
+        "error": error
     }))
 }
 

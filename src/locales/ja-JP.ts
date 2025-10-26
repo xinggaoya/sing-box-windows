@@ -429,7 +429,7 @@ export default {
   },
 
   // プロキシ関連
-  proxy: {
+  proxyMode: {
     currentMode: '現在のモード',
   },
 

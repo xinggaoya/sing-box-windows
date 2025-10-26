@@ -67,17 +67,17 @@ class KernelService {
       console.log('🔌 使用端口配置:', { apiPort, proxyMode })
       
       // 使用新的增强启动命令
-      const result = await invoke<string>('kernel_start_enhanced', { 
+      const result = await invoke<{ success: boolean; message: string }>('kernel_start_enhanced', {
         proxyMode,
-        apiPort 
+        apiPort
       })
-      
+
       console.log('✅ 内核启动结果:', result)
-      
+
       // 清除状态缓存
       this.clearStatusCache()
-      
-      return { success: true, message: result }
+
+      return result
     } catch (error) {
       console.error('❌ 内核启动失败:', error)
       return { 
@@ -107,14 +107,14 @@ class KernelService {
       console.log('🛑 开始停止内核...', options)
       
       // 使用新的增强停止命令
-      const result = await invoke<string>('kernel_stop_enhanced')
-      
+      const result = await invoke<{ success: boolean; message: string }>('kernel_stop_enhanced')
+
       console.log('✅ 内核停止结果:', result)
-      
+
       // 清除状态缓存
       this.clearStatusCache()
-      
-      return { success: true, message: result }
+
+      return result
     } catch (error) {
       console.error('❌ 内核停止失败:', error)
       return { 
@@ -324,6 +324,18 @@ class KernelService {
    */
   private clearStatusCache(): void {
     this.statusCache.clear()
+    console.log('🧹 已清除内核状态缓存')
+  }
+
+  /**
+   * 强制刷新状态（跳过缓存）
+   */
+  async forceRefreshStatus(): Promise<KernelStatus> {
+    // 清除缓存
+    this.clearStatusCache()
+
+    // 立即获取新状态
+    return await this.getKernelStatus()
   }
 
   /**

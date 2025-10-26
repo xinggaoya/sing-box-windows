@@ -429,7 +429,7 @@ export default {
   },
 
   // Proxy related
-  proxy: {
+  proxyMode: {
     currentMode: 'Current Mode',
   },
 
