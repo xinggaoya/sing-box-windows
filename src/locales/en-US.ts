@@ -306,6 +306,7 @@ export default {
     network: {
       ipv6: 'IPv6 Support',
       ipv4Only: 'IPv4 Only',
+      ipv6Enabled: 'IPv6 Enabled',
       ipv6Desc: 'Enable or disable IPv6 network protocol support',
       ipVersionChanged: 'IP version settings changed',
       ports: 'Port Settings',
@@ -385,6 +386,8 @@ export default {
       title: 'Kernel Management',
       description: 'Manage Sing-Box kernel version and download',
       download: 'Download Kernel',
+      redownload: 'Redownload',
+      update: 'Update Kernel',
       checkInstall: 'Check Installation',
       downloadComplete: 'Kernel download complete!',
       installSuccess: 'Kernel installation verification successful!',

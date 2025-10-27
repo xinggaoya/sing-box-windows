@@ -306,6 +306,7 @@ export default {
     network: {
       ipv6: 'IPv6 支持',
       ipv4Only: '仅使用 IPv4',
+      ipv6Enabled: 'IPv6 已启用',
       ipv6Desc: '启用或禁用 IPv6 网络协议支持',
       ipVersionChanged: 'IP 版本设置已更改',
       ports: '端口设置',
@@ -385,6 +386,8 @@ export default {
       title: '内核管理',
       description: '管理 Sing-Box 内核版本和下载',
       download: '下载内核',
+      redownload: '重新下载',
+      update: '更新内核',
       checkInstall: '检查安装',
       downloadComplete: '内核下载完成！',
       installSuccess: '内核安装验证成功！',

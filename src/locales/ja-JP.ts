@@ -306,6 +306,7 @@ export default {
     network: {
       ipv6: 'IPv6 サポート',
       ipv4Only: 'IPv4 のみ',
+      ipv6Enabled: 'IPv6が有効',
       ipv6Desc: 'IPv6ネットワークプロトコルサポートを有効または無効にする',
       ipVersionChanged: 'IPバージョン設定が変更されました',
       ports: 'ポート設定',
@@ -385,6 +386,8 @@ export default {
       title: 'カーネル管理',
       description: 'Sing-Boxカーネルバージョンとダウンロードを管理',
       download: 'カーネルをダウンロード',
+      redownload: '再ダウンロード',
+      update: 'カーネルを更新',
       checkInstall: 'インストールを確認',
       downloadComplete: 'カーネルダウンロード完了！',
       installSuccess: 'カーネルインストール確認成功！',

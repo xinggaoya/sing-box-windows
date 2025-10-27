@@ -306,6 +306,7 @@ export default {
     network: {
       ipv6: 'Поддержка IPv6',
       ipv4Only: 'Только IPv4',
+      ipv6Enabled: 'IPv6 включен',
       ipv6Desc: 'Включить или выключить поддержку сетевого протокола IPv6',
       ipVersionChanged: 'Настройки версии IP изменены',
       ports: 'Настройки портов',
@@ -385,6 +386,8 @@ export default {
       title: 'Управление ядром',
       description: 'Управление версией ядра Sing-Box и загрузкой',
       download: 'Загрузить ядро',
+      redownload: 'Повторная загрузка',
+      update: 'Обновить ядро',
       checkInstall: 'Проверить установку',
       downloadComplete: 'Загрузка ядра завершена!',
       installSuccess: 'Проверка установки ядра прошла успешно!',
