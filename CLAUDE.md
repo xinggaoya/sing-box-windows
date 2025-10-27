@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-sing-box-windows 是一个基于 Tauri 2.0 + Vue 3 的现代化 Windows 代理客户端，提供完整的代理管理、路由规则、订阅管理和系统服务功能。
+sing-box-windows 是一个基于 Tauri 2.0 + Vue 3 的现代化跨平台代理客户端（支持 Windows 和 Linux），提供完整的代理管理、路由规则、订阅管理和系统服务功能。
 
 ### 技术栈
 
@@ -31,8 +31,14 @@ pnpm tauri dev
 # 构建生产版本
 pnpm tauri build
 
-# 构建 MSI 安装包
+# 构建 MSI 安装包 (Windows)
 pnpm tauri build -- --target x86_64-pc-windows-msi
+
+# 构建 DEB 包 (Linux)
+pnpm tauri build -- --target x86_64-unknown-linux-gnu
+
+# 构建 AppImage (Linux)
+pnpm tauri build -- --target x86_64-unknown-linux-gnu
 
 # 构建时跳过目标检查
 pnpm tauri build -- --target x86_64-pc-windows-msi --no-target-check
@@ -181,12 +187,19 @@ src-tauri/src/
 2. **错误处理**: 所有异步操作都需要适当的错误处理
 3. **类型安全**: 优先使用 TypeScript 类型，避免 any 类型
 4. **性能优化**: 大数据量操作使用虚拟滚动或分页
-5. **跨平台**: 虽然主要针对 Windows，但要保持代码的可移植性
+5. **跨平台**: 支持 Windows 和 Linux 平台，保持代码的可移植性
 
 ## 常见问题
 
 ### 构建问题
+
+**Windows:**
 - 如果遇到链接错误，检查 Visual Studio Build Tools 是否正确安装
+- 如果遇到依赖问题，尝试删除 `node_modules` 和 `src-tauri/target` 后重新安装
+
+**Linux:**
+- 确保安装了必要的依赖：`sudo apt install build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev`
+- 如果遇到权限问题，检查文件和目录权限设置
 - 如果遇到依赖问题，尝试删除 `node_modules` 和 `src-tauri/target` 后重新安装
 
 ### 开发问题

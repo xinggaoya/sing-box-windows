@@ -4,7 +4,7 @@
   <h1>Sing-Box Windows</h1>
 
   <p>
-    <strong>基于 Tauri 2.0 + Vue 3 构建的现代化 Sing-Box Windows GUI 客户端</strong>
+    <strong>基于 Tauri 2.0 + Vue 3 构建的现代化 Sing-Box 跨平台 GUI 客户端 (Windows + Linux)</strong>
   </p>
 
   <p>
@@ -25,7 +25,7 @@
     <a href="https://github.com/xinggaoya/sing-box-windows/releases">
       <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows?style=for-the-badge&logo=github" alt="GitHub release">
     </a>
-    <img src="https://img.shields.io/badge/platform-Windows-blue?style=for-the-badge&logo=windows" alt="平台支持">
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue?style=for-the-badge&logo=windows" alt="平台支持">
     <img src="https://img.shields.io/badge/version-1.8.2-informational?style=for-the-badge" alt="版本">
     <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="许可证">
   </p>
@@ -35,7 +35,7 @@
 
 ## 🌟 项目介绍
 
-Sing-Box GUI 客户端是一款尖端的 Windows 应用程序，为管理 Sing-Box 代理配置提供了现代化、直观的界面。基于强大的 Tauri 2.0 和 Vue 3 技术栈构建，提供卓越的性能、安全性和用户体验。
+Sing-Box GUI 客户端是一款尖端的跨平台应用程序（支持 Windows 和 Linux），为管理 Sing-Box 代理配置提供了现代化、直观的界面。基于强大的 Tauri 2.0 和 Vue 3 技术栈构建，提供卓越的性能、安全性和用户体验。
 
 ### 🎯 核心亮点
 
@@ -75,31 +75,69 @@ Sing-Box GUI 客户端是一款尖端的 Windows 应用程序，为管理 Sing-B
 
 ### 📥 系统要求
 
+#### Windows
 - **操作系统**: Windows 10/11 (x64)
 - **内存**: 最低 4GB RAM (推荐 8GB)
 - **存储空间**: 100MB 可用磁盘空间
 - **网络**: 订阅和更新需要网络连接
 
+#### Linux
+- **操作系统**: Ubuntu 20.04+, Fedora 36+, Debian 11+, 或等效发行版
+- **内存**: 最低 4GB RAM (推荐 8GB)
+- **存储空间**: 100MB 可用磁盘空间
+- **网络**: 订阅和更新需要网络连接
+- **依赖**: libwebkit2gtk-4.1-0, libssl3, libgtk-3-0（使用 .deb 包时自动安装）
+
 ### 🎯 安装方式
 
 #### 方式一：下载安装包（推荐）
+
+**Windows:**
 1. 访问 [发布页面](https://github.com/xinggaoya/sing-box-windows/releases)
 2. 下载最新的 `sing-box-windows-x.x.x-setup.exe`
 3. 运行安装程序并按照向导操作
 4. 从开始菜单或桌面快捷方式启动应用
 
-#### 方式二：便携版
-1. 下载最新的 `sing-box-windows-x.x.x-portable.zip`
-2. 解压到您想要的文件夹
-3. 运行 `sing-box-windows.exe`
+**Linux (.deb - Debian/Ubuntu):**
+1. 访问 [发布页面](https://github.com/xinggaoya/sing-box-windows/releases)
+2. 下载最新的 `sing-box-windows_x.x.x_amd64.deb`
+3. 使用命令安装：`sudo dpkg -i sing-box-windows_x.x.x_amd64.deb`
+4. 如果缺少依赖，运行：`sudo apt-get install -f`
+5. 从应用程序菜单启动或运行 `sing-box-windows`
 
-#### 方式三：包管理器（即将支持）
+**Linux (.AppImage - 通用版):**
+1. 访问 [发布页面](https://github.com/xinggaoya/sing-box-windows/releases)
+2. 下载最新的 `sing-box-windows-x.x.x.AppImage`
+3. 添加执行权限：`chmod +x sing-box-windows-x.x.x.AppImage`
+4. 运行：`./sing-box-windows-x.x.x.AppImage`
+
+**Linux (源码编译):**
+1. 克隆仓库：`git clone https://github.com/xinggaoya/sing-box-windows.git`
+2. 安装依赖：
+   ```bash
+   # Ubuntu/Debian
+   sudo apt update
+   sudo apt install build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+   ```
+3. 安装 Node.js 和 Rust（如果尚未安装）
+4. 构建应用：`cd sing-box-windows && pnpm tauri build`
+5. 在 `src-tauri/target/release/` 目录中找到构建好的应用程序
+
+#### 方式二：包管理器
+
+**Windows（即将支持）：**
 ```powershell
 # 使用 winget（计划中）
 winget install sing-box-windows
 
 # 使用 Chocolatey（计划中）
 choco install sing-box-windows
+```
+
+**Linux（暂时不可用）：**
+```bash
+# 注意：目前不提供 APT/DNF/Snap 仓库
+# 请使用 GitHub Releases 的预编译二进制文件或从源码编译
 ```
 
 ---
@@ -235,6 +273,7 @@ sing-box-windows/
 ### 🗄️ 存储位置
 
 - **Windows**: `%APPDATA%\sing-box-windows\*.bin` (二进制数据库文件)
+- **Linux**: `~/.local/share/sing-box-windows/*.bin` (二进制数据库文件)
 - **便携版**: `<应用目录>\*.bin` (二进制数据库文件)
 
 ### ⚙️ 配置结构

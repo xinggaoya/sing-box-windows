@@ -4,7 +4,7 @@
   <h1>Sing-Box Windows</h1>
 
   <p>
-    <strong>A modern Sing-Box GUI client for Windows built with Tauri 2.0 + Vue 3</strong>
+    <strong>A modern Sing-Box GUI client for Windows and Linux built with Tauri 2.0 + Vue 3</strong>
   </p>
 
   <p>
@@ -25,7 +25,7 @@
     <a href="https://github.com/xinggaoya/sing-box-windows/releases">
       <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows?style=for-the-badge&logo=github" alt="GitHub release">
     </a>
-    <img src="https://img.shields.io/badge/platform-Windows-blue?style=for-the-badge&logo=windows" alt="Platform">
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue?style=for-the-badge&logo=windows" alt="Platform">
     <img src="https://img.shields.io/badge/version-1.8.2-informational?style=for-the-badge" alt="Version">
     <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
   </p>
@@ -35,7 +35,7 @@
 
 ## 🌟 About
 
-Sing-Box GUI Client is a cutting-edge Windows application that provides a modern, intuitive interface for managing Sing-Box proxy configurations. Built with the powerful combination of Tauri 2.0 and Vue 3, it offers exceptional performance, security, and user experience.
+Sing-Box GUI Client is a cutting-edge cross-platform application for Windows and Linux that provides a modern, intuitive interface for managing Sing-Box proxy configurations. Built with the powerful combination of Tauri 2.0 and Vue 3, it offers exceptional performance, security, and user experience.
 
 ### 🎯 Key Highlights
 
@@ -75,31 +75,69 @@ Sing-Box GUI Client is a cutting-edge Windows application that provides a modern
 
 ### 📥 System Requirements
 
+#### Windows
 - **Operating System**: Windows 10/11 (x64)
 - **Memory**: 4GB RAM minimum (8GB recommended)
 - **Storage**: 100MB free disk space
 - **Network**: Internet connection for subscriptions and updates
 
+#### Linux
+- **Operating System**: Ubuntu 20.04+, Fedora 36+, Debian 11+, or equivalent distributions
+- **Memory**: 4GB RAM minimum (8GB recommended)
+- **Storage**: 100MB free disk space
+- **Network**: Internet connection for subscriptions and updates
+- **Dependencies**: libwebkit2gtk-4.1-0, libssl3, libgtk-3-0 (automatically installed with .deb packages)
+
 ### 🎯 Installation Methods
 
 #### Method 1: Download Release (Recommended)
+
+**Windows:**
 1. Visit the [Releases Page](https://github.com/yourusername/sing-box-windows/releases)
 2. Download the latest `sing-box-windows-x.x.x-setup.exe`
 3. Run the installer and follow the setup wizard
 4. Launch the application from Start Menu or Desktop shortcut
 
-#### Method 2: Portable Version
-1. Download the latest `sing-box-windows-x.x.x-portable.zip`
-2. Extract to your desired folder
-3. Run `sing-box-windows.exe`
+**Linux (.deb - Debian/Ubuntu):**
+1. Visit the [Releases Page](https://github.com/yourusername/sing-box-windows/releases)
+2. Download the latest `sing-box-windows_x.x.x_amd64.deb`
+3. Install using: `sudo dpkg -i sing-box-windows_x.x.x_amd64.deb`
+4. If dependencies are missing, run: `sudo apt-get install -f`
+5. Launch from your applications menu or run `sing-box-windows`
 
-#### Method 3: Package Manager (Coming Soon)
+**Linux (.AppImage - Universal):**
+1. Visit the [Releases Page](https://github.com/yourusername/sing-box-windows/releases)
+2. Download the latest `sing-box-windows-x.x.x.AppImage`
+3. Make executable: `chmod +x sing-box-windows-x.x.x.AppImage`
+4. Run: `./sing-box-windows-x.x.x.AppImage`
+
+**Linux (Source Compilation):**
+1. Clone the repository: `git clone https://github.com/yourusername/sing-box-windows.git`
+2. Install dependencies:
+   ```bash
+   # Ubuntu/Debian
+   sudo apt update
+   sudo apt install build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+   ```
+3. Install Node.js and Rust (if not already installed)
+4. Build the application: `cd sing-box-windows && pnpm tauri build`
+5. Find the built application in `src-tauri/target/release/`
+
+#### Method 2: Package Manager
+
+**Windows (Coming Soon):**
 ```powershell
 # Using winget (planned)
 winget install sing-box-windows
 
 # Using Chocolatey (planned)
 choco install sing-box-windows
+```
+
+**Linux (Not Currently Available):**
+```bash
+# Note: APT/DNF/Snap repositories are not currently available
+# Please use pre-compiled binaries from GitHub Releases or compile from source
 ```
 
 ---
@@ -235,6 +273,7 @@ This application uses **Tauri Store Plugin** for backend data persistence, which
 ### 🗄️ Storage Location
 
 - **Windows**: `%APPDATA%\sing-box-windows\*.bin` (binary database files)
+- **Linux**: `~/.local/share/sing-box-windows/*.bin` (binary database files)
 - **Portable**: `<app-directory>\*.bin` (binary database files)
 
 ### ⚙️ Configuration Structure
