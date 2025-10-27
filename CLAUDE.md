@@ -2,206 +2,248 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目概述
+## Project Overview
 
-sing-box-windows 是一个基于 Tauri 2.0 + Vue 3 的现代化跨平台代理客户端（支持 Windows 和 Linux），提供完整的代理管理、路由规则、订阅管理和系统服务功能。
+sing-box-windows is a modern cross-platform proxy client for Windows and Linux built with Tauri 2.0 + Vue 3, providing complete proxy management, routing rules, subscription management, and system service functionality.
 
-### 技术栈
+### Tech Stack
 
-- **前端**: Vue 3 + TypeScript + Vite + Pinia + Naive UI
-- **后端**: Rust + Tauri 2.0 + tokio
-- **架构**: MVVM + 模块化设计
-- **持久化**: Tauri Store (替代 localStorage)
-- **构建**: Vite (前端) + cargo-cp-artifact (Rust 后端)
+- **Frontend**: Vue 3 + TypeScript + Vite + Pinia + Naive UI
+- **Backend**: Rust + Tauri 2.0 + tokio
+- **Architecture**: MVVM + modular design
+- **Persistence**: Tauri Store (replaces localStorage) + SQLite database
+- **Build**: Vite (frontend) + cargo-cp-artifact (Rust backend)
 
-## 常用命令
+## Common Commands
 
-### 开发环境
+### Development
 ```bash
-# 安装依赖
+# Install dependencies
 pnpm install
 cd src-tauri && cargo fetch
 
-# 启动开发服务器
+# Start development server
 pnpm tauri dev
 ```
 
-### 构建和打包
+### Build and Packaging
 ```bash
-# 构建生产版本
+# Build production version
 pnpm tauri build
 
-# 构建 MSI 安装包 (Windows)
+# Build MSI installer (Windows)
 pnpm tauri build -- --target x86_64-pc-windows-msi
 
-# 构建 DEB 包 (Linux)
+# Build DEB package (Linux)
 pnpm tauri build -- --target x86_64-unknown-linux-gnu
 
-# 构建 AppImage (Linux)
+# Build AppImage (Linux)
 pnpm tauri build -- --target x86_64-unknown-linux-gnu
 
-# 构建时跳过目标检查
+# Build with target check skip
 pnpm tauri build -- --target x86_64-pc-windows-msi --no-target-check
+
+# Build all targets
+pnpm tauri build:all
 ```
 
-### 代码质量
+### Code Quality
 ```bash
-# ESLint 检查
+# ESLint check (includes OXLint)
 pnpm lint
 
-# ESLint 自动修复
-pnpm lint:fix
+# Code formatting
+pnpm format
 
-# TypeScript 类型检查
+# TypeScript type checking
 pnpm type-check
 
-# 代码格式化 (需要手动安装 rustfmt)
+# Rust code formatting (requires manual installation of rustfmt)
 cd src-tauri && cargo fmt
 ```
 
-### 测试
+### Testing
 ```bash
-# 前端单元测试
+# Frontend unit tests
 pnpm test
 
-# Rust 单元测试
+# Rust unit tests
 cd src-tauri && cargo test
 
-# Rust 文档测试
+# Rust documentation tests
 cd src-tauri && cargo test --doc
 ```
 
-## 核心架构
+## Core Architecture
 
-### 前端架构
+### Frontend Architecture
 
 ```
 src/
-├── stores/          # Pinia 状态管理 (自定义 StoreManager)
-│   ├── app/        # 应用相关 stores (AppStore, ThemeStore, LocaleStore等)
-│   ├── kernel/     # 内核相关 stores (KernelStore, ProxyStore, TrafficStore等)
-│   ├── subscription/ # 订阅相关 store
-│   └── tray/       # 系统托盘 store
-├── components/      # Vue 组件
-│   ├── layout/     # 布局组件 (MainLayout, TrafficChart)
-│   ├── home/       # 首页组件 (ProxyModeCard, TrafficStatsCard等)
-│   └── utils/      # 工具组件 (LazyComponent, VirtualList, UpdateModal)
-├── views/           # 页面视图
-├── services/        # API 服务层 (websocket-service, tauri命令封装)
-├── utils/           # 工具函数 (内存管理、性能优化)
-├── locales/         # 国际化文件
-└── types/           # TypeScript 类型定义
+├── stores/          # Pinia state management (custom StoreManager)
+│   ├── app/        # App-related stores (AppStore, ThemeStore, LocaleStore, etc.)
+│   ├── kernel/     # Kernel-related stores (KernelStore, ProxyStore, TrafficStore, etc.)
+│   ├── subscription/ # Subscription store
+│   └── tray/       # System tray store
+├── components/      # Vue components
+│   ├── layout/     # Layout components (MainLayout, TrafficChart)
+│   ├── home/       # Homepage components (ProxyModeCard, TrafficStatsCard, etc.)
+│   └── utils/      # Utility components (LazyComponent, VirtualList, UpdateModal)
+├── views/           # Page views
+├── services/        # API service layer (websocket-service, tauri command wrappers)
+├── utils/           # Utility functions (memory management, performance optimization)
+├── locales/         # Internationalization files
+└── types/           # TypeScript type definitions
 ```
 
-### 后端架构
+### Backend Architecture
 
 ```
 src-tauri/src/
-├── app/             # 应用服务层
-│   ├── core/       # 核心服务 (kernel_service, proxy_service)
-│   ├── network/    # 网络服务 (subscription_service)
-│   ├── system/     # 系统服务 (system_service, update_service)
-│   └── constants/  # 常量定义
-├── entity/          # 数据实体模型
-├── process/         # 进程管理
-├── utils/           # 工具函数
-├── main.rs          # 程序入口
-└── lib.rs           # 库入口和命令注册
+├── app/             # Application service layer
+│   ├── core/       # Core services (kernel_service, proxy_service)
+│   ├── network/    # Network services (subscription_service)
+│   ├── system/     # System services (system_service, update_service, config_service)
+│   ├── storage/    # Storage services (enhanced_storage_service with SQLite)
+│   └── constants/  # Constants definitions
+├── entity/          # Data entity models
+├── process/         # Process management
+├── utils/           # Utility functions
+├── main.rs          # Program entry point
+└── lib.rs           # Library entry point and command registration
 ```
 
-## 关键特性
+## Key Features
 
-### 1. Store 管理系统
-- **自定义 StoreManager**: 支持按需加载和内存优化
-- **防抖持久化**: 自动防抖保存状态到 Tauri Store
-- **内存泄漏检测**: 内置内存泄漏检测和自动清理机制
+### 1. Store Management System
+- **Custom StoreManager**: Supports lazy loading and memory optimization
+- **Debounced Persistence**: Auto-debounce save state to Tauri Store and SQLite
+- **Memory Leak Detection**: Built-in memory leak detection and auto-cleanup mechanism
+- **Route-based Preloading**: Stores are preloaded based on route requirements
 
-### 2. 前后端通信
-- **Tauri Commands**: 所有前端调用通过 Tauri 命令
-- **统一错误处理**: 后端统一返回 Result<T, String> 格式
-- **类型安全**: 使用 typescript-bindings 保证类型安全
+### 2. Frontend-Backend Communication
+- **Tauri Commands**: All frontend calls go through Tauri commands
+- **Unified Error Handling**: Backend returns Result<T, String> format consistently
+- **Type Safety**: Uses typescript-bindings to ensure type safety
+- **WebSocket Communication**: Real-time updates via WebSocket for kernel status and traffic
 
-### 3. 模块化设计
-- **组件按功能分组**: 每个功能模块独立的组件目录
-- **服务层抽象**: API 调用封装在 services/ 目录
-- **类型定义集中**: 统一的 TypeScript 类型定义
+### 3. Modular Design
+- **Components grouped by functionality**: Each functional module has independent component directories
+- **Service layer abstraction**: API calls wrapped in services/ directory
+- **Centralized type definitions**: Unified TypeScript type definitions
+- **Enhanced Storage**: Hybrid storage using Tauri Store for settings and SQLite for structured data
 
-### 4. 性能优化
-- **虚拟滚动**: 使用自定义 VirtualList.vue 组件优化大列表
-- **懒加载**: 使用 LazyComponent.vue 实现组件按需加载
-- **内存管理**: 内置内存泄漏检测和 WebSocket 连接清理
-- **自动导入**: 使用 unplugin-auto-import 和 unplugin-vue-components
+### 4. Performance Optimization
+- **Virtual Scrolling**: Custom VirtualList.vue component optimizes large lists
+- **Lazy Loading**: LazyComponent.vue implements on-demand component loading
+- **Memory Management**: Built-in memory leak detection and WebSocket connection cleanup
+- **Auto Imports**: Uses unplugin-auto-import and unplugin-vue-components
 
-## 开发规范
+## Development Workflow
 
-### 新增功能步骤
-1. 在 `types/` 中定义 TypeScript 类型
-2. 在 `stores/` 中创建状态管理 (如需要)
-3. 在 `services/` 中创建 API 服务层
-4. 在 `components/` 中创建 UI 组件
-5. 在 `views/` 中创建页面视图
-6. 在 `src-tauri/commands/` 中实现后端命令
-7. 更新路由配置 (如需要)
+### Adding New Features
+1. Define TypeScript types in `types/`
+2. Create state management in `stores/` (if needed)
+3. Create API service layer in `services/`
+4. Create UI components in `components/`
+5. Create page views in `views/`
+6. Implement backend commands in `src-tauri/src/app/`
+7. Update routing configuration (if needed)
+8. Register new Tauri commands in `lib.rs`
 
-### 组件命名规范
-- **页面组件**: 使用 PascalCase，如 `ProxyPage.vue`
-- **功能组件**: 使用 PascalCase，如 `ProxyConfig.vue`
-- **工具组件**: 使用 PascalCase，如 `LoadingSpinner.vue`
+### Component Naming Conventions
+- **Page components**: Use PascalCase, e.g., `ProxyPage.vue`
+- **Functional components**: Use PascalCase, e.g., `ProxyConfig.vue`
+- **Utility components**: Use PascalCase, e.g., `LoadingSpinner.vue`
 
-### 状态管理规范
-- **Store 命名**: 功能名 + Store，如 `proxyStore`
-- **Action 命名**: 动词 + 名词，如 `updateConfig`
-- **State 命名**: 使用 camelCase，避免缩写
+### State Management Conventions
+- **Store naming**: Feature name + Store, e.g., `proxyStore`
+- **Action naming**: Verb + noun, e.g., `updateConfig`
+- **State naming**: Use camelCase, avoid abbreviations
 
-## 调试指南
+## Key Files and Their Purposes
 
-### 前端调试
-- 开发环境下自动集成 Vue DevTools
-- 使用 console.log 或 debugger 进行断点调试
-- 网络请求通过浏览器开发者工具查看
+### Configuration Files
+- `src-tauri/tauri.conf.json`: Tauri application configuration
+- `src-tauri/Cargo.toml`: Rust dependency configuration
+- `package.json`: Node.js dependency configuration
+- `vite.config.ts`: Vite build configuration with auto-imports
 
-### 后端调试
-- 使用 `println!` 或 `log::info!` 输出调试信息
-- 查看控制台输出获取 Rust 日志
-- 复杂逻辑可以使用 VS Code 调试器 (需要配置 launch.json)
+### Core Files
+- `src/stores/index.ts`: Store management system entry point
+- `src/stores/StoreManager.ts`: Store lifecycle manager with lazy loading
+- `src/services/websocket-service.ts`: WebSocket communication service
+- `src/utils/memory-leak-fix.ts`: Memory management utilities
+- `src-tauri/src/lib.rs`: Tauri entry file and command registration
+- `src-tauri/src/app/`: Backend service layer implementation
+- `src-tauri/src/app/storage/enhanced_storage_service.rs`: SQLite-based storage service
 
-## 重要文件
+## Storage System
 
-### 配置文件
-- `src-tauri/tauri.conf.json`: Tauri 应用配置
-- `src-tauri/Cargo.toml`: Rust 依赖配置
-- `package.json`: Node.js 依赖配置
-- `vite.config.ts`: Vite 构建配置
+The application uses a hybrid storage approach:
+- **Tauri Store**: For simple settings and preferences
+- **SQLite Database**: For structured data (subscriptions, logs, etc.)
+- **Storage Locations**:
+  - Windows: `%APPDATA%\sing-box-windows\`
+  - Linux: `~/.local/share/sing-box-windows/`
 
-### 核心文件
-- `src/stores/index.ts`: Store 管理系统入口
-- `src/stores/StoreManager.ts`: Store 生命周期管理器
-- `src/services/websocket-service.ts`: WebSocket 通信服务
-- `src/utils/memory-leak-fix.ts`: 内存管理工具
-- `src-tauri/src/lib.rs`: Tauri 入口文件和命令注册
-- `src-tauri/src/app/`: 后端服务层实现
+## Development Guidelines
 
-## 注意事项
+### Memory Management
+- Pay special attention to memory leaks for long-running applications
+- Use the StoreManager's cleanup methods for proper resource management
+- Monitor WebSocket connections and ensure proper cleanup
 
-1. **内存管理**: 长时间运行的应用需要特别注意内存泄漏
-2. **错误处理**: 所有异步操作都需要适当的错误处理
-3. **类型安全**: 优先使用 TypeScript 类型，避免 any 类型
-4. **性能优化**: 大数据量操作使用虚拟滚动或分页
-5. **跨平台**: 支持 Windows 和 Linux 平台，保持代码的可移植性
+### Error Handling
+- All async operations require proper error handling
+- Backend commands should return Result<T, String> for consistent error handling
+- Use TypeScript's strict type checking to avoid runtime errors
 
-## 常见问题
+### Performance
+- Use virtual scrolling or pagination for large data operations
+- Implement lazy loading for non-critical components
+- Leverage the StoreManager's route-based preloading
 
-### 构建问题
+### Cross-Platform Compatibility
+- Maintain compatibility with both Windows and Linux platforms
+- Use platform-specific dependencies only when necessary
+- Test builds on both target platforms before releases
 
-**Windows:**
-- 如果遇到链接错误，检查 Visual Studio Build Tools 是否正确安装
-- 如果遇到依赖问题，尝试删除 `node_modules` 和 `src-tauri/target` 后重新安装
+## Debugging
 
-**Linux:**
-- 确保安装了必要的依赖：`sudo apt install build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev`
-- 如果遇到权限问题，检查文件和目录权限设置
-- 如果遇到依赖问题，尝试删除 `node_modules` 和 `src-tauri/target` 后重新安装
+### Frontend Debugging
+- Vue DevTools automatically integrated in development environment
+- Use console.log or debugger for breakpoint debugging
+- Network requests viewed via browser developer tools
 
-### 开发问题
-- 热重载不工作时，检查端口是否被占用
-- Tauri 命令调用失败时，检查后端命令是否正确注册
+### Backend Debugging
+- Use `println!` or `log::info!` for debug output
+- Check console output for Rust logs
+- Complex logic can use VS Code debugger (requires launch.json configuration)
+- Log levels controlled via RUST_LOG environment variable
+
+## Platform-Specific Notes
+
+### Windows
+- Requires Visual Studio Build Tools for compilation
+- MSI and NSIS installers supported
+- System proxy integration via Windows API
+
+### Linux
+- Requires libwebkit2gtk-4.1-0, libssl3, libgtk-3-0 dependencies
+- DEB and AppImage packages supported
+- System proxy integration via environment variables
+
+## Testing and Quality Assurance
+
+### Code Quality Tools
+- **ESLint + OXLint**: JavaScript/TypeScript linting
+- **Prettier**: Code formatting
+- **rustfmt**: Rust code formatting
+- **TypeScript**: Static type checking
+
+### Before Committing
+1. Run `pnpm lint` to fix code style issues
+2. Run `pnpm type-check` to verify TypeScript types
+3. Test functionality on target platforms
+4. Verify memory usage for long-running operations

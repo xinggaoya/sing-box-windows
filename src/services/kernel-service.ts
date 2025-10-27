@@ -244,14 +244,14 @@ class KernelService {
   async toggleIpVersion(preferIpv6: boolean): Promise<{ success: boolean; message: string }> {
     try {
       console.log('🔄 切换IP版本偏好:', preferIpv6)
-      
-      // 暂时使用现有的切换命令
+
+      // 使用现有的切换命令，后端会直接修改配置文件
       const { proxyApi } = await import('./tauri-api')
       await proxyApi.toggleIpVersion(preferIpv6)
-      
-      // 清除状态缓存
+
+      // 清除状态缓存以反映最新状态
       this.clearStatusCache()
-      
+
       return { success: true, message: preferIpv6 ? '已切换到IPv6优先模式' : '已切换到IPv4优先模式' }
     } catch (error) {
       console.error('切换IP版本失败:', error)

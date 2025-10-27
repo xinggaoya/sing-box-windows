@@ -272,20 +272,18 @@ export const useKernelStore = defineStore(
 
       try {
         console.log('🔄 切换IP版本偏好:', preferIpv6)
-        
+
         const result = await kernelService.toggleIpVersion(preferIpv6)
-        
+
         if (result.success) {
           console.log('✅ IP版本切换成功:', result.message)
-          
+
           // 同步配置
           await syncConfig()
-          
-          // 如果内核正在运行，需要重启
-          if (isRunning.value) {
-            await restartKernel()
-          }
-          
+
+          // 内核支持热修改配置，无需重启
+          // 配置缓存已在 toggleIpVersion 中清除
+
           return true
         } else {
           console.error('❌ IP版本切换失败:', result.message)
