@@ -118,6 +118,9 @@ export default {
       globalTip: 'すべてのトラフィックをプロキシ経由',
       ruleTip: 'ルールベースのスマート分割',
     },
+
+    // 切换模式
+    switchMode: 'モード切り替え',
   },
 
   // 代理页面

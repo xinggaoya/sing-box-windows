@@ -118,6 +118,9 @@ export default {
       globalTip: 'Route all traffic through proxy',
       ruleTip: 'Intelligent traffic routing based on rules',
     },
+
+    // Switch mode
+    switchMode: 'Switch Mode',
   },
 
   // Proxy page

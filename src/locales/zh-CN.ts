@@ -118,6 +118,9 @@ export default {
       globalTip: '全部流量走代理',
       ruleTip: '根据规则智能分流',
     },
+
+    // 切换模式
+    switchMode: '切换模式',
   },
 
   // 代理页面
