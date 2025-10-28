@@ -12,10 +12,12 @@
               </div>
             </div>
             <div class="brand-info">
-              <h1 class="app-title">{{ t('common.appName') }}</h1>
-              <div class="status-badge" :class="statusClass">
-                <div class="status-dot"></div>
-                <span class="status-text">{{ appStore.isRunning ? t('status.running') : t('status.stopped') }}</span>
+              <div class="brand-info-row">
+                <h1 class="app-title">{{ t('common.appName') }}</h1>
+                <div class="status-badge" :class="statusClass">
+                  <div class="status-dot"></div>
+                  <span class="status-text">{{ appStore.isRunning ? t('status.running') : t('status.stopped') }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -407,8 +409,13 @@ onUnmounted(() => {
 
 .brand-info {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+}
+
+.brand-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .app-title {
