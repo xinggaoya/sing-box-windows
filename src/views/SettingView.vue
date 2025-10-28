@@ -304,9 +304,74 @@
                 <h3 class="card-title">{{ t('setting.update.title') }}</h3>
                 <p class="card-description">{{ t('setting.update.description') }}</p>
               </div>
+              <div class="card-status">
+                <n-tag
+                  v-if="updateStore.isChecking"
+                  type="info"
+                  size="small"
+                  round
+                >
+                  {{ t('setting.update.checking') }}
+                </n-tag>
+                <n-tag
+                  v-else-if="updateStore.hasUpdate"
+                  type="warning"
+                  size="small"
+                  round
+                >
+                  {{ t('setting.update.hasUpdate') }}
+                </n-tag>
+                <n-tag
+                  v-else
+                  type="success"
+                  size="small"
+                  round
+                >
+                  {{ t('setting.update.latest') }}
+                </n-tag>
+              </div>
             </div>
 
             <div class="card-content">
+              <!-- 检查更新按钮 -->
+              <div class="check-update-section">
+                <n-button
+                  type="primary"
+                  @click="handleCheckUpdate"
+                  :loading="checkingUpdate"
+                  :disabled="updateStore.isChecking"
+                  block
+                  size="medium"
+                >
+                  <template #icon>
+                    <n-icon size="16">
+                      <RefreshOutline />
+                    </n-icon>
+                  </template>
+                  {{
+                    checkingUpdate
+                      ? t('setting.update.checking')
+                      : updateStore.hasUpdate
+                      ? t('setting.update.checkAgain')
+                      : t('setting.update.checkNow')
+                  }}
+                </n-button>
+
+                <!-- 更新信息 -->
+                <div v-if="updateStore.hasUpdate" class="update-info">
+                  <n-alert type="info" size="small" :show-icon="true" class="update-alert">
+                    <div class="update-info-content">
+                      <div class="update-version">
+                        {{ t('setting.update.currentVersion') }}: {{ updateStore.appVersion }}
+                      </div>
+                      <div class="update-version">
+                        {{ t('setting.update.latestVersion') }}: {{ updateStore.latestVersion }}
+                      </div>
+                    </div>
+                  </n-alert>
+                </div>
+              </div>
+
               <div class="setting-item-list">
                 <div class="setting-item">
                   <div class="setting-main">
@@ -1403,6 +1468,31 @@ onUnmounted(() => {
   color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
 }
 
+/* 检查更新区域 */
+.check-update-section {
+  margin-bottom: 16px;
+}
+
+.update-info {
+  margin-top: 12px;
+}
+
+.update-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.update-version {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.update-alert {
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+
 /* 链接区域 */
 .links-section {
   display: flex;
@@ -1551,6 +1641,14 @@ onUnmounted(() => {
 
   .info-value {
     font-size: 0.8rem;
+  }
+
+  .update-info-content {
+    gap: 6px;
+  }
+
+  .update-version {
+    font-size: 0.75rem;
   }
 }
 
