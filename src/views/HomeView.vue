@@ -234,7 +234,15 @@
         <!-- 右侧：流量统计和系统信息 -->
         <n-grid-item :span="24" :s="24" :m="8" :l="8" :xl="8" :xxl="8">
           <!-- 流量统计卡片（包含图表） -->
-          <TrafficStatsCard />
+          <TrafficStatsCard
+            :active-connections-count="String(connectionStore.connections.length)"
+            :traffic-up="trafficStore.traffic.up"
+            :traffic-down="trafficStore.traffic.down"
+            :total-up="trafficStore.traffic.totalUp"
+            :total-down="trafficStore.traffic.totalDown"
+            :memory="connectionStore.memory.inuse"
+            :is-route-active="true"
+          />
         </n-grid-item>
       </n-grid>
     </div>
@@ -280,6 +288,7 @@ import { useAppStore } from '@/stores'
 import { useProxyStore } from '@/stores/kernel/ProxyStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
+import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useThemeStore } from '@/stores/app/ThemeStore'
 import { kernelApi } from '@/services/tauri-api'
 import { formatBandwidth } from '@/utils'
@@ -299,6 +308,7 @@ const appStore = useAppStore()
 const proxyStore = useProxyStore()
 const kernelStore = useKernelStore()
 const trafficStore = useTrafficStore()
+const connectionStore = useConnectionStore()
 const themeStore = useThemeStore()
 
 // 响应式状态
@@ -416,16 +426,13 @@ const runKernel = async () => {
 
   isStarting.value = true
   try {
-    const result = await kernelApi.startKernel()
-    if (result.success) {
+    console.log('🚀 开始启动内核...')
+    const result = await kernelStore.startKernel()
+    if (result) {
       message.success(t('home.startSuccess'))
-
-      // 启动成功后等待片刻再刷新状态
-      setTimeout(async () => {
-        await refreshKernelStatus()
-      }, 1000)
+      console.log('✅ 内核启动成功，数据收集已自动启动')
     } else {
-      message.error(result.message || t('home.startFailed'))
+      message.error(kernelStore.lastError || t('home.startFailed'))
     }
   } catch (error) {
     console.error('启动内核失败:', error)
@@ -441,26 +448,17 @@ const stopKernel = async () => {
 
   isStopping.value = true
   try {
-    const result = await kernelApi.stopKernel()
-    if (result.success) {
+    console.log('🛑 开始停止内核...')
+    const result = await kernelStore.stopKernel()
+    if (result) {
       message.success(t('home.stopSuccess'))
-
-      // 停止成功后立即刷新状态
-      await refreshKernelStatus()
+      console.log('✅ 内核停止成功，数据收集已自动停止')
     } else {
-      message.error(result.message || t('home.stopFailed'))
+      message.error(kernelStore.lastError || t('home.stopFailed'))
     }
   } catch (error) {
     console.error('停止内核失败:', error)
-    // 检查错误消息，如果包含"成功"字样，则显示成功
-    const errorMsg = error instanceof Error ? error.message : String(error)
-    if (errorMsg.includes('成功') || errorMsg.includes('success')) {
-      message.success(t('home.stopSuccess'))
-      // 即使出错也尝试刷新状态
-      await refreshKernelStatus()
-    } else {
-      message.error(t('home.stopFailed'))
-    }
+    message.error(t('home.stopFailed'))
   } finally {
     isStopping.value = false
   }
@@ -472,11 +470,13 @@ const restartKernel = async () => {
 
   isStarting.value = true
   try {
-    const result = await kernelApi.restartKernel()
-    if (result.success) {
-      message.success(t('home.startSuccess'))
+    console.log('🔄 开始重启内核...')
+    const result = await kernelStore.restartKernel()
+    if (result) {
+      message.success(t('home.restartSuccess'))
+      console.log('✅ 内核重启成功，数据收集已自动重启')
     } else {
-      message.error(result.message || t('home.restartFailed'))
+      message.error(kernelStore.lastError || t('home.restartFailed'))
     }
   } catch (error) {
     console.error('重启内核失败:', error)
@@ -527,23 +527,6 @@ const handleNodeProxyModeChange = async (mode: string) => {
   }
 }
 
-// 刷新内核状态
-const refreshKernelStatus = async () => {
-  try {
-    console.log('🔄 刷新内核状态...')
-
-    // 强制刷新状态
-    const { kernelService } = await import('@/services/kernel-service')
-    const newStatus = await kernelService.forceRefreshStatus()
-
-    console.log('📊 内核状态已更新:', newStatus)
-
-    // 更新 store 状态
-    await kernelStore.syncStatus()
-  } catch (error) {
-    console.error('刷新内核状态失败:', error)
-  }
-}
 
 // 检查管理员权限
 const checkAdmin = async () => {
@@ -557,12 +540,17 @@ const checkAdmin = async () => {
 }
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   checkAdmin()
+  // 初始化KernelStore，确保数据收集正确设置
+  await kernelStore.initializeStore()
 })
 
 onUnmounted(() => {
   // 清理工作
+  console.log('🧹 HomeView卸载，清理数据监听')
+  // 如果内核正在运行，保持数据收集继续
+  // 如果需要完全清理，可以调用 stopDataCollection()
 })
 </script>
 
