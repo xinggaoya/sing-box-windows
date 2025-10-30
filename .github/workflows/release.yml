@@ -54,7 +54,21 @@ jobs:
 
       # 构建应用
       - name: Build the app
-        run: pnpm run build && pnpm exec tauri build
+        run: |
+          pnpm run build
+          pnpm exec tauri build
+
+      - name: List build artifacts
+        shell: bash
+        run: |
+          echo "Build directory contents:"
+          ls -la src-tauri/target/release/ || true
+          echo "Bundle directory contents:"
+          ls -la src-tauri/target/release/bundle/ || true
+          echo "MSI files:"
+          find src-tauri/target/release/bundle/ -name "*.msi" || true
+          echo "EXE files:"
+          find src-tauri/target/release/bundle/ -name "*.exe" || true
 
       - name: Extract tag name
         id: tag
@@ -144,7 +158,20 @@ jobs:
         run: pnpm install
 
       - name: Build the app
-        run: pnpm run build && pnpm exec tauri build --target x86_64-unknown-linux-gnu
+        run: |
+          pnpm run build
+          pnpm exec tauri build --target x86_64-unknown-linux-gnu
+
+      - name: List build artifacts
+        run: |
+          echo "Build directory contents:"
+          ls -la src-tauri/target/x86_64-unknown-linux-gnu/release/ || true
+          echo "Bundle directory contents:"
+          ls -la src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/ || true
+          echo "DEB files:"
+          find src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/ -name "*.deb" || true
+          echo "AppImage files:"
+          find src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/ -name "*.AppImage*" || true
 
       - name: Extract tag name
         id: tag
@@ -156,8 +183,8 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            src-tauri/target/release/bundle/appimage/sing-box-windows_*.AppImage*
-            src-tauri/target/release/bundle/deb/sing-box-windows_*.deb*
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/sing-box-windows_*.AppImage*
+            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/sing-box-windows_*.deb*
           body: |
             ## 🚀 sing-box-windows ${{ steps.tag.outputs.tag }} Linux 版本发布
 
