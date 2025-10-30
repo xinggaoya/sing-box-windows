@@ -20,7 +20,7 @@ jobs:
           node-version: 20
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
           version: 8
 
@@ -54,7 +54,7 @@ jobs:
 
       # 构建应用
       - name: Build the app
-        run: pnpm run build && pnpm exec tauri build -- --target x86_64-pc-windows-msi
+        run: pnpm run build && pnpm exec tauri build
 
       - name: Extract tag name
         id: tag
@@ -67,8 +67,8 @@ jobs:
         with:
           name: 'Sing-Box Windows ${{ steps.tag.outputs.tag }}'
           files: |
-            src-tauri/target/x86_64-pc-windows-msi/release/bundle/msi/*.msi
-            src-tauri/target/x86_64-pc-windows-msi/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -135,7 +135,12 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Install frontend dependencies
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
         run: pnpm install
 
       - name: Build the app
@@ -154,7 +159,7 @@ jobs:
             src-tauri/target/release/bundle/appimage/sing-box-windows_*.AppImage*
             src-tauri/target/release/bundle/deb/sing-box-windows_*.deb*
           body: |
-            ## 🚀 sing-box-windowsgs ${{ steps.tag.outputs.tag }} Linux 版本发布
+            ## 🚀 sing-box-windows ${{ steps.tag.outputs.tag }} Linux 版本发布
 
             感谢使用 sing-box-windows Linux 版本！
 
