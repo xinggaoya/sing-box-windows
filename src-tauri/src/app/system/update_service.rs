@@ -6,6 +6,49 @@ use serde_json::json;
 use std::path::Path;
 use tauri::{Emitter, Manager};
 
+// 获取当前平台标识符
+fn get_platform_identifier() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "unknown"
+    }
+}
+
+// 检查文件是否匹配当前平台
+fn is_platform_compatible(filename: &str) -> bool {
+    let platform = get_platform_identifier();
+
+    match platform {
+        "windows" => filename.ends_with(".msi") || filename.ends_with(".exe"),
+        "linux" => filename.ends_with(".AppImage") || filename.ends_with(".deb"),
+        "macos" => filename.ends_with(".dmg") || filename.ends_with(".app.tar.gz"),
+        _ => false,
+    }
+}
+
+// 获取平台优先级分数（用于选择最合适的安装包）
+fn get_platform_priority(filename: &str) -> i32 {
+    let platform = get_platform_identifier();
+
+    match platform {
+        "windows" => {
+            if filename.ends_with(".msi") { 2 } else if filename.ends_with(".exe") { 1 } else { 0 }
+        }
+        "linux" => {
+            if filename.ends_with(".AppImage") { 2 } else if filename.ends_with(".deb") { 1 } else { 0 }
+        }
+        "macos" => {
+            if filename.ends_with(".dmg") { 2 } else if filename.ends_with(".app.tar.gz") { 1 } else { 0 }
+        }
+        _ => 0,
+    }
+}
+
 // 更新信息结构体
 #[derive(serde::Serialize, Debug)]
 pub struct UpdateInfo {
@@ -117,19 +160,33 @@ pub async fn check_update(
         .as_array()
         .ok_or_else(|| format!("{}: 无法获取下载资源", messages::ERR_GET_VERSION_FAILED))?;
 
-    // 查找Windows安装程序
+    // 根据当前平台查找对应的安装程序
     let mut download_url = String::new();
     let mut file_size: Option<u64> = None;
+    let mut best_priority = 0;
 
+    // 遍历所有资源，找到最适合当前平台的安装包
     for asset in assets {
         let name = asset["name"].as_str().unwrap_or("");
-        if name.ends_with(".msi") || name.ends_with(".exe") {
-            download_url = asset["browser_download_url"]
-                .as_str()
-                .unwrap_or("")
-                .to_string();
-            file_size = asset["size"].as_u64();
-            break;
+
+        // 检查文件是否与当前平台兼容
+        if is_platform_compatible(name) {
+            let priority = get_platform_priority(name);
+
+            // 选择优先级最高的安装包
+            if priority > best_priority {
+                download_url = asset["browser_download_url"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                file_size = asset["size"].as_u64();
+                best_priority = priority;
+
+                // 如果找到了最高优先级的包，可以提前退出
+                if priority == 2 {
+                    break;
+                }
+            }
         }
     }
 
@@ -181,6 +238,12 @@ pub async fn install_update(_download_path: String) -> Result<(), String> {
     Ok(())
 }
 
+// 获取当前平台信息
+#[tauri::command]
+pub async fn get_platform_info() -> Result<String, String> {
+    Ok(get_platform_identifier().to_string())
+}
+
 // 下载并安装更新
 #[tauri::command]
 pub async fn download_and_install_update(
@@ -190,7 +253,31 @@ pub async fn download_and_install_update(
     let window = app_handle.get_webview_window("main")
         .ok_or("无法获取主窗口")?;
     let work_dir = get_work_dir_sync();
-    let download_path = Path::new(&work_dir).join("update.exe");
+
+    // 根据下载链接和平台确定下载文件名
+    let update_filename = if download_url.ends_with(".msi") {
+        "update.msi"
+    } else if download_url.ends_with(".exe") {
+        "update.exe"
+    } else if download_url.ends_with(".AppImage") {
+        "update.AppImage"
+    } else if download_url.ends_with(".deb") {
+        "update.deb"
+    } else if download_url.ends_with(".dmg") {
+        "update.dmg"
+    } else if download_url.ends_with(".app.tar.gz") {
+        "update.app.tar.gz"
+    } else {
+        // 根据平台使用默认扩展名
+        match get_platform_identifier() {
+            "windows" => "update.exe",
+            "linux" => "update.AppImage",
+            "macos" => "update.dmg",
+            _ => "update.bin",
+        }
+    };
+
+    let download_path = Path::new(&work_dir).join(update_filename);
 
     // 发送开始下载事件
     let _ = window.emit(
@@ -257,21 +344,91 @@ pub async fn download_and_install_update(
     );
 
     // 启动安装程序（在后台运行）
-    let mut cmd = tokio::process::Command::new(download_path);
+    let install_result = match get_platform_identifier() {
+        "windows" => {
+            // Windows: 直接运行安装程序
+            let mut cmd = tokio::process::Command::new(&download_path);
+            #[cfg(target_os = "windows")]
+            cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
+            cmd.spawn()
+        }
+        "linux" => {
+            // Linux: 根据文件类型执行不同的安装逻辑
+            if download_url.ends_with(".AppImage") {
+                // AppImage: 添加执行权限并运行
+                let mut chmod_cmd = tokio::process::Command::new("chmod");
+                chmod_cmd.arg("+x").arg(&download_path);
+                chmod_cmd.spawn().and_then(|_| {
+                    let mut run_cmd = tokio::process::Command::new(&download_path);
+                    run_cmd.spawn()
+                })
+            } else if download_url.ends_with(".deb") {
+                // DEB包: 使用pkexec安装（需要管理员权限）
+                let mut cmd = tokio::process::Command::new("pkexec");
+                cmd.arg("dpkg").arg("-i").arg(&download_path);
+                cmd.spawn()
+            } else {
+                // 其他二进制文件
+                let mut cmd = tokio::process::Command::new(&download_path);
+                cmd.spawn()
+            }
+        }
+        "macos" => {
+            // macOS: 根据文件类型执行不同的安装逻辑
+            if download_url.ends_with(".dmg") {
+                // DMG: 使用open命令挂载
+                let mut cmd = tokio::process::Command::new("open");
+                cmd.arg(&download_path);
+                cmd.spawn()
+            } else if download_url.ends_with(".app.tar.gz") {
+                // app.tar.gz: 解压并运行
+                let mut cmd = tokio::process::Command::new("tar");
+                cmd.arg("-xzf").arg(&download_path);
+                cmd.spawn()
+            } else {
+                let mut cmd = tokio::process::Command::new(&download_path);
+                cmd.spawn()
+            }
+        }
+        _ => {
+            // 其他平台：尝试直接运行
+            let mut cmd = tokio::process::Command::new(&download_path);
+            cmd.spawn()
+        }
+    };
 
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
-
-    match cmd.spawn()
-    {
+    match install_result {
         Ok(_) => {
             // 安装程序启动成功，发送安装开始事件
+            let install_message = match get_platform_identifier() {
+                "windows" => "安装程序已启动，请按照提示完成安装",
+                "linux" => {
+                    if download_url.ends_with(".AppImage") {
+                        "正在启动新版本应用程序..."
+                    } else if download_url.ends_with(".deb") {
+                        "正在安装软件包，请根据提示输入密码..."
+                    } else {
+                        "正在启动更新程序..."
+                    }
+                }
+                "macos" => {
+                    if download_url.ends_with(".dmg") {
+                        "正在挂载安装镜像..."
+                    } else if download_url.ends_with(".app.tar.gz") {
+                        "正在解压应用程序..."
+                    } else {
+                        "正在启动安装程序..."
+                    }
+                }
+                _ => "正在启动安装程序...",
+            };
+
             let _ = window.emit(
                 "update-progress",
                 json!({
                     "status": "installing",
                     "progress": 100,
-                    "message": "安装程序已启动，请按照提示完成安装"
+                    "message": install_message
                 }),
             );
             Ok(())

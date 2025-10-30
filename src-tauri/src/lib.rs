@@ -128,6 +128,7 @@ pub fn run() {
             crate::app::system::update_service::download_update,
             crate::app::system::update_service::install_update,
             crate::app::system::update_service::download_and_install_update,
+            crate::app::system::update_service::get_platform_info,
             // System - Config service commands
             crate::app::system::config_service::update_singbox_ports,
             // Core - Proxy service commands

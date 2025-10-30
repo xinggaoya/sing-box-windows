@@ -1328,12 +1328,34 @@ pub async fn kernel_get_status_enhanced(api_port: Option<u16>) -> Result<serde_j
         }
     }
 
+    // 获取版本信息
+    let version = if process_running {
+        // 如果进程正在运行，尝试从API获取版本
+        let client = http_client::get_client();
+        let api_url = format!("http://127.0.0.1:{}/version", port);
+        match client.get(&api_url).timeout(Duration::from_secs(2)).send().await {
+            Ok(response) if response.status().is_success() => {
+                match response.text().await {
+                    Ok(text) => Some(text.trim().to_string()),
+                    Err(_) => None,
+                }
+            },
+            _ => None,
+        }
+    } else {
+        // 如果进程没有运行，尝试直接从内核文件获取版本
+        match check_kernel_version().await {
+            Ok(v) => Some(v.trim().to_string()),
+            Err(_) => None,
+        }
+    };
+
     Ok(serde_json::json!({
         "process_running": process_running,
         "api_ready": api_ready,
         "websocket_ready": websocket_ready,
         "uptime_ms": 0,
-        "version": null,
+        "version": version,
         "error": error
     }))
 }

@@ -41,12 +41,13 @@ export const useKernelStore = defineStore(
 
     const isLoading = ref(false)
     const lastError = ref<string>('')
+    const isKernelInstalled = ref(false) // 内核是否已安装的状态
 
     // 计算属性
     const isRunning = computed(() => status.value.process_running)
-    const isReady = computed(() => 
-      status.value.process_running && 
-      status.value.api_ready && 
+    const isReady = computed(() =>
+      status.value.process_running &&
+      status.value.api_ready &&
       status.value.websocket_ready
     )
     const isStarting = computed(() => isLoading.value && !isRunning.value)
@@ -66,14 +67,37 @@ export const useKernelStore = defineStore(
       }
     })
 
+      // 检查内核安装状态
+    const checkKernelInstallation = async () => {
+      try {
+        const version = await kernelService.getKernelVersion()
+        const installed = Boolean(version && version.trim() !== '')
+        isKernelInstalled.value = installed
+
+        if (installed && (!status.value.version || status.value.version.trim() === '')) {
+          status.value.version = version
+        }
+
+        console.log('内核安装状态检查:', { installed, version })
+      } catch (error) {
+        console.error('检查内核安装状态失败:', error)
+        isKernelInstalled.value = false
+      }
+    }
+
     // 状态同步
     const syncStatus = async () => {
       try {
         status.value = await kernelService.getKernelStatus()
-        
+
         // 同步到 appStore
         appStore.setRunningState(status.value.process_running)
-        
+
+        // 根据版本信息更新安装状态
+        if (status.value.version && status.value.version.trim() !== '') {
+          isKernelInstalled.value = true
+        }
+
         // 清除错误
         if (status.value.error) {
           lastError.value = status.value.error
@@ -399,21 +423,24 @@ export const useKernelStore = defineStore(
     const initializeStore = async () => {
       try {
         console.log('🔧 初始化 KernelStore...')
-        
+
+        // 首先检查内核安装状态
+        await checkKernelInstallation()
+
         // 同步初始状态和配置
         await Promise.all([
           syncStatus(),
           syncConfig()
         ])
-        
+
         // 设置事件监听
         setupEventListeners()
-        
+
         // 如果内核正在运行，启动数据收集
         if (isRunning.value) {
           await startDataCollection()
         }
-        
+
         console.log('✅ KernelStore 初始化完成')
       } catch (error) {
         console.error('❌ KernelStore 初始化失败:', error)
@@ -480,7 +507,8 @@ export const useKernelStore = defineStore(
       config,
       isLoading,
       lastError,
-      
+      isKernelInstalled,
+
       // 计算属性
       isRunning,
       isReady,
@@ -502,12 +530,11 @@ export const useKernelStore = defineStore(
       initializeStore,
       
       // 兼容旧接口
-      hasVersionInfo: () => !!status.value.version,
+      hasVersionInfo: () => isKernelInstalled.value,
       getVersionString: () => status.value.version || '',
       newVersion: ref(''),
       updateVersion: async () => {
-        const version = await kernelService.getKernelVersion()
-        status.value.version = version
+        await checkKernelInstallation()
         return true
       },
       checkKernelVersion: async () => {

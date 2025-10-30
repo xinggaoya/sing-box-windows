@@ -227,6 +227,8 @@ export const systemApi = {
 
   getSystemUptime: () => invoke<number>('get_system_uptime'),
 
+  getPlatformInfo: () => invoke<string>('get_platform_info'),
+
   checkUpdate: (currentVersion?: string, includePrerelease?: boolean) => {
     const version = currentVersion || '1.8.2' // 默认版本
     const includePre = includePrerelease || false
@@ -241,10 +243,8 @@ export const systemApi = {
   installUpdate: (downloadPath: string) =>
     invoke<void>('install_update', { downloadPath }),
 
-  downloadAndInstallUpdate: async () => {
-    await systemApi.downloadUpdate()
-    console.warn('downloadAndInstallUpdate 只触发了下载，安装需要手动完成')
-  },
+  downloadAndInstallUpdate: (downloadUrl?: string) =>
+    invoke<void>('download_and_install_update', { downloadUrl }),
 
   downloadLatestKernel: () => invoke<void>('download_latest_kernel'),
 
