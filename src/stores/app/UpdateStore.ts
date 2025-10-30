@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { tauriApi } from '@/services/tauri-api'
 import { getVersion } from '@tauri-apps/api/app'
 import { DatabaseService } from '@/services/database-service'
@@ -336,8 +336,9 @@ export const useUpdateStore = defineStore(
       setAcceptPrerelease,
 
       // 计算属性
-      formattedFileSize: () => formatFileSize(fileSize.value),
-      formattedReleaseDate: () => (releaseDate.value ? formatReleaseDate(releaseDate.value) : ''),
+      formattedFileSize: computed(() => formatFileSize(fileSize.value)),
+      formattedReleaseDate: computed(() => (releaseDate.value ? formatReleaseDate(releaseDate.value) : '')),
+      isChecking: computed(() => updateState.value.checking),
 
       // 初始化和持久化
       initializeStore,
