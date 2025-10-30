@@ -132,6 +132,20 @@
         </n-layout-content>
       </n-layout>
     </n-layout>
+
+    <!-- 更新弹窗 -->
+    <UpdateModal
+      v-model:show="showUpdateModal"
+      :latest-version="updateInfo.latestVersion"
+      :current-version="updateInfo.currentVersion"
+      :download-url="updateInfo.downloadUrl"
+      :release-notes="updateInfo.releaseNotes"
+      :release-date="updateInfo.releaseDate"
+      :file-size="updateInfo.fileSize"
+      @update="handleUpdate"
+      @cancel="handleUpdateCancel"
+      @skip="handleUpdateSkip"
+    />
   </n-config-provider>
 </template>
 
@@ -160,6 +174,7 @@ import {
 } from '@vicons/ionicons5'
 import { useMessage } from 'naive-ui'
 import mitt from 'mitt'
+import UpdateModal from '@/components/UpdateModal.vue'
 import logo from '@/assets/icon.png'
 
 defineOptions({
@@ -171,6 +186,17 @@ const route = useRoute()
 const collapsed = ref(false)
 const message = useMessage()
 const mittInstance = mitt()
+
+// 更新弹窗相关
+const showUpdateModal = ref(false)
+const updateInfo = ref({
+  latestVersion: '',
+  currentVersion: '',
+  downloadUrl: '',
+  releaseNotes: '',
+  releaseDate: '',
+  fileSize: 0,
+})
 
 // Store实例
 const themeStore = useThemeStore()
@@ -310,8 +336,41 @@ const onSelect = (key: string) => {
 }
 
 // 事件监听器
-const handleShowUpdateModal = () => {
+const handleShowUpdateModal = (data: any) => {
   // 处理更新模态框显示
+  if (data && typeof data === 'object') {
+    updateInfo.value = {
+      latestVersion: data.latestVersion || '',
+      currentVersion: data.currentVersion || updateStore.appVersion,
+      downloadUrl: data.downloadUrl || '',
+      releaseNotes: data.releaseNotes || '',
+      releaseDate: data.releaseDate || '',
+      fileSize: data.fileSize || 0,
+    }
+    showUpdateModal.value = true
+  }
+}
+
+// 更新处理函数
+const handleUpdate = async (downloadUrl: string) => {
+  try {
+    message.info('开始下载更新...')
+    await updateStore.downloadAndInstallUpdate()
+    showUpdateModal.value = false
+  } catch (error) {
+    message.error(`更新失败: ${error}`)
+  }
+}
+
+const handleUpdateCancel = () => {
+  showUpdateModal.value = false
+  message.info('已取消更新')
+}
+
+const handleUpdateSkip = () => {
+  showUpdateModal.value = false
+  updateStore.skipCurrentVersion()
+  message.info('已跳过此版本')
 }
 
 onMounted(() => {

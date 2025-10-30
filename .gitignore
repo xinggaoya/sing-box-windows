@@ -29,3 +29,5 @@ coverage
 
 *.tsbuildinfo
 /src-tauri/sing-box
+
+target

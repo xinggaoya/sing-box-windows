@@ -369,6 +369,37 @@
                       </div>
                     </div>
                   </n-alert>
+
+                  <!-- 更新按钮 -->
+                  <div class="update-actions">
+                    <n-button
+                      type="primary"
+                      size="small"
+                      :loading="updateStore.updateState.downloading"
+                      :disabled="updateStore.updateState.downloading"
+                      @click="handleDownloadUpdate"
+                      class="update-btn"
+                    >
+                      <template #icon>
+                        <n-icon size="14">
+                          <DownloadOutline />
+                        </n-icon>
+                      </template>
+                      {{
+                        updateStore.updateState.downloading
+                          ? t('setting.update.downloading')
+                          : t('setting.update.updateNow')
+                      }}
+                    </n-button>
+
+                    <n-button
+                      size="small"
+                      @click="handleSkipVersion"
+                      class="update-btn secondary"
+                    >
+                      {{ t('setting.update.skipVersion') }}
+                    </n-button>
+                  </div>
                 </div>
               </div>
 
@@ -697,6 +728,26 @@ const handleCheckUpdate = async () => {
     message.error(`${t('setting.update.checkError')}: ${error}`)
   } finally {
     checkingUpdate.value = false
+  }
+}
+
+// 下载并安装更新
+const handleDownloadUpdate = async () => {
+  try {
+    await updateStore.downloadAndInstallUpdate()
+    message.success(t('setting.update.downloadStarted'))
+  } catch (error) {
+    message.error(`${t('setting.update.downloadError')}: ${error}`)
+  }
+}
+
+// 跳过当前版本
+const handleSkipVersion = async () => {
+  try {
+    await updateStore.skipCurrentVersion()
+    message.success(t('setting.update.skipSuccess'))
+  } catch (error) {
+    message.error(`${t('setting.update.skipError')}: ${error}`)
   }
 }
 
@@ -1491,6 +1542,36 @@ onUnmounted(() => {
 .update-alert {
   border-radius: 8px;
   font-size: 0.8rem;
+}
+
+.update-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.update-btn {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.25s ease;
+}
+
+.update-btn.primary {
+  box-shadow: 0 2px 8px rgba(24, 160, 88, 0.2);
+}
+
+.update-btn.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 160, 88, 0.3);
+}
+
+.update-btn.secondary {
+  opacity: 0.7;
+}
+
+.update-btn.secondary:hover:not(:disabled) {
+  opacity: 1;
 }
 
 /* 链接区域 */
