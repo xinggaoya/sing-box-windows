@@ -144,7 +144,7 @@ jobs:
         run: pnpm install
 
       - name: Build the app
-        run: pnpm tauri build:linux
+        run: pnpm run build && pnpm exec tauri build --target x86_64-unknown-linux-gnu
 
       - name: Extract tag name
         id: tag
