@@ -125,64 +125,14 @@ jobs:
         id: tag
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Create Release
+      - name: Update Release Assets
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: 'sing-box-windows ${{ steps.tag.outputs.tag }}'
-          draft: false
-          prerelease: false
-          generate_release_notes: true
           files: |
             windows-artifacts/msi/*.msi
             windows-artifacts/nsis/*.exe
             linux-artifacts/appimage/sing-box-windows_*.AppImage*
             linux-artifacts/deb/sing-box-windows_*.deb*
-          body: |
-            ## 🚀 sing-box-windows ${{ steps.tag.outputs.tag }} 发布
-
-            感谢使用 sing-box-windows！
-
-            ### ✨ 主要更新
-            - 🎯 基于 Tauri 2.0 + Vue 3 的现代化界面
-            - 🔧 完整的代理管理和路由规则配置
-            - 📊 实时流量监控和连接状态显示
-            - 🌐 多协议支持和订阅管理
-            - 🔄 应用更新检查功能
-            - 🖥️ 增强的内核控制与流量统计展示
-            - 🐧 完全适配 Linux 桌面环境
-
-            ### 📦 安装说明
-
-            #### 🪟 Windows
-            **MSI 安装包 (推荐)**
-            1. 下载 `.msi` 文件
-            2. 双击运行并按照提示安装
-
-            **NSIS 安装包**
-            1. 下载 `.exe` 文件
-            2. 双击运行并按照提示安装
-
-            #### 🐧 Linux
-            **AppImage (推荐)**
-            1. 下载 `.AppImage` 文件
-            2. 添加执行权限：`chmod +x sing-box-windows_*.AppImage`
-            3. 双击运行或在终端执行
-
-            **Debian/Ubuntu**
-            1. 下载 `.deb` 文件
-            2. 安装：`sudo dpkg -i sing-box-windows_*.deb`
-            3. 如有依赖问题：`sudo apt-get install -f`
-
-            ### 🔧 系统要求
-            - **Windows**: Windows 10/11 (x64), 至少 100MB 可用磁盘空间
-            - **Linux**: x64 with GTK 3, libwebkit2gtk-4.1-0, libssl3, libgtk-3-0
-
-            ### 📚 更多信息
-            - 项目主页: [GitHub](https://github.com/xinggaoya/sing-box-windows)
-            - 问题反馈: [Issues](https://github.com/xinggaoya/sing-box-windows/issues)
-
-            ---
-            **感谢您的支持！🙏**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
