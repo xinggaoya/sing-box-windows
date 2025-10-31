@@ -95,8 +95,11 @@
                   size="small"
                   class="download-progress"
                 >
-                  {{ downloadMessage }}
+                  {{ downloadProgress }}%
                 </n-progress>
+                <div class="download-message">
+                  {{ downloadMessage }}
+                </div>
               </div>
 
               <!-- 操作按钮 -->
@@ -947,14 +950,16 @@ listen(
 
     if (status === 'completed') {
       downloading.value = false
+      loading.value = false
       downloadError.value = null
       message.success(t('setting.kernel.downloadComplete'))
       // 更新版本信息
       kernelStore.updateVersion()
     } else if (status === 'error') {
       downloading.value = false
+      loading.value = false
       downloadError.value = msg
-      message.error(t('setting.kernel.downloadFailed'))
+      message.error(`${t('setting.kernel.downloadFailed')}: ${msg}`)
     }
   },
 ).then((unlisten) => {
@@ -1474,6 +1479,14 @@ onUnmounted(() => {
 .download-progress {
   height: 32px;
   border-radius: 8px;
+}
+
+.download-message {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
+  line-height: 1.4;
+  text-align: center;
 }
 
 /* 操作区域 */

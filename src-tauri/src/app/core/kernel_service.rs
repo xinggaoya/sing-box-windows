@@ -32,6 +32,63 @@ lazy_static::lazy_static! {
     static ref KERNEL_READY_NOTIFY: Arc<Notify> = Arc::new(Notify::new());
 }
 
+// 获取最新内核版本号
+async fn get_latest_kernel_version() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    use serde::Deserialize;
+
+    // GitHub Release API 响应结构
+    #[derive(Deserialize)]
+    struct GitHubRelease {
+        tag_name: String,
+    }
+
+    // 设置下载超时和更好的用户代理
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10)) // 10秒超时
+        .user_agent("sing-box-windows/1.8.2")
+        .build()?;
+
+    // 使用多个 API 源获取版本信息
+    let api_urls = vec![
+        // 使用 GitHub API（原始）
+        "https://api.github.com/repos/SagerNet/sing-box/releases/latest",
+        // 使用 gh-proxy 加速的 GitHub API
+        "https://v6.gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest",
+        // 使用 gh-proxy 镜像的 GitHub API
+        "https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest",
+    ];
+
+    for (index, api_url) in api_urls.iter().enumerate() {
+        info!("尝试第 {} 个 API 源获取版本: {}", index + 1, api_url);
+
+        match client.get(*api_url).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    let release: GitHubRelease = response.json().await?;
+                    let tag_name = release.tag_name;
+
+                    // 去掉 'v' 前缀，只保留版本号
+                    let version = if tag_name.starts_with('v') {
+                        tag_name[1..].to_string()
+                    } else {
+                        tag_name
+                    };
+
+                    info!("成功获取版本号: {} (来源: {})", version, api_url);
+                    return Ok(version);
+                } else {
+                    warn!("API 返回错误状态: {} (来源: {})", response.status(), api_url);
+                }
+            }
+            Err(e) => {
+                warn!("API 请求失败: {} (来源: {})", e, api_url);
+            }
+        }
+    }
+
+    Err("所有 API 源都获取版本失败".into())
+}
+
 // 检查内核版本
 #[tauri::command]
 pub async fn check_kernel_version() -> Result<String, String> {
@@ -214,12 +271,33 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
     // 记录检测到的架构信息
     info!("检测到平台: {}, 架构: {}", platform, arch);
 
-    // 构造下载 URL - 使用正确的 GitHub 资源命名格式
-    let version = "1.12.10"; // 可以从 GitHub API 获取最新版本
-    let filename = format!("sing-box-{}-{}-{}.tar.gz", version, platform, arch);
+    // 获取最新版本号
+    let version = match get_latest_kernel_version().await {
+        Ok(v) => {
+            info!("获取到最新版本号: {}", v);
+            v
+        }
+        Err(e) => {
+            warn!("获取最新版本失败: {}, 使用默认版本 1.12.10", e);
+            "1.12.10".to_string()
+        }
+    };
+
+    // 构造下载 URL - 使用 sing-box 官方的文件命名格式
+    // 根据官方文件列表，格式为：sing-box-{version}-{platform}-{arch}.tar.gz 或 .zip
+    let filename = if cfg!(target_os = "windows") {
+        format!("sing-box-{}-windows-{}.zip", version, arch) // Windows 使用 .zip
+    } else {
+        format!("sing-box-{}-linux-{}.tar.gz", version, arch) // Linux 使用 .tar.gz
+    };
 
     // 使用多个下载源以提高成功率
     let download_urls = vec![
+        // 使用 v6.gh-proxy 镜像（新增）
+        format!(
+            "https://v6.gh-proxy.com/https://github.com/SagerNet/sing-box/releases/download/v{}/{}",
+            version, filename
+        ),
         // 使用 gh-proxy 镜像
         format!(
             "https://gh-proxy.com/https://github.com/SagerNet/sing-box/releases/download/v{}/{}",
@@ -253,13 +331,16 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
     ];
 
     // 记录下载信息
+    info!("内核版本: {}", version);
+    info!("平台: {}, 架构: {}", platform, arch);
     info!("文件名: {}", filename);
-    info!("主要下载 URL (ghfast.top 加速): {}", download_urls[0]);
-    info!("备用下载源 1 (hub.fastgit.xyz): {}", download_urls[1]);
-    info!("备用下载源 2 (hub.fgit.cf): {}", download_urls[2]);
-    info!("备用下载源 3 (jsdelivr CDN): {}", download_urls[3]);
-    info!("备用下载源 4 (gh-proxy): {}", download_urls[4]);
-    info!("备用下载源 5 (GitHub 原始): {}", download_urls[5]);
+    info!("主要下载 URL (v6.gh-proxy 加速): {}", download_urls[0]);
+    info!("备用下载源 1 (gh-proxy): {}", download_urls[1]);
+    info!("备用下载源 2 (ghfast.top): {}", download_urls[2]);
+    info!("备用下载源 3 (hub.fastgit.xyz): {}", download_urls[3]);
+    info!("备用下载源 4 (hub.fgit.cf): {}", download_urls[4]);
+    info!("备用下载源 5 (jsdelivr CDN): {}", download_urls[5]);
+    info!("备用下载源 6 (GitHub 原始): {}", download_urls[6]);
     info!("总共 {} 个下载源", download_urls.len());
 
     // 获取工作目录
@@ -303,8 +384,30 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
                 break; // 下载成功，退出循环
             }
             Err(e) => {
-                let error_msg = format!("下载源 {} 失败: {}", index + 1, e);
+                let source_name = match index {
+                    0 => "v6.gh-proxy 镜像",
+                    1 => "gh-proxy 镜像",
+                    2 => "ghfast.top 加速",
+                    3 => "hub.fastgit.xyz",
+                    4 => "hub.fgit.cf",
+                    5 => "jsdelivr CDN",
+                    6 => "GitHub 原始",
+                    _ => "未知源",
+                };
+
+                let error_details = format!("{} 失败: {}", source_name, e);
+                let error_msg = format!("下载源 {} 失败: {}", source_name, e);
                 warn!("{}", error_msg);
+
+                // 发送详细的失败信息到前端
+                let _ = window.emit(
+                    "kernel-download-progress",
+                    json!({
+                        "status": "downloading",
+                        "progress": 15 + (index * 5),
+                        "message": format!("⚠️ {} - 尝试下一个下载源...", error_details)
+                    }),
+                );
 
                 // 删除部分下载的文件
                 let _ = std::fs::remove_file(&download_path);
@@ -314,17 +417,22 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
                     continue;
                 }
 
-                // 所有下载源都失败
+                // 所有下载源都失败，汇总所有错误信息
+                let final_error = format!(
+                    "所有下载源都已失败。最后尝试的 {} 也失败了。请检查网络连接或稍后重试。",
+                    source_name
+                );
+
                 let _ = window.emit(
                     "kernel-download-progress",
                     json!({
                         "status": "error",
                         "progress": 0,
-                        "message": error_msg
+                        "message": final_error
                     }),
                 );
 
-                return Err(error_msg);
+                return Err(final_error);
             }
         }
     }
@@ -365,6 +473,8 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
     } else {
         "sing-box"
     };
+
+    info!("开始查找可执行文件: {}", executable_name);
 
     // 查找可执行文件（可能在子目录中）
     let found_executable_path = find_executable_file(&kernel_dir, executable_name).await?;
@@ -498,10 +608,6 @@ async fn extract_archive(
     archive_path: &std::path::Path,
     extract_to: &std::path::Path,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use flate2::read::GzDecoder;
-    use std::fs::File;
-    use tar::Archive;
-
     info!("开始解压文件: {:?}", archive_path);
 
     // 验证文件是否存在
@@ -518,12 +624,95 @@ async fn extract_archive(
         return Err("压缩文件为空".into());
     }
 
-    // 打开压缩文件
+    // 根据文件扩展名决定解压方式
+    let file_extension = archive_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("");
+
+    info!("文件扩展名: {}", file_extension);
+
+    if file_extension == "zip" {
+        // Windows ZIP 格式解压
+        extract_zip_archive(archive_path, extract_to).await?;
+    } else if file_extension == "gz" || archive_path.to_string_lossy().ends_with(".tar.gz") {
+        // Linux TAR.GZ 格式解压
+        extract_tar_gz_archive(archive_path, extract_to).await?;
+    } else {
+        return Err(format!("不支持的压缩格式: {}", file_extension).into());
+    }
+
+    // 列出解压后的文件（用于调试）
+    if let Ok(entries) = std::fs::read_dir(extract_to) {
+        info!("解压后的文件:");
+        for entry in entries.flatten() {
+            info!("  - {:?}", entry.path());
+        }
+    }
+
+    Ok(())
+}
+
+// 解压 ZIP 文件（Windows）
+async fn extract_zip_archive(
+    archive_path: &std::path::Path,
+    extract_to: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use zip::ZipArchive;
+
+    info!("解压 ZIP 文件: {:?}", archive_path);
+
+    let file = std::fs::File::open(archive_path)?;
+    let mut zip = ZipArchive::new(file)?;
+
+    // 确保解压目录存在
+    if !extract_to.exists() {
+        std::fs::create_dir_all(extract_to)?;
+    }
+
+    for i in 0..zip.len() {
+        let mut file = zip.by_index(i)?;
+        let file_path = extract_to.join(file.name());
+
+        // 跳过目录条目
+        if file.name().ends_with('/') {
+            if let Some(parent) = file_path.parent() {
+                if !parent.exists() {
+                    std::fs::create_dir_all(parent)?;
+                }
+            }
+            continue;
+        }
+
+        // 确保父目录存在
+        if let Some(parent) = file_path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+
+        let mut output_file = std::fs::File::create(&file_path)?;
+        std::io::copy(&mut file, &mut output_file)?;
+    }
+
+    info!("ZIP 文件解压完成");
+    Ok(())
+}
+
+// 解压 TAR.GZ 文件（Linux）
+async fn extract_tar_gz_archive(
+    archive_path: &std::path::Path,
+    extract_to: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use flate2::read::GzDecoder;
+    use std::fs::File;
+    use tar::Archive;
+
+    info!("解压 TAR.GZ 文件: {:?}", archive_path);
+
     let file = File::open(archive_path)?;
     let gz = GzDecoder::new(file);
     let mut archive = Archive::new(gz);
-
-    info!("解压到目录: {:?}", extract_to);
 
     // 确保解压目录存在
     if !extract_to.exists() {
@@ -533,18 +722,10 @@ async fn extract_archive(
     // 解压所有文件
     match archive.unpack(extract_to) {
         Ok(_) => {
-            info!("文件解压完成");
-
-            // 列出解压后的文件（用于调试）
-            if let Ok(entries) = std::fs::read_dir(extract_to) {
-                info!("解压后的文件:");
-                for entry in entries.flatten() {
-                    info!("  - {:?}", entry.path());
-                }
-            }
+            info!("TAR.GZ 文件解压完成");
         }
         Err(e) => {
-            return Err(format!("解压失败: {}", e).into());
+            return Err(format!("TAR.GZ 解压失败: {}", e).into());
         }
     }
 
