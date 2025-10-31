@@ -37,10 +37,10 @@ fn get_platform_priority(filename: &str) -> i32 {
 
     match platform {
         "windows" => {
-            if filename.ends_with(".msi") { 2 } else if filename.ends_with(".exe") { 1 } else { 0 }
+            if filename.ends_with(".exe") { 2 } else if filename.ends_with(".msi") { 1 } else { 0 }
         }
         "linux" => {
-            if filename.ends_with(".AppImage") { 2 } else if filename.ends_with(".deb") { 1 } else { 0 }
+            if filename.ends_with(".deb") { 2 } else if filename.ends_with(".AppImage") { 1 } else { 0 }
         }
         "macos" => {
             if filename.ends_with(".dmg") { 2 } else if filename.ends_with(".app.tar.gz") { 1 } else { 0 }
@@ -346,11 +346,11 @@ pub async fn download_and_install_update(
     // 启动安装程序（在后台运行）
     let install_result = match get_platform_identifier() {
         "windows" => {
-            // Windows: 根据文件类型使用不同的安装方式
+            // Windows: 根据文件类型选择不同的处理方式
             if download_url.ends_with(".msi") {
                 // MSI文件: 使用 msiexec 安装
                 let mut cmd = tokio::process::Command::new("msiexec");
-                cmd.arg("/i").arg(&download_path).arg("/quiet").arg("/norestart");
+                cmd.arg("/i").arg(&download_path).arg("/passive");
                 #[cfg(target_os = "windows")]
                 cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
                 cmd.spawn()
@@ -361,7 +361,7 @@ pub async fn download_and_install_update(
                 cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
                 cmd.spawn()
             } else {
-                // 其他文件: 尝试直接运行
+                // 其他文件：尝试用默认方式运行
                 let mut cmd = tokio::process::Command::new(&download_path);
                 #[cfg(target_os = "windows")]
                 cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
@@ -381,7 +381,7 @@ pub async fn download_and_install_update(
             } else if download_url.ends_with(".deb") {
                 // DEB包: 使用pkexec安装（需要管理员权限）
                 let mut cmd = tokio::process::Command::new("pkexec");
-                cmd.arg("dpkg").arg("-i").arg(&download_path);
+                cmd.arg("dpkg").arg("-i").arg(&download_path).arg("--force-architecture");
                 cmd.spawn()
             } else {
                 // 其他二进制文件
@@ -417,15 +417,7 @@ pub async fn download_and_install_update(
         Ok(_) => {
             // 安装程序启动成功，发送安装开始事件
             let install_message = match get_platform_identifier() {
-                "windows" => {
-                    if download_url.ends_with(".msi") {
-                        "正在通过Windows安装程序安装新版本..."
-                    } else if download_url.ends_with(".exe") {
-                        "安装程序已启动，请按照提示完成安装"
-                    } else {
-                        "正在启动更新程序..."
-                    }
-                },
+                "windows" => "安装程序已启动，请按照提示完成安装",
                 "linux" => {
                     if download_url.ends_with(".AppImage") {
                         "正在启动新版本应用程序..."
