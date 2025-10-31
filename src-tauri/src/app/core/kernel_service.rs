@@ -3,14 +3,14 @@ use crate::app::core::event_relay::{
     create_connection_event_relay, create_log_event_relay, create_memory_event_relay,
     create_traffic_event_relay, start_event_relay_with_retry,
 };
-use serde_json::json;
-use tauri::Manager;
-use std::process::Command;
 use crate::process::manager::ProcessManager;
 use crate::utils::http_client;
+use serde_json::json;
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
@@ -47,7 +47,8 @@ pub async fn check_kernel_version() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
-    let output = cmd.output()
+    let output = cmd
+        .output()
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_VERSION_CHECK_FAILED, e))?;
 
@@ -82,14 +83,13 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
     }
 
     let mut cmd = tokio::process::Command::new(kernel_path);
-    cmd.arg("check")
-        .arg("--config")
-        .arg(path);
+    cmd.arg("check").arg("--config").arg(path);
 
     #[cfg(target_os = "windows")]
     cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
-    let output = cmd.output()
+    let output = cmd
+        .output()
         .await
         .map_err(|e| format!("执行配置检查命令失败: {}", e))?;
 
@@ -186,7 +186,8 @@ fn get_system_arch() -> &'static str {
 pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), String> {
     info!("开始下载最新内核...");
 
-    let window = app_handle.get_webview_window("main")
+    let window = app_handle
+        .get_webview_window("main")
         .ok_or("无法获取主窗口")?;
 
     // 发送开始下载事件
@@ -219,18 +220,36 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
 
     // 使用多个下载源以提高成功率
     let download_urls = vec![
-        // 使用 GitHub 快速加速镜像（优先）
-        format!("https://ghfast.top/https://github.com/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
-        // 使用 GitHub 加速镜像（国内用户）
-        format!("https://hub.fastgit.xyz/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
-        // 使用 GitLab 镜像
-        format!("https://hub.fgit.cf/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
-        // 使用 jsdelivr CDN
-        format!("https://cdn.jsdelivr.net/gh/SagerNet/sing-box@releases/download/v{}/{}", version, filename),
         // 使用 gh-proxy 镜像
-        format!("https://ghproxy.com/https://github.com/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
+        format!(
+            "https://gh-proxy.com/https://github.com/SagerNet/sing-box/releases/download/v{}/{}",
+            version, filename
+        ),
+        // 使用 GitHub 快速加速镜像（优先）
+        format!(
+            "https://ghfast.top/https://github.com/SagerNet/sing-box/releases/download/v{}/{}",
+            version, filename
+        ),
+        // 使用 GitHub 加速镜像（国内用户）
+        format!(
+            "https://hub.fastgit.xyz/SagerNet/sing-box/releases/download/v{}/{}",
+            version, filename
+        ),
+        // 使用 GitLab 镜像
+        format!(
+            "https://hub.fgit.cf/SagerNet/sing-box/releases/download/v{}/{}",
+            version, filename
+        ),
+        // 使用 jsdelivr CDN
+        format!(
+            "https://cdn.jsdelivr.net/gh/SagerNet/sing-box@releases/download/v{}/{}",
+            version, filename
+        ),
         // 原始 GitHub 链接（备用）
-        format!("https://github.com/SagerNet/sing-box/releases/download/v{}/{}", version, filename),
+        format!(
+            "https://github.com/SagerNet/sing-box/releases/download/v{}/{}",
+            version, filename
+        ),
     ];
 
     // 记录下载信息
@@ -355,7 +374,10 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
 
     // 如果找到的文件不在目标位置，需要移动
     if found_executable_path != target_executable_path {
-        info!("迁移内核文件从 {:?} 到 {:?}", found_executable_path, target_executable_path);
+        info!(
+            "迁移内核文件从 {:?} 到 {:?}",
+            found_executable_path, target_executable_path
+        );
 
         // 确保目标位置的文件不存在
         if target_executable_path.exists() {
@@ -476,8 +498,8 @@ async fn extract_archive(
     archive_path: &std::path::Path,
     extract_to: &std::path::Path,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use std::fs::File;
     use flate2::read::GzDecoder;
+    use std::fs::File;
     use tar::Archive;
 
     info!("开始解压文件: {:?}", archive_path);
@@ -534,7 +556,10 @@ async fn find_executable_file(
     search_dir: &std::path::Path,
     executable_name: &str,
 ) -> Result<std::path::PathBuf, String> {
-    info!("在目录 {:?} 中查找可执行文件: {}", search_dir, executable_name);
+    info!(
+        "在目录 {:?} 中查找可执行文件: {}",
+        search_dir, executable_name
+    );
 
     // 首先直接在根目录查找
     let direct_path = search_dir.join(executable_name);
@@ -552,11 +577,13 @@ async fn find_executable_file(
     {
         for entry in entries {
             let path = entry.path();
-            if path.file_name()
+            if path
+                .file_name()
                 .and_then(|name| name.to_str())
                 .map(|name| name == executable_name)
                 .unwrap_or(false)
-                && path.is_file() // 确保是文件而不是目录
+                && path.is_file()
+            // 确保是文件而不是目录
             {
                 info!("找到可执行文件: {:?}", path);
                 found_files.push(path.to_path_buf());
@@ -572,7 +599,10 @@ async fn find_executable_file(
                 warn!("  - {:?}", entry.path());
             }
         }
-        return Err(format!("未找到可执行文件: {} 在目录 {:?} 中", executable_name, search_dir));
+        return Err(format!(
+            "未找到可执行文件: {} 在目录 {:?} 中",
+            executable_name, search_dir
+        ));
     }
 
     // 返回第一个找到的文件
@@ -599,7 +629,10 @@ fn set_executable_permission(_file_path: &std::path::Path) -> Result<(), std::io
 }
 
 // 清理内核目录，只保留可执行文件
-fn cleanup_kernel_directory(kernel_dir: &std::path::Path, executable_name: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn cleanup_kernel_directory(
+    kernel_dir: &std::path::Path,
+    executable_name: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("清理内核目录，只保留可执行文件: {}", executable_name);
 
     if let Ok(entries) = std::fs::read_dir(kernel_dir) {
@@ -607,7 +640,8 @@ fn cleanup_kernel_directory(kernel_dir: &std::path::Path, executable_name: &str)
             let path = entry.path();
 
             // 跳过可执行文件本身
-            if path.file_name()
+            if path
+                .file_name()
                 .and_then(|name| name.to_str())
                 .map(|name| name == executable_name)
                 .unwrap_or(false)
@@ -661,7 +695,7 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
     // 检查内核是否已经在运行
     if is_kernel_running().await.unwrap_or(false) {
         warn!("内核已在运行中");
-        
+
         // 如果内核已在运行，检查事件中继是否需要启动
         if let Some(port) = api_port {
             info!("内核已运行，检查并启动事件中继...");
@@ -670,29 +704,29 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
                 Err(e) => warn!("⚠️ 事件中继启动失败: {}", e),
             }
         }
-        
+
         return Ok("内核已在运行中".to_string());
     }
 
     // 带重试机制的内核启动
     let max_attempts = 3;
     let mut last_error = String::new();
-    
+
     for attempt in 1..=max_attempts {
         info!("🚀 尝试启动内核，第 {}/{} 次", attempt, max_attempts);
-        
+
         // 启动内核进程
         match PROCESS_MANAGER.start().await {
             Ok(_) => {
                 info!("✅ 内核进程启动成功");
-                
+
                 // 等待内核启动并检查状态
                 let mut kernel_ready = false;
-                
+
                 // 多次检查内核是否真正运行起来
                 for check_attempt in 1..=5 {
                     tokio::time::sleep(Duration::from_secs(1)).await;
-                    
+
                     if is_kernel_running().await.unwrap_or(false) {
                         info!("✅ 内核确认正在运行（第{}次检查）", check_attempt);
                         kernel_ready = true;
@@ -701,7 +735,7 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
                         warn!("⏳ 内核尚未就绪，第{}次检查", check_attempt);
                     }
                 }
-                
+
                 if kernel_ready {
                     // 自动启动事件中继
                     if let Some(port) = api_port {
@@ -709,17 +743,17 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
                         match start_websocket_relay(app_handle.clone(), Some(port)).await {
                             Ok(_) => {
                                 info!("✅ 事件中继启动成功");
-                                
+
                                 // 发送内核就绪事件到前端
                                 if let Err(e) = app_handle.emit("kernel-ready", true) {
                                     error!("发送内核就绪事件失败: {}", e);
                                 }
-                                
+
                                 // 通知内核就绪
                                 KERNEL_READY_NOTIFY.notify_waiters();
-                                
+
                                 return Ok("内核启动成功".to_string());
-                            },
+                            }
                             Err(e) => {
                                 error!("❌ 事件中继启动失败: {}", e);
                                 last_error = format!("内核启动成功，但事件中继启动失败: {}", e);
@@ -742,20 +776,20 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
                         error!("停止内核失败: {}", stop_err);
                     }
                 }
-            },
+            }
             Err(e) => {
                 last_error = format!("{}: {}", messages::ERR_PROCESS_START_FAILED, e);
                 error!("❌ 内核启动失败: {}", e);
             }
         }
-        
+
         // 如果不是最后一次尝试，等待后重试
         if attempt < max_attempts {
             warn!("⏳ 第{}次启动失败，{}秒后重试...", attempt, 2 * attempt);
             tokio::time::sleep(Duration::from_secs(2 * attempt as u64)).await;
         }
     }
-    
+
     error!("❌ 内核启动失败，已尝试{}次: {}", max_attempts, last_error);
     Err(last_error)
 }
@@ -786,7 +820,10 @@ pub async fn stop_kernel() -> Result<String, String> {
 
 // 重启内核
 #[tauri::command]
-pub async fn restart_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Result<String, String> {
+pub async fn restart_kernel(
+    app_handle: AppHandle,
+    api_port: Option<u16>,
+) -> Result<String, String> {
     stop_kernel().await?;
     tokio::time::sleep(Duration::from_secs(3)).await;
     start_kernel(app_handle, api_port).await
@@ -816,7 +853,7 @@ pub async fn start_websocket_relay(
     } else {
         Duration::from_secs(2)
     };
-    
+
     tokio::time::sleep(wait_time).await;
 
     // 获取API token
@@ -908,7 +945,8 @@ async fn is_kernel_running_windows() -> Result<bool, String> {
     info!("检查内核进程，可执行文件路径: {:?}", kernel_path);
 
     // 方法1: 通过tasklist命令检查精确的进程
-    let kernel_filename = kernel_path.file_name()
+    let kernel_filename = kernel_path
+        .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("sing-box.exe");
 
@@ -945,7 +983,10 @@ async fn is_kernel_running_windows() -> Result<bool, String> {
     // 方法3: 使用PowerShell Get-Process
     {
         let mut cmd = tokio::process::Command::new("powershell");
-        cmd.args(&["-Command", "Get-Process sing-box -ErrorAction SilentlyContinue"]);
+        cmd.args(&[
+            "-Command",
+            "Get-Process sing-box -ErrorAction SilentlyContinue",
+        ]);
 
         #[cfg(target_os = "windows")]
         cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
@@ -990,7 +1031,10 @@ async fn is_kernel_running_linux() -> Result<bool, String> {
         .await
     {
         if !output.stdout.is_empty() {
-            info!("内核进程正在运行 (pgrep检测): {}", !output.stdout.is_empty());
+            info!(
+                "内核进程正在运行 (pgrep检测): {}",
+                !output.stdout.is_empty()
+            );
             return Ok(true);
         }
     }
@@ -1030,7 +1074,11 @@ async fn is_kernel_running_linux() -> Result<bool, String> {
                 {
                     let cmdline = String::from_utf8_lossy(&cmdline_output.stdout);
                     if cmdline.contains(&*kernel_path_str) {
-                        info!("内核进程正在运行 (精确匹配): PID {}, 命令: {}", pid, cmdline.trim());
+                        info!(
+                            "内核进程正在运行 (精确匹配): PID {}, 命令: {}",
+                            pid,
+                            cmdline.trim()
+                        );
                         return Ok(true);
                     }
                 }
@@ -1092,11 +1140,11 @@ async fn cleanup_event_relay_tasks() {
 
     // 等待所有任务完成
     let mut tasks = EVENT_RELAY_TASKS.lock().await;
-    
+
     for task in tasks.drain(..) {
         task.abort();
     }
-    
+
     info!("已清理所有事件中继任务");
 }
 
@@ -1106,16 +1154,13 @@ async fn check_websocket_endpoints_ready(api_port: u16, token: &str) -> bool {
     use url::Url;
 
     let endpoints = ["traffic", "memory", "logs", "connections"];
-    
+
     for endpoint in &endpoints {
         let url_str = format!("ws://127.0.0.1:{}/{}?token={}", api_port, endpoint, token);
-        
+
         match Url::parse(&url_str) {
             Ok(url) => {
-                match tokio::time::timeout(
-                    Duration::from_secs(3),
-                    connect_async(url)
-                ).await {
+                match tokio::time::timeout(Duration::from_secs(3), connect_async(url)).await {
                     Ok(Ok((ws_stream, _))) => {
                         // 连接成功，立即关闭
                         drop(ws_stream);
@@ -1133,7 +1178,7 @@ async fn check_websocket_endpoints_ready(api_port: u16, token: &str) -> bool {
             }
         }
     }
-    
+
     true
 }
 
@@ -1152,8 +1197,7 @@ pub async fn get_system_uptime() -> Result<u64, String> {
         #[cfg(target_os = "windows")]
         cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
 
-        match cmd.output().await
-        {
+        match cmd.output().await {
             Ok(output) => {
                 if output.status.success() {
                     let uptime_str = String::from_utf8_lossy(&output.stdout);
@@ -1175,7 +1219,7 @@ pub async fn get_system_uptime() -> Result<u64, String> {
             }
         }
     }
-    
+
     #[cfg(not(windows))]
     {
         // 对于非Windows系统，使用/proc/uptime
@@ -1198,8 +1242,15 @@ pub async fn get_system_uptime() -> Result<u64, String> {
 
 /// 重构版本的启动命令 - 增强版
 #[tauri::command]
-pub async fn kernel_start_enhanced(app_handle: AppHandle, proxy_mode: Option<String>, api_port: Option<u16>) -> Result<serde_json::Value, String> {
-    info!("🚀 启动内核增强版，代理模式: {:?}, API端口: {:?}", proxy_mode, api_port);
+pub async fn kernel_start_enhanced(
+    app_handle: AppHandle,
+    proxy_mode: Option<String>,
+    api_port: Option<u16>,
+) -> Result<serde_json::Value, String> {
+    info!(
+        "🚀 启动内核增强版，代理模式: {:?}, API端口: {:?}",
+        proxy_mode, api_port
+    );
 
     // 检查内核是否已在运行
     if is_kernel_running().await.unwrap_or(false) {
@@ -1280,7 +1331,9 @@ pub async fn kernel_stop_enhanced() -> Result<serde_json::Value, String> {
 
 /// 重构版本的状态查询命令 - 增强版
 #[tauri::command]
-pub async fn kernel_get_status_enhanced(api_port: Option<u16>) -> Result<serde_json::Value, String> {
+pub async fn kernel_get_status_enhanced(
+    api_port: Option<u16>,
+) -> Result<serde_json::Value, String> {
     // 使用传递的端口或默认端口12081（与AppStore默认值保持一致）
     let port = api_port.unwrap_or(12081);
 
@@ -1294,12 +1347,17 @@ pub async fn kernel_get_status_enhanced(api_port: Option<u16>) -> Result<serde_j
         let client = http_client::get_client();
         let api_url = format!("http://127.0.0.1:{}/version", port);
 
-        api_ready = match client.get(&api_url).timeout(Duration::from_secs(2)).send().await {
+        api_ready = match client
+            .get(&api_url)
+            .timeout(Duration::from_secs(2))
+            .send()
+            .await
+        {
             Ok(response) if response.status().is_success() => true,
             Ok(response) => {
                 error = Some(format!("API返回错误状态码: {}", response.status()));
                 false
-            },
+            }
             Err(e) => {
                 error = Some(format!("API连接失败: {}", e));
                 false
@@ -1314,8 +1372,10 @@ pub async fn kernel_get_status_enhanced(api_port: Option<u16>) -> Result<serde_j
             // 使用超时连接WebSocket
             websocket_ready = tokio::time::timeout(
                 Duration::from_secs(3),
-                tokio_tungstenite::connect_async(&url_str)
-            ).await.is_ok();
+                tokio_tungstenite::connect_async(&url_str),
+            )
+            .await
+            .is_ok();
 
             if !websocket_ready && error.is_none() {
                 error = Some("WebSocket连接失败".to_string());
@@ -1333,12 +1393,15 @@ pub async fn kernel_get_status_enhanced(api_port: Option<u16>) -> Result<serde_j
         // 如果进程正在运行，尝试从API获取版本
         let client = http_client::get_client();
         let api_url = format!("http://127.0.0.1:{}/version", port);
-        match client.get(&api_url).timeout(Duration::from_secs(2)).send().await {
-            Ok(response) if response.status().is_success() => {
-                match response.text().await {
-                    Ok(text) => Some(text.trim().to_string()),
-                    Err(_) => None,
-                }
+        match client
+            .get(&api_url)
+            .timeout(Duration::from_secs(2))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => match response.text().await {
+                Ok(text) => Some(text.trim().to_string()),
+                Err(_) => None,
             },
             _ => None,
         }
@@ -1387,12 +1450,17 @@ pub async fn kernel_check_health(api_port: Option<u16>) -> Result<serde_json::Va
         let port = api_port.unwrap_or(12081);
         let client = http_client::get_client();
         let api_url = format!("http://127.0.0.1:{}/version", port);
-        
-        let api_ready = match client.get(&api_url).timeout(Duration::from_secs(2)).send().await {
+
+        let api_ready = match client
+            .get(&api_url)
+            .timeout(Duration::from_secs(2))
+            .send()
+            .await
+        {
             Ok(response) if response.status().is_success() => true,
             _ => false,
         };
-        
+
         if !api_ready {
             issues.push(format!("内核进程运行但API不可用（端口: {}）", port));
             healthy = false;
