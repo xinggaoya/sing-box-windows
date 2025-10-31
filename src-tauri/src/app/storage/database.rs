@@ -371,6 +371,17 @@ impl DatabaseService {
         }
     }
     
+    // 删除配置
+    pub async fn remove_config(&self, key: &str) -> Result<(), StorageError> {
+        sqlx::query("DELETE FROM generic_config WHERE key = ?1")
+            .bind(key)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StorageError::Database(e))?;
+
+        Ok(())
+    }
+
     pub async fn close(&self) -> Result<(), StorageError> {
         self.pool.close().await;
         Ok(())
