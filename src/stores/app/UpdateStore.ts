@@ -212,7 +212,7 @@ export const useUpdateStore = defineStore(
         })
 
         // 开始下载和安装
-        const result = await tauriApi.system.downloadAndInstallUpdate()
+        const result = await tauriApi.system.downloadAndInstallUpdate(downloadUrl.value)
         return result
       } catch (error) {
         console.error('下载更新失败:', error)
