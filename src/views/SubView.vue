@@ -522,7 +522,7 @@ const handleConfirm = () => {
           })
 
           // 自动设置为当前活跃订阅（无论是手动还是URL订阅）
-          subStore.activeIndex = subStore.list.length - 1
+          await subStore.setActiveIndex(subStore.list.length - 1)
           message.success(t('sub.addAndUseSuccess'))
         } else {
           // 更新订阅
@@ -552,12 +552,19 @@ const handleCancel = () => {
   resetForm()
 }
 
-const deleteSubscription = (index: number) => {
+const deleteSubscription = async (index: number) => {
   if (subStore.activeIndex === index) {
     message.warning(t('sub.cannotDeleteActive'))
     return
   }
+
   subStore.list.splice(index, 1)
+
+  // 如果删除的索引小于当前激活索引，需要调整激活索引
+  if (subStore.activeIndex !== null && subStore.activeIndex > index) {
+    await subStore.setActiveIndex(subStore.activeIndex - 1)
+  }
+
   message.success(t('sub.deleteSuccess'))
 }
 
@@ -578,7 +585,7 @@ const useSubscription = async (url: string, index: number) => {
 
     // 更新订阅状态
     subStore.list[index].lastUpdate = Date.now()
-    subStore.activeIndex = index
+    await subStore.setActiveIndex(index)
     message.success(t('sub.useSuccess'))
 
     // 判断内核是否在运行 重启内核

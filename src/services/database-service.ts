@@ -56,4 +56,13 @@ export class DatabaseService {
   static async saveSubscriptions(subscriptions: Subscription[]): Promise<void> {
     return await invoke('db_save_subscriptions', { subscriptions })
   }
+
+  // 激活订阅索引
+  static async getActiveIndex(): Promise<number | null> {
+    return await invoke('db_get_active_subscription_index')
+  }
+
+  static async saveActiveIndex(index: number | null): Promise<void> {
+    return await invoke('db_save_active_subscription_index', { index })
+  }
 }

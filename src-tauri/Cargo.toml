@@ -28,12 +28,12 @@ sha2 = "0.10"
 semver = "1.0"
 
 tauri = { version = "2", features = ["tray-icon", "unstable", "devtools"] }
-reqwest = { version = "0", features = ["json", "stream", "rustls-tls"] }
+reqwest = { version = "0", features = ["json", "stream", "native-tls-vendored"] }
 dirs = "5.0.1"
 tokio = { version = "1", features = ["full"] }
 futures-util = "0.3"
 futures = "0.3"
-tokio-tungstenite = { version = "0.18", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.18", features = ["native-tls"] }
 url = "2"
 urlencoding = "2.1"
 zip = { version = "0.5.13" }
@@ -41,7 +41,7 @@ flate2 = "1.0"
 tar = "0.4"
 walkdir = "2.3"
 lazy_static = "1.4.0"
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "sqlite", "chrono", "uuid"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
 tauri-plugin-store = "2"
@@ -56,7 +56,7 @@ which = "7.0"
 # 通用依赖（所有平台）
 tauri-plugin-store = "2"
 thiserror = "1.0"
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "sqlite", "chrono", "uuid"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

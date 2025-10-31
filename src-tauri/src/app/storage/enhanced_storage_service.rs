@@ -127,6 +127,22 @@ impl EnhancedStorageService {
         self.database.save_config("subscriptions", &subscriptions).await
     }
 
+    // 激活订阅索引
+    pub async fn get_active_subscription_index(&self) -> StorageResult<Option<i64>> {
+        match self.database.load_config::<i64>("active_subscription_index").await? {
+            Some(index) => Ok(Some(index)),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn save_active_subscription_index(&self, index: Option<i64>) -> StorageResult<()> {
+        if let Some(idx) = index {
+            self.database.save_config("active_subscription_index", &idx).await
+        } else {
+            self.database.remove_config("active_subscription_index").await
+        }
+    }
+
     // 通用配置
     pub async fn get_config<T>(&self, key: &str) -> StorageResult<Option<T>>
     where
@@ -244,4 +260,21 @@ pub async fn db_save_subscriptions(
 ) -> Result<(), String> {
     let storage = get_enhanced_storage(&app).await?;
     storage.save_subscriptions(&subscriptions).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn db_get_active_subscription_index(
+    app: AppHandle,
+) -> Result<Option<i64>, String> {
+    let storage = get_enhanced_storage(&app).await?;
+    storage.get_active_subscription_index().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn db_save_active_subscription_index(
+    index: Option<i64>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let storage = get_enhanced_storage(&app).await?;
+    storage.save_active_subscription_index(index).await.map_err(|e| e.to_string())
 }

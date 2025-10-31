@@ -94,6 +94,8 @@ pub fn run() {
             crate::app::storage::enhanced_storage_service::db_save_update_config,
             crate::app::storage::enhanced_storage_service::db_get_subscriptions,
             crate::app::storage::enhanced_storage_service::db_save_subscriptions,
+            crate::app::storage::enhanced_storage_service::db_get_active_subscription_index,
+            crate::app::storage::enhanced_storage_service::db_save_active_subscription_index,
             // Core - Kernel service commands (legacy)
             crate::app::core::kernel_service::start_kernel,
             crate::app::core::kernel_service::stop_kernel,

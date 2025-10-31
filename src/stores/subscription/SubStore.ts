@@ -51,15 +51,37 @@ export const useSubStore = defineStore(
       try {
         console.log('📄 从数据库加载订阅配置...')
         const subscriptions = await DatabaseService.getSubscriptions()
-        
+
         // 更新响应式状态
         list.value = convertToFrontendFormat(subscriptions)
-        
-        console.log('📄 订阅配置加载完成：', { count: list.value.length })
+
+        // 加载激活索引
+        try {
+          const savedActiveIndex = await DatabaseService.getActiveIndex()
+          // 验证索引的有效性
+          if (savedActiveIndex !== null &&
+              savedActiveIndex >= 0 &&
+              savedActiveIndex < list.value.length) {
+            activeIndex.value = savedActiveIndex
+            console.log('📄 恢复激活订阅索引:', savedActiveIndex)
+          } else {
+            activeIndex.value = null
+            console.log('📄 激活索引无效，重置为 null')
+          }
+        } catch (indexError) {
+          console.warn('加载激活索引失败，使用默认值:', indexError)
+          activeIndex.value = null
+        }
+
+        console.log('📄 订阅配置加载完成：', {
+          count: list.value.length,
+          activeIndex: activeIndex.value
+        })
       } catch (error) {
         console.error('从数据库加载订阅配置失败:', error)
         // 加载失败时使用默认值
         list.value = []
+        activeIndex.value = null
       }
     }
 
@@ -104,16 +126,6 @@ export const useSubStore = defineStore(
     const remove = async (index: number) => {
       if (index >= 0 && index < list.value.length) {
         list.value.splice(index, 1)
-        
-        // 如果删除的是当前激活的订阅，需要调整激活索引
-        if (activeIndex.value !== null) {
-          if (activeIndex.value === index) {
-            activeIndex.value = list.value.length > 0 ? 0 : null
-          } else if (activeIndex.value > index) {
-            activeIndex.value = activeIndex.value - 1
-          }
-        }
-        
         // 保存会在 watch 中自动处理
       }
     }
@@ -121,7 +133,12 @@ export const useSubStore = defineStore(
     // 设置激活订阅
     const setActiveIndex = async (index: number | null) => {
       activeIndex.value = index
-      // 注意：激活索引可能不需要持久化，这里先不保存
+      // 持久化激活索引到本地存储
+      try {
+        await DatabaseService.saveActiveIndex(index)
+      } catch (error) {
+        console.error('保存激活索引失败:', error)
+      }
     }
 
     // 重置所有订阅的加载状态
