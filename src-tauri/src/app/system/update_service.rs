@@ -346,11 +346,27 @@ pub async fn download_and_install_update(
     // 启动安装程序（在后台运行）
     let install_result = match get_platform_identifier() {
         "windows" => {
-            // Windows: 直接运行安装程序
-            let mut cmd = tokio::process::Command::new(&download_path);
-            #[cfg(target_os = "windows")]
-            cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
-            cmd.spawn()
+            // Windows: 根据文件类型使用不同的安装方式
+            if download_url.ends_with(".msi") {
+                // MSI文件: 使用 msiexec 安装
+                let mut cmd = tokio::process::Command::new("msiexec");
+                cmd.arg("/i").arg(&download_path).arg("/quiet").arg("/norestart");
+                #[cfg(target_os = "windows")]
+                cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
+                cmd.spawn()
+            } else if download_url.ends_with(".exe") {
+                // EXE文件: 直接运行
+                let mut cmd = tokio::process::Command::new(&download_path);
+                #[cfg(target_os = "windows")]
+                cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
+                cmd.spawn()
+            } else {
+                // 其他文件: 尝试直接运行
+                let mut cmd = tokio::process::Command::new(&download_path);
+                #[cfg(target_os = "windows")]
+                cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
+                cmd.spawn()
+            }
         }
         "linux" => {
             // Linux: 根据文件类型执行不同的安装逻辑
@@ -401,7 +417,15 @@ pub async fn download_and_install_update(
         Ok(_) => {
             // 安装程序启动成功，发送安装开始事件
             let install_message = match get_platform_identifier() {
-                "windows" => "安装程序已启动，请按照提示完成安装",
+                "windows" => {
+                    if download_url.ends_with(".msi") {
+                        "正在通过Windows安装程序安装新版本..."
+                    } else if download_url.ends_with(".exe") {
+                        "安装程序已启动，请按照提示完成安装"
+                    } else {
+                        "正在启动更新程序..."
+                    }
+                },
                 "linux" => {
                     if download_url.ends_with(".AppImage") {
                         "正在启动新版本应用程序..."
