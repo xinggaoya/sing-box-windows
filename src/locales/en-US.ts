@@ -59,6 +59,7 @@ export default {
     restartFailed: 'Restart failed',
     nodeModeChangeSuccess: 'Node mode changed successfully',
     nodeModeChangeFailed: 'Node mode change failed',
+    restartSuccess: 'Kernel restarted successfully.',
 
     // WebSocket status
     wsStatus: {
@@ -150,6 +151,7 @@ export default {
     noProxyGroups: 'No proxy groups available',
     checkConfigOrRefresh: 'Please check configuration file or refresh page',
     currentLabel: 'Current node:',
+    switchSuccess: 'Switched group \'{group}\' to \'{proxy}\'.',
   },
 
   // Connections page
@@ -164,7 +166,7 @@ export default {
     activeConnections: 'Active Connections',
     refreshConnections: 'Refresh Connections',
     refreshSuccess: 'Connection list refreshed',
-    refreshError: 'Failed to refresh connection list',
+    refreshError: 'Failed to refresh connection list: {error}',
     noActiveConnections: 'No active network connections currently',
     adjustSearchOrFilters: 'Try adjusting search conditions or filters',
     searchPlaceholder: 'Search connections (ID, IP, domain, process)',
@@ -172,6 +174,9 @@ export default {
     ruleFilter: 'Rule Filter',
     noMatchingConnections2: 'No matching connections',
     matchedConnections: 'Matched Connections',
+    secondsAgo: '{count}s ago',
+    minutesAgo: '{count}m ago',
+    hoursAgo: '{count}h ago',
   },
 
   // Log page
@@ -200,6 +205,9 @@ export default {
       error: 'Error',
       success: 'Success',
     },
+    latestAt: 'Latest at {time}',
+    noSearchResults: 'No logs match your search.',
+    adjustSearchFilters: 'Try adjusting your search or filters.',
   },
 
   // Rules page
@@ -223,6 +231,8 @@ export default {
     proxyTargets: 'Proxy Targets',
     totalRules: 'Total Rules',
     matchingRules: 'Matching Rules',
+    fetchSuccess: 'Successfully fetched {count} rules.',
+    fetchError: 'Failed to fetch rules: {error}',
   },
 
   // Subscription page
@@ -256,6 +266,7 @@ export default {
     updateSuccess: 'Subscription updated successfully',
     operationFailed: 'Operation failed: ',
     use: 'Use',
+    useAgain: 'Use Again',
     useSuccess: 'Applied successfully',
     useFailed: 'Application failed: ',
     copyLink: 'Copy Link',
@@ -356,6 +367,7 @@ export default {
       beta: 'Beta',
       releaseNotes: 'Release Notes',
       updateNotice: 'Update Notice',
+      skipVersion: 'Skip This Version',
       prereleaseWarningDesc: 'Pre-release versions may contain unstable features and potential issues, recommended for testing environments only.',
       prereleaseConfirm: 'Confirm Enable Pre-release',
       prereleaseConfirmDesc: 'After enabling, you will receive pre-release version update notifications. These versions may not be stable, are you sure you want to continue?',
@@ -363,6 +375,11 @@ export default {
       prereleaseEnabledDesc: 'You will receive pre-release version update notifications',
       prereleaseDisabled: 'Pre-release versions disabled',
       prereleaseDisabledDesc: 'You will only receive stable version update notifications',
+      newVersionFound: 'New version {version} found!',
+      downloadStarted: 'Update download started in the background.',
+      downloadError: 'Update download failed: {error}',
+      skipSuccess: 'Successfully skipped this version.',
+      skipError: 'Failed to skip version: {error}',
     },
 
     // Auto-start settings
@@ -410,6 +427,7 @@ export default {
       manualDownloadTitle: 'Manual Download Instructions',
       manualDownloadGuide: 'Please follow these steps:\n1. Visit https://github.com/SagerNet/sing-box/releases/latest\n2. Download the corresponding system version of sing-box\n3. Place the extracted executable file in the following directory:\nWindows: User directory/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: User directory/.local/share/sing-box-windows/sing-box/sing-box\n\nAfter completion, click "Check Installation" button to verify installation.',
       installPrompt: 'Please download and install kernel before use.',
+      downloadFailedMessage: 'Kernel download failed: {error}',
     },
 
     // Developer tools
@@ -455,5 +473,7 @@ export default {
     updateDownloaded: 'Update downloaded, installing soon',
     restartAsAdmin: 'Restart as Admin',
     restartFailed: 'Restart failed',
+    goToSettings: 'Go to Settings',
+    updatePrompt: 'A new version is available. Please go to the Settings page to update.',
   },
 }

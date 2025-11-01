@@ -59,6 +59,7 @@ export default {
     restartFailed: '重启失败',
     nodeModeChangeSuccess: '节点模式切换成功',
     nodeModeChangeFailed: '节点模式切换失败',
+    restartSuccess: '内核重启成功。',
 
     // WebSocket状态
     wsStatus: {
@@ -150,6 +151,7 @@ export default {
     noProxyGroups: '暂无代理组',
     checkConfigOrRefresh: '请检查配置文件或刷新页面',
     currentLabel: '当前节点:',
+    switchSuccess: '已将代理组 \'{group}\' 切换到 \'{proxy}\'.',
   },
 
   // 连接页面
@@ -164,7 +166,7 @@ export default {
     activeConnections: '活跃连接',
     refreshConnections: '刷新连接',
     refreshSuccess: '连接列表已刷新',
-    refreshError: '刷新连接列表失败',
+    refreshError: '刷新连接列表失败: {error}',
     noActiveConnections: '当前没有活跃的网络连接',
     adjustSearchOrFilters: '尝试调整搜索条件或筛选器',
     searchPlaceholder: '搜索连接 (ID、IP、域名、进程)',
@@ -172,6 +174,9 @@ export default {
     ruleFilter: '规则筛选',
     noMatchingConnections2: '无匹配连接',
     matchedConnections: '匹配连接',
+    secondsAgo: '{count}秒前',
+    minutesAgo: '{count}分钟前',
+    hoursAgo: '{count}小时前',
   },
 
   // 日志页面
@@ -200,6 +205,9 @@ export default {
       error: '错误',
       success: '成功',
     },
+    latestAt: '最新于 {time}',
+    noSearchResults: '没有找到匹配的日志。',
+    adjustSearchFilters: '请尝试调整您的搜索或筛选条件。',
   },
 
   // 规则页面
@@ -223,6 +231,8 @@ export default {
     proxyTargets: '代理目标',
     totalRules: '总规则',
     matchingRules: '匹配规则',
+    fetchSuccess: '成功获取 {count} 条规则。',
+    fetchError: '获取规则失败: {error}',
   },
 
   // 订阅页面
@@ -256,6 +266,7 @@ export default {
     updateSuccess: '更新订阅成功',
     operationFailed: '操作失败: ',
     use: '使用',
+    useAgain: '再次使用',
     useSuccess: '应用成功',
     useFailed: '应用失败: ',
     copyLink: '复制链接',
@@ -356,6 +367,7 @@ export default {
       beta: '测试版',
       releaseNotes: '更新日志',
       updateNotice: '更新提醒',
+      skipVersion: '跳过此版本',
       prereleaseWarningDesc: '测试版本可能包含未稳定的功能和潜在的问题，建议仅在测试环境中使用。',
       prereleaseConfirm: '确认启用测试版本',
       prereleaseConfirmDesc: '启用后，您将接收到预发布版本的更新通知。这些版本可能不够稳定，确定要继续吗？',
@@ -363,6 +375,11 @@ export default {
       prereleaseEnabledDesc: '您将接收到预发布版本的更新通知',
       prereleaseDisabled: '测试版本已禁用',
       prereleaseDisabledDesc: '您将只接收正式版本的更新通知',
+      newVersionFound: '发现新版本 {version}！',
+      downloadStarted: '更新已开始在后台下载。',
+      downloadError: '更新下载失败: {error}',
+      skipSuccess: '已成功跳过此版本。',
+      skipError: '跳过版本失败: {error}',
     },
 
     // 自启动设置
@@ -410,6 +427,7 @@ export default {
       manualDownloadTitle: '手动下载说明',
       manualDownloadGuide: '请按照以下步骤操作：\n1. 访问 https://github.com/SagerNet/sing-box/releases/latest\n2. 下载对应系统版本的 sing-box\n3. 将解压后的可执行文件放置在以下目录：\nWindows: 用户目录/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: 用户目录/.local/share/sing-box-windows/sing-box/sing-box\n\n完成后点击"检查安装"按钮验证安装是否成功。',
       installPrompt: '请下载并安装内核后使用。',
+      downloadFailedMessage: '内核下载失败: {error}',
     },
 
     // 开发者工具
@@ -455,5 +473,7 @@ export default {
     updateDownloaded: '更新已下载，即将安装',
     restartAsAdmin: '以管理员重启',
     restartFailed: '重启失败',
+    goToSettings: '前往设置',
+    updatePrompt: '发现新版本，请前往设置页面进行更新。',
   },
 }

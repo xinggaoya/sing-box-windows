@@ -59,6 +59,7 @@ export default {
     restartFailed: '再起動失敗',
     nodeModeChangeSuccess: 'ノードモードの切り替え成功',
     nodeModeChangeFailed: 'ノードモードの切り替え失敗',
+    restartSuccess: 'カーネルが正常に再起動しました。',
 
     // WebSocket状态
     wsStatus: {
@@ -150,6 +151,7 @@ export default {
     noProxyGroups: 'プロキシグループがありません',
     checkConfigOrRefresh: '設定ファイルを確認するかページを更新してください',
     currentLabel: '現在のノード:',
+    switchSuccess: 'グループ「{group}」を「{proxy}」に切り替えました。',
   },
 
   // 连接页面
@@ -164,7 +166,7 @@ export default {
     activeConnections: 'アクティブ接続',
     refreshConnections: '接続を更新',
     refreshSuccess: '接続リストが更新されました',
-    refreshError: '接続リストの更新に失敗しました',
+    refreshError: '接続リストの更新に失敗しました: {error}',
     noActiveConnections: '現在アクティブなネットワーク接続がありません',
     adjustSearchOrFilters: '検索条件やフィルターを調整してください',
     searchPlaceholder: '接続を検索 (ID、IP、ドメイン、プロセス)',
@@ -172,6 +174,9 @@ export default {
     ruleFilter: 'ルールフィルタ',
     noMatchingConnections2: '一致する接続がありません',
     matchedConnections: '一致接続',
+    secondsAgo: '{count}秒前',
+    minutesAgo: '{count}分前',
+    hoursAgo: '{count}時間前',
   },
 
   // 日志页面
@@ -200,6 +205,9 @@ export default {
       error: 'エラー',
       success: '成功',
     },
+    latestAt: '最新 {time}',
+    noSearchResults: '検索に一致するログはありません。',
+    adjustSearchFilters: '検索またはフィルターを調整してみてください。',
   },
 
   // 规则页面
@@ -223,6 +231,8 @@ export default {
     proxyTargets: 'プロキシターゲット',
     totalRules: '総ルール',
     matchingRules: '一致ルール',
+    fetchSuccess: '{count} 件のルールを正常に取得しました。',
+    fetchError: 'ルールの取得に失敗しました: {error}',
   },
 
   // 订阅页面
@@ -256,6 +266,7 @@ export default {
     updateSuccess: 'サブスクリプションの更新が成功しました',
     operationFailed: '操作失敗: ',
     use: '使用',
+    useAgain: '再利用',
     useSuccess: '適用成功',
     useFailed: '適用失敗: ',
     copyLink: 'リンクをコピー',
@@ -356,6 +367,7 @@ export default {
       beta: 'ベータ',
       releaseNotes: 'リリースノート',
       updateNotice: '更新通知',
+      skipVersion: 'このバージョンをスキップ',
       prereleaseWarningDesc: 'テストバージョンには不安定な機能や潜在的な問題が含まれる可能性があります。テスト環境でのみ使用することをお勧めします。',
       prereleaseConfirm: 'プレリリースバージョンを有効にする確認',
       prereleaseConfirmDesc: '有効にすると、プレリリースバージョンの更新通知を受信します。これらのバージョンは不安定な可能性がありますが、続行しますか？',
@@ -363,6 +375,11 @@ export default {
       prereleaseEnabledDesc: 'プレリリースバージョンの更新通知を受信します',
       prereleaseDisabled: 'プレリリースバージョンが無効になりました',
       prereleaseDisabledDesc: '安定版の更新通知のみを受信します',
+      newVersionFound: '新しいバージョン {version} が見つかりました！',
+      downloadStarted: 'アップデートのダウンロードがバックグラウンドで開始されました。',
+      downloadError: 'アップデートのダウンロードに失敗しました: {error}',
+      skipSuccess: 'このバージョンを正常にスキップしました。',
+      skipError: 'バージョンのスキップに失敗しました: {error}',
     },
 
     // 自启动设置
@@ -410,6 +427,7 @@ export default {
       manualDownloadTitle: '手動ダウンロード説明',
       manualDownloadGuide: '以下の手順に従ってください：\n1. https://github.com/SagerNet/sing-box/releases/latest にアクセス\n2. 対応するシステムバージョンのsing-boxをダウンロード\n3. 解凍した実行ファイルを以下のディレクトリに配置：\nWindows: ユーザーディレクトリ/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: ユーザーディレクトリ/.local/share/sing-box-windows/sing-box/sing-box\n\n完了後、「インストール確認」ボタンをクリックしてインストールが成功したか確認してください。',
       installPrompt: '使用前にカーネルをダウンロードしてインストールしてください。',
+      downloadFailedMessage: 'カーネルのダウンロードに失敗しました: {error}',
     },
 
     // 开发者工具
@@ -455,5 +473,7 @@ export default {
     updateDownloaded: '更新がダウンロードされました、まもなくインストールされます',
     restartAsAdmin: '管理者として再起動',
     restartFailed: '再起動失敗',
+    goToSettings: '設定に移動',
+    updatePrompt: '新しいバージョンが利用可能です。設定ページに移動して更新してください。',
   },
 }

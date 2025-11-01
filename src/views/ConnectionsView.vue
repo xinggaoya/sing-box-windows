@@ -390,11 +390,11 @@ const formatConnectionTime = (timeString: string): string => {
     const diff = now.getTime() - date.getTime()
 
     if (diff < 60000) {
-      return Math.floor(diff / 1000) + 's'
+      return t('connections.secondsAgo', { count: Math.floor(diff / 1000) })
     } else if (diff < 3600000) {
-      return Math.floor(diff / 60000) + 'm'
+      return t('connections.minutesAgo', { count: Math.floor(diff / 60000) })
     } else if (diff < 86400000) {
-      return Math.floor(diff / 3600000) + 'h'
+      return t('connections.hoursAgo', { count: Math.floor(diff / 3600000) })
     } else {
       return date.toLocaleDateString()
     }
@@ -458,7 +458,7 @@ const refreshConnections = async () => {
     message.success(t('connections.refreshSuccess'))
   } catch (error) {
     console.error(t('connections.refreshError'), error)
-    message.error(`${t('connections.refreshError')}: ${error}`)
+    message.error(t('connections.refreshError', { error: String(error) }))
   } finally {
     loading.value = false
   }

@@ -35,7 +35,7 @@ import { tauriApi } from '@/services/tauri-api'
 // 导入主题配置
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 
-import { useThemeStore, useAppStore, useLocaleStore, useWindowStore, useTrayStore, useKernelStore } from '@/stores'
+import { useThemeStore, useAppStore, useLocaleStore, useWindowStore, useTrayStore, useKernelStore, useUpdateStore } from '@/stores'
 
 // 导入组件
 import UpdateNotification from '@/components/UpdateNotification.vue'
@@ -68,6 +68,38 @@ const windowStore = useWindowStore()
 
 // 清理函数数组
 const cleanupFunctions: (() => void)[] = []
+
+// 更新检查定时器ID
+let updateIntervalId: number | undefined
+
+// 自动检查更新
+async function handleAutoUpdateCheck() {
+  const updateStore = useUpdateStore()
+  if (updateStore.autoCheckUpdate) {
+    console.log('🚀 自动检查更新已启用，将在后台执行...')
+    // 立即执行一次静默检查
+    const updateResult = await updateStore.checkUpdate(true)
+    if (updateResult && updateResult.has_update) {
+      mitt.emit('update-available', updateResult)
+    }
+
+    // 设置定时检查，每4小时一次
+    updateIntervalId = window.setInterval(async () => {
+      console.log('⏰ 定时任务：执行后台更新检查...')
+      const periodicResult = await updateStore.checkUpdate(true)
+      if (periodicResult && periodicResult.has_update) {
+        mitt.emit('update-available', periodicResult)
+      }
+    }, 4 * 60 * 60 * 1000) // 4 hours
+
+    cleanupFunctions.push(() => {
+      if (updateIntervalId) {
+        clearInterval(updateIntervalId)
+        console.log('🧹 清理了更新检查定时器')
+      }
+    })
+  }
+}
 
 onMounted(async () => {
   try {
@@ -104,6 +136,9 @@ onMounted(async () => {
       console.log('🚀 检测到自动启动内核设置，准备启动内核...')
       await startKernelWithRetry()
     }
+
+    // 6. 执行自动更新检查
+    await handleAutoUpdateCheck()
 
   } catch (error) {
     console.error('应用初始化失败:', error)

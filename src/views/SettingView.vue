@@ -403,6 +403,28 @@
                       {{ t('setting.update.skipVersion') }}
                     </n-button>
                   </div>
+
+                  <!-- 下载进度 -->
+                  <div v-if="updateStore.updateState.downloading" class="download-section">
+                    <n-progress
+                      type="line"
+                      :percentage="updateStore.updateState.progress"
+                      :indicator-placement="'inside'"
+                      processing
+                      size="small"
+                      class="download-progress"
+                    >
+                      {{ updateStore.updateState.progress }}%
+                    </n-progress>
+                    <div class="download-message">
+                      {{ updateStore.updateState.message }}
+                    </div>
+                  </div>
+
+                  <!-- 错误提示 -->
+                  <n-alert v-if="updateStore.updateState.error" type="error" size="small" class="error-alert">
+                    {{ updateStore.updateState.error }}
+                  </n-alert>
                 </div>
               </div>
 
@@ -740,7 +762,7 @@ const handleDownloadUpdate = async () => {
     await updateStore.downloadAndInstallUpdate()
     message.success(t('setting.update.downloadStarted'))
   } catch (error) {
-    message.error(`${t('setting.update.downloadError')}: ${error}`)
+    message.error(t('setting.update.downloadError', { error: String(error) }))
   }
 }
 
@@ -750,7 +772,7 @@ const handleSkipVersion = async () => {
     await updateStore.skipCurrentVersion()
     message.success(t('setting.update.skipSuccess'))
   } catch (error) {
-    message.error(`${t('setting.update.skipError')}: ${error}`)
+    message.error(t('setting.update.skipError', { error: String(error) }))
   }
 }
 
@@ -802,7 +824,7 @@ const downloadTheKernel = async () => {
     // 注意：版本信息更新现在由事件监听器处理，以避免重复操作
   } catch (error) {
     downloadError.value = error as string
-    message.error(error as string)
+    message.error(t('setting.kernel.downloadFailedMessage', { error: String(error) }))
     downloading.value = false
     loading.value = false
   }
@@ -959,7 +981,7 @@ listen(
       downloading.value = false
       loading.value = false
       downloadError.value = msg
-      message.error(`${t('setting.kernel.downloadFailed')}: ${msg}`)
+      message.error(t('setting.kernel.downloadFailedMessage', { error: msg }))
     }
   },
 ).then((unlisten) => {
@@ -1000,8 +1022,8 @@ const initializeSettings = async () => {
     appDataDir().then((path) => (appDataPath.value = path)),
   ])
 
-  // 检查更新（非阻塞）
-  handleCheckUpdate()
+  // 初始化数据（非阻塞）
+  // handleCheckUpdate() // 自动检查更新逻辑已移至 App.vue
 }
 
 // 端口设置对话框

@@ -59,6 +59,7 @@ export default {
     restartFailed: 'Ошибка перезапуска',
     nodeModeChangeSuccess: 'Смена режима узла выполнена успешно',
     nodeModeChangeFailed: 'Ошибка смены режима узла',
+    restartSuccess: 'Ядро успешно перезапущено.',
 
     // WebSocket状态
     wsStatus: {
@@ -150,6 +151,7 @@ export default {
     noProxyGroups: 'Нет групп прокси',
     checkConfigOrRefresh: 'Пожалуйста проверьте файл конфигурации или обновите страницу',
     currentLabel: 'Текущий узел:',
+    switchSuccess: 'Группа \'{group}\' переключена на \'{proxy}\'.',
   },
 
   // 连接页面
@@ -164,7 +166,7 @@ export default {
     activeConnections: 'Активные соединения',
     refreshConnections: 'Обновить соединения',
     refreshSuccess: 'Список соединений обновлен',
-    refreshError: 'Ошибка обновления списка соединений',
+    refreshError: 'Не удалось обновить список подключений: {error}',
     noActiveConnections: 'В настоящее время нет активных сетевых соединений',
     adjustSearchOrFilters: 'Попробуйте изменить условия поиска или фильтры',
     searchPlaceholder: 'Поиск соединений (ID, IP, домен, процесс)',
@@ -172,6 +174,9 @@ export default {
     ruleFilter: 'Фильтр правил',
     noMatchingConnections2: 'Нет соответствующих соединений',
     matchedConnections: 'Найденные соединения',
+    secondsAgo: '{count}с назад',
+    minutesAgo: '{count}м назад',
+    hoursAgo: '{count}ч назад',
   },
 
   // 日志页面
@@ -200,6 +205,9 @@ export default {
       error: 'Ошибка',
       success: 'Успешно',
     },
+    latestAt: 'Последнее в {time}',
+    noSearchResults: 'Нет логов, соответствующих вашему поиску.',
+    adjustSearchFilters: 'Попробуйте изменить поиск или фильтры.',
   },
 
   // 规则页面
@@ -223,6 +231,8 @@ export default {
     proxyTargets: 'Целевые прокси',
     totalRules: 'Всего правил',
     matchingRules: 'Найденные правила',
+    fetchSuccess: 'Успешно получено {count} правил.',
+    fetchError: 'Не удалось получить правила: {error}',
   },
 
   // 订阅页面
@@ -256,6 +266,7 @@ export default {
     updateSuccess: 'Подписка обновлена успешно',
     operationFailed: 'Ошибка операции: ',
     use: 'Использовать',
+    useAgain: 'Использовать снова',
     useSuccess: 'Применено успешно',
     useFailed: 'Ошибка применения: ',
     copyLink: 'Копировать ссылку',
@@ -356,6 +367,7 @@ export default {
       beta: 'Бета',
       releaseNotes: 'Заметки о выпуске',
       updateNotice: 'Уведомление об обновлении',
+      skipVersion: 'Пропустить эту версию',
       prereleaseWarningDesc: 'Предварительные версии могут содержать нестабильные функции и потенциальные проблемы, рекомендуется использовать только в тестовых средах.',
       prereleaseConfirm: 'Подтвердить включение предварительных версий',
       prereleaseConfirmDesc: 'После включения вы будете получать уведомления об обновлениях предварительных версий. Эти версии могут быть нестабильными, вы уверены, что хотите продолжить?',
@@ -363,6 +375,11 @@ export default {
       prereleaseEnabledDesc: 'Вы будете получать уведомления об обновлениях предварительных версий',
       prereleaseDisabled: 'Предварительные версии отключены',
       prereleaseDisabledDesc: 'Вы будете получать только уведомления об обновлениях стабильных версий',
+      newVersionFound: 'Найдена новая версия {version}!',
+      downloadStarted: 'Загрузка обновления началась в фоновом режиме.',
+      downloadError: 'Ошибка загрузки обновления: {error}',
+      skipSuccess: 'Эта версия была успешно пропущена.',
+      skipError: 'Не удалось пропустить версию: {error}',
     },
 
     // 自启动设置
@@ -410,6 +427,7 @@ export default {
       manualDownloadTitle: 'Инструкция по ручной загрузке',
       manualDownloadGuide: 'Пожалуйста выполните следующие шаги:\n1. Посетите https://github.com/SagerNet/sing-box/releases/latest\n2. Скачайте соответствующую системную версию sing-box\n3. Поместите извлеченный исполняемый файл в следующую директорию:\nWindows: Пользовательская директория/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: Пользовательская директория/.local/share/sing-box-windows/sing-box/sing-box\n\nПосле завершения нажмите кнопку "Проверить установку" для проверки успешности установки.',
       installPrompt: 'Пожалуйста загрузите и установите ядро перед использованием.',
+      downloadFailedMessage: 'Ошибка загрузки ядра: {error}',
     },
 
     // 开发者工具
@@ -455,5 +473,7 @@ export default {
     updateDownloaded: 'Обновление загружено, скоро будет установлено',
     restartAsAdmin: 'Перезапуск от имени администратора',
     restartFailed: 'Ошибка перезапуска',
+    goToSettings: 'Перейти к настройкам',
+    updatePrompt: 'Доступна новая версия. Перейдите на страницу настроек для обновления.',
   },
 }
