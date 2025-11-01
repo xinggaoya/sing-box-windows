@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { eventService } from '@/services/event-service'
-import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 // 定义连接状态接口
 interface ConnectionState {
@@ -172,6 +171,17 @@ export const useConnectionStore = defineStore(
       } finally {
         eventListenersSetup = false
       }
+
+      // 清除健康检查定时器
+      if (connectionsHealthCheck !== null) {
+        clearInterval(connectionsHealthCheck)
+        connectionsHealthCheck = null
+      }
+
+      if (memoryHealthCheck !== null) {
+        clearInterval(memoryHealthCheck)
+        memoryHealthCheck = null
+      }
     }
 
     // 重置连接数据
@@ -195,22 +205,6 @@ export const useConnectionStore = defineStore(
         connected: false,
         connecting: false,
         error: null,
-      }
-    }
-
-    // 清理所有监听器
-    const cleanupListeners = () => {
-      cleanupEventListeners()
-
-      // 清除健康检查定时器
-      if (connectionsHealthCheck !== null) {
-        clearInterval(connectionsHealthCheck)
-        connectionsHealthCheck = null
-      }
-
-      if (memoryHealthCheck !== null) {
-        clearInterval(memoryHealthCheck)
-        memoryHealthCheck = null
       }
     }
 
@@ -294,31 +288,6 @@ export const useConnectionStore = defineStore(
       }
     }
 
-    // Store初始化方法
-    const initializeStore = async () => {
-      await setupEventListeners()
-      startMemoryMonitoring()
-      startConnectionsHealthCheck()
-      startMemoryHealthCheck()
-
-      // 注册到临时Store管理器
-      const storeInstance = {
-        cleanupStore,
-        smartConnectionCleanup,
-      }
-      temporaryStoreManager.registerStore('connection', storeInstance)
-    }
-
-    // Store清理方法
-    const cleanupStore = () => {
-      cleanupListeners()
-      stopMemoryMonitoring()
-      resetData()
-
-      // 从临时Store管理器注销
-      temporaryStoreManager.unregisterStore('connection')
-    }
-
     return {
       // 状态
       connectionsState,
@@ -332,15 +301,14 @@ export const useConnectionStore = defineStore(
       // 方法
       setupEventListeners,
       cleanupEventListeners,
-      cleanupListeners,
       resetData,
       updateConnections,
       updateMemory,
       smartConnectionCleanup,
       startMemoryMonitoring,
       stopMemoryMonitoring,
-      initializeStore,
-      cleanupStore,
+      startConnectionsHealthCheck,
+      startMemoryHealthCheck,
     }
   },
 )

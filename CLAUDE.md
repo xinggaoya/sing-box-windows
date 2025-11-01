@@ -80,7 +80,7 @@ cd src-tauri && cargo test --doc
 
 ```
 src/
-├── stores/          # Pinia state management (custom StoreManager)
+├── stores/          # Pinia state management
 │   ├── app/        # App-related stores (AppStore, ThemeStore, LocaleStore, etc.)
 │   ├── kernel/     # Kernel-related stores (KernelStore, ProxyStore, TrafficStore, etc.)
 │   ├── subscription/ # Subscription store
@@ -116,10 +116,9 @@ src-tauri/src/
 ## Key Features
 
 ### 1. Store Management System
-- **Custom StoreManager**: Supports lazy loading and memory optimization
-- **Debounced Persistence**: Auto-debounce save state to Tauri Store and SQLite
-- **Memory Leak Detection**: Built-in memory leak detection and auto-cleanup mechanism
-- **Route-based Preloading**: Stores are preloaded based on route requirements
+- **Standard Pinia**: Uses the official Pinia library for state management.
+- **Debounced Persistence**: Auto-debounce save state to Tauri Store and SQLite.
+- **Component-based Lifecycle**: Lifecycle events (like starting/stopping listeners) are managed by the Vue components that use the stores, not by the stores themselves.
 
 ### 2. Frontend-Backend Communication
 - **Tauri Commands**: All frontend calls go through Tauri commands
@@ -171,9 +170,7 @@ src-tauri/src/
 
 ### Core Files
 - `src/stores/index.ts`: Store management system entry point
-- `src/stores/StoreManager.ts`: Store lifecycle manager with lazy loading
 - `src/services/websocket-service.ts`: WebSocket communication service
-- `src/utils/memory-leak-fix.ts`: Memory management utilities
 - `src-tauri/src/lib.rs`: Tauri entry file and command registration
 - `src-tauri/src/app/`: Backend service layer implementation
 - `src-tauri/src/app/storage/enhanced_storage_service.rs`: SQLite-based storage service
@@ -190,9 +187,9 @@ The application uses a hybrid storage approach:
 ## Development Guidelines
 
 ### Memory Management
-- Pay special attention to memory leaks for long-running applications
-- Use the StoreManager's cleanup methods for proper resource management
-- Monitor WebSocket connections and ensure proper cleanup
+- Pay special attention to memory leaks for long-running applications.
+- Ensure resources like event listeners and timers are properly cleaned up in Vue component `onUnmounted` hooks.
+- Monitor WebSocket connections and ensure proper cleanup in the services that manage them.
 
 ### Error Handling
 - All async operations require proper error handling
@@ -202,7 +199,6 @@ The application uses a hybrid storage approach:
 ### Performance
 - Use virtual scrolling or pagination for large data operations
 - Implement lazy loading for non-critical components
-- Leverage the StoreManager's route-based preloading
 
 ### Cross-Platform Compatibility
 - Maintain compatibility with both Windows and Linux platforms

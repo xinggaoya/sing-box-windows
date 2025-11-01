@@ -7,15 +7,11 @@ import router from './router'
 import { usePinia } from '@/stores'
 import i18n from './locales'
 import { initializationService } from './services/initialization-service'
-import { globalMemoryManager, webSocketCleaner } from '@/utils/memory-leak-fix'
 
 const app = createApp(App)
 
 // 设置Pinia状态管理
 usePinia(app)
-
-// 启动临时Store全局内存监控
-globalMemoryManager.startGlobalMemoryMonitoring()
 
 // 设置路由
 app.use(router)
@@ -59,12 +55,6 @@ window.addEventListener('beforeunload', async () => {
   } catch (error) {
     console.error('事件服务清理失败:', error)
   }
-
-  // 清理所有WebSocket连接和定时器
-  webSocketCleaner.cleanup()
-
-  globalMemoryManager.stopGlobalMemoryMonitoring()
-  globalMemoryManager.cleanupAllStores()
 })
 
 // 开始初始化

@@ -102,7 +102,6 @@ sing-box-windows/
 │   │   └── websocket-service.ts   # WebSocket 服务
 │   ├── stores/        # Pinia 状态管理
 │   │   ├── index.ts   # Store 主入口和插件配置
-│   │   ├── StoreManager.ts # Store 管理器
 │   │   ├── app/       # 应用相关 store
 │   │   │   ├── AppStore.ts     # 核心应用状态
 │   │   │   ├── ThemeStore.ts   # 主题管理
@@ -127,7 +126,6 @@ sing-box-windows/
 │   │   └── process.ts # 进程相关类型
 │   ├── utils/         # 工具函数
 │   │   ├── index.ts   # 通用工具函数
-│   │   ├── memory-leak-fix.ts # 内存泄漏修复
 │   │   ├── mitt.ts    # 事件总线
 │   │   └── mitt.d.ts  # mitt 类型声明
 │   ├── views/         # 页面组件
@@ -431,145 +429,53 @@ pnpm tauri dev
 
 ### 状态管理
 
-项目使用 **Pinia 2.3.1** 进行状态管理，配合自定义的持久化插件和内存管理机制，采用模块化的目录结构组织各个 Store：
+项目使用 **Pinia 2.3.1** 进行状态管理，并采用模块化的目录结构组织各个 Store：
 
 ```
 src/stores/
-├── index.ts                # Store 主入口和持久化插件配置
-├── StoreManager.ts         # Store 生命周期管理器
+├── index.ts                # Store 主入口
 ├── app/                    # 应用相关 store
-│   ├── AppStore.ts         # 核心应用状态 (运行状态、自启动、数据恢复)
-│   ├── ThemeStore.ts       # 主题管理 (亮暗主题切换)
-│   ├── LocaleStore.ts      # 国际化状态 (语言切换)
-│   ├── WindowStore.ts      # 窗口管理 (窗口状态、操作)
-│   └── UpdateStore.ts      # 应用更新 (版本检查、更新状态)
+│   ├── AppStore.ts         # 核心应用状态
+│   ├── ThemeStore.ts       # 主题管理
+│   ├── LocaleStore.ts      # 国际化状态
+│   ├── WindowStore.ts      # 窗口管理
+│   └── UpdateStore.ts      # 应用更新
 ├── kernel/                 # 内核相关 store
-│   ├── KernelStore.ts         # 内核状态和操作 (启动/停止/版本)
-│   ├── KernelRuntimeStore.ts  # 内核运行时状态 (实时状态监控)
-│   ├── ProxyStore.ts          # 代理设置 (模式切换、节点管理)
-│   ├── ConnectionStore.ts     # 连接管理 (活动连接列表)
-│   ├── TrafficStore.ts        # 流量监控 (实时流量、历史统计)
-│   └── LogStore.ts            # 日志管理 (日志收集、过滤、导出)
+│   ├── KernelStore.ts         # 内核状态和操作
+│   ├── KernelRuntimeStore.ts  # 内核运行时状态
+│   ├── ProxyStore.ts          # 代理设置
+│   ├── ConnectionStore.ts     # 连接管理
+│   ├── TrafficStore.ts        # 流量监控
+│   └── LogStore.ts            # 日志管理
 ├── subscription/           # 订阅相关 store
-│   └── SubStore.ts         # 订阅管理 (订阅列表、更新、解析)
+│   └── SubStore.ts         # 订阅管理
 └── tray/                   # 系统托盘相关 store
-    └── TrayStore.ts        # 系统托盘管理 (托盘菜单、状态)
+    └── TrayStore.ts        # 系统托盘管理
 ```
 
-#### 核心特性
+#### 使用 Store
 
-1. **自定义持久化系统**：
-
-   - 使用 Tauri Store 进行持久化存储，替代传统的 localStorage
-   - 支持防抖保存，避免高频操作导致的性能问题
-   - 可配置的持久化选项（包含/排除特定字段）
-
-2. **内存管理机制**：
-
-   - 内存泄漏检测和自动清理
-   - WebSocket 连接池管理
-   - 临时 Store 的生命周期管理
-
-3. **数据恢复机制**：
-   - 应用启动时自动从持久化存储恢复状态
-   - 支持数据恢复完成回调
-   - 错误处理和默认值回退
-
-各 Store 的职责如下：
-
-1. **应用相关 Store**
-
-   - **AppStore**：管理核心应用状态，如运行状态、自动启动设置等
-   - **ThemeStore**：管理应用主题（亮色/暗色）
-   - **LocaleStore**：管理应用语言设置
-   - **WindowStore**：管理窗口状态、操作和事件
-   - **UpdateStore**：管理应用更新检查和安装
-
-2. **内核相关 Store**
-
-   - **KernelStore**：管理内核版本、启动/停止操作
-   - **ProxyStore**：管理代理设置和节点
-   - **ConnectionStore**：管理连接信息和统计
-   - **TrafficStore**：管理流量监控和统计
-   - **LogStore**：管理日志记录和显示
-
-3. **订阅相关 Store**
-
-   - **SubStore**：管理代理订阅
-
-4. **系统托盘相关 Store**
-   - **TrayStore**：管理系统托盘图标和菜单
-
-### 使用 Store
-
-在组件中使用 Store 的示例：
+在组件中，可以直接导入并使用需要的 Store：
 
 ```typescript
 // 导入需要的 store
-import { useAppStore } from '@/stores/app/AppStore'
-import { useThemeStore } from '@/stores/app/ThemeStore'
-import { useKernelStore } from '@/stores/kernel/KernelStore'
+import { useAppStore } from '@/stores'
+import { useThemeStore } from '@/stores'
 
-// 在组件中使用
+// 在组件的 setup 函数中使用
 const appStore = useAppStore()
 const themeStore = useThemeStore()
-const kernelStore = useKernelStore()
 
-// 使用 store 中的状态
+// 访问 state
 const isRunning = appStore.isRunning
-const isDarkTheme = themeStore.isDark
 
-// 调用 store 中的方法
+// 调用 actions
 themeStore.toggleTheme()
-await kernelStore.startKernel()
 ```
 
-### Store 之间的交互
+#### Store 之间的交互
 
-各个 Store 可以通过以下方式进行交互：
-
-1. **直接引用**：一个 Store 可以导入并使用另一个 Store
-
-   ```typescript
-   // 在 KernelStore 中使用 AppStore
-   import { useAppStore } from '../app/AppStore'
-
-   export const useKernelStore = defineStore('kernel', () => {
-     const appStore = useAppStore()
-
-     const startKernel = async () => {
-       // ...
-       appStore.setRunningState(true)
-     }
-   })
-   ```
-
-2. **事件总线**：使用 mitt 进行松耦合的通信
-
-   ```typescript
-   // 在一个 Store 中发送事件
-   import mitt from '@/utils/mitt'
-
-   mitt.emit('kernel-started')
-
-   // 在另一个 Store 中监听事件
-   mitt.on('kernel-started', () => {
-     // 处理内核启动事件
-   })
-   ```
-
-3. **监听状态变化**：使用 Vue 的 watch 函数监听其他 Store 的状态变化
-
-   ```typescript
-   import { watch } from 'vue'
-
-   watch(
-     () => appStore.isRunning,
-     (newValue) => {
-       // 处理运行状态变化
-     },
-   )
-   ```
+各个 Store 可以通过直接导入并使用其他 Store 的方式进行交互，或者通过 `watch` 监听其他 Store 的状态变化。
 
 ### 组件开发规范
 
@@ -1205,27 +1111,6 @@ A: 检查以下优化点：
    - 使用发布模式构建
    - 检查依赖大小
 
-### Q: 内存使用过高怎么办？
-
-A: 项目内置了内存管理机制：
-
-```typescript
-// 使用内存泄漏修复工具
-import { webSocketCleaner, temporaryStoreManager } from '@/utils/memory-leak-fix'
-
-// 清理WebSocket连接
-webSocketCleaner.cleanupAll()
-
-// 清理临时Store
-temporaryStoreManager.cleanupAllStores()
-```
-
-定期检查：
-
-- WebSocket 连接是否正确关闭
-- 大量数据的Store是否正确清理
-- 定时器是否正确销毁
-
 ### Q: 如何调试WebSocket连接问题？
 
 A:
@@ -1315,25 +1200,6 @@ export const useTrafficStore = defineStore(
     },
   },
 )
-```
-
-#### 4. 内存管理
-
-```typescript
-// 组件卸载时清理资源
-import { onUnmounted } from 'vue'
-import { webSocketCleaner } from '@/utils/memory-leak-fix'
-
-onUnmounted(() => {
-  // 清理定时器
-  clearInterval(timer)
-
-  // 清理事件监听
-  mitt.off('some-event', handler)
-
-  // 清理WebSocket连接
-  webSocketCleaner.cleanup('connection-id')
-})
 ```
 
 ### 后端性能优化

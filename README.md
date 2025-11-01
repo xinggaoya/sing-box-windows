@@ -67,7 +67,7 @@ Sing-Box GUI Client is a cutting-edge cross-platform application for Windows and
 - **Real-time Statistics**: Live bandwidth and connection monitoring via WebSocket
 - **Auto-start**: Automatic system startup with delayed launch option
 - **Update Management**: Automatic update checking and installation
-- **Memory Optimization**: Efficient resource management and cleanup with StoreManager
+- **Memory Optimization**: Efficient resource management through standard Vue.js and Pinia practices.
 
 ---
 

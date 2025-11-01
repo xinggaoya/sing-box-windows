@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 /**
  * 内核运行时临时数据Store
@@ -65,42 +64,6 @@ export const useKernelRuntimeStore = defineStore(
       console.log('🔄 运行时临时数据已重置')
     }
 
-    // Store初始化方法
-    const initializeStore = () => {
-      // 重置所有临时数据
-      resetRuntimeData()
-
-      // 注册到临时Store管理器
-      const storeInstance = {
-        cleanupStore,
-        smartCleanup: () => {
-          // 定期重置过大的内存数值，防止数值异常
-          const MAX_MEMORY = 16 * 1024 * 1024 * 1024 // 16GB
-          if (memory.value.inuse > MAX_MEMORY || memory.value.oslimit > MAX_MEMORY) {
-            console.log('🧹 运行时Store智能清理 - 重置异常内存数据')
-            memory.value = {
-              inuse: 0,
-              oslimit: 0,
-            }
-          }
-        },
-      }
-      temporaryStoreManager.registerStore('kernel-runtime', storeInstance)
-
-      console.log('✅ KernelRuntimeStore初始化完成')
-    }
-
-    // Store清理方法
-    const cleanupStore = () => {
-      stopUptimeCounter()
-      resetRuntimeData()
-
-      // 从临时Store管理器注销
-      temporaryStoreManager.unregisterStore('kernel-runtime')
-
-      console.log('🧹 KernelRuntimeStore已清理')
-    }
-
     return {
       // 临时数据
       memory,
@@ -111,8 +74,6 @@ export const useKernelRuntimeStore = defineStore(
       stopUptimeCounter,
       updateMemory,
       resetRuntimeData,
-      initializeStore,
-      cleanupStore,
     }
   },
 )

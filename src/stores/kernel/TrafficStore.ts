@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { eventService } from '@/services/event-service'
-import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 // 声明traffic-data事件的类型
 interface TrafficData {
@@ -125,35 +124,6 @@ export const useTrafficStore = defineStore(
       }
     }
 
-    // 清理所有监听器
-    const cleanupListeners = () => {
-      cleanupEventListeners()
-    }
-
-    // Store初始化方法
-    const initializeStore = async () => {
-      await setupEventListeners()
-      startMemoryOptimization()
-
-      // 注册到临时Store管理器
-      const storeInstance = {
-        cleanupStore,
-        smartCleanup: () => {
-          // 如果累计流量超过500MB，重置计数器
-          const RESET_THRESHOLD = 500 * 1024 * 1024 // 500MB
-          if (
-            traffic.value.totalUp > RESET_THRESHOLD ||
-            traffic.value.totalDown > RESET_THRESHOLD
-          ) {
-            traffic.value.totalUp = 0
-            traffic.value.totalDown = 0
-            console.log('🧹 流量Store智能清理 - 重置累计数据')
-          }
-        },
-      }
-      temporaryStoreManager.registerStore('traffic', storeInstance)
-    }
-
     // 内存优化：定期清理无用数据
     const startMemoryOptimization = () => {
       if (memoryCleanupTimer) {
@@ -179,28 +149,15 @@ export const useTrafficStore = defineStore(
       }
     }
 
-    // Store清理方法
-    const cleanupStore = () => {
-      cleanupListeners()
-      stopMemoryOptimization()
-      resetStats()
-
-      // 从临时Store管理器注销
-      temporaryStoreManager.unregisterStore('traffic')
-    }
-
     return {
       traffic,
       connectionState,
       setupEventListeners,
       cleanupEventListeners,
-      cleanupListeners,
       resetStats,
       updateTrafficStats,
       startMemoryOptimization,
       stopMemoryOptimization,
-      initializeStore,
-      cleanupStore,
     }
   },
 )

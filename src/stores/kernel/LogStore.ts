@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { eventService } from '@/services/event-service'
-import { temporaryStoreManager } from '@/utils/memory-leak-fix'
 
 // 定义消息类型
 export type MessageType = 'success' | 'info' | 'error' | 'warning'
@@ -49,6 +48,7 @@ export const useLogStore = defineStore(
 
         // 启动定期清理机制
         startPeriodicCleanup()
+        startMemoryMonitoring()
 
         eventListenersSetup = true
         console.log('✅ 日志Store事件监听器设置完成')
@@ -192,36 +192,8 @@ export const useLogStore = defineStore(
         clearInterval(logCleanupInterval)
         logCleanupInterval = null
       }
-    }
 
-    // 注册清理函数
-    temporaryStoreManager.registerCleanup(() => {
-      cleanupListeners()
-      logs.value = []
-    })
-
-    // Store初始化方法
-    const initializeStore = async () => {
-      await setupLogListener()
-      startMemoryMonitoring()
-
-      // 注册到临时Store管理器
-      const storeInstance = {
-        cleanupStore,
-        smartLogCleanup,
-      }
-      temporaryStoreManager.registerStore('log', storeInstance)
-    }
-
-    // Store清理方法
-    const cleanupStore = () => {
-      cleanupListeners()
       stopMemoryMonitoring()
-      // 清空日志数据
-      logs.value = []
-
-      // 从临时Store管理器注销
-      temporaryStoreManager.unregisterStore('log')
     }
 
     // 启动定期清理机制
@@ -251,11 +223,6 @@ export const useLogStore = defineStore(
       showMessage,
       setupLogListener,
       cleanupListeners,
-      smartLogCleanup,
-      startMemoryMonitoring,
-      stopMemoryMonitoring,
-      initializeStore,
-      cleanupStore,
     }
   },
 )
