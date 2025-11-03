@@ -1401,9 +1401,9 @@ pub async fn get_system_uptime() -> Result<u64, String> {
         }
     }
 
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
     {
-        // 对于非Windows系统，使用/proc/uptime
+        // 对于Linux系统，使用/proc/uptime
         match std::fs::read_to_string("/proc/uptime") {
             Ok(content) => {
                 let uptime_seconds: f64 = content
@@ -1415,6 +1415,57 @@ pub async fn get_system_uptime() -> Result<u64, String> {
                 Ok((uptime_seconds * 1000.0) as u64)
             }
             Err(_) => Ok(0),
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // 对于macOS系统，使用sysctl命令获取系统运行时间
+        let mut cmd = tokio::process::Command::new("sysctl");
+        cmd.args(&["-n", "kern.boottime"]);
+
+        match cmd.output().await {
+            Ok(output) => {
+                if output.status.success() {
+                    let boottime_str = String::from_utf8_lossy(&output.stdout);
+                    // 输出格式类似: { sec = 1699123456, usec = 123456 }
+                    if let Some(sec_part) = boottime_str.split("sec = ").nth(1) {
+                        if let Some(timestamp) = sec_part.split(',').next() {
+                            if let Ok(boot_timestamp) = timestamp.trim().parse::<u64>() {
+                                // 获取当前时间戳
+                                let current_timestamp = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_secs();
+
+                                // 计算运行时间（毫秒）
+                                let uptime_seconds = current_timestamp.saturating_sub(boot_timestamp);
+                                return Ok(uptime_seconds * 1000);
+                            }
+                        }
+                    }
+                }
+                // 如果sysctl失败，尝试使用uptime命令
+                match tokio::process::Command::new("uptime")
+                    .output()
+                    .await
+                {
+                    Ok(uptime_output) if uptime_output.status.success() => {
+                        let uptime_str = String::from_utf8_lossy(&uptime_output.stdout);
+                        // 解析uptime输出，提取运行时间
+                        info!("uptime输出: {}", uptime_str);
+                        Ok(0) // 简化处理，返回0
+                    }
+                    _ => {
+                        warn!("无法获取macOS系统运行时间");
+                        Ok(0)
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("sysctl命令执行失败: {}", e);
+                Ok(0)
+            }
         }
     }
 }

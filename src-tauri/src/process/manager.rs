@@ -331,6 +331,66 @@ impl ProcessManager {
             }
         }
 
+        #[cfg(target_os = "macos")]
+        {
+            // 获取我们的内核目录，只检测从该目录运行的内核进程
+            let kernel_path = crate::app::constants::paths::get_kernel_path();
+            let kernel_dir = kernel_path.parent().unwrap_or_else(|| std::path::Path::new("/nonexistent"));
+
+            info!("检查内核进程，内核目录: {:?}", kernel_dir);
+
+            // 使用ps命令检测sing-box进程
+            if let Ok(output) = tokio::process::Command::new("ps")
+                .args(&["-axo", "pid,command"])
+                .output()
+                .await
+            {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let mut found_pids = Vec::new();
+
+                for line in stdout.lines() {
+                    if line.contains("sing-box") && line.contains(&kernel_dir.display().to_string()) {
+                        if let Some(pid_str) = line.split_whitespace().next() {
+                            if let Ok(pid) = pid_str.parse::<u32>() {
+                                found_pids.push(pid);
+                            }
+                        }
+                    }
+                }
+
+                if !found_pids.is_empty() {
+                    info!("发现已有的sing-box内核进程，PIDs: {:?}", found_pids);
+
+                    // 终止找到的进程
+                    for pid in found_pids {
+                        let kill_output = tokio::process::Command::new("kill")
+                            .args(&["-9", &pid.to_string()])
+                            .output()
+                            .await;
+
+                        match kill_output {
+                            Ok(output) if output.status.success() => {
+                                info!("成功终止sing-box进程，PID: {}", pid);
+                            }
+                            Ok(_) => {
+                                warn!("终止sing-box进程可能失败，PID: {}", pid);
+                            }
+                            Err(e) => {
+                                warn!("无法终止sing-box进程，PID: {}, 错误: {}", pid, e);
+                            }
+                        }
+                    }
+
+                    // 等待一段时间确保进程完全终止
+                    sleep(Duration::from_millis(500)).await;
+                } else {
+                    info!("未发现已有的sing-box内核进程");
+                }
+            } else {
+                warn!("无法检查sing-box内核进程状态");
+            }
+        }
+
         Ok(())
     }
 
@@ -474,6 +534,22 @@ fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
     }
 
     #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+
+        let output = Command::new("kill")
+            .args(&["-9", &pid.to_string()])
+            .output()?;
+
+        if output.status.success() {
+            info!("成功使用PID {}强制终止进程", pid);
+        } else {
+            let error = String::from_utf8_lossy(&output.stderr);
+            warn!("使用PID {}强制终止进程失败: {}", pid, error);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
     {
         use std::process::Command;
 

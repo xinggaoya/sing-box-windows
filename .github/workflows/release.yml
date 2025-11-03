@@ -18,6 +18,12 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             name: linux
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos
+          - os: macos-13
+            target: x86_64-apple-darwin
+            name: macos-intel
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -77,7 +83,7 @@ jobs:
           if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
             pnpm exec tauri build --target ${{ matrix.target }}
           else
-            pnpm exec tauri build
+            pnpm exec tauri build --target ${{ matrix.target }}
           fi
 
       - name: List build artifacts
@@ -88,7 +94,7 @@ jobs:
           if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
             ls -la src-tauri/target/${{ matrix.target }}/release/bundle/ || true
           else
-            ls -la src-tauri/target/release/bundle/ || true
+            ls -la src-tauri/target/${{ matrix.target }}/release/bundle/ || true
           fi
 
       - name: Upload artifacts
@@ -96,7 +102,7 @@ jobs:
         with:
           name: ${{ matrix.name }}-artifacts
           path: |
-            ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/**/*' || 'src-tauri/target/release/bundle/**/*' }}
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*
           retention-days: 1
 
   release:
@@ -121,6 +127,18 @@ jobs:
           name: linux-artifacts
           path: linux-artifacts/
 
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-artifacts
+          path: macos-artifacts/
+
+      - name: Download macOS Intel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-intel-artifacts
+          path: macos-intel-artifacts/
+
       - name: Extract tag name
         id: tag
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
@@ -134,5 +152,9 @@ jobs:
             windows-artifacts/nsis/*.exe
             linux-artifacts/appimage/sing-box-windows_*.AppImage*
             linux-artifacts/deb/sing-box-windows_*.deb*
+            macos-artifacts/dmg/sing-box-windows_*.dmg*
+            macos-artifacts/macos/sing-box-windows.app.tar.gz*
+            macos-intel-artifacts/dmg/sing-box-windows_*.dmg*
+            macos-intel-artifacts/macos/sing-box-windows.app.tar.gz*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

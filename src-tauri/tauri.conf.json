@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "sing-box-windows",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "identifier": "cn.moncn.app",
   "build": {
     "frontendDist": "../dist",
@@ -33,7 +33,9 @@
       "msi",
       "nsis",
       "deb",
-      "appimage"
+      "appimage",
+      "dmg",
+      "app"
     ],
     "icon": [
       "icons/32x32.png",
@@ -59,6 +61,15 @@
           "libsoup2.4-1"
         ]
       }
+    },
+    "macOS": {
+      "hardenedRuntime": true,
+      "entitlements": null,
+      "exceptionDomain": "",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null,
+      "minimumSystemVersion": "10.13"
     }
   }
 }

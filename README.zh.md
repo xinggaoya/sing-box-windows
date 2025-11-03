@@ -4,7 +4,7 @@
   <h1>Sing-Box Windows</h1>
 
   <p>
-    <strong>基于 Tauri 2.0 + Vue 3 构建的现代化 Sing-Box 跨平台 GUI 客户端 (Windows + Linux)</strong>
+    <strong>基于 Tauri 2.0 + Vue 3 构建的现代化 Sing-Box 跨平台 GUI 客户端 (Windows + Linux + macOS)</strong>
   </p>
 
   <p>
@@ -25,7 +25,7 @@
     <a href="https://github.com/xinggaoya/sing-box-windows/releases">
       <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows?style=for-the-badge&logo=github" alt="GitHub release">
     </a>
-    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue?style=for-the-badge&logo=windows" alt="平台支持">
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue?style=for-the-badge&logo=apple" alt="平台支持">
     <img src="https://img.shields.io/badge/version-1.8.2-informational?style=for-the-badge" alt="版本">
     <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="许可证">
   </p>
@@ -35,7 +35,7 @@
 
 ## 🌟 项目介绍
 
-Sing-Box GUI 客户端是一款尖端的跨平台应用程序（支持 Windows 和 Linux），为管理 Sing-Box 代理配置提供了现代化、直观的界面。基于强大的 Tauri 2.0 和 Vue 3 技术栈构建，提供卓越的性能、安全性和用户体验。
+Sing-Box GUI 客户端是一款尖端的跨平台应用程序（支持 Windows、Linux 和 macOS），为管理 Sing-Box 代理配置提供了现代化、直观的界面。基于强大的 Tauri 2.0 和 Vue 3 技术栈构建，提供卓越的性能、安全性和用户体验。
 
 ### 🎯 核心亮点
 

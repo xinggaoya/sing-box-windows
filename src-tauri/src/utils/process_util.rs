@@ -126,6 +126,11 @@ mod tests {
                 assert_eq!(flags, crate::app::constants::core::process::CREATE_NO_WINDOW);
             }
         }
+        #[cfg(not(target_os = "windows"))]
+        {
+            // 在非Windows平台上，只是验证命令可以被创建
+            assert_eq!(cmd.get_program(), "echo");
+        }
     }
 
     #[test]
@@ -136,6 +141,11 @@ mod tests {
             if let Ok(flags) = cmd.get_creation_flags() {
                 assert_eq!(flags, crate::app::constants::core::process::CREATE_NO_WINDOW);
             }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            // 在非Windows平台上，只是验证命令可以被创建
+            assert_eq!(cmd.get_program(), "echo");
         }
     }
 

@@ -20,7 +20,11 @@
     "tauri build:linux:deb": "tauri build --target x86_64-unknown-linux-gnu -- --bundle deb",
     "tauri build:linux:appimage": "tauri build --target x86_64-unknown-linux-gnu -- --bundle appimage",
     "tauri build:windows": "tauri build --target x86_64-pc-windows-msi",
-    "tauri build:all": "pnpm tauri build:windows && pnpm tauri build:linux:deb && pnpm tauri build:linux:appimage"
+    "tauri build:macos": "tauri build --target aarch64-apple-darwin",
+    "tauri build:macos:intel": "tauri build --target x86_64-apple-darwin",
+    "tauri build:macos:dmg": "tauri build --target aarch64-apple-darwin -- --bundle dmg",
+    "tauri build:macos:app": "tauri build --target aarch64-apple-darwin -- --bundle app",
+    "tauri build:all": "pnpm tauri build:windows && pnpm tauri build:linux:deb && pnpm tauri build:linux:appimage && pnpm tauri build:macos:dmg"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",

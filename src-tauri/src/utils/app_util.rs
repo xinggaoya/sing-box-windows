@@ -16,6 +16,11 @@ pub fn get_work_dir_sync() -> String {
         dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("sing-box-windows")
+    } else if cfg!(target_os = "macos") {
+        // macOS: ~/Library/Application Support/sing-box-windows
+        dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("sing-box-windows")
     } else {
         // 其他系统使用默认缓存目录
         dirs::cache_dir()
@@ -40,6 +45,11 @@ pub async fn get_work_dir() -> String {
             .unwrap_or_else(|_| PathBuf::from(r"C:\ProgramData\sing-box-windows"))
     } else if cfg!(target_os = "linux") {
         // Linux: ~/.local/share/sing-box-windows
+        dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("sing-box-windows")
+    } else if cfg!(target_os = "macos") {
+        // macOS: ~/Library/Application Support/sing-box-windows
         dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("sing-box-windows")
@@ -85,8 +95,16 @@ pub fn get_service_path() -> PathBuf {
         .expect("无法获取可执行程序父目录")
         .to_str()
         .expect("无法将父目录路径转换为字符串");
+
+    // 根据平台确定可执行文件名
+    let service_name = if cfg!(target_os = "windows") {
+        "sing-box-service.exe"
+    } else {
+        "sing-box-service"
+    };
+
     PathBuf::from(&work_dir)
         .join("src")
         .join("config")
-        .join("sing-box-service.exe")
+        .join(service_name)
 }

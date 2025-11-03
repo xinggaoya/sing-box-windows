@@ -4,7 +4,7 @@
   <h1>Sing-Box Windows</h1>
 
   <p>
-    <strong>A modern Sing-Box GUI client for Windows and Linux built with Tauri 2.0 + Vue 3</strong>
+    <strong>A modern Sing-Box GUI client for Windows, Linux, and macOS built with Tauri 2.0 + Vue 3</strong>
   </p>
 
   <p>
@@ -25,7 +25,7 @@
     <a href="https://github.com/xinggaoya/sing-box-windows/releases">
       <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows?style=for-the-badge&logo=github" alt="GitHub release">
     </a>
-    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue?style=for-the-badge&logo=windows" alt="Platform">
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue?style=for-the-badge&logo=apple" alt="Platform">
     <img src="https://img.shields.io/badge/version-1.8.2-informational?style=for-the-badge" alt="Version">
     <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
   </p>
@@ -35,7 +35,7 @@
 
 ## 🌟 About
 
-Sing-Box GUI Client is a cutting-edge cross-platform application for Windows and Linux that provides a modern, intuitive interface for managing Sing-Box proxy configurations. Built with the powerful combination of Tauri 2.0 and Vue 3, it offers exceptional performance, security, and user experience.
+Sing-Box GUI Client is a cutting-edge cross-platform application for Windows, Linux, and macOS that provides a modern, intuitive interface for managing Sing-Box proxy configurations. Built with the powerful combination of Tauri 2.0 and Vue 3, it offers exceptional performance, security, and user experience.
 
 ### 🎯 Key Highlights
 
@@ -88,6 +88,13 @@ Sing-Box GUI Client is a cutting-edge cross-platform application for Windows and
 - **Network**: Internet connection for subscriptions and updates
 - **Dependencies**: libwebkit2gtk-4.1-0, libssl3, libgtk-3-0 (automatically installed with .deb packages)
 
+#### macOS
+- **Operating System**: macOS 10.13 (High Sierra) or higher
+- **Memory**: 4GB RAM minimum (8GB recommended)
+- **Storage**: 100MB free disk space
+- **Network**: Internet connection for subscriptions and updates
+- **Architecture**: Intel or Apple Silicon (M1/M2/M3) supported
+
 ### 🎯 Installation Methods
 
 #### Method 1: Download Release (Recommended)
@@ -111,6 +118,20 @@ Sing-Box GUI Client is a cutting-edge cross-platform application for Windows and
 3. Make executable: `chmod +x sing-box-windows-x.x.x.AppImage`
 4. Run: `./sing-box-windows-x.x.x.AppImage`
 
+**macOS (.dmg):**
+1. Visit the [Releases Page](https://github.com/yourusername/sing-box-windows/releases)
+2. Download the latest `sing-box-windows_x.x.x_aarch64.dmg` for Apple Silicon or `sing-box-windows_x.x.x_x86_64.dmg` for Intel Mac
+3. Open the downloaded DMG file
+4. Drag the application to your Applications folder
+5. Launch from Applications folder or Launchpad
+
+**macOS (.app):**
+1. Visit the [Releases Page](https://github.com/yourusername/sing-box-windows/releases)
+2. Download the latest `sing-box-windows.app.tar.gz`
+3. Extract the archive
+4. Move the .app file to your Applications folder
+5. Launch from Applications folder
+
 **Linux (Source Compilation):**
 1. Clone the repository: `git clone https://github.com/yourusername/sing-box-windows.git`
 2. Install dependencies:
@@ -118,6 +139,9 @@ Sing-Box GUI Client is a cutting-edge cross-platform application for Windows and
    # Ubuntu/Debian
    sudo apt update
    sudo apt install build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+   # macOS (using Homebrew)
+   brew install rust node
    ```
 3. Install Node.js and Rust (if not already installed)
 4. Build the application: `cd sing-box-windows && pnpm tauri build`
@@ -132,6 +156,15 @@ winget install sing-box-windows
 
 # Using Chocolatey (planned)
 choco install sing-box-windows
+```
+
+**macOS (Coming Soon):**
+```bash
+# Using Homebrew (planned)
+brew install sing-box-windows
+
+# Using MacPorts (planned)
+sudo port install sing-box-windows
 ```
 
 **Linux (Not Currently Available):**
@@ -225,7 +258,17 @@ After installation, the application will guide you through the initial setup:
 pnpm tauri dev          # Start development server with hot reload
 
 # Building
-pnpm tauri build        # Build release version
+pnpm tauri build        # Build release version (for current platform)
+
+# Platform-specific builds
+pnpm tauri build:windows          # Build Windows version
+pnpm tauri build:linux            # Build Linux version
+pnpm tauri build:macos            # Build macOS version (ARM64)
+pnpm tauri build:macos:intel      # Build macOS version (Intel)
+
+# Package formats
+pnpm tauri build:macos:dmg        # Build macOS DMG
+pnpm tauri build:macos:app        # Build macOS APP
 
 # Code Quality
 pnpm lint               # Run ESLint and OXLint with auto-fix
@@ -274,6 +317,7 @@ This application uses **Tauri Store Plugin** for backend data persistence, which
 
 - **Windows**: `%APPDATA%\sing-box-windows\*.bin` (binary database files)
 - **Linux**: `~/.local/share/sing-box-windows/*.bin` (binary database files)
+- **macOS**: `~/Library/Application Support/sing-box-windows/*.bin` (binary database files)
 - **Portable**: `<app-directory>\*.bin` (binary database files)
 
 ### ⚙️ Configuration Structure

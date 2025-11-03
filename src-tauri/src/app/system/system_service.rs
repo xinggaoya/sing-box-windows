@@ -18,7 +18,12 @@ pub fn restart_as_admin(app_handle: tauri::AppHandle) -> Result<(), String> {
         restart_as_admin_linux(app_handle)
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    {
+        restart_as_admin_macos(app_handle)
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
         Err("当前平台不支持管理员权限提升".to_string())
     }
@@ -140,6 +145,65 @@ fn restart_as_admin_linux(app_handle: tauri::AppHandle) -> Result<(), String> {
     Err("未找到可用的权限提升工具 (pkexec, gksu, kdesudo)".to_string())
 }
 
+#[cfg(target_os = "macos")]
+fn restart_as_admin_macos(app_handle: tauri::AppHandle) -> Result<(), String> {
+    // 检查当前是否已经有管理员权限
+    if check_admin() {
+        return Ok(());
+    }
+
+    // 获取当前可执行文件路径
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("{}: {}", messages::ERR_GET_EXE_PATH_FAILED, e))?;
+
+    // 确保文件存在
+    if !current_exe.exists() {
+        return Err(format!("找不到程序可执行文件: {}", current_exe.display()));
+    }
+
+    // 使用osascript进行权限提升
+    let exe_path = current_exe.to_string_lossy();
+
+    let apple_script = format!(
+        "do shell script \"{}\" with administrator privileges",
+        exe_path
+    );
+
+    let result = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(apple_script)
+        .spawn();
+
+    match result {
+        Ok(_) => {
+            // 启动成功，退出当前进程
+            app_handle.exit(0);
+            Ok(())
+        }
+        Err(e) => {
+            // 尝试备用方法 - 使用open命令
+            let result = std::process::Command::new("open")
+                .arg("-a")
+                .arg("Terminal")
+                .arg(&current_exe)
+                .spawn();
+
+            match result {
+                Ok(_) => {
+                    app_handle.exit(0);
+                    Ok(())
+                }
+                Err(e2) => Err(format!(
+                    "{}: {} 然后尝试备用方法失败: {}",
+                    messages::ERR_RESTART_FAILED,
+                    e,
+                    e2
+                )),
+            }
+        }
+    }
+}
+
 // 检查是否有管理员权限 - 跨平台实现
 #[tauri::command]
 pub fn check_admin() -> bool {
@@ -153,7 +217,12 @@ pub fn check_admin() -> bool {
         check_admin_linux()
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    {
+        check_admin_macos()
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
         false // 其他平台默认返回false
     }
@@ -182,6 +251,41 @@ fn check_admin_linux() -> bool {
             // 备用方法：检查是否为root用户
             nix::unistd::getuid().is_root()
         }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn check_admin_macos() -> bool {
+    // 检查当前用户是否为管理员
+    match std::env::var("USER") {
+        Ok(user) => {
+            // macOS上通常管理员用户不是root，但可以通过id命令检查
+            if let Ok(output) = std::process::Command::new("id")
+                .arg("-u")
+                .output()
+            {
+                if let Ok(uid_str) = String::from_utf8(output.stdout) {
+                    if let Ok(uid) = uid_str.trim().parse::<u32>() {
+                        // UID 0 为root，其他需要进一步检查
+                        if uid == 0 {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // 检查用户是否在admin组中
+            if let Ok(output) = std::process::Command::new("groups")
+                .arg(&user)
+                .output()
+            {
+                let groups_str = String::from_utf8_lossy(&output.stdout);
+                groups_str.contains("admin") || groups_str.contains("wheel")
+            } else {
+                false
+            }
+        }
+        Err(_) => false,
     }
 }
 
