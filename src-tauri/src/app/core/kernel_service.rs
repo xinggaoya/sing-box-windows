@@ -232,6 +232,51 @@ fn get_system_arch() -> &'static str {
         }
 
         detected_arch
+    } else if cfg!(target_os = "macos") {
+        // macOS 架构检测
+        let mut detected_arch = "amd64"; // 默认值
+
+        // 首先尝试通过 uname 命令获取准确架构
+        if let Ok(output) = Command::new("uname").arg("-m").output() {
+            if let Ok(arch_str) = String::from_utf8(output.stdout) {
+                let arch = arch_str.trim();
+                info!("uname -m 输出: '{}'", arch);
+
+                detected_arch = match arch {
+                    "x86_64" => "amd64",
+                    "amd64" => "amd64",
+                    "i386" | "i486" | "i586" | "i686" => "386",
+                    "aarch64" | "arm64" => "arm64",
+                    "armv7l" | "armv6l" => "armv5",
+                    _ => {
+                        info!("未知的 uname 架构，使用 Rust ARCH 常量");
+                        match std::env::consts::ARCH {
+                            "x86_64" => "amd64",
+                            "x86" => "386",
+                            "aarch64" => "arm64",
+                            _ => "amd64",
+                        }
+                    }
+                };
+                info!("通过 uname 检测到的架构: {}", detected_arch);
+            }
+        } else {
+            info!("uname 命令执行失败，使用 Rust ARCH 常量");
+        }
+
+        // 如果 uname 命令失败或结果不明确，使用 Rust 的 ARCH 常量作为备用
+        if detected_arch == "amd64" && std::env::consts::ARCH != "x86_64" {
+            detected_arch = match std::env::consts::ARCH {
+                "x86_64" => "amd64",
+                "x86" => "386",
+                "aarch64" => "arm64",
+                "arm" => "armv5",
+                _ => "amd64",
+            };
+            info!("通过 Rust ARCH 常量检测到的架构: {}", detected_arch);
+        }
+
+        detected_arch
     } else {
         info!("其他平台，使用默认架构 amd64");
         "amd64" // 其他平台的默认值
@@ -262,6 +307,8 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
         "windows"
     } else if cfg!(target_os = "linux") {
         "linux"
+    } else if cfg!(target_os = "macos") {
+        "darwin"
     } else {
         return Err("当前平台不支持".to_string());
     };
@@ -287,6 +334,8 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
     // 根据官方文件列表，格式为：sing-box-{version}-{platform}-{arch}.tar.gz 或 .zip
     let filename = if cfg!(target_os = "windows") {
         format!("sing-box-{}-windows-{}.zip", version, arch) // Windows 使用 .zip
+    } else if cfg!(target_os = "macos") {
+        format!("sing-box-{}-darwin-{}.tar.gz", version, arch) // macOS 使用 .tar.gz
     } else {
         format!("sing-box-{}-linux-{}.tar.gz", version, arch) // Linux 使用 .tar.gz
     };
@@ -1112,7 +1161,12 @@ pub async fn is_kernel_running() -> Result<bool, String> {
         is_kernel_running_linux().await
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    {
+        is_kernel_running_macos().await
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
         Err("当前平台不支持内核状态检查".to_string())
     }
@@ -1250,6 +1304,108 @@ async fn is_kernel_running_linux() -> Result<bool, String> {
             for pid in pids {
                 if let Ok(cmdline_output) = tokio::process::Command::new("ps")
                     .args(&["-p", pid, "-o", "cmd="])
+                    .output()
+                    .await
+                {
+                    let cmdline = String::from_utf8_lossy(&cmdline_output.stdout);
+                    if cmdline.contains(&*kernel_path_str) {
+                        info!(
+                            "内核进程正在运行 (精确匹配): PID {}, 命令: {}",
+                            pid,
+                            cmdline.trim()
+                        );
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+    }
+
+    info!("内核运行状态检查: false (未找到相关进程)");
+    Ok(false)
+}
+
+#[cfg(target_os = "macos")]
+async fn is_kernel_running_macos() -> Result<bool, String> {
+    // 获取我们的内核工作目录
+    let kernel_dir = crate::app::constants::core::paths::get_kernel_work_dir();
+    let kernel_path = crate::app::constants::core::paths::get_kernel_path();
+
+    info!("检查内核进程，可执行文件路径: {:?}", kernel_path);
+    info!("内核工作目录: {:?}", kernel_dir);
+
+    // 方法1: 使用 lsof 检查我们的可执行文件是否被某个进程使用
+    if let Ok(output) = tokio::process::Command::new("lsof")
+        .arg(&kernel_path)
+        .output()
+        .await
+    {
+        if !output.stdout.is_empty() {
+            info!("内核进程正在运行 (lsof检测): {}", output.status.success());
+            return Ok(true);
+        }
+    }
+
+    // 方法2: 使用 pgrep 检查特定路径的进程
+    if let Ok(output) = tokio::process::Command::new("pgrep")
+        .args(&["-f", &kernel_path.to_string_lossy()])
+        .output()
+        .await
+    {
+        if !output.stdout.is_empty() {
+            info!(
+                "内核进程正在运行 (pgrep检测): {}",
+                !output.stdout.is_empty()
+            );
+            return Ok(true);
+        }
+    }
+
+    // 方法3: 检查进程命令行是否包含我们的工作目录
+    if let Ok(output) = tokio::process::Command::new("ps")
+        .args(&["-ef", "-o", "args="])
+        .output()
+        .await
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let kernel_dir_str = kernel_dir.to_string_lossy();
+        let kernel_path_str = kernel_path.to_string_lossy();
+
+        if stdout.contains(&*kernel_dir_str) || stdout.contains(&*kernel_path_str) {
+            info!("内核进程正在运行 (ps检测): true");
+            return Ok(true);
+        }
+    }
+
+    // 方法4: 使用 ps aux 检查 sing-box 进程
+    if let Ok(output) = tokio::process::Command::new("ps")
+        .args(&["aux"])
+        .output()
+        .await
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let kernel_path_str = kernel_path.to_string_lossy();
+
+        if stdout.contains("sing-box") && stdout.contains(&*kernel_path_str) {
+            info!("内核进程正在运行 (ps aux检测): true");
+            return Ok(true);
+        }
+    }
+
+    // 方法5: 最后用简单检查，但加上路径验证
+    if let Ok(output) = tokio::process::Command::new("pgrep")
+        .arg("sing-box")
+        .output()
+        .await
+    {
+        if !output.stdout.is_empty() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let pids: Vec<&str> = stdout.trim().split('\n').collect();
+
+            let kernel_path_str = kernel_path.to_string_lossy();
+            for pid in pids {
+                if let Ok(cmdline_output) = tokio::process::Command::new("ps")
+                    .args(&["-p", pid, "-o", "command="])
                     .output()
                     .await
                 {
