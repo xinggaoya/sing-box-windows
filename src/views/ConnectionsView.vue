@@ -475,7 +475,7 @@ onMounted(async () => {
 
 // 组件卸载时清理连接监听器
 onUnmounted(() => {
-  connectionStore.cleanupListeners()
+  connectionStore.cleanupEventListeners()
 })
 </script>
 

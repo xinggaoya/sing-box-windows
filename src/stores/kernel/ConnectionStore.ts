@@ -288,6 +288,20 @@ export const useConnectionStore = defineStore(
       }
     }
 
+    // 初始化Store
+    const initializeStore = async () => {
+      try {
+        console.log('🔧 初始化 ConnectionStore...')
+        await setupEventListeners()
+        startConnectionsHealthCheck()
+        startMemoryHealthCheck()
+        startMemoryMonitoring()
+        console.log('✅ ConnectionStore 初始化完成')
+      } catch (error) {
+        console.error('❌ ConnectionStore 初始化失败:', error)
+      }
+    }
+
     return {
       // 状态
       connectionsState,
@@ -309,6 +323,7 @@ export const useConnectionStore = defineStore(
       stopMemoryMonitoring,
       startConnectionsHealthCheck,
       startMemoryHealthCheck,
+      initializeStore, // 添加这个方法
     }
   },
 )

@@ -149,6 +149,18 @@ export const useTrafficStore = defineStore(
       }
     }
 
+    // 初始化Store
+    const initializeStore = async () => {
+      try {
+        console.log('🔧 初始化 TrafficStore...')
+        await setupEventListeners()
+        startMemoryOptimization()
+        console.log('✅ TrafficStore 初始化完成')
+      } catch (error) {
+        console.error('❌ TrafficStore 初始化失败:', error)
+      }
+    }
+
     return {
       traffic,
       connectionState,
@@ -158,6 +170,7 @@ export const useTrafficStore = defineStore(
       updateTrafficStats,
       startMemoryOptimization,
       stopMemoryOptimization,
+      initializeStore, // 添加这个方法
     }
   },
 )

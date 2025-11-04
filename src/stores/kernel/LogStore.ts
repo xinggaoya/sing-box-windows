@@ -215,6 +215,17 @@ export const useLogStore = defineStore(
       ) // 5分钟
     }
 
+    // 初始化Store
+    const initializeStore = async () => {
+      try {
+        console.log('🔧 初始化 LogStore...')
+        await setupLogListener()
+        console.log('✅ LogStore 初始化完成')
+      } catch (error) {
+        console.error('❌ LogStore 初始化失败:', error)
+      }
+    }
+
     return {
       logs,
       addLog,
@@ -223,6 +234,7 @@ export const useLogStore = defineStore(
       showMessage,
       setupLogListener,
       cleanupListeners,
+      initializeStore, // 添加这个方法
     }
   },
 )

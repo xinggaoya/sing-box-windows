@@ -4037,6 +4037,7 @@ version = "2.0.0"
 dependencies = [
  "base64 0.13.1",
  "chrono",
+ "core-foundation 0.9.4",
  "dirs 5.0.1",
  "flate2",
  "futures",
@@ -4044,6 +4045,7 @@ dependencies = [
  "lazy_static",
  "nix 0.29.0",
  "reqwest",
+ "security-framework",
  "semver",
  "serde",
  "serde_json",

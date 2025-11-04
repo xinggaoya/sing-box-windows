@@ -9,7 +9,7 @@
             <MessageConsumer />
 
             <!-- 主路由视图 -->
-            <div @contextmenu="handleContextMenu" class="app-container">
+            <div class="app-container">
               <router-view />
             </div>
 

@@ -384,8 +384,8 @@ export const useKernelStore = defineStore(
         console.log('📊 停止数据收集...')
         
         // 清理各个数据 store
-        connectionStore.cleanupListeners()
-        trafficStore.cleanupListeners()
+        connectionStore.cleanupEventListeners()
+        trafficStore.cleanupEventListeners()
         logStore.cleanupListeners()
         
         // 停止运行时间计数
