@@ -69,6 +69,10 @@ const windowStore = useWindowStore()
 // 清理函数数组
 const cleanupFunctions: (() => void)[] = []
 
+const handleBeforeUnload = () => {
+  cleanup()
+}
+
 // 更新检查定时器ID
 let updateIntervalId: number | undefined
 
@@ -102,6 +106,11 @@ async function handleAutoUpdateCheck() {
 }
 
 onMounted(async () => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  cleanupFunctions.push(() => {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+  })
+
   try {
     // 1. 注册消息实例
     const handleMessageReady = (message: unknown) => {
@@ -271,8 +280,6 @@ onBeforeUnmount(() => {
   cleanup()
 })
 
-// 应用关闭前清理
-window.addEventListener('beforeunload', cleanup)
 </script>
 
 <style>

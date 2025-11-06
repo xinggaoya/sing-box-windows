@@ -44,18 +44,33 @@ const initializeApp = async () => {
 import { eventService } from '@/services/event-service'
 console.log('🔧 Tauri 事件服务已导入')
 
-// 设置应用关闭时的清理逻辑
-window.addEventListener('beforeunload', async () => {
+const handleBeforeUnload = () => {
   console.log('应用关闭，执行清理...')
 
-  // 清理事件服务
   try {
     eventService.destroy()
     console.log('事件服务已清理')
   } catch (error) {
     console.error('事件服务清理失败:', error)
   }
-})
+}
+
+type WindowWithCleanup = Window & {
+  __appBeforeUnloadHandler?: () => void
+}
+
+const windowWithCleanup = window as WindowWithCleanup
+
+if (windowWithCleanup.__appBeforeUnloadHandler) {
+  window.removeEventListener('beforeunload', windowWithCleanup.__appBeforeUnloadHandler)
+}
+
+const beforeUnloadHandler = () => {
+  handleBeforeUnload()
+}
+
+window.addEventListener('beforeunload', beforeUnloadHandler)
+windowWithCleanup.__appBeforeUnloadHandler = beforeUnloadHandler
 
 // 开始初始化
 initializeApp()
