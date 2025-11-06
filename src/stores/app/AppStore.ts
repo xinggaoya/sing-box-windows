@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
 import { useMessage } from 'naive-ui'
 import { config, tauriApi } from '@/services/tauri-api'
@@ -186,57 +186,71 @@ export const useAppStore = defineStore(
     // 标记是否正在初始化
     let isInitializing = false
     
+    let lastSavePromise: Promise<void> | null = null
+
     // 监听应用配置变化并自动保存到数据库
     watch(
       [proxyMode, autoStartKernel, preferIpv6, proxyPort, apiPort, trayInstanceId],
       async () => {
         // 初始化期间不保存
         if (isInitializing) return
-        await saveToBackend()
+        const savePromise = saveToBackend()
+        lastSavePromise = savePromise
+        await savePromise
       },
       { deep: true }
     )
 
+    const waitForSaveCompletion = async () => {
+      await nextTick()
+      if (lastSavePromise) {
+        await lastSavePromise
+      }
+    }
+
     // Store初始化方法
     const initializeStore = async () => {
       isInitializing = true
-      
-      // 初始化数据恢复Promise
-      initializeDataRestore()
 
-      // 从后端加载数据
-      await loadFromBackend()
+      try {
+        // 初始化数据恢复Promise
+        initializeDataRestore()
 
-      // 检测是否是开机自启动场景
-      await detectAutostartScenario()
+        // 从后端加载数据
+        await loadFromBackend()
 
-      // WebSocket连接状态管理现在由后端直接处理，无需前端监听
-      console.log('✅ AppStore初始化完成 - 使用数据库存储')
-      
-      // 检查是否需要自动启动内核
-      if (autoStartKernel.value) {
-        console.log('🚀 检测到自动启动内核设置，开始启动内核...')
-        
-        if (isAutostartScenario.value) {
-          // 开机自启动场景，延迟启动避免资源竞争
-          console.log('🕐 开机自启动场景，使用延迟启动')
-          await delayedKernelStart(10000) // 延迟10秒
-        } else {
-          // 正常启动，立即启动
-          console.log('🖥️ 正常启动场景，立即启动内核')
-          try {
-            const { useKernelStore } = await import('../kernel/KernelStore')
-            const kernelStore = useKernelStore()
-            await kernelStore.startKernel()
-          } catch (error) {
-            console.error('自动启动内核失败:', error)
+        // 检测是否是开机自启动场景
+        await detectAutostartScenario()
+
+        // WebSocket连接状态管理现在由后端直接处理，无需前端监听
+        console.log('✅ AppStore初始化完成 - 使用数据库存储')
+
+        // 检查是否需要自动启动内核
+        if (autoStartKernel.value) {
+          console.log('🚀 检测到自动启动内核设置，开始启动内核...')
+
+          if (isAutostartScenario.value) {
+            // 开机自启动场景，延迟启动避免资源竞争
+            console.log('🕐 开机自启动场景，使用延迟启动')
+            await delayedKernelStart(10000) // 延迟10秒
+          } else {
+            // 正常启动，立即启动
+            console.log('🖥️ 正常启动场景，立即启动内核')
+            try {
+              const { useKernelStore } = await import('../kernel/KernelStore')
+              const kernelStore = useKernelStore()
+              await kernelStore.startKernel()
+            } catch (error) {
+              console.error('自动启动内核失败:', error)
+            }
           }
         }
-      }
 
-      // 等待一下确保所有数据都加载完成
-      await new Promise(resolve => setTimeout(resolve, 100))
-      isInitializing = false
+        // 等待一下确保所有数据都加载完成
+        await new Promise(resolve => setTimeout(resolve, 100))
+      } finally {
+        isInitializing = false
+      }
     }
 
     // 检测开机自启动场景
@@ -377,8 +391,6 @@ export const useAppStore = defineStore(
         // 注意：这里不应该改变 autoStartKernel，因为这是两个独立的设置
         // 系统开机自启 ≠ 启动内核
         // 只保存系统自启动状态，autoStartKernel 的值由用户单独控制
-
-        await saveToBackend()
       } catch (error) {
         console.error('切换系统开机自启失败:', error)
 
@@ -403,7 +415,7 @@ export const useAppStore = defineStore(
       try {
         // 只更新 autoStartKernel 设置
         autoStartKernel.value = enabled
-        await saveToBackend()
+        await waitForSaveCompletion()
         console.log(`自动启动内核设置已${enabled ? '启用' : '禁用'}`)
       } catch (error) {
         console.error('切换自动启动内核设置失败:', error)
