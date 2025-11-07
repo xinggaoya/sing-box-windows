@@ -1,7 +1,7 @@
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useProxyStore } from '@/stores/kernel/ProxyStore'
-import { tauriApi } from './tauri-api'
+import { tauriApi } from './tauri'
 import { NotificationService } from './notification-service'
 import i18n from '@/locales'
 

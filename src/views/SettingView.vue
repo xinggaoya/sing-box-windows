@@ -666,7 +666,7 @@ import {
   ConstructOutline,
 } from '@vicons/ionicons5'
 import { listen } from '@tauri-apps/api/event'
-import { tauriApi } from '@/services/tauri-api'
+import { tauriApi } from '@/services/tauri'
 import { appDataDir } from '@tauri-apps/api/path'
 import { supportedLocales } from '@/locales'
 import { useI18n } from 'vue-i18n'

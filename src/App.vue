@@ -30,7 +30,7 @@ import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
 import { useMessage } from 'naive-ui'
 import type { Router } from 'vue-router'
-import { tauriApi } from '@/services/tauri-api'
+import { tauriApi } from '@/services/tauri'
 
 // 导入主题配置
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'

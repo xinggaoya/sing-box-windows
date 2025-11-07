@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch, computed } from 'vue'
-import { tauriApi } from '@/services/tauri-api'
+import { tauriApi } from '@/services/tauri'
 import { getVersion } from '@tauri-apps/api/app'
 import { DatabaseService } from '@/services/database-service'
 import type { UpdateConfig } from '@/types/database'
