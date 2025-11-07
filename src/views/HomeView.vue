@@ -290,7 +290,7 @@ import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useThemeStore } from '@/stores/app/ThemeStore'
-import { kernelApi } from '@/services/tauri-api'
+import { kernelApi } from '@/services/tauri'
 import { formatBandwidth } from '@/utils'
 import TrafficStatsCard from '@/components/home/TrafficStatsCard.vue'
 
@@ -489,7 +489,7 @@ const restartKernel = async () => {
 // 以管理员身份重启
 const restartAsAdmin = async () => {
   try {
-    const { systemApi } = await import('@/services/tauri-api')
+    const { systemApi } = await import('@/services/tauri')
     await systemApi.restartAsAdmin()
   } catch (error) {
     console.error('以管理员身份重启失败:', error)
@@ -531,7 +531,7 @@ const handleNodeProxyModeChange = async (mode: string) => {
 // 检查管理员权限
 const checkAdmin = async () => {
   try {
-    const { systemApi } = await import('@/services/tauri-api')
+    const { systemApi } = await import('@/services/tauri')
     isAdmin.value = await systemApi.checkAdmin()
   } catch (error) {
     console.error('检查管理员权限失败:', error)

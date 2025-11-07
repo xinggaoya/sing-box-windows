@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { tauriApi } from '@/services/tauri-api'
+import { tauriApi } from '@/services/tauri'
 import { useAppStore } from '@/stores'
 
 // 代理模式声明

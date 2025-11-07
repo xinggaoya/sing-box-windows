@@ -98,7 +98,13 @@ sing-box-windows/
 │   ├── services/      # 服务层
 │   │   ├── notification-service.ts # 通知服务
 │   │   ├── proxy-service.ts        # 代理服务
-│   │   ├── tauri-api.ts           # Tauri API 封装
+│   │   ├── tauri/                # Tauri API 分层封装
+│   │   │   ├── index.ts         # 聚合导出，兼容旧接口
+│   │   │   ├── kernel.ts        # 内核命令封装
+│   │   │   ├── proxy.ts         # 代理命令封装
+│   │   │   ├── subscription.ts  # 订阅命令封装
+│   │   │   ├── system.ts        # 系统命令封装
+│   │   │   └── config.ts        # 配置命令封装
 │   │   └── websocket-service.ts   # WebSocket 服务
 │   ├── stores/        # Pinia 状态管理
 │   │   ├── index.ts   # Store 主入口和插件配置

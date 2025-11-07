@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
-import { nextTick, ref, watch } from 'vue'
+import { ref } from 'vue'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
-import { useMessage } from 'naive-ui'
-import { config, tauriApi } from '@/services/tauri-api'
-import { DatabaseService } from '@/services/database-service'
-import type { AppConfig } from '@/types/database'
+import type { MessageApiInjection } from 'naive-ui'
+import { config as configApi, tauriApi } from '@/services/tauri'
+import { useAppMessaging } from './composables/messaging'
+import { createAppPersistence } from './composables/persistence'
 
 // 代理模式类型
 export type ProxyMode = 'system' | 'tun' | 'manual'
@@ -12,41 +12,18 @@ export type ProxyMode = 'system' | 'tun' | 'manual'
 export const useAppStore = defineStore(
   'app',
   () => {
-    // 消息服务实例
-    let messageInstance: ReturnType<typeof useMessage> | null = null
+    const messaging = useAppMessaging()
 
-    // 设置消息服务实例
-    const setMessageInstance = (instance: ReturnType<typeof useMessage>) => {
-      messageInstance = instance
+    const setMessageInstance = (instance: MessageApiInjection) => {
+      messaging.setMessageInstance(instance)
     }
 
-    // 显示成功消息
-    const showSuccessMessage = (content: string) => {
-      if (messageInstance) {
-        messageInstance.success(content)
-      }
-    }
-
-    // 显示错误消息
-    const showErrorMessage = (content: string) => {
-      if (messageInstance) {
-        messageInstance.error(content)
-      }
-    }
-
-    // 显示警告消息
-    const showWarningMessage = (content: string) => {
-      if (messageInstance) {
-        messageInstance.warning(content)
-      }
-    }
-
-    // 显示信息消息
-    const showInfoMessage = (content: string) => {
-      if (messageInstance) {
-        messageInstance.info(content)
-      }
-    }
+    const {
+      showSuccessMessage,
+      showErrorMessage,
+      showWarningMessage,
+      showInfoMessage,
+    } = messaging
 
     // 应用运行状态
     const isRunning = ref(false)
@@ -59,12 +36,6 @@ export const useAppStore = defineStore(
     const isAutostartScenario = ref(false)
     // 自动启动延迟计时器
     let autostartDelayTimer: ReturnType<typeof setTimeout> | null = null
-
-    // 数据恢复完成标志 - 解决启动竞态条件
-    const isDataRestored = ref(false)
-    // 数据恢复Promise，用于等待恢复完成
-    let dataRestorePromise: Promise<void> | null = null
-    let dataRestoreResolve: (() => void) | null = null
 
     // 托盘实例ID - 由TrayStore使用
     const trayInstanceId = ref<string | null>(null)
@@ -84,157 +55,47 @@ export const useAppStore = defineStore(
     const proxyPort = ref(12080) // 代理端口
     const apiPort = ref(12081) // API端口
 
-    // 从后端加载数据
-    const loadFromBackend = async () => {
-      try {
-        console.log('📋 从数据库加载应用配置...')
-        const appConfig = await DatabaseService.getAppConfig()
-        
-        // 更新响应式状态
-        proxyMode.value = appConfig.proxy_mode as ProxyMode
-        autoStartKernel.value = appConfig.auto_start_kernel
-        preferIpv6.value = appConfig.prefer_ipv6
-        proxyPort.value = appConfig.proxy_port
-        apiPort.value = appConfig.api_port
-        trayInstanceId.value = appConfig.tray_instance_id || null
-        
-        console.log('📋 应用配置加载完成：', {
-          proxyMode: proxyMode.value,
-          autoStartKernel: autoStartKernel.value,
-          preferIpv6: preferIpv6.value,
-          proxyPort: proxyPort.value,
-          apiPort: apiPort.value,
-          trayInstanceId: trayInstanceId.value,
-        })
-        
-        markDataRestored()
-      } catch (error) {
-        console.error('从数据库加载应用配置失败:', error)
-        // 加载失败时使用默认值
-        markDataRestored()
-      }
-    }
-
-    // 保存配置到数据库
-    const saveToBackend = async () => {
-      try {
-        const config: AppConfig = {
-          proxy_mode: proxyMode.value,
-          auto_start_kernel: autoStartKernel.value,
-          prefer_ipv6: preferIpv6.value,
-          proxy_port: proxyPort.value,
-          api_port: apiPort.value,
-          tray_instance_id: trayInstanceId.value,
-        }
-        
-        await DatabaseService.saveAppConfig(config)
-        console.log('✅ 应用配置已保存到数据库')
-      } catch (error) {
-        console.error('保存应用配置到数据库失败:', error)
-      }
-    }
-
-    // 初始化数据恢复Promise
-    const initializeDataRestore = () => {
-      if (!dataRestorePromise) {
-        dataRestorePromise = new Promise<void>((resolve) => {
-          dataRestoreResolve = resolve
-        })
-      }
-    }
-
-    // 标记数据恢复完成
-    const markDataRestored = () => {
-      console.log('📋 AppStore 数据恢复完成，端口配置：', {
-        proxyPort: proxyPort.value,
-        apiPort: apiPort.value,
-      })
-      isDataRestored.value = true
-      if (dataRestoreResolve) {
-        dataRestoreResolve()
-        dataRestoreResolve = null
-      }
-    }
-
-    // 等待数据恢复完成
-    const waitForDataRestore = async (timeout = 5000): Promise<boolean> => {
-      if (isDataRestored.value) {
-        return true
-      }
-
-      if (!dataRestorePromise) {
-        console.warn('⚠️ 数据恢复Promise未初始化，可能存在时序问题')
-        return false
-      }
-
-      try {
-        await Promise.race([
-          dataRestorePromise,
-          new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('数据恢复超时')), timeout)
-          }),
-        ])
-        return true
-      } catch (error) {
-        console.error('等待数据恢复失败:', error)
-        // 即使超时也标记为已恢复，使用当前值
-        markDataRestored()
-        return false
-      }
-    }
-
-    // 标记是否正在初始化
-    let isInitializing = false
-    
-    let lastSavePromise: Promise<void> | null = null
-
-    // 监听应用配置变化并自动保存到数据库
-    watch(
-      [proxyMode, autoStartKernel, preferIpv6, proxyPort, apiPort, trayInstanceId],
-      async () => {
-        // 初始化期间不保存
-        if (isInitializing) return
-        const savePromise = saveToBackend()
-        lastSavePromise = savePromise
-        await savePromise
-      },
-      { deep: true }
-    )
-
-    const waitForSaveCompletion = async () => {
-      await nextTick()
-      if (lastSavePromise) {
-        await lastSavePromise
-      }
-    }
+    const {
+      isDataRestored,
+      startInitialization,
+      finishInitialization,
+      loadFromBackend,
+      saveToBackend,
+      waitForDataRestore,
+      waitForSaveCompletion,
+      markDataRestored,
+      stopAutoSave,
+    } = createAppPersistence({
+      proxyMode,
+      autoStartKernel,
+      preferIpv6,
+      proxyPort,
+      apiPort,
+      trayInstanceId,
+    })
 
     // Store初始化方法
     const initializeStore = async () => {
-      isInitializing = true
+      startInitialization()
 
       try {
-        // 初始化数据恢复Promise
-        initializeDataRestore()
-
-        // 从后端加载数据
         await loadFromBackend()
+        console.log('📋 AppStore 数据恢复完成，端口配置：', {
+          proxyPort: proxyPort.value,
+          apiPort: apiPort.value,
+        })
 
-        // 检测是否是开机自启动场景
         await detectAutostartScenario()
 
-        // WebSocket连接状态管理现在由后端直接处理，无需前端监听
         console.log('✅ AppStore初始化完成 - 使用数据库存储')
 
-        // 检查是否需要自动启动内核
         if (autoStartKernel.value) {
           console.log('🚀 检测到自动启动内核设置，开始启动内核...')
 
           if (isAutostartScenario.value) {
-            // 开机自启动场景，延迟启动避免资源竞争
             console.log('🕐 开机自启动场景，使用延迟启动')
-            await delayedKernelStart(10000) // 延迟10秒
+            await delayedKernelStart(10000)
           } else {
-            // 正常启动，立即启动
             console.log('🖥️ 正常启动场景，立即启动内核')
             try {
               const { useKernelStore } = await import('../kernel/KernelStore')
@@ -246,10 +107,9 @@ export const useAppStore = defineStore(
           }
         }
 
-        // 等待一下确保所有数据都加载完成
         await new Promise(resolve => setTimeout(resolve, 100))
       } finally {
-        isInitializing = false
+        finishInitialization()
       }
     }
 
@@ -319,11 +179,13 @@ export const useAppStore = defineStore(
         clearTimeout(connectionCheckTimeout)
         connectionCheckTimeout = null
       }
-      
+
       if (autostartDelayTimer) {
         clearTimeout(autostartDelayTimer)
         autostartDelayTimer = null
       }
+
+      stopAutoSave()
     }
 
     // 应用运行状态变更
@@ -451,7 +313,7 @@ export const useAppStore = defineStore(
     // 同步端口配置到sing-box配置文件
     const syncPortsToSingbox = async () => {
       try {
-        await config.updateSingboxPorts(proxyPort.value, apiPort.value)
+        await configApi.updateSingboxPorts(proxyPort.value, apiPort.value)
         console.log('端口配置已同步到sing-box配置文件')
       } catch (error) {
         console.error('同步端口配置到sing-box失败:', error)

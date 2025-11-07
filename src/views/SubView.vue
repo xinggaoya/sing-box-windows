@@ -332,7 +332,7 @@ import {
   TimeOutline,
 } from '@vicons/ionicons5'
 import type { FormInst, FormRules, DropdownOption } from 'naive-ui'
-import { tauriApi } from '@/services/tauri-api'
+import { tauriApi } from '@/services/tauri'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
 import { useThemeStore } from '@/stores/app/ThemeStore'

@@ -14,7 +14,7 @@ import { useWindowStore } from '@/stores/app/WindowStore'
 import { ProxyService } from '@/services/proxy-service'
 import i18n from '@/locales'
 import { useRouter } from 'vue-router'
-import { tauriApi } from '@/services/tauri-api'
+import { tauriApi } from '@/services/tauri'
 
 // 自定义菜单项类型定义
 export interface TrayMenuOptions {

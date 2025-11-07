@@ -254,7 +254,7 @@ import {
   ExtensionPuzzleOutline,
   GlobeOutline,
 } from '@vicons/ionicons5'
-import { tauriApi } from '@/services/tauri-api'
+import { tauriApi } from '@/services/tauri'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/app/ThemeStore'
 

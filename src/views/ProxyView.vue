@@ -162,7 +162,7 @@ import {
   ChevronDownOutline,
 } from '@vicons/ionicons5'
 import { useWindowSize } from '@vueuse/core'
-import { tauriApi } from '@/services/tauri-api'
+import { tauriApi } from '@/services/tauri'
 import { listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
