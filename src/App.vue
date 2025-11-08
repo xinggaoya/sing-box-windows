@@ -35,7 +35,7 @@ import { tauriApi } from '@/services/tauri'
 // 导入主题配置
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 
-import { useThemeStore, useAppStore, useLocaleStore, useWindowStore, useTrayStore, useKernelStore, useUpdateStore } from '@/stores'
+import { useThemeStore, useAppStore, useLocaleStore, useWindowStore, useTrayStore, useKernelStore, useUpdateStore, useSubStore } from '@/stores'
 
 // 导入组件
 import UpdateNotification from '@/components/UpdateNotification.vue'
@@ -63,6 +63,7 @@ const themeStore = useThemeStore()
 const appStore = useAppStore()
 const localeStore = useLocaleStore()
 const windowStore = useWindowStore()
+const subStore = useSubStore()
 
 // 生产环境下禁用右键菜单
 
@@ -115,6 +116,9 @@ onMounted(async () => {
     // 0. 初始化 AppStore 以确保持久化数据已加载
     console.log('📋 初始化 AppStore...')
     await appStore.initializeStore()
+
+    // 0.1 初始化订阅数据，确保跨会话持久化生效
+    await subStore.initializeStore()
 
     // 1. 注册消息实例
     const handleMessageReady = (message: unknown) => {

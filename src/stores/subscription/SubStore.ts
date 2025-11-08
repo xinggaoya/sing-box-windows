@@ -186,6 +186,8 @@ export const useSubStore = defineStore(
 
     // 标记是否正在初始化
     let isInitializing = false
+    let hasInitialized = false
+    let initializePromise: Promise<void> | null = null
     
     // 监听订阅列表变化并自动保存到数据库
     watch(
@@ -200,11 +202,23 @@ export const useSubStore = defineStore(
 
     // 初始化方法
     const initializeStore = async () => {
-      isInitializing = true
-      await loadFromBackend()
-      // 等待一下确保数据加载完成
-      await new Promise(resolve => setTimeout(resolve, 100))
-      isInitializing = false
+      if (hasInitialized) {
+        return
+      }
+      if (initializePromise) {
+        return initializePromise
+      }
+
+      initializePromise = (async () => {
+        isInitializing = true
+        await loadFromBackend()
+        // 等待一下确保数据加载完成
+        await new Promise(resolve => setTimeout(resolve, 100))
+        isInitializing = false
+        hasInitialized = true
+      })()
+
+      return initializePromise
     }
 
     return {

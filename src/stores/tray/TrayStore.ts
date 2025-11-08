@@ -1,6 +1,6 @@
 // TrayStore.ts - 管理应用程序托盘功能的Store
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, watch, type WatchStopHandle } from 'vue'
 import { TrayIcon, TrayIconEvent } from '@tauri-apps/api/tray'
 import { Window } from '@tauri-apps/api/window'
 import { defaultWindowIcon } from '@tauri-apps/api/app'
@@ -39,8 +39,26 @@ export const useTrayStore = defineStore('tray', () => {
   // 添加一个内部状态，记录上次菜单刷新时的代理模式
   const lastProxyMode = ref<'system' | 'tun' | 'manual'>(appStore.proxyMode)
 
-  // 只存储托盘ID，不存储实例
-  const trayInstanceId = ref<string | null>(null)
+  // 只存储托盘ID，不存储实例（与 AppStore 持久化字段保持同步）
+  const trayInstanceId = ref<string | null>(appStore.trayInstanceId)
+  const setTrayInstanceId = (id: string | null) => {
+    trayInstanceId.value = id
+    appStore.trayInstanceId = id
+  }
+
+  // watcher 清理集合，避免重复注册
+  const trayWatchers: WatchStopHandle[] = []
+  const registerWatcher = (...args: Parameters<typeof watch>) => {
+    const stop = watch(...args)
+    trayWatchers.push(stop)
+    return stop
+  }
+  const cleanupWatchers = () => {
+    while (trayWatchers.length) {
+      const stop = trayWatchers.pop()
+      stop?.()
+    }
+  }
 
   // 获取翻译函数
   const t = i18n.global.t
@@ -77,7 +95,8 @@ export const useTrayStore = defineStore('tray', () => {
    * 更新托盘提示信息
    */
   const updateTrayTooltip = async () => {
-    if (trayInstanceId.value) {
+    const currentId = trayInstanceId.value ?? appStore.trayInstanceId
+    if (currentId) {
       try {
         const status = appStore.isRunning ? t('home.status.running') : t('home.status.stopped')
         const mode =
@@ -102,7 +121,7 @@ export const useTrayStore = defineStore('tray', () => {
         }
 
         // 获取托盘实例并更新提示
-        const trayIcon = await TrayIcon.getById(trayInstanceId.value)
+        const trayIcon = await TrayIcon.getById(currentId)
         if (trayIcon) {
           await trayIcon.setTooltip(tooltipText)
           console.log('更新托盘提示成功:', tooltipText)
@@ -324,12 +343,15 @@ export const useTrayStore = defineStore('tray', () => {
    */
   const initTray = async () => {
     try {
-      // 清理之前的托盘实例（如果存在）
-      if (appStore.trayInstanceId) {
+      // 清理之前的托盘实例（如果存在），解决热刷新重复托盘
+      const existingId = trayInstanceId.value ?? appStore.trayInstanceId
+      if (existingId) {
         try {
-          await destroyTray()
-        } catch {
-          // 忽略可能的错误
+          await TrayIcon.removeById(existingId)
+        } catch (removeError) {
+          console.warn('移除旧托盘失败（可能已被系统清理）:', removeError)
+        } finally {
+          setTrayInstanceId(null)
         }
       }
 
@@ -369,8 +391,7 @@ export const useTrayStore = defineStore('tray', () => {
       try {
         // 创建托盘实例，但不存储引用，只存储ID
         const trayInstance = await TrayIcon.new(options)
-        trayInstanceId.value = trayInstance.id
-        appStore.trayInstanceId = trayInstance.id
+        setTrayInstanceId(trayInstance.id)
       } catch (error) {
         console.error('创建托盘实例失败:', error)
         throw error
@@ -379,22 +400,22 @@ export const useTrayStore = defineStore('tray', () => {
       // 初始化提示文本
       await updateTrayTooltip()
 
-      // 监听状态变化以更新提示和菜单
-      watch(
+      // 注册状态监听，确保每次初始化前先清理旧watcher
+      cleanupWatchers()
+
+      registerWatcher(
         () => appStore.isRunning,
         () => {
           updateTrayTooltip()
-          refreshTrayMenu() // 当运行状态变化时刷新菜单
+          refreshTrayMenu()
         },
       )
 
-      // 直接监听代理模式变化并强制刷新菜单
-      watch(
+      registerWatcher(
         () => appStore.proxyMode,
         (newMode) => {
           console.log(`代理模式变更为: ${newMode}, 上次菜单模式: ${lastProxyMode.value}`)
           updateTrayTooltip()
-          // 如果模式确实发生了变化，则强制刷新菜单
           if (newMode !== lastProxyMode.value) {
             console.log('模式已变化，强制刷新托盘菜单')
             refreshTrayMenu()
@@ -402,8 +423,7 @@ export const useTrayStore = defineStore('tray', () => {
         },
       )
 
-      // 监听语言变更
-      watch(
+      registerWatcher(
         () => i18n.global.locale.value,
         () => {
           console.log('语言已变更，刷新托盘菜单')
@@ -412,28 +432,23 @@ export const useTrayStore = defineStore('tray', () => {
         },
       )
 
-      watch(() => [subStore.activeIndex, subStore.list.length], updateTrayTooltip)
+      registerWatcher(
+        () => [subStore.activeIndex, subStore.list.length],
+        () => {
+          updateTrayTooltip()
+        },
+      )
 
-      // 使用Pinia的watch监听状态变化，替代mitt事件
-      watch(() => appStore.isRunning, () => {
-        updateTrayTooltip()
-        refreshTrayMenu() // 当进程状态变化时刷新菜单
-      })
-
-      watch(() => appStore.proxyMode, () => {
-        console.log('代理模式已变更，刷新托盘菜单')
-        updateTrayTooltip()
-        refreshTrayMenu() // 当代理模式变化时刷新菜单
-      })
-
-      // 监听语言变更 - 需要导入LocaleStore
       const { useLocaleStore } = await import('@/stores')
       const localeStore = useLocaleStore()
-      watch(() => localeStore.currentLocale, () => {
-        console.log('语言已变更，刷新托盘菜单')
-        refreshTrayMenu()
-        updateTrayTooltip()
-      })
+      registerWatcher(
+        () => localeStore.currentLocale,
+        () => {
+          console.log('LocaleStore 语言变更，刷新托盘菜单')
+          refreshTrayMenu()
+          updateTrayTooltip()
+        },
+      )
 
       return true
     } catch (error) {
@@ -446,11 +461,12 @@ export const useTrayStore = defineStore('tray', () => {
    * 刷新托盘菜单
    */
   const refreshTrayMenu = async () => {
-    if (!trayInstanceId.value) return
+    const currentId = trayInstanceId.value ?? appStore.trayInstanceId
+    if (!currentId) return
 
     // 接使用TrayIcon实例的方法
     try {
-      const tray = await TrayIcon.getById(trayInstanceId.value)
+      const tray = await TrayIcon.getById(currentId)
       const menu = await createTrayMenu()
       if (tray) {
         await tray.setMenu(menu)
@@ -472,18 +488,18 @@ export const useTrayStore = defineStore('tray', () => {
    * 销毁托盘
    */
   const destroyTray = async () => {
-    if (trayInstanceId.value) {
+    const currentId = trayInstanceId.value ?? appStore.trayInstanceId
+    if (currentId) {
       try {
         // 使用静态方法关闭托盘
-        await TrayIcon.removeById(trayInstanceId.value)
-        trayInstanceId.value = null
-        appStore.trayInstanceId = null
+        await TrayIcon.removeById(currentId)
+        setTrayInstanceId(null)
       } catch (error) {
         console.error('销毁托盘失败:', error)
       }
     }
 
-    // 移除事件监听 - 现在使用Pinia的watch，无需手动清理
+    cleanupWatchers()
     console.log('托盘事件监听器已清理')
   }
 
