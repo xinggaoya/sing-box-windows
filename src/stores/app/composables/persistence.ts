@@ -5,6 +5,7 @@ import type { AppConfig } from '@/types/database'
 export interface PersistenceState {
   proxyMode: Ref<string>
   autoStartKernel: Ref<boolean>
+  autoStartApp: Ref<boolean>
   preferIpv6: Ref<boolean>
   proxyPort: Ref<number>
   apiPort: Ref<number>
@@ -66,6 +67,7 @@ export function createAppPersistence(state: PersistenceState) {
       const appConfig = await DatabaseService.getAppConfig()
       state.proxyMode.value = appConfig.proxy_mode
       state.autoStartKernel.value = appConfig.auto_start_kernel
+      state.autoStartApp.value = appConfig.auto_start_app
       state.preferIpv6.value = appConfig.prefer_ipv6
       state.proxyPort.value = appConfig.proxy_port
       state.apiPort.value = appConfig.api_port
@@ -82,6 +84,7 @@ export function createAppPersistence(state: PersistenceState) {
       const config: AppConfig = {
         proxy_mode: state.proxyMode.value,
         auto_start_kernel: state.autoStartKernel.value,
+        auto_start_app: state.autoStartApp.value,
         prefer_ipv6: state.preferIpv6.value,
         proxy_port: state.proxyPort.value,
         api_port: state.apiPort.value,
@@ -95,7 +98,7 @@ export function createAppPersistence(state: PersistenceState) {
   }
 
   const stopAutoSave = watch(
-    [state.proxyMode, state.autoStartKernel, state.preferIpv6, state.proxyPort, state.apiPort, state.trayInstanceId],
+    [state.proxyMode, state.autoStartKernel, state.autoStartApp, state.preferIpv6, state.proxyPort, state.apiPort, state.trayInstanceId],
     async () => {
       if (isInitializing.value) {
         return

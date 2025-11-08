@@ -156,7 +156,7 @@ export const useUpdateStore = defineStore(
         const updateInfo = await tauriApi.system.checkUpdate(
           appVersion.value,
           acceptPrerelease.value
-        )
+        ) as UpdateInfo | null
 
         if (updateInfo && updateInfo.has_update) {
           hasUpdate.value = true

@@ -435,7 +435,7 @@ const clearFilters = () => {
 const fetchRules = async () => {
   loading.value = true
   try {
-    const response: RulesResponse = await tauriApi.getRules()
+    const response = await tauriApi.getRules() as RulesResponse
     rules.value = response.rules
     message.success(t('rules.fetchSuccess', { count: response.rules.length }))
   } catch (error) {

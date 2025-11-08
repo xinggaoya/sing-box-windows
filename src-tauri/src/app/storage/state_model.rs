@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub auto_start_kernel: bool,
+    pub auto_start_app: bool,
     pub prefer_ipv6: bool,
     pub proxy_port: u16,
     pub api_port: u16,
@@ -14,6 +15,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             auto_start_kernel: false,
+            auto_start_app: false,
             prefer_ipv6: false,
             proxy_port: 12080,
             api_port: 12081,

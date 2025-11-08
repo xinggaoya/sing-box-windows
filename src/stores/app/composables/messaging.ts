@@ -1,12 +1,12 @@
 import { ref } from 'vue'
-import type { MessageApiInjection } from 'naive-ui'
+import type { MessageApi } from 'naive-ui/es/message'
 
 type MessageMethod = 'success' | 'error' | 'warning' | 'info'
 
 export function useAppMessaging() {
-  const instanceRef = ref<MessageApiInjection | null>(null)
+  const instanceRef = ref<MessageApi | null>(null)
 
-  const setMessageInstance = (instance: MessageApiInjection) => {
+  const setMessageInstance = (instance: MessageApi) => {
     instanceRef.value = instance
   }
 

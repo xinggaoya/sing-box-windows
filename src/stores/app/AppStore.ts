@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { enable, disable } from '@tauri-apps/plugin-autostart'
-import type { MessageApiInjection } from 'naive-ui'
+import type { MessageApi } from 'naive-ui/es/message'
 import { config as configApi, tauriApi } from '@/services/tauri'
 import { useAppMessaging } from './composables/messaging'
 import { createAppPersistence } from './composables/persistence'
@@ -14,7 +14,7 @@ export const useAppStore = defineStore(
   () => {
     const messaging = useAppMessaging()
 
-    const setMessageInstance = (instance: MessageApiInjection) => {
+    const setMessageInstance = (instance: MessageApi) => {
       messaging.setMessageInstance(instance)
     }
 
@@ -45,6 +45,9 @@ export const useAppStore = defineStore(
 
     const autoStartKernel = ref(false)
 
+    // 系统开机自启动设置
+    const autoStartApp = ref(false)
+
     // IP版本设置
     const preferIpv6 = ref(false)
 
@@ -68,6 +71,7 @@ export const useAppStore = defineStore(
     } = createAppPersistence({
       proxyMode,
       autoStartKernel,
+      autoStartApp,
       preferIpv6,
       proxyPort,
       apiPort,
@@ -83,29 +87,15 @@ export const useAppStore = defineStore(
         console.log('📋 AppStore 数据恢复完成，端口配置：', {
           proxyPort: proxyPort.value,
           apiPort: apiPort.value,
+          autoStartKernel: autoStartKernel.value,
         })
 
         await detectAutostartScenario()
 
         console.log('✅ AppStore初始化完成 - 使用数据库存储')
 
-        if (autoStartKernel.value) {
-          console.log('🚀 检测到自动启动内核设置，开始启动内核...')
-
-          if (isAutostartScenario.value) {
-            console.log('🕐 开机自启动场景，使用延迟启动')
-            await delayedKernelStart(10000)
-          } else {
-            console.log('🖥️ 正常启动场景，立即启动内核')
-            try {
-              const { useKernelStore } = await import('../kernel/KernelStore')
-              const kernelStore = useKernelStore()
-              await kernelStore.startKernel()
-            } catch (error) {
-              console.error('自动启动内核失败:', error)
-            }
-          }
-        }
+        // 注意：自动启动内核的逻辑现在由 App.vue 统一处理
+        // 这里只加载数据，不执行启动逻辑，避免重复
 
         await new Promise(resolve => setTimeout(resolve, 100))
       } finally {
@@ -250,6 +240,10 @@ export const useAppStore = defineStore(
           await disable()
         }
 
+        // 更新并持久化系统自启动状态
+        autoStartApp.value = enabled
+        await waitForSaveCompletion()
+
         // 注意：这里不应该改变 autoStartKernel，因为这是两个独立的设置
         // 系统开机自启 ≠ 启动内核
         // 只保存系统自启动状态，autoStartKernel 的值由用户单独控制
@@ -341,6 +335,7 @@ export const useAppStore = defineStore(
       trayInstanceId,
       proxyMode,
       autoStartKernel,
+      autoStartApp,
       preferIpv6,
       proxyPort,
       apiPort,

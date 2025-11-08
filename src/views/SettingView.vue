@@ -702,7 +702,22 @@ const updateMobileStatus = () => {
 }
 
 onMounted(async () => {
-  autoStart.value = await isEnabled()
+  // 从 AppStore 获取系统开机自启动状态
+  autoStart.value = appStore.autoStartApp
+  // 同时检查系统实际状态，确保一致性
+  try {
+    const systemAutoStart = await isEnabled()
+    if (autoStart.value !== systemAutoStart) {
+      console.warn('系统自启动状态不一致，更新AppStore状态', {
+        appStore: autoStart.value,
+        system: systemAutoStart
+      })
+      appStore.autoStartApp = systemAutoStart
+      autoStart.value = systemAutoStart
+    }
+  } catch (error) {
+    console.warn('检查系统自启动状态失败:', error)
+  }
 })
 
 // 检查更新状态

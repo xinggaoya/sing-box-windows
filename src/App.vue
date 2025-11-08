@@ -112,6 +112,10 @@ onMounted(async () => {
   })
 
   try {
+    // 0. 初始化 AppStore 以确保持久化数据已加载
+    console.log('📋 初始化 AppStore...')
+    await appStore.initializeStore()
+
     // 1. 注册消息实例
     const handleMessageReady = (message: unknown) => {
       appStore.setMessageInstance(message as ReturnType<typeof useMessage>)

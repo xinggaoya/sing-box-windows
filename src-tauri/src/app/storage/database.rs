@@ -39,6 +39,7 @@ impl DatabaseService {
             CREATE TABLE IF NOT EXISTS app_config (
                 id INTEGER PRIMARY KEY,
                 auto_start_kernel BOOLEAN DEFAULT FALSE,
+                auto_start_app BOOLEAN DEFAULT FALSE,
                 prefer_ipv6 BOOLEAN DEFAULT FALSE,
                 proxy_port INTEGER DEFAULT 12080,
                 api_port INTEGER DEFAULT 12081,
@@ -51,6 +52,17 @@ impl DatabaseService {
         )
         .execute(pool)
         .await?;
+
+        // 检查并添加 auto_start_app 字段（用于现有数据库的升级）
+        let add_column_query = r#"
+            ALTER TABLE app_config ADD COLUMN auto_start_app BOOLEAN DEFAULT FALSE
+        "#;
+
+        // 尝试添加新字段，如果字段已存在会失败，这是正常的
+        sqlx::query(add_column_query)
+            .execute(pool)
+            .await
+            .ok(); // 忽略错误，因为字段可能已经存在
         
         // 主题配置表
         sqlx::query(
@@ -141,6 +153,7 @@ impl DatabaseService {
         if let Some(row) = row {
             Ok(Some(AppConfig {
                 auto_start_kernel: row.get("auto_start_kernel"),
+                auto_start_app: row.get("auto_start_app"),
                 prefer_ipv6: row.get("prefer_ipv6"),
                 proxy_port: row.get("proxy_port"),
                 api_port: row.get("api_port"),
@@ -155,12 +168,13 @@ impl DatabaseService {
     pub async fn save_app_config(&self, config: &AppConfig) -> Result<(), StorageError> {
         sqlx::query(
             r#"
-            INSERT OR REPLACE INTO app_config 
-            (id, auto_start_kernel, prefer_ipv6, proxy_port, api_port, proxy_mode, tray_instance_id, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO app_config
+            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, tray_instance_id, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_start_kernel)
+        .bind(config.auto_start_app)
         .bind(config.prefer_ipv6)
         .bind(config.proxy_port)
         .bind(config.api_port)
@@ -169,7 +183,7 @@ impl DatabaseService {
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;
-        
+
         Ok(())
     }
     
