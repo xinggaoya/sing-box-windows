@@ -8,7 +8,12 @@
           <div class="header-brand">
             <div class="brand-logo" @click="onSelect('home')" data-tauri-drag-region="false">
               <div class="logo-container">
-                <img :src="logo" alt="App Logo" class="logo-image" :class="{ 'logo-active': appStore.isRunning }" />
+                <img
+                  :src="logo"
+                  alt="App Logo"
+                  class="logo-image"
+                  :class="{ 'logo-active': appStore.isRunning }"
+                />
               </div>
             </div>
             <div class="brand-info">
@@ -16,7 +21,9 @@
                 <h1 class="app-title">{{ t('common.appName') }}</h1>
                 <div class="status-badge" :class="statusClass">
                   <div class="status-dot"></div>
-                  <span class="status-text">{{ appStore.isRunning ? t('status.running') : t('status.stopped') }}</span>
+                  <span class="status-text">{{
+                    appStore.isRunning ? t('status.running') : t('status.stopped')
+                  }}</span>
                 </div>
               </div>
             </div>
@@ -26,17 +33,31 @@
           <div class="window-controls">
             <button class="window-btn minimize" @click="windowStore.minimizeWindow">
               <svg width="12" height="12" viewBox="0 0 12 12">
-                <rect x="2" y="5.5" width="8" height="1" rx="0.5" fill="currentColor"/>
+                <rect x="2" y="5.5" width="8" height="1" rx="0.5" fill="currentColor" />
               </svg>
             </button>
             <button class="window-btn maximize" @click="windowStore.toggleMaximize">
               <svg width="12" height="12" viewBox="0 0 12 12">
-                <rect x="2" y="2" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                <rect
+                  x="2"
+                  y="2"
+                  width="8"
+                  height="8"
+                  rx="1"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  fill="none"
+                />
               </svg>
             </button>
             <button class="window-btn close" @click="() => windowStore.hideWindow(router)">
               <svg width="12" height="12" viewBox="0 0 12 12">
-                <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path
+                  d="M3 3L9 9M9 3L3 9"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -79,7 +100,7 @@
                   <transition name="nav-text">
                     <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
                   </transition>
-                  </div>
+                </div>
               </div>
             </div>
 
@@ -178,7 +199,7 @@ import UpdateModal from '@/components/UpdateModal.vue'
 import logo from '@/assets/icon.png'
 
 defineOptions({
-  name: 'MainLayout'
+  name: 'MainLayout',
 })
 
 const router = useRouter()
@@ -219,7 +240,8 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => ({
     borderRadiusSmall: '8px',
     borderRadiusMedium: '10px',
     fontSize: '14px',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    fontFamily:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   },
   Layout: {
     headerHeight: '48px',
@@ -264,7 +286,7 @@ const currentMenu = computed(() => {
     '/setting': 'settings',
     '/connections': 'connections',
     '/proxy': 'proxy',
-    '/rules': 'rules'
+    '/rules': 'rules',
   }
 
   return pathToMenuMap[path] || path.slice(1)
@@ -276,6 +298,12 @@ const menuItems = computed(() => [
     label: t('nav.home'),
     key: 'home',
     icon: HomeOutline,
+    disabled: false,
+  },
+  {
+    label: t('nav.subscription'),
+    key: 'subscription',
+    icon: FolderOutline,
     disabled: false,
   },
   {
@@ -303,12 +331,6 @@ const menuItems = computed(() => [
     disabled: false,
   },
   {
-    label: t('nav.subscription'),
-    key: 'subscription',
-    icon: FolderOutline,
-    disabled: false,
-  },
-  {
     label: t('nav.settings'),
     key: 'settings',
     icon: SettingsOutline,
@@ -328,7 +350,7 @@ const onSelect = (key: string) => {
       settings: '/setting',
       connections: '/connections',
       proxy: '/proxy',
-      rules: '/rules'
+      rules: '/rules',
     }
     const routePath = routeMap[key] || `/${key}`
     router.push(routePath)
@@ -392,7 +414,8 @@ onUnmounted(() => {
 /* 现代化布局样式 */
 .modern-layout {
   background: v-bind('themeStore.isDark ? "#18181b" : "#f8fafc"');
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* 现代化顶部栏 */
@@ -400,7 +423,8 @@ onUnmounted(() => {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"');
-  border-bottom: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  border-bottom: 1px solid
+    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
   box-shadow: 0 1px 3px 0 v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.05)"');
   z-index: 1000;
 }
@@ -462,8 +486,15 @@ onUnmounted(() => {
 }
 
 @keyframes logo-glow {
-  0%, 100% { transform: scale(1); opacity: 0.3; }
-  50% { transform: scale(1.1); opacity: 0.1; }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.1;
+  }
 }
 
 .brand-info {
@@ -502,7 +533,9 @@ onUnmounted(() => {
 }
 
 .status-badge.status-stopped {
-  background: v-bind('themeStore.isDark ? "rgba(107, 114, 128, 0.15)" : "rgba(107, 114, 128, 0.1)"');
+  background: v-bind(
+    'themeStore.isDark ? "rgba(107, 114, 128, 0.15)" : "rgba(107, 114, 128, 0.1)"'
+  );
   color: #6b7280;
 }
 
@@ -518,8 +551,15 @@ onUnmounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.2); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.2);
+  }
 }
 
 .window-controls {
@@ -560,8 +600,11 @@ onUnmounted(() => {
 .modern-sider {
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
-  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"') !important;
-  border-right: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  background: v-bind(
+    'themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.8)"'
+  ) !important;
+  border-right: 1px solid
+    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
   box-shadow: 4px 0 24px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.03)"');
 }
 
@@ -662,14 +705,14 @@ onUnmounted(() => {
   flex: 1;
 }
 
-
 /* 底部工具区 */
 .tools-section {
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding-top: 16px;
-  border-top: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
+  border-top: 1px solid
+    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
 }
 
 .tool-group {
@@ -776,7 +819,6 @@ onUnmounted(() => {
   padding: 10px;
 }
 
-
 /* 响应式设计 */
 @media (max-width: 768px) {
   .modern-sider {
@@ -818,15 +860,21 @@ onUnmounted(() => {
 }
 
 :deep(.n-scrollbar-rail--scrollable) {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.04)"') !important;
+  background: v-bind(
+    'themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.04)"'
+  ) !important;
 }
 
 :deep(.n-scrollbar-bar) {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.2)" : "rgba(0, 0, 0, 0.2)"') !important;
+  background: v-bind(
+    'themeStore.isDark ? "rgba(255, 255, 255, 0.2)" : "rgba(0, 0, 0, 0.2)"'
+  ) !important;
   border-radius: 4px;
 }
 
 :deep(.n-scrollbar-bar:hover) {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"') !important;
+  background: v-bind(
+    'themeStore.isDark ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"'
+  ) !important;
 }
 </style>
