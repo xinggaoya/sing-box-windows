@@ -51,14 +51,15 @@
       "deb": {
         "depends": [
           "libwebkit2gtk-4.1-0",
-          "libssl3",
-          "libgtk-3-0",
+          "libssl3t64",
+          "libgtk-3-0t64",
           "librsvg2-2",
-          "pango1.0",
+          "libpango-1.0-0",
           "libcairo2",
-          "libgdk-pixbuf2.0-0",
-          "libglib2.0-0",
-          "libsoup2.4-1"
+          "libgdk-pixbuf-2.0-0",
+          "libglib2.0-0t64",
+          "libsoup-2.4-1",
+          "libayatana-appindicator3-1"
         ]
       }
     },
