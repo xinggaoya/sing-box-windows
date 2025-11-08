@@ -13,6 +13,7 @@ import { useKernelStore } from '@/stores'
 import { useWindowStore } from '@/stores/app/WindowStore'
 import { ProxyService } from '@/services/proxy-service'
 import i18n from '@/locales'
+import type { ProxyMode } from '@/types'
 import { useRouter } from 'vue-router'
 import { tauriApi } from '@/services/tauri'
 
@@ -37,7 +38,7 @@ export const useTrayStore = defineStore('tray', () => {
   const proxyService = ProxyService.getInstance()
 
   // 添加一个内部状态，记录上次菜单刷新时的代理模式
-  const lastProxyMode = ref<'system' | 'tun' | 'manual'>(appStore.proxyMode)
+  const lastProxyMode = ref<ProxyMode>(appStore.proxyMode)
 
   // 只存储托盘ID，不存储实例（与 AppStore 持久化字段保持同步）
   const trayInstanceId = ref<string | null>(appStore.trayInstanceId)
@@ -412,11 +413,12 @@ export const useTrayStore = defineStore('tray', () => {
       )
 
       registerWatcher(
-        () => appStore.proxyMode,
+        () => appStore.proxyMode as ProxyMode,
         (newMode) => {
-          console.log(`代理模式变更为: ${newMode}, 上次菜单模式: ${lastProxyMode.value}`)
+          const mode = newMode as unknown as ProxyMode
+          console.log(`代理模式变更为: ${mode}, 上次菜单模式: ${lastProxyMode.value}`)
           updateTrayTooltip()
-          if (newMode !== lastProxyMode.value) {
+          if (mode !== lastProxyMode.value) {
             console.log('模式已变化，强制刷新托盘菜单')
             refreshTrayMenu()
           }
