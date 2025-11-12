@@ -49,7 +49,6 @@ export default {
     start: '启动',
     stop: '停止',
     restart: '重启',
-    restartAsAdmin: '以管理员重启',
 
     // 状态信息
     startSuccess: '启动成功',

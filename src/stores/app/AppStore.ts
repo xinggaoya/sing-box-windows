@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { enable, disable } from '@tauri-apps/plugin-autostart'
+import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart'
 import type { MessageApi } from 'naive-ui/es/message'
 import { config as configApi, tauriApi } from '@/services/tauri'
 import { useAppMessaging } from './composables/messaging'
@@ -78,19 +78,56 @@ export const useAppStore = defineStore(
       trayInstanceId,
     })
 
+    // 同步开机自启设置与系统状态
+    const syncAutoStartWithSystem = async () => {
+      try {
+        // 检查系统实际的自启状态
+        const systemEnabled = await isEnabled()
+
+        console.log('🔍 系统自启状态检查:', {
+          databaseSetting: autoStartApp.value,
+          systemActual: systemEnabled,
+        })
+
+        // 如果数据库中设置为启用，但系统未注册，则重新注册
+        if (autoStartApp.value && !systemEnabled) {
+          console.log('⚠️ 检测到数据库自启设置为true但系统未注册，正在重新注册...')
+          await enable()
+          console.log('✅ 系统开机自启已重新注册')
+        }
+        // 如果数据库中设置为禁用，但系统已注册，则取消注册
+        else if (!autoStartApp.value && systemEnabled) {
+          console.log('⚠️ 检测到数据库自启设置为false但系统已注册，正在取消注册...')
+          await disable()
+          console.log('✅ 系统开机自启已取消注册')
+        }
+        // 两者一致，无需操作
+        else {
+          console.log('✅ 数据库设置与系统状态一致，无需同步')
+        }
+      } catch (error) {
+        console.error('同步开机自启状态失败:', error)
+        // 不抛出错误，避免影响应用正常启动
+      }
+    }
+
     // Store初始化方法
     const initializeStore = async () => {
       startInitialization()
 
       try {
         await loadFromBackend()
-        console.log('📋 AppStore 数据恢复完成，端口配置：', {
+        console.log('📋 AppStore 数据恢复完成，配置：', {
           proxyPort: proxyPort.value,
           apiPort: apiPort.value,
           autoStartKernel: autoStartKernel.value,
+          autoStartApp: autoStartApp.value,
         })
 
         await detectAutostartScenario()
+
+        // 同步开机自启设置与系统状态（修复更新后设置丢失的问题）
+        await syncAutoStartWithSystem()
 
         console.log('✅ AppStore初始化完成 - 使用数据库存储')
 
@@ -140,27 +177,87 @@ export const useAppStore = defineStore(
       }
     }
 
-    // 延迟启动内核（用于开机自启动场景）
-    const delayedKernelStart = async (delayMs: number = 10000): Promise<boolean> => {
-      console.log(`⏰ 开机自启动场景，延迟${delayMs/1000}秒后启动内核...`)
-      
-      return new Promise((resolve) => {
-        autostartDelayTimer = setTimeout(async () => {
-          try {
-            console.log('🚀 延迟时间到，开始启动内核...')
-            // 动态导入避免循环依赖
-            const { useKernelStore } = await import('../kernel/KernelStore')
-            const kernelStore = useKernelStore()
-            const result = await kernelStore.startKernel()
-            resolve(result)
-          } catch (error) {
-            console.error('延迟启动内核失败:', error)
-            resolve(false)
-          } finally {
-            autostartDelayTimer = null
+    // 检查网络连接状态
+    const checkNetworkReady = async (timeoutMs: number = 5000): Promise<boolean> => {
+      try {
+        console.log('🌐 检查网络连接状态...')
+        // 尝试访问一个可靠的地址来检查网络
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+        try {
+          // 使用 fetch 检查网络连接，优先使用轻量级请求
+          const response = await fetch('https://1.1.1.1', {
+            method: 'HEAD',
+            mode: 'no-cors',
+            signal: controller.signal,
+          })
+          clearTimeout(timeoutId)
+          console.log('✅ 网络连接正常')
+          return true
+        } catch (networkError) {
+          clearTimeout(timeoutId)
+          // 即使外部网络不可达，本地网络可能已就绪
+          console.log('⚠️ 外部网络不可达，但可能本地网络已就绪')
+          return true
+        }
+      } catch (error) {
+        console.warn('网络检查失败:', error)
+        // 默认返回 true，避免网络检查失败影响内核启动
+        return true
+      }
+    }
+
+    // 延迟启动内核（用于开机自启动场景，支持重试）
+    const delayedKernelStart = async (
+      delayMs: number = 20000,
+      maxRetries: number = 3
+    ): Promise<boolean> => {
+      console.log(`⏰ 开机自启动场景，首次延迟${delayMs/1000}秒后启动内核（最多${maxRetries}次尝试）...`)
+
+      // 首次延迟
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+
+      // 检查网络连接
+      const networkReady = await checkNetworkReady()
+      if (!networkReady) {
+        console.warn('⚠️ 网络未就绪，可能无法成功启动内核')
+      }
+
+      // 尝试启动内核（带重试机制）
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🚀 第 ${attempt}/${maxRetries} 次尝试启动内核...`)
+
+          // 动态导入避免循环依赖
+          const { useKernelStore } = await import('../kernel/KernelStore')
+          const kernelStore = useKernelStore()
+
+          // 等待应用Store数据完全恢复
+          await waitForDataRestore(5000)
+
+          const result = await kernelStore.startKernel()
+
+          if (result) {
+            console.log(`✅ 第 ${attempt} 次尝试成功启动内核！`)
+            return true
+          } else {
+            throw new Error(kernelStore.lastError || '内核启动返回false')
           }
-        }, delayMs)
-      })
+        } catch (error) {
+          console.error(`❌ 第 ${attempt} 次尝试失败:`, error)
+
+          // 如果不是最后一次尝试，等待后重试
+          if (attempt < maxRetries) {
+            const retryDelay = delayMs * attempt // 递增延迟：20s, 40s, 60s
+            console.log(`⏳ ${retryDelay/1000} 秒后进行第 ${attempt + 1} 次尝试...`)
+            await new Promise(resolve => setTimeout(resolve, retryDelay))
+          }
+        }
+      }
+
+      console.error(`❌ 经过 ${maxRetries} 次尝试后，内核启动仍然失败`)
+      return false
     }
 
     // Store清理方法
@@ -362,6 +459,8 @@ export const useAppStore = defineStore(
       waitForDataRestore,
       detectAutostartScenario,
       delayedKernelStart,
+      syncAutoStartWithSystem,
+      checkNetworkReady,
       loadFromBackend,
       saveToBackend,
     }

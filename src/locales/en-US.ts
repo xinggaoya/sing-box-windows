@@ -49,7 +49,6 @@ export default {
     start: 'Start',
     stop: 'Stop',
     restart: 'Restart',
-    restartAsAdmin: 'Restart as Admin',
 
     // Status messages
     startSuccess: 'Started successfully',

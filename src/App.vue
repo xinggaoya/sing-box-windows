@@ -203,29 +203,44 @@ async function checkInitialWindowState() {
   }
 }
 
-// 简化的内核自动启动函数（增强版本，支持开机自启动检测）
+// 增强的内核自动启动函数（支持开机自启动检测和重试机制）
 async function startKernelWithRetry() {
   console.log('🚀 检测到自动启动内核设置，开始启动...')
 
   try {
     // 检测是否是开机自启动场景
     if (appStore.isAutostartScenario) {
-      console.log('🕐 检测到开机自启动场景，使用延迟启动策略')
-      
-      // 开机自启动场景：延迟10-15秒让系统完全就绪
-      const delay = 10000 + Math.random() * 5000 // 10-15秒随机延迟
-      const success = await appStore.delayedKernelStart(delay)
-      
+      console.log('🕐 检测到开机自启动场景，使用增强的延迟启动策略')
+
+      // 开机自启动场景：使用增强的延迟启动（20秒延迟 + 最多3次重试）
+      const success = await appStore.delayedKernelStart(20000, 3)
+
       if (success) {
-        console.log('✅ 开机自启动延迟启动内核成功！')
+        console.log('✅ 开机自启动成功启动内核！')
         return
       } else {
-        console.warn('⚠️ 开机自启动延迟启动失败，尝试正常启动流程')
-      }
-    }
+        console.error('❌ 开机自启动经过3次尝试后仍然失败')
 
-    // 正常启动流程
-    await normalKernelStart()
+        // 发送失败通知给用户
+        try {
+          const { isEnabled } = await import('@tauri-apps/plugin-autostart')
+          const enabled = await isEnabled()
+
+          mitt.emit('notification', {
+            type: 'warning',
+            title: '内核自动启动失败',
+            content: '开机自启动时内核启动失败，请手动启动或检查配置',
+            duration: 0, // 不自动关闭
+          })
+        } catch (notifyError) {
+          console.warn('发送通知失败:', notifyError)
+        }
+      }
+    } else {
+      // 正常启动流程（非开机自启动场景）
+      console.log('🖥️ 正常启动场景，直接使用标准启动流程')
+      await normalKernelStart()
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('❌ 内核自动启动失败:', errorMessage)
@@ -235,6 +250,18 @@ async function startKernelWithRetry() {
 
     // 提示用户可以手动启动
     console.log('💡 提示：您可以在主页手动启动内核')
+
+    // 发送错误通知
+    try {
+      mitt.emit('notification', {
+        type: 'error',
+        title: '内核启动失败',
+        content: `自动启动失败: ${errorMessage}`,
+        duration: 5000,
+      })
+    } catch (notifyError) {
+      console.warn('发送通知失败:', notifyError)
+    }
   }
 }
 
