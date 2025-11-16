@@ -121,6 +121,12 @@ export default {
 
     // 切换模式
     switchMode: '切换模式',
+
+    tunConfirm: {
+      title: '需要管理员权限',
+      description: '切换到 TUN 模式需要以管理员权限重启应用，是否立即以管理员身份重启？',
+      confirm: '以管理员身份重启',
+    },
   },
 
   // 代理页面

@@ -122,6 +122,12 @@ export default {
 
     // 切换模式
     switchMode: 'モード切り替え',
+
+    tunConfirm: {
+      title: '管理者権限が必要です',
+      description: 'TUN モードに切り替えるにはアプリを管理者権限で再起動する必要があります。今すぐ管理者として再起動しますか？',
+      confirm: '管理者として再起動',
+    },
   },
 
   // 代理页面

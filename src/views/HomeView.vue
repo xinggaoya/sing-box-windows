@@ -262,6 +262,7 @@ import {
   NTag,
   NSpin,
   NTooltip,
+  useDialog,
   useMessage
 } from 'naive-ui'
 import {
@@ -293,6 +294,7 @@ import { useThemeStore } from '@/stores/app/ThemeStore'
 import { kernelApi } from '@/services/tauri'
 import { formatBandwidth } from '@/utils'
 import TrafficStatsCard from '@/components/home/TrafficStatsCard.vue'
+import type { ProxyMode } from '@/stores/app/AppStore'
 
 defineOptions({
   name: 'HomeView'
@@ -302,6 +304,7 @@ const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 const message = useMessage()
+const dialog = useDialog()
 
 // Store实例
 const appStore = useAppStore()
@@ -497,19 +500,55 @@ const restartAsAdmin = async () => {
   }
 }
 
-// 切换代理模式
-const onModeChange = async (mode: string) => {
-  if (appStore.proxyMode === mode || isStarting.value || isStopping.value) return
-
+// 切换代理模式并在必要时重启内核
+const switchProxyModeAndRefreshKernel = async (mode: ProxyMode) => {
   try {
-    const result = await kernelApi.switchProxyMode(mode as 'system' | 'tun' | 'manual')
+    const result = await kernelApi.switchProxyMode(mode)
     console.log('代理模式切换结果:', result)
-    appStore.setProxyMode(mode as any)
+    await appStore.setProxyMode(mode)
     message.success(t('notification.proxyModeChanged'))
+
+    if (appStore.isRunning) {
+      console.log('检测到内核正在运行，自动重启以应用新的代理模式')
+      await restartKernel()
+    }
+
+    return true
   } catch (error) {
     console.error('切换代理模式失败:', error)
     message.error(t('notification.proxyModeChangeFailed'))
+    return false
   }
+}
+
+// 切换代理模式
+const onModeChange = async (mode: ProxyMode) => {
+  if (appStore.proxyMode === mode || isStarting.value || isStopping.value) return
+
+  const handleModeChange = () => switchProxyModeAndRefreshKernel(mode)
+
+  if (mode === 'tun') {
+    dialog.warning({
+      title: t('home.tunConfirm.title'),
+      content: t('home.tunConfirm.description'),
+      positiveText: t('home.tunConfirm.confirm'),
+      negativeText: t('common.cancel'),
+      maskClosable: false,
+      onPositiveClick: async () => {
+        const success = await handleModeChange()
+        if (!success) return false
+
+        if (!isAdmin.value) {
+          await restartAsAdmin()
+        }
+
+        return true
+      },
+    })
+    return
+  }
+
+  await handleModeChange()
 }
 
 // 切换节点代理模式

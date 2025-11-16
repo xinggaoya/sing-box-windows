@@ -121,6 +121,12 @@ export default {
 
     // Switch mode
     switchMode: 'Switch Mode',
+
+    tunConfirm: {
+      title: 'Administrator permission required',
+      description: 'TUN mode needs the app to restart with administrator privileges. Restart as admin now?',
+      confirm: 'Restart as admin',
+    },
   },
 
   // Proxy page
