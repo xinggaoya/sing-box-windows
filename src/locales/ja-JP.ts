@@ -158,6 +158,12 @@ export default {
     checkConfigOrRefresh: '設定ファイルを確認するかページを更新してください',
     currentLabel: '現在のノード:',
     switchSuccess: 'グループ「{group}」を「{proxy}」に切り替えました。',
+    dashboard: {
+      groupTotal: 'グループ',
+      nodeTotal: 'ノード',
+      expanded: '展開済み',
+      testing: 'テスト中',
+    },
   },
 
   // 连接页面

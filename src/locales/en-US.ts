@@ -157,6 +157,12 @@ export default {
     checkConfigOrRefresh: 'Please check configuration file or refresh page',
     currentLabel: 'Current node:',
     switchSuccess: 'Switched group \'{group}\' to \'{proxy}\'.',
+    dashboard: {
+      groupTotal: 'Groups',
+      nodeTotal: 'Nodes',
+      expanded: 'Expanded',
+      testing: 'Testing',
+    },
   },
 
   // Connections page

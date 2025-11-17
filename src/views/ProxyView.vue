@@ -1,39 +1,55 @@
 <template>
-  <div class="modern-proxy">
-    <!-- 工具栏区域 -->
-    <div class="toolbar-section">
-      <n-card class="toolbar-card" :bordered="false">
-        <div class="toolbar-content">
-          <div class="toolbar-left">
-            <div class="toolbar-icon">
-              <n-icon size="20"><SwapHorizontalOutline /></n-icon>
-            </div>
-            <div class="toolbar-info">
-              <h2 class="toolbar-title">{{ t('proxy.title') }}</h2>
-              <p class="toolbar-subtitle">{{ proxyGroups.length }} {{ t('proxy.nodeCount') }}</p>
-            </div>
+  <div class="page-shell proxy-page" :style="pageThemeStyle">
+    <section class="page-hero">
+      <div class="hero-row">
+        <div class="hero-left">
+          <div class="hero-icon">
+            <n-icon size="28">
+              <SwapHorizontalOutline />
+            </n-icon>
           </div>
-
-          <div class="toolbar-actions">
-            <n-button
-              @click="init"
-              :loading="isLoading"
-              type="primary"
-              size="medium"
-              class="refresh-btn"
-            >
-              <template #icon>
-                <n-icon size="16"><RefreshOutline /></n-icon>
-              </template>
-              {{ t('common.refresh') }}
-            </n-button>
+          <div class="hero-meta">
+            <p class="hero-subtitle">{{ t('proxy.subtitle') }}</p>
+            <h2 class="hero-title">{{ t('proxy.title') }}</h2>
           </div>
         </div>
-      </n-card>
-    </div>
+        <div class="hero-actions">
+          <n-button
+            @click="init"
+            :loading="isLoading"
+            type="primary"
+            size="large"
+          >
+            <template #icon>
+              <n-icon size="18">
+                <RefreshOutline />
+              </n-icon>
+            </template>
+            {{ t('common.refresh') }}
+          </n-button>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div
+          v-for="stat in proxyStats"
+          :key="stat.label"
+          class="stat-card"
+          :data-accent="stat.accent"
+        >
+          <div class="stat-icon">
+            <n-icon :size="20">
+              <component :is="stat.icon" />
+            </n-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ stat.value }}</div>
+            <div class="stat-label">{{ stat.label }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <!-- 主内容区域 -->
-    <div class="content-section">
+    <section class="page-section">
       <n-spin :show="isLoading" class="loading-container">
         <template #description>
           <span class="loading-text">{{ t('proxy.loadingInfo') }}</span>
@@ -146,7 +162,7 @@
           </div>
         </div>
       </n-spin>
-    </div>
+    </section>
   </div>
 </template>
 
@@ -167,6 +183,7 @@ import { listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
 import { useThemeStore } from '@/stores/app/ThemeStore'
+import { usePageTheme } from '@/composables/usePageTheme'
 
 // 接口定义
 interface ProxyHistory {
@@ -207,6 +224,7 @@ const { width } = useWindowSize()
 const { t } = useI18n()
 const appStore = useAppStore()
 const themeStore = useThemeStore()
+const pageThemeStyle = usePageTheme(themeStore)
 
 // 代理数据
 const rawProxies = ref<Record<string, ProxyData>>({})
@@ -242,6 +260,40 @@ const gridCols = computed(() => {
   if (width.value < 1280) return 3
   if (width.value < 1600) return 4
   return 5
+})
+
+const proxyStats = computed(() => {
+  const groups = proxyGroups.value
+  const totalNodes = groups.reduce((sum, group) => sum + (group.all?.length ?? 0), 0)
+  const expanded = expandedGroups.value.length
+  const testingCount = Object.values(testingNodes).filter(Boolean).length
+
+  return [
+    {
+      label: t('proxy.dashboard.groupTotal'),
+      value: groups.length,
+      icon: SwapHorizontalOutline,
+      accent: 'purple',
+    },
+    {
+      label: t('proxy.dashboard.nodeTotal'),
+      value: totalNodes,
+      icon: GlobeOutline,
+      accent: 'blue',
+    },
+    {
+      label: t('proxy.dashboard.expanded'),
+      value: expanded,
+      icon: ChevronDownOutline,
+      accent: 'amber',
+    },
+    {
+      label: t('proxy.dashboard.testing'),
+      value: testingCount,
+      icon: SpeedometerOutline,
+      accent: 'pink',
+    },
+  ]
 })
 
 // 生命周期钩子
@@ -429,519 +481,255 @@ const changeProxy = async (group: string, proxy: string) => {
 </script>
 
 <style scoped>
-.modern-proxy {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  min-height: 100%;
-  animation: fadeIn 0.4s ease-out;
+.proxy-page {
+  animation: fadeIn 0.4s ease both;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* 工具栏区域 */
-.toolbar-section {
-  margin-bottom: 4px;
-}
-
-.toolbar-card {
-  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
-  backdrop-filter: blur(12px) saturate(180%);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
-  transition: all 0.3s ease;
-}
-
-.toolbar-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.08)"');
-}
-
-.toolbar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 4px;
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex: 1;
-}
-
-.toolbar-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #5b4cfd, #7c3aed);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(91, 76, 253, 0.3);
-}
-
-.toolbar-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.toolbar-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--n-text-color-1);
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-
-.toolbar-subtitle {
-  font-size: 13px;
-  color: var(--n-text-color-3);
-  margin: 0;
-}
-
-.toolbar-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.refresh-btn {
-  min-width: 100px;
-  height: 40px;
-  font-weight: 600;
-  border-radius: 10px;
-}
-
-/* 主内容区域 */
-.content-section {
-  flex: 1;
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .loading-container {
-  min-height: 300px;
+  min-height: 320px;
 }
 
 .loading-text {
-  color: var(--n-text-color-3);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
-/* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 16px;
-  text-align: center;
-  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
-  backdrop-filter: blur(12px) saturate(180%);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
-  border-radius: 16px;
-  margin: 0 4px;
-}
-
-.empty-icon {
-  color: var(--n-text-color-disabled);
-  margin-bottom: 12px;
-  opacity: 0.6;
-}
-
-.empty-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--n-text-color-1);
-  margin: 0 0 8px 0;
-}
-
-.empty-description {
-  font-size: 14px;
-  color: var(--n-text-color-3);
-  margin: 0 0 24px 0;
-  line-height: 1.5;
-  max-width: 300px;
-}
-
-/* 代理组列表 */
 .proxy-groups {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .proxy-group {
-  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
-  backdrop-filter: blur(12px) saturate(180%);
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
-  border-radius: 16px;
+  border-radius: 28px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
   overflow: hidden;
-  transition: all 0.3s ease;
 }
 
-.proxy-group:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.08)"');
-}
-
-/* 组头部 */
 .group-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
+  gap: 16px;
+  padding: 22px 28px;
   cursor: pointer;
-  user-select: none;
-  transition: all 0.2s ease;
+  border-bottom: 1px solid var(--divider-color);
+  transition: background 0.2s ease;
 }
 
 .group-header:hover {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.03)"');
+  background: rgba(91, 76, 253, 0.08);
 }
 
 .group-info {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
+  flex: 1;
 }
 
 .group-main {
   display: flex;
-  align-items: center;
-  gap: 12px;
   flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
 }
 
 .group-name {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--n-text-color-1);
   margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .group-badges {
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .group-current {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.current-label {
-  font-size: 13px;
-  color: var(--n-text-color-3);
-  font-weight: 500;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
 }
 
 .group-actions {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.test-btn {
-  height: 32px;
-  min-width: 80px;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: 8px;
+  flex-wrap: wrap;
 }
 
 .expand-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--chip-bg);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
-  transition: all 0.2s ease;
-  color: var(--n-text-color-2);
+  transition: transform 0.25s ease;
 }
 
 .expand-icon.expanded {
   transform: rotate(180deg);
 }
 
-.expand-icon:hover {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)"');
-  color: var(--n-text-color-1);
-}
-
-/* 节点容器 */
 .nodes-container {
-  padding: 0 16px 16px;
+  padding: 24px 28px 32px;
 }
 
 .nodes-grid {
   display: grid;
-  grid-template-columns: repeat(var(--grid-columns), 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(var(--grid-columns, 4), minmax(0, 1fr));
+  gap: 14px;
 }
 
-/* 节点卡片 */
 .node-card {
   position: relative;
-  background: v-bind('themeStore.isDark ? "rgba(17, 24, 39, 0.6)" : "rgba(255, 255, 255, 0.8)"');
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
-  border-radius: 12px;
-  padding: 16px;
-  min-height: 72px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  border-radius: 20px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
   display: flex;
+  gap: 14px;
   align-items: center;
-  gap: 12px;
-  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .node-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.08)"');
-  border-color: #5b4cfd;
+  box-shadow: 0 25px 40px rgba(15, 23, 42, 0.12);
 }
 
 .node-card.node-active {
-  background: v-bind('themeStore.isDark ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.1)"');
   border-color: #10b981;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.22));
 }
 
 .node-card.node-testing {
-  background: v-bind('themeStore.isDark ? "rgba(59, 130, 246, 0.15)" : "rgba(59, 130, 246, 0.1)"');
-  border-color: #3b82f6;
+  border-color: #6366f1;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(59, 130, 246, 0.18));
 }
 
-/* 节点状态指示器 */
 .node-status {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  background: var(--chip-bg);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.2s ease;
 }
 
 .node-status.success {
-  background: rgba(34, 197, 94, 0.2);
-  color: #10b981;
+  background: rgba(16, 185, 129, 0.18);
+  color: #059669;
 }
 
 .node-status.info {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.18);
   color: #2563eb;
 }
 
 .node-status.warning {
-  background: rgba(245, 158, 11, 0.2);
-  color: #d97706;
+  background: rgba(251, 191, 36, 0.2);
+  color: #b45309;
 }
 
 .node-status.error {
-  background: rgba(239, 68, 68, 0.2);
+  background: rgba(248, 113, 113, 0.2);
   color: #dc2626;
 }
 
-.node-status.default {
-  background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"');
-  color: var(--n-text-color-3);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* 节点信息 */
 .node-info {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 .node-name {
-  font-size: 14px;
+  margin: 0;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--n-text-color-1);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.3;
 }
 
 .node-delay {
-  cursor: pointer;
-  transition: all 0.15s ease;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
-.node-delay:hover {
-  transform: scale(1.05);
-}
-
-.delay-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--n-text-color-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 活跃指示线 */
 .active-indicator {
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(180deg, #10b981, #059669);
-  border-radius: 0 2px 2px 0;
+  inset: 0;
+  border-radius: 20px;
+  border: 1px solid rgba(16, 185, 129, 0.6);
+  pointer-events: none;
 }
 
-/* 动画 */
 .group-expand-enter-active,
 .group-expand-leave-active {
-  transition: all 0.3s ease;
   overflow: hidden;
+  transition: all 0.3s ease;
 }
 
 .group-expand-enter-from,
 .group-expand-leave-to {
-  max-height: 0;
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-12px);
 }
 
-.group-expand-enter-to,
-.group-expand-leave-from {
-  max-height: 1000px;
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* 响应式设计 */
 @media (max-width: 1024px) {
-  .nodes-grid {
-    gap: 10px;
+  .group-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
-  .node-card {
-    min-height: 68px;
-    padding: 14px;
+  .group-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 
 @media (max-width: 768px) {
-  .modern-proxy {
-    gap: 16px;
-  }
-
-  .toolbar-content {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-  }
-
-  .toolbar-left {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .group-header {
-    padding: 16px;
-  }
-
-  .group-main {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .group-current {
-    align-self: flex-start;
-  }
-
-  .nodes-container {
-    padding: 0 16px 16px;
-  }
-
   .nodes-grid {
-    gap: 8px;
-  }
-
-  .node-card {
-    min-height: 64px;
-    padding: 12px;
-  }
-
-  .node-name {
-    font-size: 13px;
-  }
-
-  .delay-value {
-    font-size: 11px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
+  .nodes-container {
+    padding: 18px;
+  }
+
   .group-actions {
-    gap: 8px;
-  }
-
-  .test-btn {
-    min-width: 70px;
-    font-size: 12px;
-  }
-
-  .expand-icon {
-    width: 28px;
-    height: 28px;
-  }
-
-  .node-card {
-    min-height: 60px;
-    padding: 10px;
-  }
-
-  .node-status {
-    width: 20px;
-    height: 20px;
-  }
-
-  .node-name {
-    font-size: 12px;
-  }
-
-  .delay-value {
-    font-size: 10px;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
-
-/* 移除 Naive UI 组件内部样式覆盖，使用官方主题系统 */
 </style>

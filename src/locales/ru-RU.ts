@@ -158,6 +158,12 @@ export default {
     checkConfigOrRefresh: 'Пожалуйста проверьте файл конфигурации или обновите страницу',
     currentLabel: 'Текущий узел:',
     switchSuccess: 'Группа \'{group}\' переключена на \'{proxy}\'.',
+    dashboard: {
+      groupTotal: 'Группы',
+      nodeTotal: 'Узлы',
+      expanded: 'Развернуты',
+      testing: 'Тестируется',
+    },
   },
 
   // 连接页面

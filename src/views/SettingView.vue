@@ -1,33 +1,41 @@
 <template>
-  <div class="settings-container">
-    <!-- 页面标题区域 -->
-    <div class="page-header">
-      <div class="header-content">
-        <div class="header-left">
-          <div class="header-icon">
-            <n-icon size="24">
+  <div class="page-shell settings-container" :style="pageThemeStyle">
+    <section class="page-hero">
+      <div class="hero-row">
+        <div class="hero-left">
+          <div class="hero-icon">
+            <n-icon size="26">
               <SettingsOutline />
             </n-icon>
           </div>
-          <div class="header-info">
-            <h1 class="page-title">{{ t('setting.title') }}</h1>
-            <p class="page-subtitle">{{ t('setting.subtitle') }}</p>
-          </div>
-        </div>
-        <div class="header-right">
-          <div class="version-badge">
-            <span class="version-label">{{ t('setting.appVersion') }} {{ updateStore.appVersion }}</span>
-            <span class="version-separator">•</span>
-            <span class="version-label">{{ t('setting.kernelVersion') }} {{
-              kernelStore.hasVersionInfo() ? formatVersion(kernelStore.getVersionString()) : t('setting.notInstalled')
-            }}</span>
+          <div class="hero-meta">
+            <p class="hero-subtitle">{{ t('setting.subtitle') }}</p>
+            <h2 class="hero-title">{{ t('setting.title') }}</h2>
           </div>
         </div>
       </div>
-    </div>
+      <div class="hero-stats">
+        <div
+          v-for="stat in settingStats"
+          :key="stat.label"
+          class="stat-card"
+          :data-accent="stat.accent"
+        >
+          <div class="stat-icon">
+            <n-icon :size="20">
+              <component :is="stat.icon" />
+            </n-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ stat.value }}</div>
+            <div class="stat-label">{{ stat.label }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- 设置内容区域 -->
-    <div class="settings-content">
+    <section class="page-section settings-content">
       <n-grid
         :cols="24"
         :x-gap="12"
@@ -673,7 +681,7 @@
           </n-card>
         </n-grid-item>
       </n-grid>
-    </div>
+    </section>
 
     <!-- 端口设置对话框 -->
     <n-modal
@@ -734,6 +742,7 @@ import { useAppStore } from '@/stores/app/AppStore'
 import { useUpdateStore } from '@/stores/app/UpdateStore'
 import { useLocaleStore } from '@/stores/app/LocaleStore'
 import { useThemeStore } from '@/stores/app/ThemeStore'
+import { usePageTheme } from '@/composables/usePageTheme'
 import type { Locale } from '@/stores/app/LocaleStore'
 import { useRouter } from 'vue-router'
 import {
@@ -773,6 +782,7 @@ const kernelStore = useKernelStore()
 const updateStore = useUpdateStore()
 const localeStore = useLocaleStore()
 const themeStore = useThemeStore()
+const pageThemeStyle = usePageTheme(themeStore)
 const autoStart = ref(false)
 const router = useRouter()
 const loading = ref(false)
@@ -790,6 +800,45 @@ const proxyAdvancedForm = reactive({
   tunStrictRoute: appStore.tunStrictRoute,
   tunStack: appStore.tunStack,
 })
+
+// 格式化版本号，只显示纯版本号部分
+const formatVersion = (version: string) => {
+  if (!version) return ''
+
+  const versionRegex = /\d+\.\d+\.\d+(?:-[\w.]+)?/
+  const match = version.match(versionRegex)
+
+  if (match) {
+    return match[0]
+  }
+
+  if (version.startsWith('sing-box version ')) {
+    return version.split(' ')[2]
+  }
+
+  if (version.includes(' ')) {
+    return version.split(' ')[0]
+  }
+
+  return version
+}
+
+const settingStats = computed(() => [
+  {
+    label: t('setting.appVersion'),
+    value: updateStore.appVersion,
+    icon: SettingsOutline,
+    accent: 'purple',
+  },
+  {
+    label: t('setting.kernelVersion'),
+    value: kernelStore.hasVersionInfo()
+      ? formatVersion(kernelStore.getVersionString())
+      : t('setting.notInstalled'),
+    icon: DownloadOutline,
+    accent: 'blue',
+  },
+])
 
 const tunStackOptions = computed(() => [
   { label: t('setting.proxyAdvanced.stackOptions.system'), value: 'system' },
@@ -936,31 +985,6 @@ const handleSkipVersion = async () => {
   } catch (error) {
     message.error(t('setting.update.skipError', { error: String(error) }))
   }
-}
-
-// 格式化版本号，只显示纯版本号部分
-const formatVersion = (version: string) => {
-  if (!version) return ''
-
-  // 使用正则表达式提取版本号
-  const versionRegex = /\d+\.\d+\.\d+(?:-[\w.]+)?/
-  const match = version.match(versionRegex)
-
-  if (match) {
-    return match[0]
-  }
-
-  // 如果没有匹配到版本号格式，则使用原始的处理方式
-  if (version.startsWith('sing-box version ')) {
-    return version.split(' ')[2]
-  }
-
-  // 如果包含空格，只取第一部分（通常是版本号）
-  if (version.includes(' ')) {
-    return version.split(' ')[0]
-  }
-
-  return version
 }
 
 const hasNewVersion = computed(() => {
@@ -1423,104 +1447,9 @@ onUnmounted(() => {
 
 <style scoped>
 .settings-container {
-  padding: 16px;
+  padding: 0;
   background: transparent;
-  min-height: 100vh;
   animation: fadeInUp 0.4s ease-out;
-}
-
-/* 页面标题区域 */
-.page-header {
-  margin-bottom: 24px;
-  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-radius: 16px;
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"');
-  box-shadow: 0 4px 20px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.1)" : "rgba(0, 0, 0, 0.03)"');
-  padding: 16px 20px;
-  transition: all 0.3s ease;
-}
-
-.page-header:hover {
-  box-shadow: 0 8px 32px v-bind('themeStore.isDark ? "rgba(0, 0, 0, 0.15)" : "rgba(0, 0, 0, 0.08)"');
-}
-
-.header-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.header-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #5b4cfd 0%, #7c3aed 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  box-shadow: 0 8px 24px rgba(91, 76, 253, 0.3);
-  transition: all 0.3s ease;
-}
-
-.header-icon:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(91, 76, 253, 0.4);
-}
-
-.header-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.page-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: v-bind('themeStore.isDark ? "#f8fafc" : "#1e293b"');
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-
-.page-subtitle {
-  font-size: 0.9rem;
-  color: v-bind('themeStore.isDark ? "#94a3b8" : "#64748b"');
-  margin: 0;
-  font-weight: 400;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-}
-
-.version-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: v-bind('themeStore.isDark ? "rgba(91, 76, 253, 0.1)" : "rgba(91, 76, 253, 0.05)"');
-  border-radius: 20px;
-  border: 1px solid v-bind('themeStore.isDark ? "rgba(91, 76, 253, 0.2)" : "rgba(91, 76, 253, 0.1)"');
-}
-
-.version-label {
-  font-size: 0.8rem;
-  color: v-bind('themeStore.isDark ? "#a5b4fc" : "#6366f1"');
-  font-weight: 500;
-}
-
-.version-separator {
-  color: v-bind('themeStore.isDark ? "#6b7280" : "#9ca3af"');
-  font-weight: 300;
 }
 
 /* 设置内容区域 */
