@@ -1644,10 +1644,7 @@ onUnmounted(() => {
   color: #7c3aed;
 }
 
-/* 模态框样式 */
-:deep(.n-modal) {
-  border-radius: 16px;
-}
+/* 移除 Naive UI 模态框样式覆盖 */
 
 .port-settings-form {
   padding: 16px 0;
@@ -1857,18 +1854,5 @@ onUnmounted(() => {
   }
 }
 
-/* 深色主题优化 */
-:deep(.n-card) {
-  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-}
-
-:deep(.n-card .n-card-header) {
-  padding: 0;
-}
-
-:deep(.n-card .n-card-body) {
-  padding: 0;
-}
+/* 移除 Naive UI 组件内部样式覆盖，使用官方主题系统 */
 </style>

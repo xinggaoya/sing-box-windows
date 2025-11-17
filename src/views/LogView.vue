@@ -910,28 +910,7 @@ onUnmounted(() => {
   background: v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"');
 }
 
-/* Naive UI 组件优化 */
-:deep(.n-input) {
-  border-radius: 10px;
-}
-
-:deep(.n-base-selection) {
-  border-radius: 10px;
-}
-
-:deep(.n-tag) {
-  border-radius: 6px;
-  font-weight: 500;
-}
-
-:deep(.n-button) {
-  border-radius: 8px;
-  font-weight: 500;
-}
-
-:deep(.n-switch) {
-  font-weight: 500;
-}
+/* 移除 Naive UI 组件内部样式覆盖，使用官方主题系统 */
 
 /* 高亮样式 */
 mark {

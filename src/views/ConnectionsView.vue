@@ -962,21 +962,5 @@ onUnmounted(() => {
   }
 }
 
-/* Naive UI 组件优化 */
-:deep(.n-spin-container) {
-  min-height: 200px;
-}
-
-:deep(.n-input) {
-  border-radius: 10px;
-}
-
-:deep(.n-base-selection) {
-  border-radius: 10px;
-}
-
-:deep(.n-tag) {
-  border-radius: 6px;
-  font-weight: 500;
-}
+/* 移除 Naive UI 组件内部样式覆盖，使用官方主题系统 */
 </style>

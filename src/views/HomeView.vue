@@ -169,7 +169,7 @@
                 :key="mode.value"
                 class="mode-card"
                 :class="{ 'mode-active': appStore.proxyMode === mode.value }"
-                @click="onModeChange(mode.value)"
+                @click="onModeChange(mode.value as ProxyMode)"
               >
                 <div class="mode-icon">
                   <n-icon :size="24">

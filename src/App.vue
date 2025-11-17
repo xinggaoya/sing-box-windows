@@ -318,6 +318,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
+/* 应用容器基础样式 */
 #app {
   height: 100vh;
 }
@@ -325,21 +326,5 @@ onBeforeUnmount(() => {
 .app-container {
   height: 100%;
   width: 100%;
-}
-
-/* 生产环境下禁用文本选择 */
-@media (not (hover: hover)) {
-  .app-container {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-}
-
-/* 在生产环境下的额外安全措施 */
-.app-container {
-  -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
 }
 </style>

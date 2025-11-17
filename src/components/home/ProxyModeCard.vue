@@ -92,12 +92,7 @@ const { t } = useI18n()
   border: 1px solid rgba(128, 128, 128, 0.1);
 }
 
-.mode-card :deep(.n-card__content) {
-  padding: 12px 16px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
+/* 移除 Naive UI 卡片内容样式覆盖，使用官方主题系统 */
 
 .mode-card-header {
   display: flex;
@@ -133,36 +128,10 @@ const { t } = useI18n()
   gap: 10px;
 }
 
-.mode-buttons :deep(.n-button-group) {
-  width: 100%;
-  display: flex;
-}
-
-.mode-buttons :deep(.n-button) {
-  flex: 1;
-  border-radius: 8px;
-  font-weight: 500;
-  height: 36px;
-}
-
-/* 使用更现代的阴影和交互效果 */
-.mode-buttons :deep(.n-button:not(:disabled)) {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease;
-}
-
-.mode-buttons :deep(.n-button:not(:disabled):hover) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.mode-buttons :deep(.n-button-group .n-button:not(:first-child)) {
-  margin-left: 8px;
-}
 
 .mode-description {
   font-size: 14px;
-  color: var(--n-text-color-3);
+  color: #666;
   line-height: 1.5;
   padding: 4px 2px;
   flex-grow: 1;
@@ -171,16 +140,8 @@ const { t } = useI18n()
 }
 
 @media (max-width: 768px) {
-  .mode-card :deep(.n-card__content) {
-    padding: 12px 16px;
-  }
-  
   .mode-card-header {
     margin-bottom: 12px;
-  }
-  
-  .mode-buttons :deep(.n-button) {
-    height: 36px;
   }
 }
 </style> 

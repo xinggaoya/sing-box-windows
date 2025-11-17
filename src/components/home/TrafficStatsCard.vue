@@ -180,13 +180,6 @@ const formattedMemory = computed(() => {
   border: 1px solid rgba(128, 128, 128, 0.1);
 }
 
-.stats-card :deep(.n-card__content) {
-  padding: 12px 16px;
-}
-
-.stats-card :deep(.n-card__header) {
-  padding: 12px 16px 0;
-}
 
 .stats-header {
   display: flex;
@@ -307,22 +300,14 @@ const formattedMemory = computed(() => {
 }
 
 @media (max-width: 768px) {
-  .stats-card :deep(.n-card__content) {
-    padding: 12px 16px;
-  }
-  
-  .stats-card :deep(.n-card__header) {
-    padding: 12px 16px 0;
-  }
-  
   .chart-container {
     height: 150px;
   }
-  
+
   .traffic-value {
     font-size: 16px;
   }
-  
+
   .traffic-row {
     grid-template-columns: repeat(2, 1fr);
   }

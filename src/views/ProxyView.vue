@@ -943,25 +943,5 @@ const changeProxy = async (group: string, proxy: string) => {
   }
 }
 
-/* 优化Naive UI组件 */
-:deep(.n-card) {
-  border-radius: 16px;
-}
-
-:deep(.n-card__content) {
-  padding: 24px;
-}
-
-:deep(.n-button) {
-  border-radius: 10px;
-  font-weight: 500;
-}
-
-:deep(.n-tag) {
-  font-weight: 500;
-}
-
-:deep(.n-spin-container) {
-  min-height: 300px;
-}
+/* 移除 Naive UI 组件内部样式覆盖，使用官方主题系统 */
 </style>

@@ -850,31 +850,5 @@ onUnmounted(() => {
   }
 }
 
-/* 滚动条美化 */
-:deep(.n-scrollbar) {
-  height: 100%;
-}
-
-:deep(.n-scrollbar-rail) {
-  background: transparent !important;
-}
-
-:deep(.n-scrollbar-rail--scrollable) {
-  background: v-bind(
-    'themeStore.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.04)"'
-  ) !important;
-}
-
-:deep(.n-scrollbar-bar) {
-  background: v-bind(
-    'themeStore.isDark ? "rgba(255, 255, 255, 0.2)" : "rgba(0, 0, 0, 0.2)"'
-  ) !important;
-  border-radius: 4px;
-}
-
-:deep(.n-scrollbar-bar:hover) {
-  background: v-bind(
-    'themeStore.isDark ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"'
-  ) !important;
-}
+/* 移除 Naive UI 滚动条样式覆盖，使用官方主题系统 */
 </style>

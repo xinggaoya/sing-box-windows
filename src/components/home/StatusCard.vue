@@ -160,9 +160,6 @@ const statusText = computed(() => {
   border: 1px solid rgba(128, 128, 128, 0.1);
 }
 
-.status-card :deep(.n-card__content) {
-  padding: 12px 16px;
-}
 
 .status-header {
   display: flex;
@@ -291,10 +288,6 @@ const statusText = computed(() => {
 }
 
 @media (max-width: 768px) {
-  .status-card :deep(.n-card__content) {
-    padding: 12px 16px;
-  }
-  
   .status-left,
   .status-right {
     width: 100%;

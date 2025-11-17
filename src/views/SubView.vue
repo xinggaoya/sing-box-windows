@@ -1084,15 +1084,7 @@ onMounted(() => {
   border-radius: 8px;
 }
 
-/* 下拉菜单样式 */
-:deep(.n-dropdown-menu) {
-  border-radius: 8px;
-}
-
-:deep(.n-dropdown-option) {
-  padding: 8px 12px;
-  font-size: 13px;
-}
+/* 移除 Naive UI 下拉菜单样式覆盖 */
 
 .dropdown-icon {
   display: flex;
@@ -1264,18 +1256,5 @@ onMounted(() => {
   }
 }
 
-/* 深色主题优化 */
-:deep(.n-card) {
-  background: v-bind('themeStore.isDark ? "rgba(24, 24, 28, 0.8)" : "rgba(255, 255, 255, 0.9)"');
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-}
-
-:deep(.n-card .n-card-header) {
-  padding: 0;
-}
-
-:deep(.n-card .n-card-body) {
-  padding: 16px;
-}
+/* 移除 Naive UI 组件内部样式覆盖，使用官方主题系统 */
 </style>
