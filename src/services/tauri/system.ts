@@ -52,5 +52,13 @@ export const systemApi = {
 
   openDevtools() {
     return invokeWithAppContext<void>('open_devtools')
+  },
+
+  waitForNetworkReady(options?: { timeoutMs?: number; checkIntervalMs?: number; strict?: boolean }) {
+    return invokeWithAppContext<boolean>('wait_for_network_ready', options, { skipDataRestore: true })
+  },
+
+  checkNetworkConnectivity(options?: { strict?: boolean }) {
+    return invokeWithAppContext<boolean>('check_network_connectivity', options, { skipDataRestore: true })
   }
 }

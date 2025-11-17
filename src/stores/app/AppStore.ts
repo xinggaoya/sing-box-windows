@@ -9,6 +9,15 @@ import { createAppPersistence } from './composables/persistence'
 // 代理模式类型
 export type ProxyMode = 'system' | 'tun' | 'manual'
 
+type AutostartFailureReason = 'network_timeout' | 'kernel_error' | null
+
+type NetworkCheckOptions = {
+  timeoutMs?: number
+  intervalMs?: number
+  strict?: boolean
+  waitUntilReady?: boolean
+}
+
 const DEFAULT_SYSTEM_PROXY_BYPASS =
   'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*'
 const DEFAULT_TUN_IPV4 = '172.19.0.1/30'
@@ -40,6 +49,7 @@ export const useAppStore = defineStore(
 
     // 开机自启动检测
     const isAutostartScenario = ref(false)
+    const autostartFailureReason = ref<AutostartFailureReason>(null)
     // 自动启动延迟计时器
     let autostartDelayTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -197,34 +207,33 @@ export const useAppStore = defineStore(
       }
     }
 
-    // 检查网络连接状态
-    const checkNetworkReady = async (timeoutMs: number = 5000): Promise<boolean> => {
+    // 检查或等待网络连接状态
+    const checkNetworkReady = async ({
+      timeoutMs = 5000,
+      intervalMs = 3000,
+      strict = false,
+      waitUntilReady = false,
+    }: NetworkCheckOptions = {}): Promise<boolean> => {
       try {
-        console.log('🌐 检查网络连接状态...')
-        // 尝试访问一个可靠的地址来检查网络
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+        console.log('🌐 检查网络连接状态...', { waitUntilReady, timeoutMs, strict })
 
-        try {
-          // 使用 fetch 检查网络连接，优先使用轻量级请求
-          const response = await fetch('https://1.1.1.1', {
-            method: 'HEAD',
-            mode: 'no-cors',
-            signal: controller.signal,
+        if (waitUntilReady) {
+          const ready = await tauriApi.system.waitForNetworkReady({
+            timeoutMs,
+            checkIntervalMs: intervalMs,
+            strict,
           })
-          clearTimeout(timeoutId)
-          console.log('✅ 网络连接正常')
-          return true
-        } catch (networkError) {
-          clearTimeout(timeoutId)
-          // 即使外部网络不可达，本地网络可能已就绪
-          console.log('⚠️ 外部网络不可达，但可能本地网络已就绪')
-          return true
+          console.log(ready ? '✅ 网络连接已经就绪' : '⚠️ 网络检查超时')
+          return ready
         }
+
+        const ready = await tauriApi.system.checkNetworkConnectivity({ strict })
+        console.log(ready ? '✅ 网络连接已经就绪' : '⚠️ 网络连接未就绪')
+        return ready
       } catch (error) {
         console.warn('网络检查失败:', error)
-        // 默认返回 true，避免网络检查失败影响内核启动
-        return true
+        // 回退到浏览器的在线状态，避免因接口异常阻塞启动
+        return typeof navigator !== 'undefined' ? navigator.onLine : true
       }
     }
 
@@ -234,14 +243,23 @@ export const useAppStore = defineStore(
       maxRetries: number = 3
     ): Promise<boolean> => {
       console.log(`⏰ 开机自启动场景，首次延迟${delayMs/1000}秒后启动内核（最多${maxRetries}次尝试）...`)
+      autostartFailureReason.value = null
 
       // 首次延迟
       await new Promise(resolve => setTimeout(resolve, delayMs))
 
-      // 检查网络连接
-      const networkReady = await checkNetworkReady()
+      // 检查网络连接，必要时等待网络恢复
+      const networkReady = await checkNetworkReady({
+        timeoutMs: 60000,
+        intervalMs: 5000,
+        strict: true,
+        waitUntilReady: true,
+      })
+
       if (!networkReady) {
-        console.warn('⚠️ 网络未就绪，可能无法成功启动内核')
+        console.warn('⚠️ 网络在限定时间内仍未就绪，暂不启动内核')
+        autostartFailureReason.value = 'network_timeout'
+        return false
       }
 
       // 尝试启动内核（带重试机制）
@@ -260,6 +278,7 @@ export const useAppStore = defineStore(
 
           if (result) {
             console.log(`✅ 第 ${attempt} 次尝试成功启动内核！`)
+            autostartFailureReason.value = null
             return true
           } else {
             throw new Error(kernelStore.lastError || '内核启动返回false')
@@ -277,6 +296,7 @@ export const useAppStore = defineStore(
       }
 
       console.error(`❌ 经过 ${maxRetries} 次尝试后，内核启动仍然失败`)
+      autostartFailureReason.value = 'kernel_error'
       return false
     }
 
@@ -525,6 +545,7 @@ export const useAppStore = defineStore(
       checkNetworkReady,
       loadFromBackend,
       saveToBackend,
+      autostartFailureReason,
     }
   },
   // 移除 persist 配置，现在使用后端存储

@@ -121,6 +121,8 @@ pub fn run() {
             // System - System service commands
             crate::app::system::system_service::check_admin,
             crate::app::system::system_service::restart_as_admin,
+            crate::app::system::system_service::check_network_connectivity,
+            crate::app::system::system_service::wait_for_network_ready,
             crate::app::system::system_service::toggle_devtools,
             crate::app::system::system_service::open_devtools,
             crate::app::system::system_service::close_devtools,

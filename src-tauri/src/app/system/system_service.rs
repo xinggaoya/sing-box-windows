@@ -3,7 +3,12 @@ use crate::app::constants::messages;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
+use reqwest::Client;
+use std::time::{Duration, Instant};
 use tauri::Manager;
+use tokio::net::TcpStream;
+use tokio::time::{sleep, timeout};
+use tracing::{debug, info, warn};
 
 // 以管理员权限重启 (跨平台实现)
 #[tauri::command]
@@ -336,4 +341,116 @@ pub fn is_devtools_open(app_handle: tauri::AppHandle) -> Result<bool, String> {
         .ok_or("无法获取主窗口".to_string())?;
 
     Ok(main_window.is_devtools_open())
+}
+
+const TCP_PROBE_TARGETS: [(&str, u16); 3] = [
+    ("1.1.1.1", 443),
+    ("8.8.8.8", 53),
+    ("223.5.5.5", 53),
+];
+
+const HTTP_PROBE_URLS: [&str; 3] = [
+    "https://connectivitycheck.gstatic.com/generate_204",
+    "https://www.cloudflare.com/cdn-cgi/trace",
+    "https://1.1.1.1",
+];
+
+async fn perform_network_probe(strict_http: bool) -> Result<bool, String> {
+    let tcp_timeout = Duration::from_secs(3);
+    let mut tcp_success = false;
+
+    for (host, port) in TCP_PROBE_TARGETS.iter() {
+        let target = format!("{}:{}", host, port);
+        match timeout(tcp_timeout, TcpStream::connect(&target)).await {
+            Ok(Ok(_)) => {
+                debug!("TCP 检测成功: {}", target);
+                tcp_success = true;
+                break;
+            }
+            Ok(Err(err)) => debug!("TCP 检测失败: {} -> {}", target, err),
+            Err(_) => debug!("TCP 检测超时: {}", target),
+        }
+    }
+
+    let client = Client::builder()
+        .timeout(Duration::from_secs(6))
+        .user_agent("sing-box-windows/connectivity-check")
+        .build()
+        .map_err(|err| err.to_string())?;
+
+    let mut http_success = false;
+    for url in HTTP_PROBE_URLS.iter() {
+        match client.get(*url).send().await {
+            Ok(response) => {
+                if response.status().is_success() || response.status().as_u16() == 204 {
+                    debug!("HTTP 检测成功: {}", url);
+                    http_success = true;
+                    break;
+                } else {
+                    debug!(
+                        "HTTP 检测失败: {} -> 状态 {}",
+                        url,
+                        response.status().as_u16()
+                    );
+                }
+            }
+            Err(err) => debug!("HTTP 检测异常: {} -> {}", url, err),
+        }
+    }
+
+    if strict_http {
+        Ok(http_success)
+    } else {
+        Ok(tcp_success || http_success)
+    }
+}
+
+#[tauri::command]
+pub async fn check_network_connectivity(strict: Option<bool>) -> Result<bool, String> {
+    perform_network_probe(strict.unwrap_or(false)).await
+}
+
+#[tauri::command]
+pub async fn wait_for_network_ready(
+    timeout_ms: Option<u64>,
+    check_interval_ms: Option<u64>,
+    strict: Option<bool>,
+) -> Result<bool, String> {
+    let timeout = Duration::from_millis(timeout_ms.unwrap_or(60_000));
+    let interval = Duration::from_millis(check_interval_ms.unwrap_or(3_000));
+    let strict_mode = strict.unwrap_or(false);
+    let start = Instant::now();
+    let mut attempts = 0u32;
+
+    loop {
+        attempts += 1;
+        match perform_network_probe(strict_mode).await {
+            Ok(true) => {
+                info!("网络在第{}次检查后已就绪", attempts);
+                return Ok(true);
+            }
+            Ok(false) => {
+                if start.elapsed() >= timeout {
+                    warn!("网络检查超时，累计尝试 {} 次", attempts);
+                    return Ok(false);
+                }
+            }
+            Err(err) => {
+                warn!("网络检查失败: {}", err);
+                if start.elapsed() >= timeout {
+                    return Err(err);
+                }
+            }
+        }
+
+        if start.elapsed() >= timeout {
+            warn!("网络检查已达到超时时间");
+            return Ok(false);
+        }
+
+        let remaining = timeout
+            .checked_sub(start.elapsed())
+            .unwrap_or_else(|| Duration::from_secs(0));
+        sleep(std::cmp::min(interval, remaining)).await;
+    }
 }

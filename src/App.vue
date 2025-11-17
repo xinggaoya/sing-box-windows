@@ -70,6 +70,19 @@ const subStore = useSubStore()
 // 清理函数数组
 const cleanupFunctions: (() => void)[] = []
 
+let cancelNetworkRecovery: (() => void) | null = null
+
+const cleanupNetworkRecovery = () => {
+  if (cancelNetworkRecovery) {
+    cancelNetworkRecovery()
+    cancelNetworkRecovery = null
+  }
+}
+
+cleanupFunctions.push(() => {
+  cleanupNetworkRecovery()
+})
+
 const handleBeforeUnload = () => {
   cleanup()
 }
@@ -203,9 +216,65 @@ async function checkInitialWindowState() {
   }
 }
 
+// 网络自动恢复监听：在检测到网络原因导致的自动启动失败后挂起
+function scheduleNetworkAutoRecovery() {
+  if (!appStore.autoStartKernel || cancelNetworkRecovery) {
+    return
+  }
+
+  console.log('🌐 网络未就绪，监听 online 事件并定时重试内核启动')
+
+  const onlineHandler = async () => {
+    if (!appStore.autoStartKernel || appStore.isRunning) {
+      cleanupNetworkRecovery()
+      return
+    }
+
+    const ready = await appStore.checkNetworkReady({
+      timeoutMs: 15000,
+      intervalMs: 3000,
+      waitUntilReady: true,
+      strict: true,
+    })
+
+    if (!ready) {
+      return
+    }
+
+    cleanupNetworkRecovery()
+    await startKernelWithRetry()
+  }
+
+  window.addEventListener('online', onlineHandler)
+
+  const intervalId = window.setInterval(async () => {
+    if (!appStore.autoStartKernel || appStore.isRunning) {
+      cleanupNetworkRecovery()
+      return
+    }
+
+    const ready = await appStore.checkNetworkReady({
+      timeoutMs: 8000,
+      strict: true,
+    })
+
+    if (ready) {
+      cleanupNetworkRecovery()
+      await startKernelWithRetry()
+    }
+  }, 30000)
+
+  cancelNetworkRecovery = () => {
+    window.removeEventListener('online', onlineHandler)
+    clearInterval(intervalId)
+    cancelNetworkRecovery = null
+  }
+}
+
 // 增强的内核自动启动函数（支持开机自启动检测和重试机制）
 async function startKernelWithRetry() {
   console.log('🚀 检测到自动启动内核设置，开始启动...')
+  cleanupNetworkRecovery()
 
   try {
     // 检测是否是开机自启动场景
@@ -223,15 +292,22 @@ async function startKernelWithRetry() {
 
         // 发送失败通知给用户
         try {
-          const { isEnabled } = await import('@tauri-apps/plugin-autostart')
-          const enabled = await isEnabled()
-
-          mitt.emit('notification', {
-            type: 'warning',
-            title: '内核自动启动失败',
-            content: '开机自启动时内核启动失败，请手动启动或检查配置',
-            duration: 0, // 不自动关闭
-          })
+          if (appStore.autostartFailureReason === 'network_timeout') {
+            mitt.emit('notification', {
+              type: 'warning',
+              title: '等待网络就绪',
+              content: '网络尚未准备好，已开启监听并将在网络恢复后自动重试内核启动。',
+              duration: 8000,
+            })
+            scheduleNetworkAutoRecovery()
+          } else {
+            mitt.emit('notification', {
+              type: 'warning',
+              title: '内核自动启动失败',
+              content: '开机自启动时内核启动失败，请手动启动或检查配置',
+              duration: 0, // 不自动关闭
+            })
+          }
         } catch (notifyError) {
           console.warn('发送通知失败:', notifyError)
         }
