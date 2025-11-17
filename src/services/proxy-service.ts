@@ -35,7 +35,7 @@ export class ProxyService {
     try {
       // 根据模式设置代理
       if (mode === 'system') {
-        await tauriApi.proxy.setSystemProxy()
+        await tauriApi.proxy.setSystemProxy(this.appStore.systemProxyBypass)
         this.appStore.proxyMode = 'system'
         if (messageCallback) {
           messageCallback('success', '系统代理模式已启用')
@@ -48,7 +48,14 @@ export class ProxyService {
         }
       } else {
         // TUN模式
-        await tauriApi.proxy.setTunProxy()
+        await tauriApi.proxy.setTunProxy({
+          ipv4_address: this.appStore.tunIpv4,
+          ipv6_address: this.appStore.tunIpv6,
+          mtu: this.appStore.tunMtu,
+          auto_route: this.appStore.tunAutoRoute,
+          strict_route: this.appStore.tunStrictRoute,
+          stack: this.appStore.tunStack,
+        })
         this.appStore.proxyMode = 'tun'
         if (messageCallback) {
           messageCallback('success', 'TUN模式已启用')

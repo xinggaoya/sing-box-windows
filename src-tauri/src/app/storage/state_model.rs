@@ -1,3 +1,4 @@
+use crate::utils::proxy_util::DEFAULT_BYPASS_LIST;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9,6 +10,13 @@ pub struct AppConfig {
     pub api_port: u16,
     pub proxy_mode: String,
     pub tray_instance_id: Option<String>,
+    pub system_proxy_bypass: String,
+    pub tun_auto_route: bool,
+    pub tun_strict_route: bool,
+    pub tun_mtu: u16,
+    pub tun_ipv4: String,
+    pub tun_ipv6: String,
+    pub tun_stack: String,
 }
 
 impl Default for AppConfig {
@@ -21,6 +29,13 @@ impl Default for AppConfig {
             api_port: 12081,
             proxy_mode: "manual".to_string(),
             tray_instance_id: None,
+            system_proxy_bypass: DEFAULT_BYPASS_LIST.to_string(),
+            tun_auto_route: true,
+            tun_strict_route: true,
+            tun_mtu: 1500,
+            tun_ipv4: "172.19.0.1/30".to_string(),
+            tun_ipv6: "fdfe:dcba:9876::1/126".to_string(),
+            tun_stack: "mixed".to_string(),
         }
     }
 }

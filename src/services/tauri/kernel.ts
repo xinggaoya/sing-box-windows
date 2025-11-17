@@ -1,11 +1,21 @@
 import { invokeWithAppContext, withAppStore } from './invoke-client'
 
+export interface TunSettings {
+  ipv4_address: string
+  ipv6_address: string
+  mtu: number
+  auto_route: boolean
+  strict_route: boolean
+}
+
 export interface KernelStartConfig {
   proxy_mode: string
   api_port: number
   proxy_port: number
   prefer_ipv6: boolean
   auto_start: boolean
+  system_proxy_bypass: string
+  tun: TunSettings
 }
 
 export interface KernelStartOptions {
@@ -23,12 +33,34 @@ export const kernelApi = {
   async startKernel(options: KernelStartOptions = {}) {
     return withAppStore(async store => {
       await store.waitForDataRestore()
+      const tunOptions = options.config?.tun ?? {
+        ipv4_address: store.tunIpv4,
+        ipv6_address: store.tunIpv6,
+        mtu: store.tunMtu,
+        auto_route: store.tunAutoRoute,
+        strict_route: store.tunStrictRoute,
+        stack: store.tunStack,
+      }
+      const systemProxyBypass =
+        options.config?.system_proxy_bypass ?? store.systemProxyBypass
+      const args = {
+        proxyMode: options.config?.proxy_mode ?? store.proxyMode,
+        proxy_mode: options.config?.proxy_mode ?? store.proxyMode,
+        apiPort: options.config?.api_port ?? store.apiPort,
+        api_port: options.config?.api_port ?? store.apiPort,
+        proxyPort: options.config?.proxy_port ?? store.proxyPort,
+        proxy_port: options.config?.proxy_port ?? store.proxyPort,
+        preferIpv6: options.config?.prefer_ipv6 ?? store.preferIpv6,
+        prefer_ipv6: options.config?.prefer_ipv6 ?? store.preferIpv6,
+        systemProxyBypass,
+        system_proxy_bypass: systemProxyBypass,
+        tunOptions,
+        tun_options: tunOptions,
+      }
+
       return invokeWithAppContext<{ success: boolean; message: string }>(
         'kernel_start_enhanced',
-        {
-          proxyMode: options.config?.proxy_mode ?? store.proxyMode,
-          apiPort: options.config?.api_port ?? store.apiPort
-        },
+        args,
         { skipDataRestore: true }
       )
     })
@@ -69,8 +101,28 @@ export const kernelApi = {
     const command =
       mode === 'system' ? 'set_system_proxy' : mode === 'tun' ? 'set_tun_proxy' : 'set_manual_proxy'
 
-    return invokeWithAppContext<string | void>(command, undefined, {
-      withProxyPort: 'port'
+    return withAppStore(async store => {
+      await store.waitForDataRestore()
+      const args: Record<string, unknown> = {}
+
+      if (mode === 'system') {
+        args.systemProxyBypass = store.systemProxyBypass
+        args.system_proxy_bypass = store.systemProxyBypass
+      } else if (mode === 'tun') {
+        const tunOptions = {
+          ipv4_address: store.tunIpv4,
+          ipv6_address: store.tunIpv6,
+          mtu: store.tunMtu,
+          auto_route: store.tunAutoRoute,
+          strict_route: store.tunStrictRoute,
+        }
+        args.tunOptions = tunOptions
+        args.tun_options = tunOptions
+      }
+
+      return invokeWithAppContext<string | void>(command, args, {
+        withProxyPort: 'port',
+      })
     })
   },
 

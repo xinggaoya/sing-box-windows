@@ -434,6 +434,35 @@ export default {
       installPrompt: '请下载并安装内核后使用。',
       downloadFailedMessage: '内核下载失败: {error}',
     },
+    proxyAdvanced: {
+      title: '代理高级设置',
+      description: '配置系统代理绕过列表与 TUN 虚拟网卡参数',
+      systemBypass: '系统代理绕过域名',
+      systemBypassPlaceholder: '使用逗号、分号或换行分隔多个条目',
+      systemBypassDesc: '示例：localhost;127.*;10.*;192.168.*',
+      tunTitle: 'TUN 虚拟网卡',
+      tunIpv4: 'IPv4 地址段',
+      tunIpv6: 'IPv6 地址段',
+      tunMtu: 'MTU',
+      tunStack: '协议栈模式',
+      autoRoute: '自动路由',
+      strictRoute: '严格路由',
+      save: '保存高级设置',
+      savedTitle: '设置已保存',
+      savedDesc: '新的代理参数会在下次启动或重启内核后生效',
+      stackOptions: {
+        system: 'System：使用系统网络栈处理 TCP/UDP',
+        gvisor: 'gVisor：使用 gVisor 虚拟网络栈处理所有流量',
+        mixed: 'Mixed：System 处理 TCP，gVisor 处理 UDP（默认）',
+      },
+      errors: {
+        bypassRequired: '请填写系统代理绕过域名',
+        invalidIpv4: '请输入合法的 IPv4 CIDR（例如 172.19.0.1/30）',
+        invalidIpv6: '请输入合法的 IPv6 CIDR（例如 fdfe:dcba:9876::1/126）',
+        invalidMtu: 'MTU 取值需在 576-9000 之间',
+        invalidStack: '请选择合法的协议栈模式',
+      },
+    },
 
     // 开发者工具
     developer: {

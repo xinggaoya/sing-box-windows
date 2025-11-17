@@ -45,6 +45,13 @@ impl DatabaseService {
                 api_port INTEGER DEFAULT 12081,
                 proxy_mode TEXT DEFAULT 'manual',
                 tray_instance_id TEXT,
+                system_proxy_bypass TEXT DEFAULT 'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*',
+                tun_auto_route BOOLEAN DEFAULT TRUE,
+                tun_strict_route BOOLEAN DEFAULT TRUE,
+                tun_mtu INTEGER DEFAULT 1500,
+                tun_ipv4 TEXT DEFAULT '172.19.0.1/30',
+                tun_ipv6 TEXT DEFAULT 'fdfe:dcba:9876::1/126',
+                tun_stack TEXT DEFAULT 'mixed',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -53,16 +60,21 @@ impl DatabaseService {
         .execute(pool)
         .await?;
 
-        // 检查并添加 auto_start_app 字段（用于现有数据库的升级）
-        let add_column_query = r#"
-            ALTER TABLE app_config ADD COLUMN auto_start_app BOOLEAN DEFAULT FALSE
-        "#;
+        // 检查并添加 legacy 缺失字段（升级兼容）
+        let alter_statements = [
+            "ALTER TABLE app_config ADD COLUMN auto_start_app BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE app_config ADD COLUMN system_proxy_bypass TEXT DEFAULT 'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*'",
+            "ALTER TABLE app_config ADD COLUMN tun_auto_route BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN tun_strict_route BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN tun_mtu INTEGER DEFAULT 1500",
+            "ALTER TABLE app_config ADD COLUMN tun_ipv4 TEXT DEFAULT '172.19.0.1/30'",
+            "ALTER TABLE app_config ADD COLUMN tun_ipv6 TEXT DEFAULT 'fdfe:dcba:9876::1/126'",
+            "ALTER TABLE app_config ADD COLUMN tun_stack TEXT DEFAULT 'mixed'",
+        ];
 
-        // 尝试添加新字段，如果字段已存在会失败，这是正常的
-        sqlx::query(add_column_query)
-            .execute(pool)
-            .await
-            .ok(); // 忽略错误，因为字段可能已经存在
+        for statement in alter_statements {
+            sqlx::query(statement).execute(pool).await.ok();
+        }
         
         // 主题配置表
         sqlx::query(
@@ -151,6 +163,7 @@ impl DatabaseService {
         .await?;
         
         if let Some(row) = row {
+            let default_config = AppConfig::default();
             Ok(Some(AppConfig {
                 auto_start_kernel: row.get("auto_start_kernel"),
                 auto_start_app: row.get("auto_start_app"),
@@ -159,6 +172,25 @@ impl DatabaseService {
                 api_port: row.get("api_port"),
                 proxy_mode: row.get("proxy_mode"),
                 tray_instance_id: row.get("tray_instance_id"),
+                system_proxy_bypass: row
+                    .try_get("system_proxy_bypass")
+                    .unwrap_or_else(|_| default_config.system_proxy_bypass.clone()),
+                tun_auto_route: row
+                    .try_get("tun_auto_route")
+                    .unwrap_or(default_config.tun_auto_route),
+                tun_strict_route: row
+                    .try_get("tun_strict_route")
+                    .unwrap_or(default_config.tun_strict_route),
+                tun_mtu: row.try_get("tun_mtu").unwrap_or(default_config.tun_mtu),
+                tun_ipv4: row
+                    .try_get("tun_ipv4")
+                    .unwrap_or_else(|_| default_config.tun_ipv4.clone()),
+                tun_ipv6: row
+                    .try_get("tun_ipv6")
+                    .unwrap_or_else(|_| default_config.tun_ipv6.clone()),
+                tun_stack: row
+                    .try_get("tun_stack")
+                    .unwrap_or_else(|_| default_config.tun_stack.clone()),
             }))
         } else {
             Ok(None)
@@ -169,8 +201,8 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO app_config
-            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, tray_instance_id, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_start_kernel)
@@ -180,6 +212,13 @@ impl DatabaseService {
         .bind(config.api_port)
         .bind(&config.proxy_mode)
         .bind(&config.tray_instance_id)
+        .bind(&config.system_proxy_bypass)
+        .bind(config.tun_auto_route)
+        .bind(config.tun_strict_route)
+        .bind(config.tun_mtu)
+        .bind(&config.tun_ipv4)
+        .bind(&config.tun_ipv6)
+        .bind(&config.tun_stack)
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;

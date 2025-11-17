@@ -17,12 +17,23 @@ export interface KernelStatus {
   error?: string
 }
 
+export interface TunSettings {
+  ipv4_address: string
+  ipv6_address: string
+  mtu: number
+  auto_route: boolean
+  strict_route: boolean
+  stack: 'system' | 'gvisor' | 'mixed'
+}
+
 export interface KernelConfig {
   proxy_mode: 'system' | 'tun' | 'manual'
   api_port: number
   proxy_port: number
   prefer_ipv6: boolean
   auto_start: boolean
+  system_proxy_bypass: string
+  tun: TunSettings
 }
 
 class KernelService {
@@ -133,7 +144,16 @@ class KernelService {
       api_port: 9090,
       proxy_port: 7890,
       prefer_ipv6: false,
-      auto_start: false
+      auto_start: false,
+      system_proxy_bypass: '',
+      tun: {
+        ipv4_address: '',
+        ipv6_address: '',
+        mtu: 1500,
+        auto_route: true,
+        strict_route: true,
+        stack: 'mixed',
+      },
     }
   }
 

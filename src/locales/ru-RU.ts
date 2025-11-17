@@ -435,6 +435,35 @@ export default {
       installPrompt: 'Пожалуйста загрузите и установите ядро перед использованием.',
       downloadFailedMessage: 'Ошибка загрузки ядра: {error}',
     },
+    proxyAdvanced: {
+      title: 'Расширенные параметры прокси',
+      description: 'Настройте список обхода системного прокси и параметры виртуального адаптера TUN',
+      systemBypass: 'Домены обхода системного прокси',
+      systemBypassPlaceholder: 'Используйте запятые, точки с запятой или переносы строк',
+      systemBypassDesc: 'Пример: localhost;127.*;10.*;192.168.*',
+      tunTitle: 'Виртуальный адаптер TUN',
+      tunIpv4: 'IPv4 CIDR',
+      tunIpv6: 'IPv6 CIDR',
+      tunMtu: 'MTU',
+      tunStack: 'Сетевая стековая модель',
+      autoRoute: 'Автомаршрутизация',
+      strictRoute: 'Строгая маршрутизация',
+      save: 'Сохранить расширенные настройки',
+      savedTitle: 'Настройки сохранены',
+      savedDesc: 'Новые параметры вступят в силу после следующего запуска или перезапуска ядра',
+      stackOptions: {
+        system: 'System: использовать сетевой стек ОС',
+        gvisor: 'gVisor: виртуальный стек gVisor для всего трафика',
+        mixed: 'Mixed: System для TCP и gVisor для UDP (по умолчанию)',
+      },
+      errors: {
+        bypassRequired: 'Укажите хотя бы один домен для обхода',
+        invalidIpv4: 'Введите корректный IPv4 CIDR (например 172.19.0.1/30)',
+        invalidIpv6: 'Введите корректный IPv6 CIDR (например fdfe:dcba:9876::1/126)',
+        invalidMtu: 'Значение MTU должно быть в пределах 576–9000',
+        invalidStack: 'Выберите допустимый режим стека',
+      },
+    },
 
     // 开发者工具
     developer: {

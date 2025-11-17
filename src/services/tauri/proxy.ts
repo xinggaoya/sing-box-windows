@@ -18,15 +18,29 @@ export interface ProxiesData {
   proxies: Record<string, ProxyData>
 }
 
+export interface TunOptionsPayload {
+  ipv4_address: string
+  ipv6_address: string
+  mtu: number
+  auto_route: boolean
+  strict_route: boolean
+  stack: 'system' | 'gvisor' | 'mixed'
+}
+
 export const proxyApi = {
-  setSystemProxy() {
-    return invokeWithAppContext<void>('set_system_proxy', undefined, {
+  setSystemProxy(systemProxyBypass?: string) {
+    const args =
+      typeof systemProxyBypass === 'string'
+        ? { systemProxyBypass, system_proxy_bypass: systemProxyBypass }
+        : undefined
+    return invokeWithAppContext<void>('set_system_proxy', args, {
       withProxyPort: 'port'
     })
   },
 
-  setTunProxy() {
-    return invokeWithAppContext<void>('set_tun_proxy', undefined, {
+  setTunProxy(tunOptions?: TunOptionsPayload) {
+    const args = tunOptions ? { tunOptions, tun_options: tunOptions } : undefined
+    return invokeWithAppContext<void>('set_tun_proxy', args, {
       withProxyPort: 'port'
     })
   },

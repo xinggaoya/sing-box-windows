@@ -294,6 +294,94 @@
           </n-card>
         </n-grid-item>
 
+        <!-- 代理高级设置 -->
+        <n-grid-item :span="24" :s="24" :m="24" :l="12" :xl="12" :xxl="12">
+          <n-card class="settings-card proxy-advanced-card" :bordered="false">
+            <div class="card-header">
+              <div class="card-icon advanced-icon">
+                <n-icon size="20">
+                  <OptionsOutline />
+                </n-icon>
+              </div>
+              <div class="card-info">
+                <h3 class="card-title">{{ t('setting.proxyAdvanced.title') }}</h3>
+                <p class="card-description">{{ t('setting.proxyAdvanced.description') }}</p>
+              </div>
+            </div>
+
+            <div class="card-content">
+              <n-form label-placement="top">
+                <n-form-item :label="t('setting.proxyAdvanced.systemBypass')">
+                  <n-input
+                    v-model:value="proxyAdvancedForm.systemProxyBypass"
+                    type="textarea"
+                    :rows="3"
+                    :placeholder="t('setting.proxyAdvanced.systemBypassPlaceholder')"
+                  />
+                  <div class="helper-text">
+                    {{ t('setting.proxyAdvanced.systemBypassDesc') }}
+                  </div>
+                </n-form-item>
+
+                <div class="tun-section">
+                  <div class="tun-section-title">{{ t('setting.proxyAdvanced.tunTitle') }}</div>
+                  <n-grid :cols="24" :x-gap="12">
+                    <n-grid-item :span="24" :s="24" :m="12">
+                      <n-form-item :label="t('setting.proxyAdvanced.tunIpv4')">
+                        <n-input v-model:value="proxyAdvancedForm.tunIpv4" />
+                      </n-form-item>
+                    </n-grid-item>
+                    <n-grid-item :span="24" :s="24" :m="12">
+                      <n-form-item :label="t('setting.proxyAdvanced.tunIpv6')">
+                        <n-input v-model:value="proxyAdvancedForm.tunIpv6" />
+                      </n-form-item>
+                    </n-grid-item>
+                    <n-grid-item :span="24" :s="24" :m="12">
+                      <n-form-item :label="t('setting.proxyAdvanced.tunMtu')">
+                        <n-input-number
+                          v-model:value="proxyAdvancedForm.tunMtu"
+                          :min="576"
+                          :max="9000"
+                          style="width: 100%"
+                        />
+                      </n-form-item>
+                    </n-grid-item>
+                    <n-grid-item :span="24" :s="24" :m="12">
+                      <n-form-item :label="t('setting.proxyAdvanced.tunStack')">
+                        <n-select
+                          v-model:value="proxyAdvancedForm.tunStack"
+                          :options="tunStackOptions"
+                        />
+                      </n-form-item>
+                    </n-grid-item>
+                    <n-grid-item :span="24" :s="24" :m="12">
+                      <div class="switch-group">
+                        <div class="switch-item">
+                          <div class="switch-label">{{ t('setting.proxyAdvanced.autoRoute') }}</div>
+                          <n-switch v-model:value="proxyAdvancedForm.tunAutoRoute" />
+                        </div>
+                        <div class="switch-item">
+                          <div class="switch-label">{{ t('setting.proxyAdvanced.strictRoute') }}</div>
+                          <n-switch v-model:value="proxyAdvancedForm.tunStrictRoute" />
+                        </div>
+                      </div>
+                    </n-grid-item>
+                  </n-grid>
+                </div>
+
+                <n-button
+                  type="primary"
+                  block
+                  :loading="savingAdvanced"
+                  @click="saveProxyAdvancedSettings"
+                >
+                  {{ t('setting.proxyAdvanced.save') }}
+                </n-button>
+              </n-form>
+            </div>
+          </n-card>
+        </n-grid-item>
+
         <!-- 更新设置卡片 -->
         <n-grid-item :span="24" :s="24" :m="24" :l="12" :xl="12" :xxl="12">
           <n-card class="settings-card update-card" :bordered="false">
@@ -638,7 +726,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useMessage, useDialog, useNotification } from 'naive-ui'
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -692,6 +780,22 @@ const downloading = ref(false)
 const downloadProgress = ref(0)
 const downloadMessage = ref('')
 const { t } = useI18n()
+const savingAdvanced = ref(false)
+const proxyAdvancedForm = reactive({
+  systemProxyBypass: appStore.systemProxyBypass,
+  tunIpv4: appStore.tunIpv4,
+  tunIpv6: appStore.tunIpv6,
+  tunMtu: appStore.tunMtu,
+  tunAutoRoute: appStore.tunAutoRoute,
+  tunStrictRoute: appStore.tunStrictRoute,
+  tunStack: appStore.tunStack,
+})
+
+const tunStackOptions = computed(() => [
+  { label: t('setting.proxyAdvanced.stackOptions.system'), value: 'system' },
+  { label: t('setting.proxyAdvanced.stackOptions.gvisor'), value: 'gvisor' },
+  { label: t('setting.proxyAdvanced.stackOptions.mixed'), value: 'mixed' },
+])
 
 // 判断是否为移动端视图
 const isMobile = ref(window.innerWidth < 768)
@@ -700,6 +804,49 @@ const isMobile = ref(window.innerWidth < 768)
 const updateMobileStatus = () => {
   isMobile.value = window.innerWidth < 768
 }
+
+watch(
+  () => appStore.systemProxyBypass,
+  value => {
+    proxyAdvancedForm.systemProxyBypass = value
+  }
+)
+watch(
+  () => appStore.tunIpv4,
+  value => {
+    proxyAdvancedForm.tunIpv4 = value
+  }
+)
+watch(
+  () => appStore.tunIpv6,
+  value => {
+    proxyAdvancedForm.tunIpv6 = value
+  }
+)
+watch(
+  () => appStore.tunMtu,
+  value => {
+    proxyAdvancedForm.tunMtu = value
+  }
+)
+watch(
+  () => appStore.tunAutoRoute,
+  value => {
+    proxyAdvancedForm.tunAutoRoute = value
+  }
+)
+watch(
+  () => appStore.tunStrictRoute,
+  value => {
+    proxyAdvancedForm.tunStrictRoute = value
+  }
+)
+watch(
+  () => appStore.tunStack,
+  value => {
+    proxyAdvancedForm.tunStack = value
+  }
+)
 
 onMounted(async () => {
   // 从 AppStore 获取系统开机自启动状态
@@ -842,6 +989,86 @@ const downloadTheKernel = async () => {
     message.error(t('setting.kernel.downloadFailedMessage', { error: String(error) }))
     downloading.value = false
     loading.value = false
+  }
+}
+
+const normalizeBypassList = (value: string) => {
+  return value
+    .split(/[\n,;]+/)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .join(';')
+}
+
+const isValidIpv4Cidr = (value: string) => {
+  const match = value.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/)
+  if (!match) {
+    return false
+  }
+  const prefix = Number(match[2])
+  if (prefix < 0 || prefix > 32) {
+    return false
+  }
+  return match[1].split('.').every(octet => {
+    const num = Number(octet)
+    return num >= 0 && num <= 255
+  })
+}
+
+const isValidIpv6Cidr = (value: string) => {
+  const match = value.match(/^([0-9a-fA-F:]+)\/(\d{1,3})$/)
+  if (!match) {
+    return false
+  }
+  const prefix = Number(match[2])
+  return prefix >= 0 && prefix <= 128
+}
+
+const saveProxyAdvancedSettings = async () => {
+  try {
+    savingAdvanced.value = true
+    const bypassInput = proxyAdvancedForm.systemProxyBypass.trim()
+    if (!bypassInput) {
+      message.error(t('setting.proxyAdvanced.errors.bypassRequired'))
+      return
+    }
+    if (!isValidIpv4Cidr(proxyAdvancedForm.tunIpv4)) {
+      message.error(t('setting.proxyAdvanced.errors.invalidIpv4'))
+      return
+    }
+    if (!isValidIpv6Cidr(proxyAdvancedForm.tunIpv6)) {
+      message.error(t('setting.proxyAdvanced.errors.invalidIpv6'))
+      return
+    }
+    if (proxyAdvancedForm.tunMtu < 576 || proxyAdvancedForm.tunMtu > 9000) {
+      message.error(t('setting.proxyAdvanced.errors.invalidMtu'))
+      return
+    }
+    const stackValid = ['system', 'gvisor', 'mixed'].includes(proxyAdvancedForm.tunStack)
+    if (!stackValid) {
+      message.error(t('setting.proxyAdvanced.errors.invalidStack'))
+      return
+    }
+
+    await appStore.updateProxyAdvancedSettings({
+      systemProxyBypass: normalizeBypassList(bypassInput),
+      tunIpv4: proxyAdvancedForm.tunIpv4,
+      tunIpv6: proxyAdvancedForm.tunIpv6,
+      tunMtu: proxyAdvancedForm.tunMtu,
+      tunAutoRoute: proxyAdvancedForm.tunAutoRoute,
+      tunStrictRoute: proxyAdvancedForm.tunStrictRoute,
+      tunStack: proxyAdvancedForm.tunStack as 'system' | 'gvisor' | 'mixed',
+    })
+
+    notification.success({
+      title: t('setting.proxyAdvanced.savedTitle'),
+      content: t('setting.proxyAdvanced.savedDesc'),
+      duration: 3000,
+    })
+  } catch (error) {
+    message.error(`${t('common.error')}: ${error}`)
+  } finally {
+    savingAdvanced.value = false
   }
 }
 
@@ -1375,6 +1602,12 @@ onUnmounted(() => {
   --card-color-end: #7c3aed;
 }
 
+.advanced-icon {
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  --card-color-start: #14b8a6;
+  --card-color-end: #0d9488;
+}
+
 .update-icon {
   background: linear-gradient(135deg, #06b6d4, #0891b2);
   --card-color-start: #06b6d4;
@@ -1396,6 +1629,53 @@ onUnmounted(() => {
 .card-info {
   flex: 1;
   min-width: 0;
+}
+
+.proxy-advanced-card .helper-text {
+  margin-top: 4px;
+  font-size: 12px;
+  color: v-bind('themeStore.isDark ? "#9ca3af" : "#6b7280"');
+}
+
+.tun-section {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid v-bind('themeStore.isDark ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)"');
+}
+
+.tun-section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: v-bind('themeStore.isDark ? "#f1f5f9" : "#0f172a"');
+}
+
+.switch-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (min-width: 768px) {
+  .switch-group {
+    flex-direction: row;
+  }
+}
+
+.switch-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid v-bind('themeStore.isDark ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.06)"');
+  background: v-bind('themeStore.isDark ? "rgba(39,39,42,0.5)" : "#f8fafc"');
+}
+
+.switch-label {
+  font-weight: 600;
+  color: v-bind('themeStore.isDark ? "#e4e4e7" : "#0f172a"');
 }
 
 .card-title {

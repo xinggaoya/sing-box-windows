@@ -435,6 +435,35 @@ export default {
       installPrompt: '使用前にカーネルをダウンロードしてインストールしてください。',
       downloadFailedMessage: 'カーネルのダウンロードに失敗しました: {error}',
     },
+    proxyAdvanced: {
+      title: '高度なプロキシ設定',
+      description: 'システムプロキシのバイパスリストと TUN 仮想アダプタを調整します',
+      systemBypass: 'システムプロキシのバイパスドメイン',
+      systemBypassPlaceholder: '改行・セミコロン・カンマで複数の値を指定できます',
+      systemBypassDesc: '例: localhost;127.*;10.*;192.168.*',
+      tunTitle: 'TUN 仮想アダプタ',
+      tunIpv4: 'IPv4 CIDR',
+      tunIpv6: 'IPv6 CIDR',
+      tunMtu: 'MTU',
+      tunStack: 'スタックモード',
+      autoRoute: '自動ルート',
+      strictRoute: '厳密ルート',
+      save: '高度な設定を保存',
+      savedTitle: '設定を保存しました',
+      savedDesc: '新しいパラメータは次回の起動または内核再起動後に反映されます',
+      stackOptions: {
+        system: 'System: OS のネットワークスタックを使用',
+        gvisor: 'gVisor: gVisor 仮想スタックで全トラフィックを処理',
+        mixed: 'Mixed: System は TCP、gVisor は UDP を処理（デフォルト）',
+      },
+      errors: {
+        bypassRequired: 'バイパスドメインを入力してください',
+        invalidIpv4: '正しい IPv4 CIDR（例: 172.19.0.1/30）を入力してください',
+        invalidIpv6: '正しい IPv6 CIDR（例: fdfe:dcba:9876::1/126）を入力してください',
+        invalidMtu: 'MTU は 576〜9000 の範囲で指定してください',
+        invalidStack: '有効なスタックモードを選択してください',
+      },
+    },
 
     // 开发者工具
     developer: {

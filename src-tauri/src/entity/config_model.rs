@@ -20,6 +20,14 @@ pub struct Inbound {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sniff: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub sniff_override_destination: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mtu: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route_address: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route_exclude_address: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub set_system_proxy: Option<bool>,
 }
 

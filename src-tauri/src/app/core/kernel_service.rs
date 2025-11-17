@@ -3,6 +3,9 @@ use crate::app::core::event_relay::{
     create_connection_event_relay, create_log_event_relay, create_memory_event_relay,
     create_traffic_event_relay, start_event_relay_with_retry,
 };
+use crate::app::core::proxy_service::{
+    set_manual_proxy, set_system_proxy, set_tun_proxy, update_dns_strategy, TunProxyOptions,
+};
 use crate::process::manager::ProcessManager;
 use crate::utils::http_client;
 use serde_json::json;
@@ -1634,11 +1637,46 @@ pub async fn kernel_start_enhanced(
     app_handle: AppHandle,
     proxy_mode: Option<String>,
     api_port: Option<u16>,
+    proxy_port: Option<u16>,
+    prefer_ipv6: Option<bool>,
+    system_proxy_bypass: Option<String>,
+    tun_options: Option<TunProxyOptions>,
 ) -> Result<serde_json::Value, String> {
+    let resolved_mode = proxy_mode.unwrap_or_else(|| "manual".to_string());
+    let resolved_api_port = api_port.unwrap_or(12081);
+    let resolved_proxy_port = proxy_port.unwrap_or(12080);
+    let resolved_ipv6_pref = prefer_ipv6.unwrap_or(false);
+    let resolved_tun = tun_options.unwrap_or_default();
+
     info!(
-        "🚀 启动内核增强版，代理模式: {:?}, API端口: {:?}",
-        proxy_mode, api_port
+        "🚀 启动内核增强版，代理模式: {}, API端口: {}, 代理端口: {}",
+        resolved_mode, resolved_api_port, resolved_proxy_port
     );
+
+    // 同步端口配置，确保配置文件中的端口与UI一致
+    if let Err(e) =
+        crate::app::system::config_service::update_singbox_ports(resolved_proxy_port, resolved_api_port)
+    {
+        warn!("更新端口配置失败: {}", e);
+    }
+
+    // 根据代理模式更新配置文件
+    if let Err(e) = apply_proxy_mode_configuration(
+        &resolved_mode,
+        resolved_proxy_port,
+        system_proxy_bypass.clone(),
+        resolved_tun.clone(),
+    ) {
+        return Ok(json!({
+            "success": false,
+            "message": format!("应用代理模式配置失败: {}", e)
+        }));
+    }
+
+    // 调整DNS策略
+    if let Err(e) = update_dns_strategy(resolved_ipv6_pref) {
+        warn!("更新DNS策略失败: {}", e);
+    }
 
     // 检查内核是否已在运行
     if is_kernel_running().await.unwrap_or(false) {
@@ -1654,40 +1692,30 @@ pub async fn kernel_start_enhanced(
         Ok(_) => {
             info!("✅ 内核进程启动成功");
 
-            // 如果提供了API端口，尝试启动事件中继
-            if let Some(port) = api_port {
-                info!("🔌 启动事件中继服务，端口: {}", port);
-                match start_websocket_relay(app_handle.clone(), Some(port)).await {
-                    Ok(_) => {
-                        info!("✅ 事件中继启动成功");
+            info!("🔌 启动事件中继服务，端口: {}", resolved_api_port);
+            match start_websocket_relay(app_handle.clone(), Some(resolved_api_port)).await {
+                Ok(_) => {
+                    info!("✅ 事件中继启动成功");
 
-                        // 发送内核就绪事件
-                        let _ = app_handle.emit("kernel-ready", ());
+                    // 发送内核就绪事件
+                    let _ = app_handle.emit("kernel-ready", ());
 
-                        Ok(serde_json::json!({
-                            "success": true,
-                            "message": "内核启动成功，事件中继已启动".to_string()
-                        }))
-                    }
-                    Err(e) => {
-                        warn!("⚠️ 事件中继启动失败: {}, 但内核进程已启动", e);
-
-                        // 即使事件中继失败，内核也已经启动了
-                        let _ = app_handle.emit("kernel-ready", ());
-
-                        Ok(serde_json::json!({
-                            "success": true,
-                            "message": "内核启动成功，但事件中继启动失败".to_string()
-                        }))
-                    }
+                    Ok(serde_json::json!({
+                        "success": true,
+                        "message": "内核启动成功，事件中继已启动".to_string()
+                    }))
                 }
-            } else {
-                // 没有提供API端口，只发送内核就绪事件
-                let _ = app_handle.emit("kernel-ready", ());
-                Ok(serde_json::json!({
-                    "success": true,
-                    "message": "内核启动成功".to_string()
-                }))
+                Err(e) => {
+                    warn!("⚠️ 事件中继启动失败: {}, 但内核进程已启动", e);
+
+                    // 即使事件中继失败，内核也已经启动了
+                    let _ = app_handle.emit("kernel-ready", ());
+
+                    Ok(serde_json::json!({
+                        "success": true,
+                        "message": "内核启动成功，但事件中继启动失败".to_string()
+                    }))
+                }
             }
         }
         Err(e) => {
@@ -1696,6 +1724,23 @@ pub async fn kernel_start_enhanced(
                 "success": false,
                 "message": format!("内核启动失败: {}", e)
             }))
+        }
+    }
+}
+
+fn apply_proxy_mode_configuration(
+    mode: &str,
+    proxy_port: u16,
+    bypass: Option<String>,
+    tun_options: TunProxyOptions,
+) -> Result<(), String> {
+    match mode {
+        "system" => set_system_proxy(proxy_port, bypass),
+        "tun" => set_tun_proxy(proxy_port, Some(tun_options)),
+        "manual" => set_manual_proxy(proxy_port),
+        _ => {
+            warn!("未知的代理模式: {}，将回退到手动模式", mode);
+            set_manual_proxy(proxy_port)
         }
     }
 }

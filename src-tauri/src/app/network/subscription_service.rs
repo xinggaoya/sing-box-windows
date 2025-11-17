@@ -34,7 +34,7 @@ pub async fn download_subscription(
 
     // 使用传入的代理端口
     if let Some(port) = proxy_port {
-        if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port) {
+        if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port, None) {
             warn!("设置系统代理失败: {}", e);
         }
     }
@@ -63,7 +63,7 @@ pub async fn add_manual_subscription(
 
     // 使用传入的代理端口
     if let Some(port) = proxy_port {
-        if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port) {
+        if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port, None) {
             warn!("设置系统代理失败: {}", e);
         }
     }

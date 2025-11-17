@@ -434,6 +434,35 @@ export default {
       installPrompt: 'Please download and install kernel before use.',
       downloadFailedMessage: 'Kernel download failed: {error}',
     },
+    proxyAdvanced: {
+      title: 'Advanced Proxy Settings',
+      description: 'Configure system proxy bypass rules and TUN virtual adapter parameters',
+      systemBypass: 'System proxy bypass domains',
+      systemBypassPlaceholder: 'Use commas, semicolons, or new lines to separate multiple entries',
+      systemBypassDesc: 'Example: localhost;127.*;10.*;192.168.*',
+      tunTitle: 'TUN Virtual Adapter',
+      tunIpv4: 'IPv4 CIDR',
+      tunIpv6: 'IPv6 CIDR',
+      tunMtu: 'MTU',
+      tunStack: 'Protocol stack',
+      autoRoute: 'Auto route',
+      strictRoute: 'Strict route',
+      save: 'Save Advanced Settings',
+      savedTitle: 'Settings Saved',
+      savedDesc: 'New proxy parameters will apply after the next start or kernel restart',
+      stackOptions: {
+        system: 'System: use OS network stack for TCP/UDP',
+        gvisor: 'gVisor: use gVisor virtual stack for all traffic',
+        mixed: 'Mixed: system TCP + gVisor UDP (default)',
+      },
+      errors: {
+        bypassRequired: 'Please enter at least one bypass entry',
+        invalidIpv4: 'Enter a valid IPv4 CIDR such as 172.19.0.1/30',
+        invalidIpv6: 'Enter a valid IPv6 CIDR such as fdfe:dcba:9876::1/126',
+        invalidMtu: 'MTU must be between 576 and 9000',
+        invalidStack: 'Please choose a valid stack mode',
+      },
+    },
 
     // Developer tools
     developer: {

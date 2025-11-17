@@ -7,6 +7,13 @@ export interface AppConfig {
   api_port: number
   proxy_mode: string
   tray_instance_id?: string | null
+  system_proxy_bypass: string
+  tun_auto_route: boolean
+  tun_strict_route: boolean
+  tun_mtu: number
+  tun_ipv4: string
+  tun_ipv6: string
+  tun_stack: string
 }
 
 export interface ThemeConfig {

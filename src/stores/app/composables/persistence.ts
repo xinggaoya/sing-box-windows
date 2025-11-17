@@ -10,6 +10,13 @@ export interface PersistenceState {
   proxyPort: Ref<number>
   apiPort: Ref<number>
   trayInstanceId: Ref<string | null>
+  systemProxyBypass: Ref<string>
+  tunIpv4: Ref<string>
+  tunIpv6: Ref<string>
+  tunMtu: Ref<number>
+  tunAutoRoute: Ref<boolean>
+  tunStrictRoute: Ref<boolean>
+  tunStack: Ref<string>
 }
 
 export function createAppPersistence(state: PersistenceState) {
@@ -72,6 +79,13 @@ export function createAppPersistence(state: PersistenceState) {
       state.proxyPort.value = appConfig.proxy_port
       state.apiPort.value = appConfig.api_port
       state.trayInstanceId.value = appConfig.tray_instance_id || null
+      state.systemProxyBypass.value = appConfig.system_proxy_bypass
+      state.tunIpv4.value = appConfig.tun_ipv4
+      state.tunIpv6.value = appConfig.tun_ipv6
+      state.tunMtu.value = appConfig.tun_mtu
+      state.tunAutoRoute.value = appConfig.tun_auto_route
+      state.tunStrictRoute.value = appConfig.tun_strict_route
+      state.tunStack.value = appConfig.tun_stack
     } catch (error) {
       console.error('从数据库加载应用配置失败:', error)
     } finally {
@@ -88,7 +102,14 @@ export function createAppPersistence(state: PersistenceState) {
         prefer_ipv6: state.preferIpv6.value,
         proxy_port: state.proxyPort.value,
         api_port: state.apiPort.value,
-        tray_instance_id: state.trayInstanceId.value
+        tray_instance_id: state.trayInstanceId.value,
+        system_proxy_bypass: state.systemProxyBypass.value,
+        tun_ipv4: state.tunIpv4.value,
+        tun_ipv6: state.tunIpv6.value,
+        tun_mtu: state.tunMtu.value,
+        tun_auto_route: state.tunAutoRoute.value,
+        tun_strict_route: state.tunStrictRoute.value,
+        tun_stack: state.tunStack.value,
       }
       await DatabaseService.saveAppConfig(config)
       console.log('✅ 应用配置已保存到数据库')
@@ -98,7 +119,22 @@ export function createAppPersistence(state: PersistenceState) {
   }
 
   const stopAutoSave = watch(
-    [state.proxyMode, state.autoStartKernel, state.autoStartApp, state.preferIpv6, state.proxyPort, state.apiPort, state.trayInstanceId],
+    [
+      state.proxyMode,
+      state.autoStartKernel,
+      state.autoStartApp,
+      state.preferIpv6,
+      state.proxyPort,
+      state.apiPort,
+      state.trayInstanceId,
+      state.systemProxyBypass,
+      state.tunIpv4,
+      state.tunIpv6,
+      state.tunMtu,
+      state.tunAutoRoute,
+      state.tunStrictRoute,
+      state.tunStack,
+    ],
     async () => {
       if (isInitializing.value) {
         return

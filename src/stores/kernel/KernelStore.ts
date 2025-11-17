@@ -37,6 +37,15 @@ export const useKernelStore = defineStore(
       proxy_port: 12080,
       prefer_ipv6: false,
       auto_start: false,
+      system_proxy_bypass: '',
+      tun: {
+        ipv4_address: '',
+        ipv6_address: '',
+        mtu: 1500,
+        auto_route: true,
+        strict_route: true,
+        stack: 'mixed',
+      },
     })
 
     const isLoading = ref(false)
@@ -122,6 +131,15 @@ export const useKernelStore = defineStore(
           proxy_port: appStore.proxyPort,
           prefer_ipv6: appStore.preferIpv6,
           auto_start: appStore.autoStartKernel,
+          system_proxy_bypass: appStore.systemProxyBypass,
+          tun: {
+            ipv4_address: appStore.tunIpv4,
+            ipv6_address: appStore.tunIpv6,
+            mtu: appStore.tunMtu,
+            auto_route: appStore.tunAutoRoute,
+            strict_route: appStore.tunStrictRoute,
+            stack: appStore.tunStack,
+          },
         }
         
         console.log('📋 内核配置已同步:', {

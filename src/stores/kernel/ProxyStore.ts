@@ -66,7 +66,7 @@ export const useProxyStore = defineStore('proxy', () => {
   // 设置系统代理
   const setSystemProxy = async () => {
     try {
-      await tauriApi.proxy.setSystemProxy()
+      await tauriApi.proxy.setSystemProxy(appStore.systemProxyBypass)
       return true
     } catch (error) {
       console.error('设置系统代理失败:', error)
@@ -77,7 +77,14 @@ export const useProxyStore = defineStore('proxy', () => {
   // 设置TUN代理
   const setTUNProxy = async () => {
     try {
-      await tauriApi.proxy.setTunProxy()
+      await tauriApi.proxy.setTunProxy({
+        ipv4_address: appStore.tunIpv4,
+        ipv6_address: appStore.tunIpv6,
+        mtu: appStore.tunMtu,
+        auto_route: appStore.tunAutoRoute,
+        strict_route: appStore.tunStrictRoute,
+        stack: appStore.tunStack,
+      })
       return true
     } catch (error) {
       console.error('设置TUN代理失败:', error)

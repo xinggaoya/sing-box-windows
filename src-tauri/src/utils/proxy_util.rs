@@ -7,6 +7,24 @@ use winreg::enums::*;
 #[cfg(target_os = "windows")]
 use winreg::RegKey;
 
+/// 默认的系统代理绕过列表
+pub const DEFAULT_BYPASS_LIST: &str =
+    "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;\
+172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*";
+
+fn parse_bypass_entries(raw: Option<&str>) -> Vec<String> {
+    let source = raw
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(DEFAULT_BYPASS_LIST);
+
+    source
+        .split(|c| c == ';' || c == ',' || c == '\n')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
+
 /// 禁用系统代理 (跨平台实现)
 pub fn disable_system_proxy() -> io::Result<()> {
     #[cfg(target_os = "windows")]
@@ -31,20 +49,20 @@ pub fn disable_system_proxy() -> io::Result<()> {
 }
 
 /// 启用系统代理 (跨平台实现)
-pub fn enable_system_proxy(host: &str, port: u16) -> io::Result<()> {
+pub fn enable_system_proxy(host: &str, port: u16, bypass: Option<&str>) -> io::Result<()> {
     #[cfg(target_os = "windows")]
     {
-        enable_system_proxy_windows(host, port)
+        enable_system_proxy_windows(host, port, bypass)
     }
 
     #[cfg(target_os = "linux")]
     {
-        enable_system_proxy_linux(host, port)
+        enable_system_proxy_linux(host, port, bypass)
     }
 
     #[cfg(target_os = "macos")]
     {
-        enable_system_proxy_macos(host, port)
+        enable_system_proxy_macos(host, port, bypass)
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
@@ -147,7 +165,7 @@ fn disable_system_proxy_macos() -> io::Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-fn enable_system_proxy_windows(host: &str, port: u16) -> io::Result<()> {
+fn enable_system_proxy_windows(host: &str, port: u16, bypass: Option<&str>) -> io::Result<()> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let settings = hkcu.open_subkey_with_flags(registry::INTERNET_SETTINGS, KEY_WRITE)?;
 
@@ -159,16 +177,27 @@ fn enable_system_proxy_windows(host: &str, port: u16) -> io::Result<()> {
     settings.set_value(registry::PROXY_ENABLE, &1u32)?;
 
     // 设置绕过本地地址
-    settings.set_value(registry::PROXY_OVERRIDE, &"localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*")?;
+    let entries = parse_bypass_entries(bypass);
+    let override_value = if entries.is_empty() {
+        DEFAULT_BYPASS_LIST.to_string()
+    } else {
+        entries.join(";")
+    };
+    settings.set_value(registry::PROXY_OVERRIDE, &override_value)?;
 
     Ok(())
 }
 
 #[cfg(target_os = "linux")]
-fn enable_system_proxy_linux(host: &str, port: u16) -> io::Result<()> {
+fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io::Result<()> {
     let proxy_url = format!("http://{}:{}", host, port);
     let proxy_url_secure = format!("https://{}:{}", host, port);
-    let no_proxy = "localhost,127.0.0.1,::1,10.*,172.16.*,172.17.*,172.18.*,172.19.*,172.20.*,172.21.*,172.22.*,172.23.*,172.24.*,172.25.*,172.26.*,172.27.*,172.28.*,172.29.*,172.30.*,172.31.*,192.168.*";
+    let entries = parse_bypass_entries(bypass);
+    let no_proxy = if entries.is_empty() {
+        DEFAULT_BYPASS_LIST.replace(';', ",")
+    } else {
+        entries.join(",")
+    };
 
     // 设置环境变量
     std::env::set_var("http_proxy", &proxy_url);
@@ -177,8 +206,8 @@ fn enable_system_proxy_linux(host: &str, port: u16) -> io::Result<()> {
     std::env::set_var("HTTPS_PROXY", &proxy_url_secure);
     std::env::set_var("all_proxy", &proxy_url);
     std::env::set_var("ALL_PROXY", &proxy_url);
-    std::env::set_var("no_proxy", no_proxy);
-    std::env::set_var("NO_PROXY", no_proxy);
+    std::env::set_var("no_proxy", &no_proxy);
+    std::env::set_var("NO_PROXY", &no_proxy);
 
     // 尝试使用gsettings设置代理 (如果可用)
     if let Ok(_) = std::process::Command::new("which").arg("gsettings").output() {
@@ -203,7 +232,7 @@ fn enable_system_proxy_linux(host: &str, port: u16) -> io::Result<()> {
 }
 
 #[cfg(target_os = "macos")]
-fn enable_system_proxy_macos(host: &str, port: u16) -> io::Result<()> {
+fn enable_system_proxy_macos(host: &str, port: u16, bypass: Option<&str>) -> io::Result<()> {
     // 获取所有网络服务
     let output = std::process::Command::new("networksetup")
         .args(&["-listallnetworkservices"])
@@ -211,6 +240,7 @@ fn enable_system_proxy_macos(host: &str, port: u16) -> io::Result<()> {
 
     if output.status.success() {
         let services = String::from_utf8_lossy(&output.stdout);
+        let entries = parse_bypass_entries(bypass);
 
         // 跳过第一行（标题行），处理每个网络服务
         for line in services.lines().skip(1) {
@@ -237,11 +267,14 @@ fn enable_system_proxy_macos(host: &str, port: u16) -> io::Result<()> {
                     .output();
 
                 // 设置代理绕过列表
-                let bypass_list = "127.0.0.1, localhost, *.local, 169.254/16, 10.*, 172.16.*, 172.17.*, 172.18.*, 172.19.*, 172.20.*, 172.21.*, 172.22.*, 172.23.*, 172.24.*, 172.25.*, 172.26.*, 172.27.*, 172.28.*, 172.29.*, 172.30.*, 172.31.*, 192.168.*";
-                let _ = std::process::Command::new("networksetup")
-                    .args(&["-setproxybypassdomains", service])
-                    .args(&bypass_list.split(", ").collect::<Vec<_>>())
-                    .output();
+                if !entries.is_empty() {
+                    let mut cmd = std::process::Command::new("networksetup");
+                    cmd.args(&["-setproxybypassdomains", service]);
+                    for entry in &entries {
+                        cmd.arg(entry);
+                    }
+                    let _ = cmd.output();
+                }
             }
         }
     }

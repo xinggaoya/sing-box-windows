@@ -9,6 +9,12 @@ import { createAppPersistence } from './composables/persistence'
 // 代理模式类型
 export type ProxyMode = 'system' | 'tun' | 'manual'
 
+const DEFAULT_SYSTEM_PROXY_BYPASS =
+  'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*'
+const DEFAULT_TUN_IPV4 = '172.19.0.1/30'
+const DEFAULT_TUN_IPV6 = 'fdfe:dcba:9876::1/126'
+const DEFAULT_TUN_MTU = 1500
+
 export const useAppStore = defineStore(
   'app',
   () => {
@@ -57,6 +63,13 @@ export const useAppStore = defineStore(
     // 端口配置
     const proxyPort = ref(12080) // 代理端口
     const apiPort = ref(12081) // API端口
+    const systemProxyBypass = ref(DEFAULT_SYSTEM_PROXY_BYPASS)
+    const tunIpv4 = ref(DEFAULT_TUN_IPV4)
+    const tunIpv6 = ref(DEFAULT_TUN_IPV6)
+    const tunMtu = ref(DEFAULT_TUN_MTU)
+    const tunAutoRoute = ref(true)
+    const tunStrictRoute = ref(true)
+    const tunStack = ref<'system' | 'gvisor' | 'mixed'>('mixed')
 
     const {
       isDataRestored,
@@ -76,6 +89,13 @@ export const useAppStore = defineStore(
       proxyPort,
       apiPort,
       trayInstanceId,
+      systemProxyBypass,
+      tunIpv4,
+      tunIpv6,
+      tunMtu,
+      tunAutoRoute,
+      tunStrictRoute,
+      tunStack,
     })
 
     // 同步开机自启设置与系统状态
@@ -401,6 +421,40 @@ export const useAppStore = defineStore(
       // 保存会在 watch 中自动处理
     }
 
+    const updateProxyAdvancedSettings = async (settings: {
+      systemProxyBypass?: string
+      tunIpv4?: string
+      tunIpv6?: string
+      tunMtu?: number
+      tunAutoRoute?: boolean
+      tunStrictRoute?: boolean
+      tunStack?: 'system' | 'gvisor' | 'mixed'
+    }) => {
+      if (typeof settings.systemProxyBypass === 'string') {
+        systemProxyBypass.value = settings.systemProxyBypass
+      }
+      if (typeof settings.tunIpv4 === 'string') {
+        tunIpv4.value = settings.tunIpv4
+      }
+      if (typeof settings.tunIpv6 === 'string') {
+        tunIpv6.value = settings.tunIpv6
+      }
+      if (typeof settings.tunMtu === 'number') {
+        tunMtu.value = settings.tunMtu
+      }
+      if (typeof settings.tunAutoRoute === 'boolean') {
+        tunAutoRoute.value = settings.tunAutoRoute
+      }
+      if (typeof settings.tunStrictRoute === 'boolean') {
+        tunStrictRoute.value = settings.tunStrictRoute
+      }
+      if (settings.tunStack && ['system', 'gvisor', 'mixed'].includes(settings.tunStack)) {
+        tunStack.value = settings.tunStack
+      }
+
+      await waitForSaveCompletion()
+    }
+
     // 同步端口配置到sing-box配置文件
     const syncPortsToSingbox = async () => {
       try {
@@ -436,6 +490,13 @@ export const useAppStore = defineStore(
       preferIpv6,
       proxyPort,
       apiPort,
+      systemProxyBypass,
+      tunIpv4,
+      tunIpv6,
+      tunMtu,
+      tunAutoRoute,
+      tunStrictRoute,
+      tunStack,
       isAutostartScenario,
       setRunningState,
       setConnectingState,
@@ -452,6 +513,7 @@ export const useAppStore = defineStore(
       updatePorts,
       syncPortsToSingbox,
       setPreferIpv6,
+      updateProxyAdvancedSettings,
       setTrayInstanceId,
       initializeStore,
       cleanupStore,
