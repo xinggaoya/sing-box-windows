@@ -502,21 +502,45 @@ const restartAsAdmin = async () => {
 
 // 切换代理模式并在必要时重启内核
 const switchProxyModeAndRefreshKernel = async (mode: ProxyMode) => {
-  try {
-    const result = await kernelApi.switchProxyMode(mode)
-    console.log('代理模式切换结果:', result)
-    await appStore.setProxyMode(mode)
-    message.success(t('notification.proxyModeChanged'))
+  const previousMode = appStore.proxyMode as ProxyMode
 
-    if (appStore.isRunning) {
-      console.log('检测到内核正在运行，自动重启以应用新的代理模式')
-      await restartKernel()
+  try {
+    await appStore.setProxyMode(mode)
+    const success = await kernelStore.switchProxyMode(mode)
+
+    if (!success) {
+      await appStore.setProxyMode(previousMode)
+      return false
     }
 
+    message.success(t('notification.proxyModeChanged'))
     return true
   } catch (error) {
     console.error('切换代理模式失败:', error)
+    await appStore.setProxyMode(previousMode)
     message.error(t('notification.proxyModeChangeFailed'))
+    return false
+  }
+}
+
+const prepareTunModeWithAdminRestart = async () => {
+  const previousMode = appStore.proxyMode as ProxyMode
+
+  try {
+    await appStore.setProxyMode('tun')
+    await appStore.saveToBackend()
+    await kernelStore.syncConfig()
+
+    if (appStore.isRunning) {
+      await kernelStore.stopKernel()
+    }
+
+    await restartAsAdmin()
+    return true
+  } catch (error) {
+    console.error('保存 TUN 模式配置失败:', error)
+    await appStore.setProxyMode(previousMode)
+    message.error(t('home.restartFailed'))
     return false
   }
 }
@@ -535,14 +559,11 @@ const onModeChange = async (mode: ProxyMode) => {
       negativeText: t('common.cancel'),
       maskClosable: false,
       onPositiveClick: async () => {
-        const success = await handleModeChange()
-        if (!success) return false
-
         if (!isAdmin.value) {
-          await restartAsAdmin()
+          return prepareTunModeWithAdminRestart()
         }
 
-        return true
+        return handleModeChange()
       },
     })
     return
