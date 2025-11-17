@@ -1,4 +1,6 @@
 use crate::app::constants::{messages, network_config, paths};
+use crate::app::storage::state_model::AppConfig;
+use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use crate::utils::app_util::get_work_dir_sync;
 use crate::utils::http_client;
 use base64;
@@ -22,21 +24,32 @@ pub async fn download_subscription(
 ) -> Result<(), String> {
     let app_handle = window.app_handle();
 
+    let mut app_config = load_app_config(&app_handle)
+        .await
+        .map_err(|e| format!("读取设置失败: {}", e))?;
+
+    if let Some(port) = proxy_port {
+        app_config.proxy_port = port;
+    }
+    if let Some(port) = api_port {
+        app_config.api_port = port;
+    }
+
     download_and_process_subscription(
         url,
         use_original_config,
-        app_handle.clone(),
-        proxy_port,
-        api_port,
+        &app_handle,
+        &app_config,
     )
     .await
     .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
 
     // 使用传入的代理端口
-    if let Some(port) = proxy_port {
-        if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port, None) {
-            warn!("设置系统代理失败: {}", e);
-        }
+    if let Err(e) = crate::app::core::proxy_service::set_system_proxy(
+        app_config.proxy_port,
+        Some(app_config.system_proxy_bypass.clone()),
+    ) {
+        warn!("设置系统代理失败: {}", e);
     }
     Ok(())
 }
@@ -52,20 +65,30 @@ pub async fn add_manual_subscription(
 ) -> Result<(), String> {
     let app_handle = window.app_handle();
 
+    let mut app_config = load_app_config(&app_handle)
+        .await
+        .map_err(|e| format!("读取设置失败: {}", e))?;
+
+    if let Some(port) = proxy_port {
+        app_config.proxy_port = port;
+    }
+    if let Some(port) = api_port {
+        app_config.api_port = port;
+    }
+
     process_subscription_content(
         content,
         use_original_config,
-        app_handle.clone(),
-        proxy_port,
-        api_port,
+        &app_handle,
+        &app_config,
     )
     .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
 
-    // 使用传入的代理端口
-    if let Some(port) = proxy_port {
-        if let Err(e) = crate::app::core::proxy_service::set_system_proxy(port, None) {
-            warn!("设置系统代理失败: {}", e);
-        }
+    if let Err(e) = crate::app::core::proxy_service::set_system_proxy(
+        app_config.proxy_port,
+        Some(app_config.system_proxy_bypass.clone()),
+    ) {
+        warn!("设置系统代理失败: {}", e);
     }
     Ok(())
 }
@@ -194,9 +217,8 @@ fn modify_default_mode(
 async fn download_and_process_subscription(
     url: String,
     use_original_config: bool,
-    _app_handle: tauri::AppHandle,
-    proxy_port: Option<u16>,
-    api_port: Option<u16>,
+    app_handle: &tauri::AppHandle,
+    app_config: &AppConfig,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir_sync();
@@ -212,7 +234,7 @@ async fn download_and_process_subscription(
     }
 
     // 检查模板文件是否存在
-    let template_path = _app_handle
+    let template_path = app_handle
         .path()
         .resolve("src/config/template.json", BaseDirectory::Resource)?;
     if !template_path.exists() {
@@ -233,7 +255,7 @@ async fn download_and_process_subscription(
     // 如果使用原始配置，直接处理原始内容
     if use_original_config {
         info!("使用原始订阅内容，仅修改必要的端口和地址");
-        process_original_config(&response_text, _app_handle, proxy_port, api_port)?;
+        process_original_config(&response_text, app_handle, app_config)?;
         return Ok(());
     }
 
@@ -331,40 +353,6 @@ async fn download_and_process_subscription(
     // 将模板内容解析为JSON对象
     let mut config: Value = serde_json::from_str(&template_content)?;
 
-    // 根据传入的端口参数修改模板配置
-    if let Some(config_obj) = config.as_object_mut() {
-        // 修改代理端口（如果有inbounds）
-        if let Some(inbounds) = config_obj.get_mut("inbounds") {
-            if let Some(inbounds_array) = inbounds.as_array_mut() {
-                for inbound in inbounds_array {
-                    if let Some(inbound_obj) = inbound.as_object_mut() {
-                        if inbound_obj.get("tag").and_then(|t| t.as_str()) == Some("mixed-in") {
-                            if let Some(port) = proxy_port {
-                                inbound_obj.insert("listen_port".to_string(), json!(port));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 修改API端口 - experimental.clash_api.external_controller
-        if let Some(experimental) = config_obj.get_mut("experimental") {
-            if let Some(exp_obj) = experimental.as_object_mut() {
-                if let Some(clash_api) = exp_obj.get_mut("clash_api") {
-                    if let Some(clash_api_obj) = clash_api.as_object_mut() {
-                        if let Some(port) = api_port {
-                            clash_api_obj.insert(
-                                "external_controller".to_string(),
-                                json!(format!("127.0.0.1:{}", port)),
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {
         if let Some(outbounds) = config_obj.get_mut("outbounds") {
@@ -411,6 +399,10 @@ async fn download_and_process_subscription(
             }
         }
     }
+
+    apply_app_settings_to_config(&mut config, app_config);
+
+    apply_app_settings_to_config(&mut config, app_config);
 
     // 保存配置到文件
     let config_path = Path::new(&work_dir).join("sing-box/config.json");
@@ -1060,9 +1052,8 @@ fn update_selector_outbounds(outbounds_array: &mut Vec<Value>, nodes: &Vec<Value
 fn process_subscription_content(
     content: String,
     use_original_config: bool,
-    _app_handle: tauri::AppHandle,
-    proxy_port: Option<u16>,
-    api_port: Option<u16>,
+    app_handle: &tauri::AppHandle,
+    app_config: &AppConfig,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir_sync();
@@ -1082,7 +1073,7 @@ fn process_subscription_content(
     // 如果使用原始配置，直接处理原始内容
     if use_original_config {
         info!("使用原始订阅内容，仅修改必要的端口和地址");
-        process_original_config(&content, _app_handle, proxy_port, api_port)?;
+        process_original_config(&content, app_handle, app_config)?;
         return Ok(());
     }
 
@@ -1104,7 +1095,7 @@ fn process_subscription_content(
     );
 
     // 使用Tauri资源路径API获取模板文件路径
-    let template_path = _app_handle
+    let template_path = app_handle
         .path()
         .resolve("src/config/template.json", BaseDirectory::Resource)?;
     if !template_path.exists() {
@@ -1121,40 +1112,6 @@ fn process_subscription_content(
 
     // 将模板内容解析为JSON对象
     let mut config: Value = serde_json::from_str(&template_content)?;
-
-    // 根据传入的端口参数修改模板配置
-    if let Some(config_obj) = config.as_object_mut() {
-        // 修改代理端口（如果有inbounds）
-        if let Some(inbounds) = config_obj.get_mut("inbounds") {
-            if let Some(inbounds_array) = inbounds.as_array_mut() {
-                for inbound in inbounds_array {
-                    if let Some(inbound_obj) = inbound.as_object_mut() {
-                        if inbound_obj.get("tag").and_then(|t| t.as_str()) == Some("mixed-in") {
-                            if let Some(port) = proxy_port {
-                                inbound_obj.insert("listen_port".to_string(), json!(port));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 修改API端口 - experimental.clash_api.external_controller
-        if let Some(experimental) = config_obj.get_mut("experimental") {
-            if let Some(exp_obj) = experimental.as_object_mut() {
-                if let Some(clash_api) = exp_obj.get_mut("clash_api") {
-                    if let Some(clash_api_obj) = clash_api.as_object_mut() {
-                        if let Some(port) = api_port {
-                            clash_api_obj.insert(
-                                "external_controller".to_string(),
-                                json!(format!("127.0.0.1:{}", port)),
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     // 将提取的节点添加到模板配置中
     if let Some(config_obj) = config.as_object_mut() {
@@ -1253,15 +1210,14 @@ fn process_subscription_content(
 // 添加一个处理原始订阅配置的函数
 fn process_original_config(
     content: &str,
-    _app_handle: tauri::AppHandle,
-    proxy_port: Option<u16>,
-    api_port: Option<u16>,
+    _app_handle: &tauri::AppHandle,
+    app_config: &AppConfig,
 ) -> Result<(), Box<dyn Error>> {
     info!("处理原始订阅配置...");
 
     // 获取端口，如果没有传递则使用默认值
-    let proxy_port = proxy_port.unwrap_or(12080);
-    let api_port = api_port.unwrap_or(12081);
+    let proxy_port = app_config.proxy_port;
+    let api_port = app_config.api_port;
 
     // 解析内容为JSON
     let content_cleaned = clean_json_content(content);
@@ -1374,6 +1330,133 @@ fn process_original_config(
 
     info!("原始订阅配置（修改端口后）已成功保存");
     Ok(())
+}
+
+async fn load_app_config(app_handle: &tauri::AppHandle) -> Result<AppConfig, String> {
+    db_get_app_config(app_handle.clone()).await
+}
+
+fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) {
+    if let Some(config_obj) = config.as_object_mut() {
+        apply_inbounds_settings(config_obj, app_config);
+
+        let experimental = config_obj
+            .entry("experimental".to_string())
+            .or_insert(json!({}));
+        if let Some(exp_obj) = experimental.as_object_mut() {
+            let clash_api = exp_obj
+                .entry("clash_api".to_string())
+                .or_insert(json!({}));
+            if let Some(clash_api_obj) = clash_api.as_object_mut() {
+                clash_api_obj.insert(
+                    "external_controller".to_string(),
+                    json!(format!("127.0.0.1:{}", app_config.api_port)),
+                );
+            }
+        }
+
+        let dns = config_obj
+            .entry("dns".to_string())
+            .or_insert(json!({}));
+        if let Some(dns_obj) = dns.as_object_mut() {
+            let strategy = if app_config.prefer_ipv6 {
+                "prefer_ipv6"
+            } else {
+                "ipv4_only"
+            };
+            dns_obj.insert("strategy".to_string(), json!(strategy));
+        }
+    }
+}
+
+fn apply_inbounds_settings(
+    config_obj: &mut serde_json::Map<String, Value>,
+    app_config: &AppConfig,
+) {
+    const ROUTE_EXCLUDES: [&str; 6] = [
+        "127.0.0.1/8",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "::1/128",
+        "fc00::/7",
+    ];
+
+    let inbounds = config_obj
+        .entry("inbounds".to_string())
+        .or_insert(json!([]));
+
+    if let Some(inbound_array) = inbounds.as_array_mut() {
+        let mut mixed_found = false;
+        let mut tun_found = false;
+
+        for inbound in inbound_array.iter_mut() {
+            if let Some(obj) = inbound.as_object_mut() {
+                match obj.get("tag").and_then(|t| t.as_str()) {
+                    Some("mixed-in") => {
+                        mixed_found = true;
+                        obj.insert("listen_port".to_string(), json!(app_config.proxy_port));
+                        obj.insert(
+                            "set_system_proxy".to_string(),
+                            json!(app_config.proxy_mode == "system"),
+                        );
+                    }
+                    Some("tun-in") => {
+                        tun_found = true;
+                        obj.insert(
+                            "address".to_string(),
+                            json!([app_config.tun_ipv4, app_config.tun_ipv6]),
+                        );
+                        obj.insert(
+                            "auto_route".to_string(),
+                            json!(app_config.tun_auto_route),
+                        );
+                        obj.insert(
+                            "strict_route".to_string(),
+                            json!(app_config.tun_strict_route),
+                        );
+                        obj.insert("stack".to_string(), json!(app_config.tun_stack));
+                        obj.insert("mtu".to_string(), json!(app_config.tun_mtu));
+                        obj.insert(
+                            "sniff_override_destination".to_string(),
+                            json!(true),
+                        );
+                        obj.insert(
+                            "route_exclude_address".to_string(),
+                            json!(ROUTE_EXCLUDES),
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if !mixed_found {
+            inbound_array.push(json!({
+                "type": "mixed",
+                "tag": "mixed-in",
+                "listen": "127.0.0.1",
+                "listen_port": app_config.proxy_port,
+                "sniff": true,
+                "set_system_proxy": app_config.proxy_mode == "system"
+            }));
+        }
+
+        if !tun_found {
+            inbound_array.push(json!({
+                "type": "tun",
+                "tag": "tun-in",
+                "address": [app_config.tun_ipv4, app_config.tun_ipv6],
+                "auto_route": app_config.tun_auto_route,
+                "strict_route": app_config.tun_strict_route,
+                "stack": app_config.tun_stack,
+                "mtu": app_config.tun_mtu,
+                "sniff": true,
+                "sniff_override_destination": true,
+                "route_exclude_address": ROUTE_EXCLUDES
+            }));
+        }
+    }
 }
 
 // 获取当前代理模式
