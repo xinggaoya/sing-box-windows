@@ -17,6 +17,7 @@ pub struct AppConfig {
     pub tun_ipv4: String,
     pub tun_ipv6: String,
     pub tun_stack: String,
+    pub tun_enable_ipv6: bool,
 }
 
 impl Default for AppConfig {
@@ -36,6 +37,7 @@ impl Default for AppConfig {
             tun_ipv4: "172.19.0.1/30".to_string(),
             tun_ipv6: "fdfe:dcba:9876::1/126".to_string(),
             tun_stack: "mixed".to_string(),
+            tun_enable_ipv6: true,
         }
     }
 }

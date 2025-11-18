@@ -14,6 +14,7 @@ export interface AppConfig {
   tun_ipv4: string
   tun_ipv6: string
   tun_stack: string
+  tun_enable_ipv6: boolean
 }
 
 export interface ThemeConfig {

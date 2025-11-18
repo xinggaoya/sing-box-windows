@@ -17,6 +17,7 @@ export interface PersistenceState {
   tunAutoRoute: Ref<boolean>
   tunStrictRoute: Ref<boolean>
   tunStack: Ref<string>
+  tunEnableIpv6: Ref<boolean>
 }
 
 export function createAppPersistence(state: PersistenceState) {
@@ -86,6 +87,7 @@ export function createAppPersistence(state: PersistenceState) {
       state.tunAutoRoute.value = appConfig.tun_auto_route
       state.tunStrictRoute.value = appConfig.tun_strict_route
       state.tunStack.value = appConfig.tun_stack
+      state.tunEnableIpv6.value = appConfig.tun_enable_ipv6
     } catch (error) {
       console.error('从数据库加载应用配置失败:', error)
     } finally {
@@ -110,6 +112,7 @@ export function createAppPersistence(state: PersistenceState) {
         tun_auto_route: state.tunAutoRoute.value,
         tun_strict_route: state.tunStrictRoute.value,
         tun_stack: state.tunStack.value,
+        tun_enable_ipv6: state.tunEnableIpv6.value,
       }
       await DatabaseService.saveAppConfig(config)
       console.log('✅ 应用配置已保存到数据库')
@@ -134,6 +137,7 @@ export function createAppPersistence(state: PersistenceState) {
       state.tunAutoRoute,
       state.tunStrictRoute,
       state.tunStack,
+      state.tunEnableIpv6,
     ],
     async () => {
       if (isInitializing.value) {

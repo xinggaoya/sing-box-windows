@@ -54,6 +54,7 @@ impl DatabaseService {
                 tun_ipv4 TEXT DEFAULT '172.19.0.1/30',
                 tun_ipv6 TEXT DEFAULT 'fdfe:dcba:9876::1/126',
                 tun_stack TEXT DEFAULT 'mixed',
+                tun_enable_ipv6 BOOLEAN DEFAULT TRUE,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -72,6 +73,7 @@ impl DatabaseService {
             "ALTER TABLE app_config ADD COLUMN tun_ipv4 TEXT DEFAULT '172.19.0.1/30'",
             "ALTER TABLE app_config ADD COLUMN tun_ipv6 TEXT DEFAULT 'fdfe:dcba:9876::1/126'",
             "ALTER TABLE app_config ADD COLUMN tun_stack TEXT DEFAULT 'mixed'",
+            "ALTER TABLE app_config ADD COLUMN tun_enable_ipv6 BOOLEAN DEFAULT TRUE",
         ];
 
         for statement in alter_statements {
@@ -191,6 +193,9 @@ impl DatabaseService {
                 tun_stack: row
                     .try_get("tun_stack")
                     .unwrap_or_else(|_| default_config.tun_stack.clone()),
+                tun_enable_ipv6: row
+                    .try_get("tun_enable_ipv6")
+                    .unwrap_or(default_config.tun_enable_ipv6),
             }))
         } else {
             Ok(None)
@@ -201,8 +206,8 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO app_config
-            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_start_kernel)
@@ -219,6 +224,7 @@ impl DatabaseService {
         .bind(&config.tun_ipv4)
         .bind(&config.tun_ipv6)
         .bind(&config.tun_stack)
+        .bind(config.tun_enable_ipv6)
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;

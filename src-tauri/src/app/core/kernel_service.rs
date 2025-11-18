@@ -4,8 +4,9 @@ use crate::app::core::event_relay::{
     create_traffic_event_relay, start_event_relay_with_retry,
 };
 use crate::app::core::proxy_service::{
-    set_manual_proxy, set_system_proxy, set_tun_proxy, update_dns_strategy, TunProxyOptions,
+    set_manual_proxy, set_system_proxy, set_tun_proxy, update_dns_strategy,
 };
+use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use crate::app::storage::state_model::AppConfig;
 use crate::process::manager::ProcessManager;
@@ -2036,6 +2037,8 @@ impl AutoManageOptions {
                 auto_route: config.tun_auto_route,
                 strict_route: config.tun_strict_route,
                 stack: config.tun_stack.clone(),
+                enable_ipv6: config.tun_enable_ipv6,
+                interface_name: None,
             }),
             keep_alive: Some(config.auto_start_kernel),
             force_restart: false,

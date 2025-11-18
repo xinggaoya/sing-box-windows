@@ -8,6 +8,8 @@ pub struct Inbound {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub listen: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub interface_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub listen_port: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<Vec<String>>,

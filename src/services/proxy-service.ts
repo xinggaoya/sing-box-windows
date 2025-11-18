@@ -55,6 +55,7 @@ export class ProxyService {
           auto_route: this.appStore.tunAutoRoute,
           strict_route: this.appStore.tunStrictRoute,
           stack: this.appStore.tunStack,
+          enable_ipv6: this.appStore.tunEnableIpv6,
         })
         this.appStore.proxyMode = 'tun'
         if (messageCallback) {

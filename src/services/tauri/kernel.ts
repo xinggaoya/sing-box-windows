@@ -6,6 +6,8 @@ export interface TunSettings {
   mtu: number
   auto_route: boolean
   strict_route: boolean
+  stack: 'system' | 'gvisor' | 'mixed'
+  enable_ipv6: boolean
 }
 
 export interface KernelStartConfig {
@@ -50,6 +52,7 @@ export const kernelApi = {
         auto_route: store.tunAutoRoute,
         strict_route: store.tunStrictRoute,
         stack: store.tunStack,
+        enable_ipv6: store.tunEnableIpv6,
       }
       const systemProxyBypass =
         options.config?.system_proxy_bypass ?? store.systemProxyBypass
@@ -89,6 +92,7 @@ export const kernelApi = {
         auto_route: store.tunAutoRoute,
         strict_route: store.tunStrictRoute,
         stack: store.tunStack,
+        enable_ipv6: store.tunEnableIpv6,
       }
       const systemProxyBypass =
         options.config?.system_proxy_bypass ?? store.systemProxyBypass
@@ -171,6 +175,7 @@ export const kernelApi = {
           auto_route: store.tunAutoRoute,
           strict_route: store.tunStrictRoute,
           stack: store.tunStack as 'system' | 'gvisor' | 'mixed',
+          enable_ipv6: store.tunEnableIpv6,
         }
         args.tunOptions = tunOptions
         args.tun_options = tunOptions

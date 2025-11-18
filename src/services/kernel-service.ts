@@ -153,6 +153,7 @@ class KernelService {
         auto_route: true,
         strict_route: true,
         stack: 'mixed',
+        enable_ipv6: true,
       },
     }
   }

@@ -25,6 +25,7 @@ export interface TunOptionsPayload {
   auto_route: boolean
   strict_route: boolean
   stack: 'system' | 'gvisor' | 'mixed'
+  enable_ipv6: boolean
 }
 
 export const proxyApi = {

@@ -84,6 +84,7 @@ export const useProxyStore = defineStore('proxy', () => {
         auto_route: appStore.tunAutoRoute,
         strict_route: appStore.tunStrictRoute,
         stack: appStore.tunStack,
+        enable_ipv6: appStore.tunEnableIpv6,
       })
       return true
     } catch (error) {

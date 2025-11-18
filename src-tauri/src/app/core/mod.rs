@@ -6,3 +6,4 @@ pub mod proxy_service;
 pub mod task_manager;
 pub mod websocket_relay;
 pub mod event_relay;
+pub mod tun_profile;

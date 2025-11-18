@@ -314,17 +314,10 @@
 
                 <div class="tun-section">
                   <div class="tun-section-title">{{ t('setting.proxyAdvanced.tunTitle') }}</div>
+                  <p class="tun-section-desc">
+                    {{ t('setting.proxyAdvanced.tunAddressInfo') }}
+                  </p>
                   <n-grid :cols="24" :x-gap="12">
-                    <n-grid-item :span="24" :s="24" :m="12">
-                      <n-form-item :label="t('setting.proxyAdvanced.tunIpv4')">
-                        <n-input v-model:value="proxyAdvancedForm.tunIpv4" />
-                      </n-form-item>
-                    </n-grid-item>
-                    <n-grid-item :span="24" :s="24" :m="12">
-                      <n-form-item :label="t('setting.proxyAdvanced.tunIpv6')">
-                        <n-input v-model:value="proxyAdvancedForm.tunIpv6" />
-                      </n-form-item>
-                    </n-grid-item>
                     <n-grid-item :span="24" :s="24" :m="12">
                       <n-form-item :label="t('setting.proxyAdvanced.tunMtu')">
                         <n-input-number
@@ -342,6 +335,14 @@
                           :options="tunStackOptions"
                         />
                       </n-form-item>
+                    </n-grid-item>
+                    <n-grid-item :span="24" :s="24" :m="12">
+                      <n-form-item :label="t('setting.proxyAdvanced.enableIpv6')">
+                        <n-switch v-model:value="proxyAdvancedForm.tunEnableIpv6" />
+                      </n-form-item>
+                      <div class="helper-text">
+                        {{ t('setting.proxyAdvanced.enableIpv6Desc') }}
+                      </div>
                     </n-grid-item>
                     <n-grid-item :span="24" :s="24" :m="12">
                       <div class="switch-group">
@@ -774,12 +775,11 @@ const { t } = useI18n()
 const savingAdvanced = ref(false)
 const proxyAdvancedForm = reactive({
   systemProxyBypass: appStore.systemProxyBypass,
-  tunIpv4: appStore.tunIpv4,
-  tunIpv6: appStore.tunIpv6,
   tunMtu: appStore.tunMtu,
   tunAutoRoute: appStore.tunAutoRoute,
   tunStrictRoute: appStore.tunStrictRoute,
   tunStack: appStore.tunStack,
+  tunEnableIpv6: appStore.tunEnableIpv6,
 })
 
 // 格式化版本号，只显示纯版本号部分
@@ -842,18 +842,6 @@ watch(
   }
 )
 watch(
-  () => appStore.tunIpv4,
-  value => {
-    proxyAdvancedForm.tunIpv4 = value
-  }
-)
-watch(
-  () => appStore.tunIpv6,
-  value => {
-    proxyAdvancedForm.tunIpv6 = value
-  }
-)
-watch(
   () => appStore.tunMtu,
   value => {
     proxyAdvancedForm.tunMtu = value
@@ -875,6 +863,12 @@ watch(
   () => appStore.tunStack,
   value => {
     proxyAdvancedForm.tunStack = value
+  }
+)
+watch(
+  () => appStore.tunEnableIpv6,
+  value => {
+    proxyAdvancedForm.tunEnableIpv6 = value
   }
 )
 
@@ -1005,44 +999,12 @@ const normalizeBypassList = (value: string) => {
     .join(';')
 }
 
-const isValidIpv4Cidr = (value: string) => {
-  const match = value.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/)
-  if (!match) {
-    return false
-  }
-  const prefix = Number(match[2])
-  if (prefix < 0 || prefix > 32) {
-    return false
-  }
-  return match[1].split('.').every(octet => {
-    const num = Number(octet)
-    return num >= 0 && num <= 255
-  })
-}
-
-const isValidIpv6Cidr = (value: string) => {
-  const match = value.match(/^([0-9a-fA-F:]+)\/(\d{1,3})$/)
-  if (!match) {
-    return false
-  }
-  const prefix = Number(match[2])
-  return prefix >= 0 && prefix <= 128
-}
-
 const saveProxyAdvancedSettings = async () => {
   try {
     savingAdvanced.value = true
     const bypassInput = proxyAdvancedForm.systemProxyBypass.trim()
     if (!bypassInput) {
       message.error(t('setting.proxyAdvanced.errors.bypassRequired'))
-      return
-    }
-    if (!isValidIpv4Cidr(proxyAdvancedForm.tunIpv4)) {
-      message.error(t('setting.proxyAdvanced.errors.invalidIpv4'))
-      return
-    }
-    if (!isValidIpv6Cidr(proxyAdvancedForm.tunIpv6)) {
-      message.error(t('setting.proxyAdvanced.errors.invalidIpv6'))
       return
     }
     if (proxyAdvancedForm.tunMtu < 576 || proxyAdvancedForm.tunMtu > 9000) {
@@ -1057,12 +1019,11 @@ const saveProxyAdvancedSettings = async () => {
 
     await appStore.updateProxyAdvancedSettings({
       systemProxyBypass: normalizeBypassList(bypassInput),
-      tunIpv4: proxyAdvancedForm.tunIpv4,
-      tunIpv6: proxyAdvancedForm.tunIpv6,
       tunMtu: proxyAdvancedForm.tunMtu,
       tunAutoRoute: proxyAdvancedForm.tunAutoRoute,
       tunStrictRoute: proxyAdvancedForm.tunStrictRoute,
       tunStack: proxyAdvancedForm.tunStack as 'system' | 'gvisor' | 'mixed',
+      tunEnableIpv6: proxyAdvancedForm.tunEnableIpv6,
     })
 
     notification.success({
@@ -1530,6 +1491,13 @@ onUnmounted(() => {
   font-size: 14px;
   margin-bottom: 12px;
   color: v-bind('themeStore.isDark ? "#f1f5f9" : "#0f172a"');
+}
+
+.tun-section-desc {
+  font-size: 12px;
+  color: v-bind('themeStore.isDark ? "#9ca3af" : "#475569"');
+  margin: 0 0 16px;
+  line-height: 1.5;
 }
 
 .switch-group {

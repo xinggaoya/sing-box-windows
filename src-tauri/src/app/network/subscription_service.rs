@@ -1,4 +1,5 @@
 use crate::app::constants::{messages, network_config, paths};
+use crate::app::core::tun_profile::TUN_ROUTE_EXCLUDES;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use crate::app::storage::state_model::AppConfig;
 use crate::utils::app_util::get_work_dir_sync;
@@ -1371,14 +1372,10 @@ fn apply_inbounds_settings(
     config_obj: &mut serde_json::Map<String, Value>,
     app_config: &AppConfig,
 ) {
-    const ROUTE_EXCLUDES: [&str; 6] = [
-        "127.0.0.1/8",
-        "10.0.0.0/8",
-        "172.16.0.0/12",
-        "192.168.0.0/16",
-        "::1/128",
-        "fc00::/7",
-    ];
+    let mut tun_addresses = vec![app_config.tun_ipv4.clone()];
+    if app_config.tun_enable_ipv6 {
+        tun_addresses.push(app_config.tun_ipv6.clone());
+    }
 
     let inbounds = config_obj
         .entry("inbounds".to_string())
@@ -1403,7 +1400,7 @@ fn apply_inbounds_settings(
                         tun_found = true;
                         obj.insert(
                             "address".to_string(),
-                            json!([app_config.tun_ipv4, app_config.tun_ipv6]),
+                            json!(tun_addresses.clone()),
                         );
                         obj.insert("auto_route".to_string(), json!(app_config.tun_auto_route));
                         obj.insert(
@@ -1413,7 +1410,10 @@ fn apply_inbounds_settings(
                         obj.insert("stack".to_string(), json!(app_config.tun_stack));
                         obj.insert("mtu".to_string(), json!(app_config.tun_mtu));
                         obj.insert("sniff_override_destination".to_string(), json!(true));
-                        obj.insert("route_exclude_address".to_string(), json!(ROUTE_EXCLUDES));
+                        obj.insert(
+                            "route_exclude_address".to_string(),
+                            json!(TUN_ROUTE_EXCLUDES),
+                        );
                     }
                     _ => {}
                 }
@@ -1435,14 +1435,14 @@ fn apply_inbounds_settings(
             inbound_array.push(json!({
                 "type": "tun",
                 "tag": "tun-in",
-                "address": [app_config.tun_ipv4, app_config.tun_ipv6],
+                "address": tun_addresses,
                 "auto_route": app_config.tun_auto_route,
                 "strict_route": app_config.tun_strict_route,
                 "stack": app_config.tun_stack,
                 "mtu": app_config.tun_mtu,
                 "sniff": true,
                 "sniff_override_destination": true,
-                "route_exclude_address": ROUTE_EXCLUDES
+                "route_exclude_address": TUN_ROUTE_EXCLUDES
             }));
         }
     }

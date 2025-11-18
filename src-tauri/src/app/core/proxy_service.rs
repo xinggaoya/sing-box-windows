@@ -1,11 +1,11 @@
 use crate::app::constants::{config, messages, network_config, paths};
+use crate::app::core::tun_profile::{TunProfile, TunProxyOptions};
 use crate::app::system::config_service;
 use crate::entity::config_model;
 use crate::utils::app_util::get_work_dir_sync;
 use crate::utils::config_util::ConfigUtil;
 use crate::utils::http_client;
 use crate::utils::proxy_util::{disable_system_proxy, enable_system_proxy, DEFAULT_BYPASS_LIST};
-use serde::Deserialize;
 use serde_json::{json, Value};
 use std::error::Error;
 use std::fs;
@@ -13,30 +13,6 @@ use std::path::Path;
 use std::time::Duration;
 use tauri::{Emitter, Runtime};
 use tracing::{error, info, warn};
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(default)]
-pub struct TunProxyOptions {
-    pub ipv4_address: String,
-    pub ipv6_address: String,
-    pub mtu: u16,
-    pub auto_route: bool,
-    pub strict_route: bool,
-    pub stack: String,
-}
-
-impl Default for TunProxyOptions {
-    fn default() -> Self {
-        Self {
-            ipv4_address: "172.19.0.1/30".to_string(),
-            ipv6_address: "fdfe:dcba:9876::1/126".to_string(),
-            mtu: 1500,
-            auto_route: true,
-            strict_route: true,
-            stack: "mixed".to_string(),
-        }
-    }
-}
 
 // 修改代理模式为系统代理
 #[tauri::command]
@@ -54,6 +30,7 @@ pub fn set_system_proxy(port: u16, system_proxy_bypass: Option<String>) -> Resul
         r#type: config::DEFAULT_INBOUND_TYPE.to_string(),
         tag: config::DEFAULT_INBOUND_TAG.to_string(),
         listen: Some(network_config::DEFAULT_CLASH_API_ADDRESS.to_string()),
+        interface_name: None,
         listen_port: Some(port),
         address: None,
         auto_route: None,
@@ -107,6 +84,7 @@ pub fn set_manual_proxy(port: u16) -> Result<(), String> {
         r#type: config::DEFAULT_INBOUND_TYPE.to_string(),
         tag: config::DEFAULT_INBOUND_TAG.to_string(),
         listen: Some(network_config::DEFAULT_CLASH_API_ADDRESS.to_string()),
+        interface_name: None,
         listen_port: Some(port),
         address: None,
         auto_route: None,
@@ -149,60 +127,16 @@ fn set_tun_proxy_impl(port: u16, options: TunProxyOptions) -> Result<(), Box<dyn
     let path = Path::new(&work_dir).join("sing-box/config.json");
     let path_str = path.to_str().ok_or("配置文件路径包含无效字符")?;
     let mut json_util = ConfigUtil::new(path_str)?;
-    let stack_value = match options.stack.as_str() {
-        "system" | "gvisor" | "mixed" => options.stack.clone(),
-        _ => "mixed".to_string(),
-    };
+    let profile = TunProfile::from_options(&options);
 
-    let target_keys = vec!["inbounds"]; // 修改为你的属性路径
-    let new_structs = vec![
-        config_model::Inbound {
-            r#type: "mixed".to_string(),
-            tag: "mixed-in".to_string(),
-            listen: Some(network_config::DEFAULT_CLASH_API_ADDRESS.to_string()),
-            listen_port: Some(port),
-            address: None,
-            auto_route: None,
-            strict_route: None,
-            stack: None,
-            sniff: Some(true),
-            sniff_override_destination: Some(true),
-            mtu: None,
-            route_address: None,
-            route_exclude_address: None,
-            set_system_proxy: None,
-        },
-        config_model::Inbound {
-            r#type: "tun".to_string(),
-            tag: "tun-in".to_string(),
-            listen: None,
-            listen_port: None,
-            address: Some(vec![
-                options.ipv4_address.clone(),
-                options.ipv6_address.clone(),
-            ]),
-            auto_route: Some(options.auto_route),
-            strict_route: Some(options.strict_route),
-            stack: Some(stack_value),
-            sniff: Some(true),
-            sniff_override_destination: Some(true),
-            mtu: Some(options.mtu),
-            route_address: None,
-            route_exclude_address: Some(vec![
-                "127.0.0.1/8".to_string(),
-                "10.0.0.0/8".to_string(),
-                "172.16.0.0/12".to_string(),
-                "192.168.0.0/16".to_string(),
-                "::1/128".to_string(),
-                "fc00::/7".to_string(),
-            ]),
-            set_system_proxy: None,
-        },
-    ];
+    let mut inbounds = profile.to_inbounds(port);
+    if let Some(mixed) = inbounds.get_mut(0) {
+        mixed.listen = Some(network_config::DEFAULT_CLASH_API_ADDRESS.to_string());
+    }
 
     json_util.modify_property(
-        &target_keys,
-        serde_json::to_value(new_structs).map_err(|e| format!("序列化配置失败: {}", e))?,
+        &["inbounds"],
+        serde_json::to_value(inbounds).map_err(|e| format!("序列化配置失败: {}", e))?,
     );
     json_util
         .save()

@@ -70,6 +70,7 @@ export const useAppStore = defineStore(
     const tunAutoRoute = ref(true)
     const tunStrictRoute = ref(true)
     const tunStack = ref<'system' | 'gvisor' | 'mixed'>('mixed')
+    const tunEnableIpv6 = ref(true)
 
     const {
       isDataRestored,
@@ -96,6 +97,7 @@ export const useAppStore = defineStore(
       tunAutoRoute,
       tunStrictRoute,
       tunStack,
+      tunEnableIpv6,
     })
 
     // 同步开机自启设置与系统状态
@@ -425,6 +427,7 @@ export const useAppStore = defineStore(
       tunAutoRoute?: boolean
       tunStrictRoute?: boolean
       tunStack?: 'system' | 'gvisor' | 'mixed'
+      tunEnableIpv6?: boolean
     }) => {
       if (typeof settings.systemProxyBypass === 'string') {
         systemProxyBypass.value = settings.systemProxyBypass
@@ -446,6 +449,9 @@ export const useAppStore = defineStore(
       }
       if (settings.tunStack && ['system', 'gvisor', 'mixed'].includes(settings.tunStack)) {
         tunStack.value = settings.tunStack
+      }
+      if (typeof settings.tunEnableIpv6 === 'boolean') {
+        tunEnableIpv6.value = settings.tunEnableIpv6
       }
 
       await waitForSaveCompletion()

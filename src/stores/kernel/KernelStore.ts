@@ -54,6 +54,7 @@ export const useKernelStore = defineStore(
         auto_route: true,
         strict_route: true,
         stack: 'mixed',
+        enable_ipv6: true,
       },
     })
 
@@ -159,6 +160,7 @@ export const useKernelStore = defineStore(
             auto_route: appStore.tunAutoRoute,
             strict_route: appStore.tunStrictRoute,
             stack: appStore.tunStack,
+            enable_ipv6: appStore.tunEnableIpv6,
           },
         }
         
