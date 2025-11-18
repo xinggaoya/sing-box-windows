@@ -499,6 +499,7 @@ export const useAppStore = defineStore(
       tunAutoRoute,
       tunStrictRoute,
       tunStack,
+      tunEnableIpv6,
       isAutostartScenario,
       setRunningState,
       setConnectingState,
