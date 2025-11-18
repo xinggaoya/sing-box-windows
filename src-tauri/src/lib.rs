@@ -115,6 +115,7 @@ pub fn run() {
             crate::app::core::kernel_service::kernel_stop_enhanced,
             crate::app::core::kernel_service::kernel_get_status_enhanced,
             crate::app::core::kernel_service::kernel_check_health,
+            crate::app::core::kernel_service::kernel_auto_manage,
             // Network - Subscription service commands
             crate::app::network::subscription_service::download_subscription,
             crate::app::network::subscription_service::add_manual_subscription,

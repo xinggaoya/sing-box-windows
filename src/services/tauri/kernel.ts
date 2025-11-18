@@ -30,6 +30,15 @@ export interface KernelStopOptions {
   timeoutMs?: number
 }
 
+export interface KernelAutoManageResult {
+  state: 'missing_kernel' | 'missing_config' | 'invalid_config' | 'running' | 'error'
+  message: string
+  kernel_installed: boolean
+  config_ready: boolean
+  attempted_start: boolean
+  last_start_message?: string
+}
+
 export const kernelApi = {
   async startKernel(options: KernelStartOptions = {}) {
     return withAppStore(async store => {
@@ -64,6 +73,48 @@ export const kernelApi = {
 
       return invokeWithAppContext<{ success: boolean; message: string }>(
         'kernel_start_enhanced',
+        args,
+        { skipDataRestore: true }
+      )
+    })
+  },
+
+  autoManageKernel(options: KernelStartOptions & { forceRestart?: boolean } = {}) {
+    return withAppStore(async store => {
+      await store.waitForDataRestore()
+      const tunOptions = options.config?.tun ?? {
+        ipv4_address: store.tunIpv4,
+        ipv6_address: store.tunIpv6,
+        mtu: store.tunMtu,
+        auto_route: store.tunAutoRoute,
+        strict_route: store.tunStrictRoute,
+        stack: store.tunStack,
+      }
+      const systemProxyBypass =
+        options.config?.system_proxy_bypass ?? store.systemProxyBypass
+      const keepAlive = options.keepAlive ?? store.autoStartKernel
+      const forceRestart = options.forceRestart ?? false
+      const args = {
+        proxyMode: options.config?.proxy_mode ?? store.proxyMode,
+        proxy_mode: options.config?.proxy_mode ?? store.proxyMode,
+        apiPort: options.config?.api_port ?? store.apiPort,
+        api_port: options.config?.api_port ?? store.apiPort,
+        proxyPort: options.config?.proxy_port ?? store.proxyPort,
+        proxy_port: options.config?.proxy_port ?? store.proxyPort,
+        preferIpv6: options.config?.prefer_ipv6 ?? store.preferIpv6,
+        prefer_ipv6: options.config?.prefer_ipv6 ?? store.preferIpv6,
+        systemProxyBypass,
+        system_proxy_bypass: systemProxyBypass,
+        tunOptions,
+        tun_options: tunOptions,
+        keepAlive,
+        keep_alive: keepAlive,
+        forceRestart,
+        force_restart: forceRestart,
+      }
+
+      return invokeWithAppContext<KernelAutoManageResult>(
+        'kernel_auto_manage',
         args,
         { skipDataRestore: true }
       )

@@ -49,7 +49,7 @@ export const useAppStore = defineStore(
     // 代理模式
     const proxyMode = ref<ProxyMode>('system')
 
-    const autoStartKernel = ref(false)
+    const autoStartKernel = ref(true)
 
     // 系统开机自启动设置
     const autoStartApp = ref(false)

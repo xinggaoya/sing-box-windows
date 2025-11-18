@@ -22,7 +22,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            auto_start_kernel: false,
+            auto_start_kernel: true,
             auto_start_app: false,
             prefer_ipv6: false,
             proxy_port: 12080,

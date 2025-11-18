@@ -4,7 +4,7 @@
  */
 import { eventService } from './event-service'
 import { kernelApi } from './tauri'
-import type { KernelStartOptions, KernelStopOptions } from './tauri/kernel'
+import type { KernelStartOptions, KernelStopOptions, KernelAutoManageResult } from './tauri/kernel'
 import { StatusCache } from './kernel/status-cache'
 import { KernelLifecycleController } from './kernel/lifecycle-controller'
 
@@ -180,6 +180,10 @@ class KernelService {
         issues: [error instanceof Error ? error.message : '健康检查失败']
       }
     }
+  }
+
+  autoManageKernel(options: KernelStartOptions & { forceRestart?: boolean } = {}): Promise<KernelAutoManageResult> {
+    return kernelApi.autoManageKernel(options)
   }
 
   private clearStatusCache(): void {

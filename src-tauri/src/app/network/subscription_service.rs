@@ -46,6 +46,12 @@ pub async fn download_subscription(
     ) {
         warn!("设置系统代理失败: {}", e);
     }
+    crate::app::core::kernel_service::auto_manage_with_saved_config(
+        &app_handle,
+        true,
+        "subscription-download",
+    )
+    .await;
     Ok(())
 }
 
@@ -80,6 +86,12 @@ pub async fn add_manual_subscription(
     ) {
         warn!("设置系统代理失败: {}", e);
     }
+    crate::app::core::kernel_service::auto_manage_with_saved_config(
+        &app_handle,
+        true,
+        "subscription-manual",
+    )
+    .await;
     Ok(())
 }
 

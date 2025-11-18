@@ -4,12 +4,13 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { kernelService, type KernelStatus, type KernelConfig } from '@/services/kernel-service'
+import { kernelService, type KernelStatus, type KernelConfig, type KernelAutoManageResult } from '@/services/kernel-service'
 import { useAppStore } from '../app/AppStore'
 import { useConnectionStore } from './ConnectionStore'
 import { useTrafficStore } from './TrafficStore'
 import { useLogStore } from './LogStore'
 import { useKernelRuntimeStore } from './KernelRuntimeStore'
+import { useSubStore } from '../subscription/SubStore'
 
 export const useKernelStore = defineStore(
   'kernel',
@@ -20,6 +21,12 @@ export const useKernelStore = defineStore(
     const trafficStore = useTrafficStore()
     const logStore = useLogStore()
     const runtimeStore = useKernelRuntimeStore()
+    const subStore = useSubStore()
+
+    const autoManageStatus = ref<KernelAutoManageResult | null>(null)
+    const isAutoManaging = ref(false)
+    const autoManageReady = ref(false)
+    let autoManageTimer: ReturnType<typeof setTimeout> | null = null
 
     // 响应式状态
     const status = ref<KernelStatus>({
@@ -77,6 +84,15 @@ export const useKernelStore = defineStore(
     })
 
     const shouldKeepAlive = computed(() => appStore.autoStartKernel)
+    const hasActiveSubscription = computed(() => {
+      const list = subStore.list || []
+      const activeIndex = subStore.activeIndex
+      return Array.isArray(list) &&
+        list.length > 0 &&
+        typeof activeIndex === 'number' &&
+        activeIndex >= 0 &&
+        activeIndex < list.length
+    })
 
       // 检查内核安装状态
     const checkKernelInstallation = async () => {
@@ -156,51 +172,118 @@ export const useKernelStore = defineStore(
       }
     }
 
-    // 启动内核
-    const startKernel = async (options?: { forceRestart?: boolean; keepAlive?: boolean }) => {
-      if (isLoading.value) {
-        console.log('内核正在操作中，忽略启动请求')
-        return false
+    const executeAutoManageKernel = async (
+      options: { forceRestart?: boolean; keepAlive?: boolean } = {},
+      manualTrigger: boolean = false
+    ): Promise<KernelAutoManageResult> => {
+      if (manualTrigger && isLoading.value) {
+        console.log('内核正在操作中，忽略重复的手动请求')
+        return (
+          autoManageStatus.value ?? {
+            state: 'error',
+            message: '内核正在操作中',
+            kernel_installed: isKernelInstalled.value,
+            config_ready: isKernelInstalled.value,
+            attempted_start: true,
+            last_start_message: undefined,
+          }
+        )
       }
 
-      isLoading.value = true
-      lastError.value = ''
+      if (!manualTrigger && (isAutoManaging.value || isLoading.value)) {
+        return (
+          autoManageStatus.value ?? {
+            state: 'missing_kernel',
+            message: '等待上一轮自动管理完成',
+            kernel_installed: isKernelInstalled.value,
+            config_ready: false,
+            attempted_start: false,
+            last_start_message: undefined,
+          }
+        )
+      }
+
+      if (manualTrigger) {
+        isLoading.value = true
+        lastError.value = ''
+      } else {
+        isAutoManaging.value = true
+      }
 
       try {
-        console.log('🚀 开始启动内核...')
-        
-        // 准备启动选项
-        const keepAlive = options?.keepAlive ?? shouldKeepAlive.value
-
-        // 调用服务启动
-        const result = await kernelService.startKernel({
-          forceRestart: options?.forceRestart,
-          keepAlive,
+        const payload = await kernelService.autoManageKernel({
           config: config.value,
+          keepAlive: options.keepAlive ?? shouldKeepAlive.value,
+          forceRestart: options.forceRestart,
         })
-        
-        if (result.success) {
-          console.log('✅ 内核启动成功:', result.message)
-          
-          // 同步状态
+
+        autoManageStatus.value = payload
+
+        if (payload.state === 'running') {
+          console.log('✅ 自动管理结果: 内核已就绪')
           await syncStatus()
-          
-          // 启动数据收集
           await startDataCollection()
-          
-          return true
-        } else {
-          console.error('❌ 内核启动失败:', result.message)
-          lastError.value = result.message
-          return false
+        } else if (payload.message) {
+          console.warn('⚠️ 自动管理结果: ', payload.message)
+          lastError.value = payload.message
         }
+
+        return payload
       } catch (error) {
-        console.error('❌ 内核启动异常:', error)
-        lastError.value = error instanceof Error ? error.message : '启动异常'
-        return false
+        const message = error instanceof Error ? error.message : '自动管理失败'
+        console.error('❌ 自动管理内核异常:', error)
+        lastError.value = message
+        return {
+          state: 'error',
+          message,
+          kernel_installed: isKernelInstalled.value,
+          config_ready: true,
+          attempted_start: manualTrigger,
+          last_start_message: undefined,
+        }
       } finally {
-        isLoading.value = false
+        if (manualTrigger) {
+          isLoading.value = false
+        } else {
+          isAutoManaging.value = false
+        }
       }
+    }
+
+    const scheduleAutoManage = (
+      reason: string,
+      options?: { forceRestart?: boolean }
+    ) => {
+      if (!autoManageReady.value) return
+
+      if (autoManageTimer) {
+        clearTimeout(autoManageTimer)
+      }
+
+      autoManageTimer = setTimeout(() => {
+        console.log(`🧭 触发自动内核管理: ${reason}`)
+        executeAutoManageKernel(
+          {
+            forceRestart: options?.forceRestart,
+            keepAlive: shouldKeepAlive.value,
+          },
+          false
+        ).catch(error => {
+          console.error('自动管理内核失败:', error)
+        })
+      }, 800)
+    }
+
+    // 启动内核
+    const startKernel = async (options?: { forceRestart?: boolean; keepAlive?: boolean }) => {
+      const result = await executeAutoManageKernel(
+        {
+          forceRestart: options?.forceRestart,
+          keepAlive: options?.keepAlive ?? shouldKeepAlive.value,
+        },
+        true
+      )
+      return result.state === 'running'
     }
 
     // 停止内核
@@ -257,19 +340,25 @@ export const useKernelStore = defineStore(
     // 重启内核
     const restartKernel = async (options?: { force?: boolean; keepAlive?: boolean }) => {
       console.log('🔄 开始重启内核...')
-      
-      const stopResult = await stopKernel({ force: options?.force })
-      if (!stopResult) {
-        return false
-      }
-      
-      // 短暂等待
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      return startKernel({
-        forceRestart: options?.force,
-        keepAlive: options?.keepAlive ?? shouldKeepAlive.value,
-      })
+      const result = await executeAutoManageKernel(
+        {
+          forceRestart: true,
+          keepAlive: options?.keepAlive ?? shouldKeepAlive.value,
+        },
+        true
+      )
+      return result.state === 'running'
+    }
+
+    const autoManageKernel = async (options?: { forceRestart?: boolean; keepAlive?: boolean }) => {
+      const result = await executeAutoManageKernel(
+        {
+          forceRestart: options?.forceRestart,
+          keepAlive: options?.keepAlive ?? shouldKeepAlive.value,
+        },
+        true
+      )
+      return result
     }
 
     // 切换代理模式
@@ -432,18 +521,22 @@ export const useKernelStore = defineStore(
     }
 
     const ensureKernelRunning = async () => {
-      if (!isKernelInstalled.value || isRunning.value || isLoading.value) {
+      if (isLoading.value || isAutoManaging.value) {
         return isRunning.value
       }
 
-      return startKernel({ keepAlive: shouldKeepAlive.value })
+      const result = await executeAutoManageKernel(
+        { keepAlive: shouldKeepAlive.value },
+        false
+      )
+      return result.state === 'running'
     }
 
     const handleAutoManageChange = async (enabled: boolean) => {
       if (!isKernelInstalled.value) return
 
       if (enabled) {
-        await ensureKernelRunning()
+        scheduleAutoManage('auto-manage-enabled')
       } else if (isRunning.value && !isLoading.value) {
         await stopKernel({ force: true })
       }
@@ -478,6 +571,7 @@ export const useKernelStore = defineStore(
 
         // 首先检查内核安装状态
         await checkKernelInstallation()
+        await subStore.initializeStore()
 
         // 同步初始状态和配置
         await Promise.all([
@@ -487,6 +581,9 @@ export const useKernelStore = defineStore(
 
         // 设置事件监听
         setupEventListeners()
+
+        autoManageReady.value = true
+        scheduleAutoManage('store-initialized')
 
         // 如果内核正在运行，启动数据收集
         if (isRunning.value) {
@@ -545,6 +642,18 @@ export const useKernelStore = defineStore(
       }
     }
 
+    watch(hasActiveSubscription, (ready) => {
+      if (ready) {
+        scheduleAutoManage('subscription-ready', { forceRestart: true })
+      }
+    })
+
+    watch(isKernelInstalled, (installed) => {
+      if (installed) {
+        scheduleAutoManage('kernel-installed')
+      }
+    })
+
     // 监听运行状态变化
     watch(isRunning, (running) => {
       if (running) {
@@ -571,6 +680,8 @@ export const useKernelStore = defineStore(
       isLoading,
       lastError,
       isKernelInstalled,
+      isAutoManaging,
+      autoManageStatus,
 
       // 计算属性
       isRunning,
@@ -583,6 +694,7 @@ export const useKernelStore = defineStore(
       startKernel,
       stopKernel,
       restartKernel,
+      autoManageKernel,
       switchProxyMode,
       toggleIpVersion,
       updateConfig,
