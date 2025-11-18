@@ -28,6 +28,7 @@ export const useKernelStore = defineStore(
     const isAutoManaging = ref(false)
     const autoManageReady = ref(false)
     let autoManageTimer: ReturnType<typeof setTimeout> | null = null
+    const isWindowsPlatform = typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent)
 
     // 响应式状态
     const status = ref<KernelStatus>({
@@ -371,6 +372,16 @@ export const useKernelStore = defineStore(
 
       try {
         console.log('🔄 切换代理模式:', mode)
+
+        if (
+          mode === 'tun' &&
+          isWindowsPlatform &&
+          ['mixed', 'gvisor'].includes(appStore.tunStack)
+        ) {
+          appStore.showWarningMessage(
+            '当前 Windows 版 sing-box 未启用 gVisor，若选择 Mixed 或 gVisor 栈会导致 TUN 无法连接，请在高级设置中切换到 System 栈。'
+          )
+        }
         
         const result = await kernelService.switchProxyMode(mode)
         

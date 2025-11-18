@@ -170,6 +170,7 @@ export const kernelApi = {
           mtu: store.tunMtu,
           auto_route: store.tunAutoRoute,
           strict_route: store.tunStrictRoute,
+          stack: store.tunStack as 'system' | 'gvisor' | 'mixed',
         }
         args.tunOptions = tunOptions
         args.tun_options = tunOptions
