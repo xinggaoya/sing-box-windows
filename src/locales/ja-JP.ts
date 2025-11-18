@@ -7,14 +7,10 @@ export default {
     confirm: '確認',
     save: '保存',
     delete: '削除',
-    edit: '編集',
     error: 'エラー',
-    success: '成功',
     refresh: '更新',
     unknown: '不明',
-    restart: '再起動',
     search: '検索',
-    later: '後で',
     minimizedToTray: 'トレイに最小化されました',
   },
 
@@ -34,13 +30,12 @@ export default {
 
   // 状态相关
   status: {
-    running: '実行中',
-    stopped: '停止中',
-    starting: '起動中',
-    stopping: '停止中',
-    restarting: '再起動中',
     connecting: '接続中',
     disconnected: '切断',
+    running: '実行中',
+    starting: '起動中',
+    stopping: '停止中',
+    stopped: '停止中',
   },
 
   // 首页
@@ -52,10 +47,6 @@ export default {
     restartAsAdmin: '管理者として再起動',
 
     // 状态信息
-    startSuccess: '起動成功',
-    startFailed: '起動失敗',
-    stopSuccess: '停止成功',
-    stopFailed: '停止失敗',
     restartFailed: '再起動失敗',
     nodeModeChangeSuccess: 'ノードモードの切り替え成功',
     nodeModeChangeFailed: 'ノードモードの切り替え失敗',
@@ -83,7 +74,7 @@ export default {
     status: {
       startingDesc: 'カーネルを起動中です、お待ちください...',
       stoppingDesc: 'カーネルを停止中です、お待ちください...',
-      runningDesc: 'カーネルが実行中です、プロキシサービスが利用可能です',
+      runningDesc: 'カーネルが実行中、プロキシサービスが利用可能',
       stoppedDesc: 'カーネルが停止しています、プロキシサービスは利用できません',
       disconnectedDesc: 'カーネルは起動していますが接続に異常があります、設定を確認してください',
     },
@@ -104,12 +95,9 @@ export default {
       system: 'システムプロキシ',
       tun: 'TUNモード',
       manual: '手動モード',
-      systemTip: '自動的にシステムプロキシを設定する',
-      tunTip: 'TUN仮想ネットワークカードですべてのトラフィックをプロキシ、管理者権限が必要',
-      manualTip: '手動でシステムプロキシを設定する必要があります',
-      systemDescription: 'ウェブブラウザやアプリケーションのシステムプロキシ設定を自動的に構成します',
-      tunDescription: '仮想ネットワークカードを通じてすべてのシステムトラフィックをキャプチャしプロキシします、管理者権限が必要です',
-      manualDescription: 'アプリケーションやブラウザでプロキシ設定を手動で構成します',
+      systemTip: 'システムプロキシを自動設定',
+      tunTip: 'TUN仮想ネットワークカードを使用してすべてのトラフィックをプロキシ、管理者権限が必要',
+      manualTip: '手動でのシステムプロキシ設定が必要',
     },
 
     // 节点代理模式
@@ -117,7 +105,7 @@ export default {
       global: 'グローバルモード',
       rule: 'ルールモード',
       globalTip: 'すべてのトラフィックをプロキシ経由',
-      ruleTip: 'ルールベースのスマート分割',
+      ruleTip: 'ルールに基づくインテリジェントなトラフィックルーティング',
     },
 
     // 切换模式
@@ -134,14 +122,11 @@ export default {
   proxy: {
     title: 'プロキシ設定',
     subtitle: 'プロキシノード管理と遅延テスト',
-    search: '検索',
     nodes: 'ノード',
-    nodeCount: 'ノード',
     testNode: 'テスト',
     testing: 'テスト中...',
     timeout: 'タイムアウト',
     testProgress: 'テスト進捗:',
-    switch: '切り替え',
     switchFailed: '切り替え失敗',
     switchErrorMessage: '切り替え失敗、Sing-Boxが起動しているか確認してください',
     testErrorMessage: '遅延テスト失敗、ノードが到達不能またはAPIが応答していません',
@@ -172,7 +157,6 @@ export default {
     subtitle: 'ネットワーク接続の管理と監視',
     source: '送信元',
     destination: '宛先',
-    networkType: 'ネットワークタイプ',
     rule: 'ルール',
     traffic: 'トラフィック',
     activeConnections: 'アクティブ接続',
@@ -195,7 +179,6 @@ export default {
   log: {
     title: 'ログビューア',
     subtitle: 'システムログをリアルタイムで監視',
-    search: '検索',
     searchLogs: 'ログを検索...',
     clear: 'ログをクリア',
     copy: 'ログをコピー',
@@ -226,7 +209,6 @@ export default {
   rules: {
     title: 'ルール管理',
     subtitle: 'プロキシルーティングルールの管理',
-    search: '検索',
     add: 'ルールを追加',
     type: 'ルールタイプ',
     content: 'ルール内容',
@@ -263,7 +245,6 @@ export default {
     deleteSuccess: '削除成功',
     cannotDeleteActive: '使用中のサブスクリプションは削除できません',
     name: '名前',
-    url: 'URL',
     content: 'コンテンツ',
     namePlaceholder: 'サブスクリプション名を入力してください',
     urlPlaceholder: 'サブスクリプションURLを入力してください',
@@ -353,7 +334,6 @@ export default {
     update: {
       title: '更新設定',
       description: 'アプリの自動更新とバージョンチェックオプションを設定',
-      check: '更新を確認',
       checkNow: '今すぐ確認',
       checkAgain: '再確認',
       checking: '確認中...',
@@ -398,16 +378,6 @@ export default {
     autoStart: {
       app: 'システム起動時に起動',
       appDesc: 'システム起動時にアプリを自動的に実行',
-      kernel: 'カーネルを起動',
-      kernelDesc: 'アプリ起動時にカーネルサービスを自動的に実行',
-    },
-
-    // 内核自动启动
-    kernelAutoStart: {
-      enabled: 'カーネル自動起動が有効',
-      disabled: 'カーネル自動起動が無効',
-      enableSuccess: 'アプリ起動時にカーネルが自動的に起動します',
-      disableSuccess: 'アプリ起動時にカーネルは自動的に起動しません',
     },
 
     // 启动设置
@@ -431,7 +401,6 @@ export default {
       downloadComplete: 'カーネルダウンロード完了！',
       installSuccess: 'カーネルインストール確認成功！',
       installFailed: '有効なカーネルファイルが検出されませんでした',
-      downloadFailed: 'ダウンロード失敗',
       preparingDownload: 'ダウンロード準備中...',
       downloading: 'カーネルをダウンロード中',
       downloadingDescription: 'カーネルファイルをダウンロード中です、お待ちください...',
@@ -495,14 +464,7 @@ export default {
   tray: {
     kernel: 'カーネル',
     show: 'ウィンドウを表示',
-    start: 'カーネルを起動',
-    stop: 'カーネルを停止',
     quit: 'アプリケーションを終了',
-  },
-
-  // プロキシ関連
-  proxyMode: {
-    currentMode: '現在のモード',
   },
 
   // 通知メッセージ

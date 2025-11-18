@@ -7,14 +7,10 @@ export default {
     confirm: 'Confirm',
     save: 'Save',
     delete: 'Delete',
-    edit: 'Edit',
     error: 'Error',
-    success: 'Success',
     refresh: 'Refresh',
     unknown: 'Unknown',
-    restart: 'Restart',
     search: 'Search',
-    later: 'Later',
     minimizedToTray: 'Minimized to tray',
   },
 
@@ -35,10 +31,9 @@ export default {
   // Status related
   status: {
     running: 'Running',
-    stopped: 'Stopped',
     starting: 'Starting',
     stopping: 'Stopping',
-    restarting: 'Restarting',
+    stopped: 'Stopped',
     connecting: 'Connecting',
     disconnected: 'Disconnected',
   },
@@ -49,12 +44,9 @@ export default {
     start: 'Start',
     stop: 'Stop',
     restart: 'Restart',
+    restartAsAdmin: 'Restart as Admin',
 
     // Status messages
-    startSuccess: 'Started successfully',
-    startFailed: 'Start failed',
-    stopSuccess: 'Stopped successfully',
-    stopFailed: 'Stop failed',
     restartFailed: 'Restart failed',
     nodeModeChangeSuccess: 'Node mode changed successfully',
     nodeModeChangeFailed: 'Node mode change failed',
@@ -72,6 +64,12 @@ export default {
       normal: 'Normal User',
     },
 
+    // Status description
+    status: {
+      runningDesc: 'Kernel is running, proxy service available',
+      disconnectedDesc: 'Kernel started but connection abnormal, please check configuration',
+    },
+
     // Proxy headers
     proxyHeader: {
       flowMode: 'Flow Proxy Mode',
@@ -82,9 +80,7 @@ export default {
     status: {
       startingDesc: 'Starting kernel, please wait...',
       stoppingDesc: 'Stopping kernel, please wait...',
-      runningDesc: 'Kernel is running, proxy service available',
       stoppedDesc: 'Kernel stopped, proxy service unavailable',
-      disconnectedDesc: 'Kernel started but connection abnormal, please check configuration',
     },
 
     // Traffic statistics
@@ -103,12 +99,9 @@ export default {
       system: 'System Proxy',
       tun: 'TUN Mode',
       manual: 'Manual Mode',
-      systemTip: 'Auto configure system proxy',
-      tunTip: 'Use TUN virtual network card to proxy all traffic, requires admin privileges',
+      systemTip: 'Automatically set system proxy',
+      tunTip: 'Use TUN virtual network card to proxy all traffic, requires administrator privileges',
       manualTip: 'Requires manual configuration of system proxy',
-      systemDescription: 'Automatically configure system proxy settings to provide proxy services for browsers and applications',
-      tunDescription: 'Capture and proxy all system traffic through virtual network card, requires administrator privileges',
-      manualDescription: 'Requires manual proxy configuration in applications and browsers',
     },
 
     // Node proxy mode
@@ -133,14 +126,11 @@ export default {
   proxy: {
     title: 'Proxy Settings',
     subtitle: 'Proxy node management and latency testing',
-    search: 'Search',
     nodes: 'Nodes',
-    nodeCount: 'nodes',
     testNode: 'Test',
     testing: 'Testing...',
     timeout: 'Timeout',
     testProgress: 'Test Progress:',
-    switch: 'Switch',
     switchFailed: 'Switch failed',
     switchErrorMessage: 'Switch failed, please check if Sing-Box is running',
     testErrorMessage: 'Latency test failed, node may be unreachable or API not responding',
@@ -171,7 +161,6 @@ export default {
     subtitle: 'Manage and monitor network connections',
     source: 'Source',
     destination: 'Destination',
-    networkType: 'Network Type',
     rule: 'Rule',
     traffic: 'Traffic',
     activeConnections: 'Active Connections',
@@ -194,7 +183,6 @@ export default {
   log: {
     title: 'Log Viewer',
     subtitle: 'Monitor system logs in real time',
-    search: 'Search',
     searchLogs: 'Search logs...',
     clear: 'Clear Logs',
     copy: 'Copy Logs',
@@ -225,7 +213,6 @@ export default {
   rules: {
     title: 'Rule Management',
     subtitle: 'Manage proxy routing rules',
-    search: 'Search',
     add: 'Add Rule',
     type: 'Rule Type',
     content: 'Rule Content',
@@ -262,7 +249,6 @@ export default {
     deleteSuccess: 'Deleted successfully',
     cannotDeleteActive: 'Cannot delete subscription in use',
     name: 'Name',
-    url: 'URL',
     content: 'Content',
     namePlaceholder: 'Please enter subscription name',
     urlPlaceholder: 'Please enter subscription URL',
@@ -352,7 +338,6 @@ export default {
     update: {
       title: 'Update Settings',
       description: 'Configure application auto-update and version check options',
-      check: 'Check for Updates',
       checkNow: 'Check Now',
       checkAgain: 'Check Again',
       checking: 'Checking...',
@@ -397,18 +382,9 @@ export default {
     autoStart: {
       app: 'Startup with System',
       appDesc: 'Automatically run application on system startup',
-      kernel: 'Start Kernel',
-      kernelDesc: 'Automatically run kernel service on application startup',
     },
 
-    // Kernel auto-start
-    kernelAutoStart: {
-      enabled: 'Auto-start kernel enabled',
-      disabled: 'Auto-start kernel disabled',
-      enableSuccess: 'Kernel will start automatically when application starts',
-      disableSuccess: 'Kernel will not start automatically when application starts',
-    },
-
+    
     // Startup settings
     startup: {
       title: 'Startup Settings',
@@ -430,8 +406,7 @@ export default {
       downloadComplete: 'Kernel download complete!',
       installSuccess: 'Kernel installation verification successful!',
       installFailed: 'No valid kernel file detected',
-      downloadFailed: 'Download failed',
-      preparingDownload: 'Preparing download...',
+    preparingDownload: 'Preparing download...',
       downloading: 'Downloading kernel',
       downloadingDescription: 'Kernel file is downloading, please wait...',
       manualDownload: 'Manual Download',
@@ -494,14 +469,7 @@ export default {
   tray: {
     kernel: 'Kernel',
     show: 'Show Window',
-    start: 'Start Kernel',
-    stop: 'Stop Kernel',
     quit: 'Quit Application',
-  },
-
-  // Proxy related
-  proxyMode: {
-    currentMode: 'Current Mode',
   },
 
   // Notification messages

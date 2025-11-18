@@ -7,14 +7,10 @@ export default {
     confirm: '确认',
     save: '保存',
     delete: '删除',
-    edit: '编辑',
     error: '错误',
-    success: '成功',
     refresh: '刷新',
     unknown: '未知',
-    restart: '重启',
     search: '搜索',
-    later: '稍后',
     minimizedToTray: '已最小化到托盘',
   },
 
@@ -35,10 +31,9 @@ export default {
   // 状态相关
   status: {
     running: '运行中',
-    stopped: '已停止',
     starting: '启动中',
     stopping: '停止中',
-    restarting: '重启中',
+    stopped: '已停止',
     connecting: '连接中',
     disconnected: '已断开',
   },
@@ -49,12 +44,9 @@ export default {
     start: '启动',
     stop: '停止',
     restart: '重启',
+    restartAsAdmin: '以管理员重启',
 
     // 状态信息
-    startSuccess: '启动成功',
-    startFailed: '启动失败',
-    stopSuccess: '停止成功',
-    stopFailed: '停止失败',
     restartFailed: '重启失败',
     nodeModeChangeSuccess: '节点模式切换成功',
     nodeModeChangeFailed: '节点模式切换失败',
@@ -80,11 +72,11 @@ export default {
 
     // 状态描述
     status: {
+      runningDesc: '内核正在运行，代理服务可用',
+      disconnectedDesc: '内核已启动但连接异常，请检查配置',
       startingDesc: '正在启动内核，请稍候...',
       stoppingDesc: '正在停止内核，请稍候...',
-      runningDesc: '内核正在运行，代理服务可用',
       stoppedDesc: '内核已停止，代理服务不可用',
-      disconnectedDesc: '内核已启动但连接异常，请检查配置',
     },
 
     // 流量统计
@@ -106,9 +98,6 @@ export default {
       systemTip: '自动设置系统代理',
       tunTip: '使用TUN虚拟网卡代理所有流量，需要管理员权限',
       manualTip: '需要手动配置系统代理',
-      systemDescription: '自动配置系统代理设置，为浏览器和应用程序提供代理服务',
-      tunDescription: '通过虚拟网卡捕获并代理所有系统流量，需要管理员权限',
-      manualDescription: '需要在应用程序和浏览器中手动配置代理设置',
     },
 
     // 节点代理模式
@@ -133,14 +122,11 @@ export default {
   proxy: {
     title: '代理设置',
     subtitle: '代理节点管理与延迟测试',
-    search: '搜索',
     nodes: '节点',
-    nodeCount: '个节点',
     testNode: '测试',
     testing: '测试中...',
     timeout: '超时',
     testProgress: '测试进度:',
-    switch: '切换',
     switchFailed: '切换失败',
     switchErrorMessage: '切换失败，请检查Sing-Box是否已启动',
     testErrorMessage: '延迟测试失败，可能是节点无法连接或API未响应',
@@ -171,7 +157,6 @@ export default {
     subtitle: '管理和监控网络连接',
     source: '来源',
     destination: '目标',
-    networkType: '网络类型',
     rule: '规则',
     traffic: '流量',
     activeConnections: '活跃连接',
@@ -194,7 +179,6 @@ export default {
   log: {
     title: '日志查看',
     subtitle: '实时监控系统日志',
-    search: '搜索',
     searchLogs: '搜索日志...',
     clear: '清空日志',
     copy: '复制日志',
@@ -225,7 +209,6 @@ export default {
   rules: {
     title: '规则管理',
     subtitle: '管理代理路由规则',
-    search: '搜索',
     add: '添加规则',
     type: '规则类型',
     content: '规则内容',
@@ -262,7 +245,6 @@ export default {
     deleteSuccess: '删除成功',
     cannotDeleteActive: '无法删除正在使用的订阅',
     name: '名称',
-    url: '链接',
     content: '内容',
     namePlaceholder: '请输入订阅名称',
     urlPlaceholder: '请输入订阅链接',
@@ -352,8 +334,7 @@ export default {
     update: {
       title: '更新设置',
       description: '配置应用自动更新和版本检查选项',
-      check: '检查更新',
-      checkNow: '立即检查',
+        checkNow: '立即检查',
       checkAgain: '重新检查',
       checking: '检查中...',
       autoCheck: '自动检查更新',
@@ -397,16 +378,6 @@ export default {
     autoStart: {
       app: '开机自启',
       appDesc: '系统启动时自动运行应用程序',
-      kernel: '启动内核',
-      kernelDesc: '应用启动时自动运行内核服务',
-    },
-
-    // 内核自动启动
-    kernelAutoStart: {
-      enabled: '自动启动内核已启用',
-      disabled: '自动启动内核已禁用',
-      enableSuccess: '应用启动时将自动启动内核',
-      disableSuccess: '应用启动时不会自动启动内核',
     },
 
     // 启动设置
@@ -430,8 +401,7 @@ export default {
       downloadComplete: '内核下载完成！',
       installSuccess: '内核安装验证成功！',
       installFailed: '未检测到有效的内核文件',
-      downloadFailed: '下载失败',
-      preparingDownload: '准备下载...',
+        preparingDownload: '准备下载...',
       downloading: '正在下载内核',
       downloadingDescription: '内核文件正在下载中，请稍候...',
       manualDownload: '手动下载',
@@ -494,16 +464,10 @@ export default {
   tray: {
     kernel: '内核',
     show: '显示窗口',
-    start: '启动内核',
-    stop: '停止内核',
     quit: '退出应用',
   },
 
-  // 代理相关
-  proxyMode: {
-    currentMode: '当前模式',
-  },
-
+  
   // 通知消息
   notification: {
     proxyModeChanged: '代理模式已更改',
