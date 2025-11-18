@@ -1,4 +1,5 @@
 use crate::app::constants::{config, messages, network_config, paths};
+use crate::app::system::config_service;
 use crate::entity::config_model;
 use crate::utils::app_util::get_work_dir_sync;
 use crate::utils::config_util::ConfigUtil;
@@ -40,6 +41,7 @@ impl Default for TunProxyOptions {
 // 修改代理模式为系统代理
 #[tauri::command]
 pub fn set_system_proxy(port: u16, system_proxy_bypass: Option<String>) -> Result<(), String> {
+    config_service::ensure_singbox_config().map_err(|e| format!("准备配置失败: {}", e))?;
     let config_path = paths::get_config_path();
     let config_path_str = config_path.to_str().ok_or("配置文件路径包含无效字符")?;
 
@@ -92,6 +94,7 @@ pub fn set_system_proxy(port: u16, system_proxy_bypass: Option<String>) -> Resul
 // 设置手动代理模式（不自动设置系统代理）
 #[tauri::command]
 pub fn set_manual_proxy(port: u16) -> Result<(), String> {
+    config_service::ensure_singbox_config().map_err(|e| format!("准备配置失败: {}", e))?;
     let config_path = paths::get_config_path();
     let config_path_str = config_path.to_str().ok_or("配置文件路径包含无效字符")?;
 
@@ -141,6 +144,7 @@ pub fn set_tun_proxy(port: u16, tun_options: Option<TunProxyOptions>) -> Result<
 }
 
 fn set_tun_proxy_impl(port: u16, options: TunProxyOptions) -> Result<(), Box<dyn Error>> {
+    config_service::ensure_singbox_config().map_err(|e| format!("准备配置失败: {}", e))?;
     let work_dir = get_work_dir_sync();
     let path = Path::new(&work_dir).join("sing-box/config.json");
     let path_str = path.to_str().ok_or("配置文件路径包含无效字符")?;

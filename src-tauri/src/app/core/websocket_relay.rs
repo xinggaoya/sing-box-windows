@@ -1,5 +1,5 @@
-use serde::Serialize;
 use futures_util::StreamExt;
+use serde::Serialize;
 use serde_json::Value;
 use std::sync::Arc;
 use tauri::Emitter;
@@ -57,14 +57,14 @@ impl<R: Send + Sync + 'static + Serialize> WebSocketRelay<R> {
         // 处理接收到的消息
         let receive_task = task::spawn(async move {
             let mut message_count = 0u64;
-            
+
             while let Some(msg) = read.next().await {
                 match msg {
                     Ok(Message::Text(text)) => {
                         match serde_json::from_str::<Value>(&text) {
                             Ok(data) => {
                                 let parsed_data = parser(data);
-                                
+
                                 // 发送到前端
                                 if let Err(e) = window.emit(&event_name_clone, &parsed_data) {
                                     error!("发送{}事件失败: {}", event_name, e);
@@ -72,7 +72,7 @@ impl<R: Send + Sync + 'static + Serialize> WebSocketRelay<R> {
                                 }
 
                                 message_count += 1;
-                                
+
                                 // 每100条消息或缓冲区快满时记录一次
                                 if message_count % 100 == 0 {
                                     info!("已处理{}条{}数据", message_count, event_name);
@@ -116,11 +116,7 @@ impl<R: Send + Sync + 'static + Serialize> WebSocketRelay<R> {
 }
 
 /// 创建流量数据中继器
-pub fn create_traffic_relay(
-    window: Window,
-    api_port: u16,
-    token: String,
-) -> WebSocketRelay<Value> {
+pub fn create_traffic_relay(window: Window, api_port: u16, token: String) -> WebSocketRelay<Value> {
     WebSocketRelay::new(
         window,
         "/traffic",
@@ -132,11 +128,7 @@ pub fn create_traffic_relay(
 }
 
 /// 创建内存数据中继器
-pub fn create_memory_relay(
-    window: Window,
-    api_port: u16,
-    token: String,
-) -> WebSocketRelay<Value> {
+pub fn create_memory_relay(window: Window, api_port: u16, token: String) -> WebSocketRelay<Value> {
     WebSocketRelay::new(
         window,
         "/memory",
@@ -148,19 +140,8 @@ pub fn create_memory_relay(
 }
 
 /// 创建日志中继器
-pub fn create_log_relay(
-    window: Window,
-    api_port: u16,
-    token: String,
-) -> WebSocketRelay<Value> {
-    WebSocketRelay::new(
-        window,
-        "/logs",
-        "log-data",
-        |data| data,
-        api_port,
-        token,
-    )
+pub fn create_log_relay(window: Window, api_port: u16, token: String) -> WebSocketRelay<Value> {
+    WebSocketRelay::new(window, "/logs", "log-data", |data| data, api_port, token)
 }
 
 /// 创建连接中继器

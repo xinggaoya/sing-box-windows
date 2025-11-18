@@ -24,7 +24,7 @@ impl ProcessManager {
     // 启动进程（带系统环境检查和重试机制）
     pub async fn start(&self) -> Result<()> {
         info!("🚀 开始启动内核进程...");
-        
+
         // 验证配置文件有效性
         self.validate_config().await?;
 
@@ -94,38 +94,42 @@ impl ProcessManager {
         // 多次尝试启动进程
         let max_attempts = 3;
         let mut last_error = ProcessError::StartFailed("未知错误".to_string());
-        
+
         for attempt in 1..=max_attempts {
             info!("🔧 尝试启动内核进程，第 {}/{} 次", attempt, max_attempts);
-            
-            match self.try_start_kernel_process(&kernel_path, &kernel_work_dir).await {
+
+            match self
+                .try_start_kernel_process(&kernel_path, &kernel_work_dir)
+                .await
+            {
                 Ok(child) => {
                     // 保存进程句柄
                     {
                         let mut process_guard = self.process.write().await;
                         *process_guard = Some(child);
                     }
-                    
+
                     // 更稳健的启动检查
                     if self.verify_startup().await {
                         info!("✅ 内核进程启动成功并验证通过");
                         return Ok(());
                     } else {
-                        last_error = ProcessError::StartFailed("内核进程启动后验证失败".to_string());
+                        last_error =
+                            ProcessError::StartFailed("内核进程启动后验证失败".to_string());
                         warn!("❌ 第{}次启动后验证失败", attempt);
-                        
+
                         // 清理失败的进程
                         if let Err(e) = self.cleanup_failed_process().await {
                             error!("清理失败进程时出错: {}", e);
                         }
                     }
-                },
+                }
                 Err(e) => {
                     last_error = e;
                     error!("❌ 第{}次启动失败: {}", attempt, last_error);
                 }
             }
-            
+
             // 如果不是最后一次尝试，等待后重试
             if attempt < max_attempts {
                 let delay = Duration::from_secs(2 * attempt as u64);
@@ -133,14 +137,14 @@ impl ProcessManager {
                 tokio::time::sleep(delay).await;
             }
         }
-        
+
         Err(last_error)
     }
-    
+
     // 检查系统环境
     async fn check_system_environment(&self) -> Result<()> {
         info!("🔍 检查系统环境...");
-        
+
         // 检查是否有足够的系统资源
         #[cfg(windows)]
         {
@@ -158,7 +162,7 @@ impl ProcessManager {
                 }
             }
         }
-        
+
         // 检查内核文件是否可执行
         let kernel_path = paths::get_kernel_path();
         if !kernel_path.exists() {
@@ -167,7 +171,7 @@ impl ProcessManager {
                 kernel_path.to_str().unwrap_or("unknown")
             )));
         }
-        
+
         // 检查工作目录
         let kernel_work_dir = paths::get_kernel_work_dir();
         if !kernel_work_dir.exists() {
@@ -178,11 +182,11 @@ impl ProcessManager {
                 )));
             }
         }
-        
+
         info!("✅ 系统环境检查完成");
         Ok(())
     }
-    
+
     // 尝试启动内核进程
     async fn try_start_kernel_process(
         &self,
@@ -193,28 +197,29 @@ impl ProcessManager {
         cmd.args(&[
             "run",
             "-D",
-            kernel_work_dir.to_str().ok_or_else(|| {
-                ProcessError::StartFailed("工作目录路径包含无效字符".to_string())
-            })?,
+            kernel_work_dir
+                .to_str()
+                .ok_or_else(|| ProcessError::StartFailed("工作目录路径包含无效字符".to_string()))?,
         ]);
 
         #[cfg(target_os = "windows")]
         cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
-        let child = cmd.spawn()
+        let child = cmd
+            .spawn()
             .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
-            
+
         Ok(child)
     }
-    
+
     // 验证启动是否成功
     async fn verify_startup(&self) -> bool {
         info!("🔍 验证内核启动状态...");
-        
+
         // 多次检查，确保真正启动成功
         for i in 1..=5 {
             tokio::time::sleep(Duration::from_secs(1)).await;
-            
+
             if self.is_running().await {
                 info!("✅ 内核状态验证通过（第{}次检查）", i);
                 return true;
@@ -222,11 +227,11 @@ impl ProcessManager {
                 debug!("⏳ 内核尚未就绪，第{}次检查", i);
             }
         }
-        
+
         error!("❌ 内核启动验证失败，多次检查都未通过");
         false
     }
-    
+
     // 清理失败的进程
     async fn cleanup_failed_process(&self) -> Result<()> {
         let mut process_guard = self.process.write().await;
@@ -294,7 +299,9 @@ impl ProcessManager {
         {
             // 获取我们的内核目录，只检测从该目录运行的内核进程
             let kernel_path = crate::app::constants::paths::get_kernel_path();
-            let kernel_dir = kernel_path.parent().unwrap_or_else(|| std::path::Path::new("/nonexistent"));
+            let kernel_dir = kernel_path
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("/nonexistent"));
 
             info!("检查内核进程，内核目录: {:?}", kernel_dir);
 
@@ -335,7 +342,9 @@ impl ProcessManager {
         {
             // 获取我们的内核目录，只检测从该目录运行的内核进程
             let kernel_path = crate::app::constants::paths::get_kernel_path();
-            let kernel_dir = kernel_path.parent().unwrap_or_else(|| std::path::Path::new("/nonexistent"));
+            let kernel_dir = kernel_path
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("/nonexistent"));
 
             info!("检查内核进程，内核目录: {:?}", kernel_dir);
 
@@ -349,7 +358,8 @@ impl ProcessManager {
                 let mut found_pids = Vec::new();
 
                 for line in stdout.lines() {
-                    if line.contains("sing-box") && line.contains(&kernel_dir.display().to_string()) {
+                    if line.contains("sing-box") && line.contains(&kernel_dir.display().to_string())
+                    {
                         if let Some(pid_str) = line.split_whitespace().next() {
                             if let Ok(pid) = pid_str.parse::<u32>() {
                                 found_pids.push(pid);

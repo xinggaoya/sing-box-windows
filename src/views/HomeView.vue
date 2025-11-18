@@ -47,76 +47,39 @@
           </div>
         </div>
         <div class="hero-actions">
-          <n-button
-            v-if="!appStore.isRunning"
-            type="primary"
-            size="large"
-            :loading="isStarting"
-            @click="runKernel"
-            class="primary-control"
-          >
-            <template #icon>
-              <n-icon :size="20">
-                <PlayOutline />
-              </n-icon>
-            </template>
-            {{ t('home.start') }}
-          </n-button>
-          <n-button
-            v-else
-            type="error"
-            size="large"
-            :loading="isStopping"
-            @click="stopKernel"
-            class="primary-control"
-          >
-            <template #icon>
-              <n-icon :size="20">
-                <StopCircleOutline />
-              </n-icon>
-            </template>
-            {{ t('home.stop') }}
-          </n-button>
           <div class="hero-secondary">
             <n-tooltip :show-arrow="false">
               <template #trigger>
                 <n-button
-                  circle
                   tertiary
                   size="medium"
+                  class="rounded-control"
                   @click="restartKernel"
                   :loading="isStarting || isStopping"
                 >
-                  <n-icon :size="18">
-                    <RefreshOutline />
-                  </n-icon>
+                  <template #icon>
+                    <n-icon :size="18">
+                      <RefreshOutline />
+                    </n-icon>
+                  </template>
+                  {{ t('home.restart') }}
                 </n-button>
               </template>
               {{ t('home.restart') }}
             </n-tooltip>
             <n-tooltip :show-arrow="false" v-if="!isAdmin">
               <template #trigger>
-                <n-button circle tertiary size="medium" @click="restartAsAdmin">
-                  <n-icon :size="18">
-                    <ShieldCheckmarkOutline />
-                  </n-icon>
+                <n-button class="rounded-control" tertiary size="medium" @click="restartAsAdmin">
+                  <template #icon>
+                    <n-icon :size="18">
+                      <ShieldCheckmarkOutline />
+                    </n-icon>
+                  </template>
+                  {{ t('home.restartAsAdmin') }}
                 </n-button>
               </template>
               {{ t('home.restartAsAdmin') }}
             </n-tooltip>
-          </div>
-        </div>
-      </div>
-      <div class="hero-stats">
-        <div v-for="stat in quickStats" :key="stat.label" class="stat-card">
-          <div class="stat-icon" :class="`accent-${stat.accent}`">
-            <n-icon :size="18">
-              <component :is="stat.icon" />
-            </n-icon>
-          </div>
-          <div class="stat-body">
-            <p class="stat-label">{{ stat.label }}</p>
-            <p class="stat-value">{{ stat.value }}</p>
           </div>
         </div>
       </div>
@@ -140,26 +103,46 @@
                 {{ getCurrentProxyModeName() }}
               </n-tag>
             </div>
-            <div class="mode-grid">
-              <div
-                v-for="mode in proxyModes"
-                :key="mode.value"
-                class="mode-card"
-                :class="{ 'mode-active': appStore.proxyMode === mode.value }"
-                @click="onModeChange(mode.value as ProxyMode)"
-              >
-                <div class="mode-icon">
-                  <n-icon :size="24">
-                    <component :is="mode.icon" />
-                  </n-icon>
+            <div class="mode-toggle-list">
+              <div class="mode-toggle">
+                <div class="mode-toggle-info">
+                  <div class="mode-icon">
+                    <n-icon :size="24">
+                      <component :is="proxyModes[0].icon" />
+                    </n-icon>
+                  </div>
+                  <div class="mode-content">
+                    <h4 class="mode-name">{{ t(proxyModes[0].nameKey) }}</h4>
+                    <p class="mode-description">{{ t(proxyModes[0].tipKey) }}</p>
+                  </div>
                 </div>
-                <div class="mode-content">
-                  <h4 class="mode-name">{{ t(mode.nameKey) }}</h4>
-                  <p class="mode-description">{{ t(mode.tipKey) }}</p>
+                <n-switch
+                  :value="systemProxyEnabled"
+                  :loading="modeSwitchPending"
+                  :disabled="modeSwitchPending"
+                  size="large"
+                  @update:value="toggleSystemProxy"
+                />
+              </div>
+              <div class="mode-toggle">
+                <div class="mode-toggle-info">
+                  <div class="mode-icon">
+                    <n-icon :size="24">
+                      <component :is="proxyModes[1].icon" />
+                    </n-icon>
+                  </div>
+                  <div class="mode-content">
+                    <h4 class="mode-name">{{ t(proxyModes[1].nameKey) }}</h4>
+                    <p class="mode-description">{{ t(proxyModes[1].tipKey) }}</p>
+                  </div>
                 </div>
-                <div class="mode-indicator">
-                  <span></span>
-                </div>
+                <n-switch
+                  :value="tunProxyEnabled"
+                  :loading="modeSwitchPending"
+                  :disabled="modeSwitchPending"
+                  size="large"
+                  @update:value="toggleTunProxy"
+                />
               </div>
             </div>
           </n-card>
@@ -233,25 +216,21 @@ import {
   NGridItem,
   NTag,
   NTooltip,
+  NSwitch,
   useDialog,
   useMessage,
 } from 'naive-ui'
 import {
-  PlayOutline,
-  StopCircleOutline,
   RefreshOutline,
   SettingsOutline,
   GlobeOutline,
   FlashOutline,
   ShieldCheckmarkOutline,
-  SpeedometerOutline,
   PowerOutline,
   CheckmarkCircleOutline,
   TimeOutline,
   CloseCircleOutline,
   WifiOutline,
-  ArrowUpOutline,
-  ArrowDownOutline,
   RadioOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores'
@@ -260,7 +239,6 @@ import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useThemeStore } from '@/stores/app/ThemeStore'
 import { kernelApi } from '@/services/tauri'
-import { formatBandwidth } from '@/utils'
 import TrafficStatsCard from '@/components/home/TrafficStatsCard.vue'
 import type { ProxyMode } from '@/stores/app/AppStore'
 
@@ -284,6 +262,7 @@ const isStarting = ref(false)
 const isStopping = ref(false)
 const isAdmin = ref(false)
 const currentNodeProxyMode = ref('rule')
+const modeSwitchPending = ref(false)
 
 // 计算属性
 const statusOrbClass = computed(() => {
@@ -298,42 +277,8 @@ const statusIconClass = computed(() => {
   return 'icon-connecting'
 })
 
-// 以适合 UI 的方式展示内存占用
-const formatBytes = (bytes: number) => {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  const value = bytes / Math.pow(1024, index)
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[index]}`
-}
-
-// 首页指标展示
-const quickStats = computed(() => [
-  {
-    label: t('home.traffic.uploadSpeed'),
-    value: `${formatBandwidth(trafficStore.traffic.up || 0)}/s`,
-    icon: ArrowUpOutline,
-    accent: 'upload',
-  },
-  {
-    label: t('home.traffic.downloadSpeed'),
-    value: `${formatBandwidth(trafficStore.traffic.down || 0)}/s`,
-    icon: ArrowDownOutline,
-    accent: 'download',
-  },
-  {
-    label: t('connections.activeConnections'),
-    value: String(connectionStore.connections.length),
-    icon: RadioOutline,
-    accent: 'connections',
-  },
-  {
-    label: t('home.traffic.memory'),
-    value: formatBytes(connectionStore.memory.inuse || 0),
-    icon: SpeedometerOutline,
-    accent: 'memory',
-  },
-])
+const systemProxyEnabled = computed(() => appStore.proxyMode === 'system')
+const tunProxyEnabled = computed(() => appStore.proxyMode === 'tun')
 
 // 代理模式配置 - 恢复原始实现
 const proxyModes = [
@@ -432,47 +377,44 @@ const getNodeProxyModeTagType = (mode: string) => {
   }
 }
 
-// 启动内核
-const runKernel = async () => {
-  if (isStarting.value || isStopping.value) return
-
-  isStarting.value = true
-  try {
-    console.log('🚀 开始启动内核...')
-    const result = await kernelStore.startKernel()
-    if (result) {
-      message.success(t('home.startSuccess'))
-      console.log('✅ 内核启动成功，数据收集已自动启动')
-    } else {
-      message.error(kernelStore.lastError || t('home.startFailed'))
-    }
-  } catch (error) {
-    console.error('启动内核失败:', error)
-    message.error(t('home.startFailed'))
-  } finally {
-    isStarting.value = false
-  }
+const toggleSystemProxy = async (value: boolean) => {
+  const targetMode: ProxyMode = value ? 'system' : tunProxyEnabled.value ? 'tun' : 'manual'
+  await switchProxyModeAndRefreshKernel(targetMode)
 }
 
-// 停止内核
-const stopKernel = async () => {
-  if (isStarting.value || isStopping.value) return
+const confirmTunSwitch = () => {
+  return new Promise<boolean>((resolve) => {
+    dialog.warning({
+      title: t('home.tunConfirm.title'),
+      content: t('home.tunConfirm.description'),
+      positiveText: t('home.tunConfirm.confirm'),
+      negativeText: t('common.cancel'),
+      maskClosable: false,
+      onPositiveClick: async () => {
+        if (!isAdmin.value) {
+          modeSwitchPending.value = true
+          try {
+            const success = await prepareTunModeWithAdminRestart()
+            resolve(success)
+          } finally {
+            modeSwitchPending.value = false
+          }
+        } else {
+          const success = await switchProxyModeAndRefreshKernel('tun')
+          resolve(success)
+        }
+      },
+      onNegativeClick: () => resolve(false),
+    })
+  })
+}
 
-  isStopping.value = true
-  try {
-    console.log('🛑 开始停止内核...')
-    const result = await kernelStore.stopKernel()
-    if (result) {
-      message.success(t('home.stopSuccess'))
-      console.log('✅ 内核停止成功，数据收集已自动停止')
-    } else {
-      message.error(kernelStore.lastError || t('home.stopFailed'))
-    }
-  } catch (error) {
-    console.error('停止内核失败:', error)
-    message.error(t('home.stopFailed'))
-  } finally {
-    isStopping.value = false
+const toggleTunProxy = async (value: boolean) => {
+  if (value) {
+    await confirmTunSwitch()
+  } else {
+    const fallbackMode: ProxyMode = systemProxyEnabled.value ? 'system' : 'manual'
+    await switchProxyModeAndRefreshKernel(fallbackMode)
   }
 }
 
@@ -483,7 +425,9 @@ const restartKernel = async () => {
   isStarting.value = true
   try {
     console.log('🔄 开始重启内核...')
-    const result = await kernelStore.restartKernel()
+    const result = await kernelStore.restartKernel({
+      keepAlive: appStore.autoStartKernel,
+    })
     if (result) {
       message.success(t('home.restartSuccess'))
       console.log('✅ 内核重启成功，数据收集已自动重启')
@@ -512,6 +456,11 @@ const restartAsAdmin = async () => {
 // 切换代理模式并在必要时重启内核
 const switchProxyModeAndRefreshKernel = async (mode: ProxyMode) => {
   const previousMode = appStore.proxyMode as ProxyMode
+  if (modeSwitchPending.value || previousMode === mode) {
+    return previousMode === mode
+  }
+
+  modeSwitchPending.value = true
 
   try {
     await appStore.setProxyMode(mode)
@@ -529,6 +478,8 @@ const switchProxyModeAndRefreshKernel = async (mode: ProxyMode) => {
     await appStore.setProxyMode(previousMode)
     message.error(t('notification.proxyModeChangeFailed'))
     return false
+  } finally {
+    modeSwitchPending.value = false
   }
 }
 
@@ -552,33 +503,6 @@ const prepareTunModeWithAdminRestart = async () => {
     message.error(t('home.restartFailed'))
     return false
   }
-}
-
-// 切换代理模式
-const onModeChange = async (mode: ProxyMode) => {
-  if (appStore.proxyMode === mode || isStarting.value || isStopping.value) return
-
-  const handleModeChange = () => switchProxyModeAndRefreshKernel(mode)
-
-  if (mode === 'tun') {
-    dialog.warning({
-      title: t('home.tunConfirm.title'),
-      content: t('home.tunConfirm.description'),
-      positiveText: t('home.tunConfirm.confirm'),
-      negativeText: t('common.cancel'),
-      maskClosable: false,
-      onPositiveClick: async () => {
-        if (!isAdmin.value) {
-          return prepareTunModeWithAdminRestart()
-        }
-
-        return handleModeChange()
-      },
-    })
-    return
-  }
-
-  await handleModeChange()
 }
 
 // 切换节点代理模式
@@ -748,84 +672,17 @@ onUnmounted(() => {
   justify-content: flex-end;
 }
 
-.primary-control {
+.rounded-control {
   border-radius: 16px;
   font-weight: 600;
-  min-width: 140px;
-  height: 48px;
-  box-shadow: 0 15px 35px rgba(15, 23, 42, 0.15);
+  min-width: 130px;
+  height: 42px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
 }
 
 .hero-secondary {
   display: flex;
   gap: 12px;
-}
-
-.hero-stats {
-  margin-top: 32px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 16px;
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 18px;
-  border-radius: 18px;
-  background: v-bind('themeStore.isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.9)"');
-  border: 1px solid
-    v-bind('themeStore.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(148, 163, 184, 0.25)"');
-  box-shadow: 0 15px 30px
-    v-bind('themeStore.isDark ? "rgba(2, 6, 23, 0.8)" : "rgba(148, 163, 184, 0.2)"');
-  backdrop-filter: blur(16px);
-}
-
-.stat-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.stat-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.accent-upload {
-  background: linear-gradient(135deg, #fb7185, #f43f5e);
-}
-
-.accent-download {
-  background: linear-gradient(135deg, #34d399, #059669);
-}
-
-.accent-connections {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-}
-
-.accent-memory {
-  background: linear-gradient(135deg, #fbbf24, #f97316);
-}
-
-.stat-label {
-  margin: 0;
-  font-size: 12px;
-  color: v-bind('themeStore.isDark ? "#cbd5f5" : "#64748b"');
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.stat-value {
-  margin: 2px 0 0;
-  font-size: 18px;
-  color: v-bind('themeStore.isDark ? "#f8fafc" : "#0f172a"');
-  font-weight: 600;
 }
 
 .content-grid {
@@ -865,6 +722,35 @@ onUnmounted(() => {
   margin: 4px 0 0;
   font-size: 22px;
   color: v-bind('themeStore.isDark ? "#f8fafc" : "#0f172a"');
+}
+
+.mode-toggle-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mode-toggle {
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid
+    v-bind('themeStore.isDark ? "rgba(148, 163, 184, 0.2)" : "rgba(148, 163, 184, 0.4)"');
+  background: v-bind(
+    'themeStore.isDark ? "rgba(148, 163, 184, 0.05)" : "rgba(248, 250, 252, 0.9)"'
+  );
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mode-toggle-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
 }
 
 .mode-grid {
@@ -983,7 +869,7 @@ onUnmounted(() => {
     padding: 24px;
   }
 
-  .primary-control {
+  .rounded-control {
     width: 100%;
   }
 

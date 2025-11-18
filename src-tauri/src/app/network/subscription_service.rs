@@ -1,6 +1,6 @@
 use crate::app::constants::{messages, network_config, paths};
-use crate::app::storage::state_model::AppConfig;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
+use crate::app::storage::state_model::AppConfig;
 use crate::utils::app_util::get_work_dir_sync;
 use crate::utils::http_client;
 use base64;
@@ -35,14 +35,9 @@ pub async fn download_subscription(
         app_config.api_port = port;
     }
 
-    download_and_process_subscription(
-        url,
-        use_original_config,
-        &app_handle,
-        &app_config,
-    )
-    .await
-    .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
+    download_and_process_subscription(url, use_original_config, &app_handle, &app_config)
+        .await
+        .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
 
     // 使用传入的代理端口
     if let Err(e) = crate::app::core::proxy_service::set_system_proxy(
@@ -76,13 +71,8 @@ pub async fn add_manual_subscription(
         app_config.api_port = port;
     }
 
-    process_subscription_content(
-        content,
-        use_original_config,
-        &app_handle,
-        &app_config,
-    )
-    .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
+    process_subscription_content(content, use_original_config, &app_handle, &app_config)
+        .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
 
     if let Err(e) = crate::app::core::proxy_service::set_system_proxy(
         app_config.proxy_port,
@@ -1344,9 +1334,7 @@ fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) {
             .entry("experimental".to_string())
             .or_insert(json!({}));
         if let Some(exp_obj) = experimental.as_object_mut() {
-            let clash_api = exp_obj
-                .entry("clash_api".to_string())
-                .or_insert(json!({}));
+            let clash_api = exp_obj.entry("clash_api".to_string()).or_insert(json!({}));
             if let Some(clash_api_obj) = clash_api.as_object_mut() {
                 clash_api_obj.insert(
                     "external_controller".to_string(),
@@ -1355,9 +1343,7 @@ fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) {
             }
         }
 
-        let dns = config_obj
-            .entry("dns".to_string())
-            .or_insert(json!({}));
+        let dns = config_obj.entry("dns".to_string()).or_insert(json!({}));
         if let Some(dns_obj) = dns.as_object_mut() {
             let strategy = if app_config.prefer_ipv6 {
                 "prefer_ipv6"
@@ -1407,24 +1393,15 @@ fn apply_inbounds_settings(
                             "address".to_string(),
                             json!([app_config.tun_ipv4, app_config.tun_ipv6]),
                         );
-                        obj.insert(
-                            "auto_route".to_string(),
-                            json!(app_config.tun_auto_route),
-                        );
+                        obj.insert("auto_route".to_string(), json!(app_config.tun_auto_route));
                         obj.insert(
                             "strict_route".to_string(),
                             json!(app_config.tun_strict_route),
                         );
                         obj.insert("stack".to_string(), json!(app_config.tun_stack));
                         obj.insert("mtu".to_string(), json!(app_config.tun_mtu));
-                        obj.insert(
-                            "sniff_override_destination".to_string(),
-                            json!(true),
-                        );
-                        obj.insert(
-                            "route_exclude_address".to_string(),
-                            json!(ROUTE_EXCLUDES),
-                        );
+                        obj.insert("sniff_override_destination".to_string(), json!(true));
+                        obj.insert("route_exclude_address".to_string(), json!(ROUTE_EXCLUDES));
                     }
                     _ => {}
                 }

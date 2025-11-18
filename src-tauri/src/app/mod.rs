@@ -4,11 +4,11 @@ pub mod storage; // 重新启用存储模块
 
 // Core services
 pub mod core {
+    pub mod event_relay;
     pub mod kernel_service;
     pub mod proxy_service;
     pub mod task_manager;
     pub mod websocket_relay;
-    pub mod event_relay;
 }
 
 // Network services

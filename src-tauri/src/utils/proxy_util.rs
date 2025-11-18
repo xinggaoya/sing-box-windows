@@ -99,7 +99,10 @@ fn disable_system_proxy_linux() -> io::Result<()> {
     std::env::remove_var("NO_PROXY");
 
     // 尝试使用gsettings重置代理设置 (如果可用)
-    if let Ok(_) = std::process::Command::new("which").arg("gsettings").output() {
+    if let Ok(_) = std::process::Command::new("which")
+        .arg("gsettings")
+        .output()
+    {
         let _ = std::process::Command::new("gsettings")
             .args(&["set", "org.gnome.system.proxy.http", "host", "''"])
             .output();
@@ -210,18 +213,31 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
     std::env::set_var("NO_PROXY", &no_proxy);
 
     // 尝试使用gsettings设置代理 (如果可用)
-    if let Ok(_) = std::process::Command::new("which").arg("gsettings").output() {
+    if let Ok(_) = std::process::Command::new("which")
+        .arg("gsettings")
+        .output()
+    {
         let _ = std::process::Command::new("gsettings")
             .args(&["set", "org.gnome.system.proxy.http", "host", host])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy.http", "port", &port.to_string()])
+            .args(&[
+                "set",
+                "org.gnome.system.proxy.http",
+                "port",
+                &port.to_string(),
+            ])
             .output();
         let _ = std::process::Command::new("gsettings")
             .args(&["set", "org.gnome.system.proxy.https", "host", host])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy.https", "port", &port.to_string()])
+            .args(&[
+                "set",
+                "org.gnome.system.proxy.https",
+                "port",
+                &port.to_string(),
+            ])
             .output();
         let _ = std::process::Command::new("gsettings")
             .args(&["set", "org.gnome.system.proxy", "mode", "'manual'"])

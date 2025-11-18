@@ -766,7 +766,6 @@ onUnmounted(() => {
 
 /* 内容区域 */
 .modern-content {
-  padding: 20px;
   overflow: auto;
 }
 
@@ -841,9 +840,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 480px) {
-  .modern-content {
-    padding: 16px;
-  }
 
   .content-wrapper {
     padding: 0;

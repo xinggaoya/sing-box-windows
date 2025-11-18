@@ -22,6 +22,7 @@ export interface KernelStartOptions {
   config?: Partial<KernelStartConfig>
   forceRestart?: boolean
   timeoutMs?: number
+  keepAlive?: boolean
 }
 
 export interface KernelStopOptions {
@@ -43,6 +44,7 @@ export const kernelApi = {
       }
       const systemProxyBypass =
         options.config?.system_proxy_bypass ?? store.systemProxyBypass
+      const keepAlive = options.keepAlive ?? store.autoStartKernel
       const args = {
         proxyMode: options.config?.proxy_mode ?? store.proxyMode,
         proxy_mode: options.config?.proxy_mode ?? store.proxyMode,
@@ -56,6 +58,8 @@ export const kernelApi = {
         system_proxy_bypass: systemProxyBypass,
         tunOptions,
         tun_options: tunOptions,
+        keepAlive,
+        keep_alive: keepAlive,
       }
 
       return invokeWithAppContext<{ success: boolean; message: string }>(

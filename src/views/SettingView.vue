@@ -195,25 +195,6 @@
                     size="medium"
                   />
                 </div>
-
-                <div class="setting-item">
-                  <div class="setting-main">
-                    <div class="setting-icon">
-                      <n-icon size="18">
-                        <SettingsOutline />
-                      </n-icon>
-                    </div>
-                    <div class="setting-info">
-                      <div class="setting-name">{{ t('setting.autoStart.kernel') }}</div>
-                      <div class="setting-desc">{{ t('setting.autoStart.kernelDesc') }}</div>
-                    </div>
-                  </div>
-                  <n-switch
-                    v-model:value="appStore.autoStartKernel"
-                    @update:value="onAutoStartKernelChange"
-                    size="medium"
-                  />
-                </div>
               </div>
             </div>
           </n-card>
@@ -1149,28 +1130,6 @@ const onAutoStartChange = async (value: boolean) => {
 }
 
 // 自动启动内核设置
-const onAutoStartKernelChange = async (value: boolean) => {
-  try {
-    await appStore.toggleAutoStartKernel(value)
-
-    if (value) {
-      notification.success({
-        title: t('setting.kernelAutoStart.enabled'),
-        content: t('setting.kernelAutoStart.enableSuccess'),
-        duration: 3000,
-      })
-    } else {
-      notification.info({
-        title: t('setting.kernelAutoStart.disabled'),
-        content: t('setting.kernelAutoStart.disableSuccess'),
-        duration: 3000,
-      })
-    }
-  } catch (error) {
-    message.error(`${t('common.error')}: ${error}`)
-  }
-}
-
 const onIpVersionChange = async (value: boolean) => {
   try {
     // 先更新 AppStore 状态并保存到数据库
@@ -1335,31 +1294,25 @@ const savePortSettings = async () => {
     appStore.apiPort = tempApiPort.value
     await appStore.saveToBackend()
 
-    // 是否需要重启
     if (appStore.isRunning) {
-      // 显示需要重启的提示
-      const shouldRestart = await dialog.warning({
+      notification.info({
         title: t('setting.network.restartRequired'),
         content: t('setting.network.restartDesc'),
-        positiveText: t('common.restart'),
-        negativeText: t('common.later'),
+        duration: 2500,
       })
 
-      if (shouldRestart) {
-        // 使用 KernelStore 来处理重启
-        const { useKernelStore } = await import('@/stores/kernel/KernelStore')
-        const kernelStore = useKernelStore()
-        const restartResult = await kernelStore.restartKernel()
+      const restartResult = await kernelStore.restartKernel({
+        keepAlive: appStore.autoStartKernel,
+      })
 
-        if (restartResult) {
-          notification.success({
-            title: t('setting.network.portChanged'),
-            content: t('setting.network.portChangeSuccess'),
-            duration: 3000,
-          })
-        } else {
-          message.error(kernelStore.lastError || t('notification.restartFailed'))
-        }
+      if (restartResult) {
+        notification.success({
+          title: t('setting.network.portChanged'),
+          content: t('setting.network.portChangeSuccess'),
+          duration: 3000,
+        })
+      } else {
+        message.error(kernelStore.lastError || t('notification.restartFailed'))
       }
     } else {
       notification.success({
@@ -1447,7 +1400,7 @@ onUnmounted(() => {
 
 <style scoped>
 .settings-container {
-  padding: 0;
+  padding: 24px;
   background: transparent;
   animation: fadeInUp 0.4s ease-out;
 }

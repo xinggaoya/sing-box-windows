@@ -1,8 +1,8 @@
+use app::storage::EnhancedStorageService;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
-use tracing_subscriber::{fmt, EnvFilter};
-use app::storage::EnhancedStorageService; // 重新启用数据库存储
+use tracing_subscriber::{fmt, EnvFilter}; // 重新启用数据库存储
 
 pub mod app;
 pub mod entity;
@@ -12,12 +12,11 @@ pub mod utils;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 设置默认的 debug 日志级别
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| {
-            // 使用 RUST_LOG 环境变量，或者默认启用 debug 级别
-            std::env::set_var("RUST_LOG", "debug,sing_box_windows=debug,tauri=info");
-            EnvFilter::from_default_env()
-        });
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        // 使用 RUST_LOG 环境变量，或者默认启用 debug 级别
+        std::env::set_var("RUST_LOG", "debug,sing_box_windows=debug,tauri=info");
+        EnvFilter::from_default_env()
+    });
 
     fmt()
         .with_env_filter(env_filter)
@@ -57,9 +56,10 @@ pub fn run() {
                     window.hide().unwrap();
                 }
             }
-            
+
             // 重新启用增强版存储服务（数据库）
-            let enhanced_storage = std::sync::Mutex::new(None as Option<Arc<EnhancedStorageService>>);
+            let enhanced_storage =
+                std::sync::Mutex::new(None as Option<Arc<EnhancedStorageService>>);
             app.manage(enhanced_storage);
 
             // 异步初始化数据库服务
@@ -67,7 +67,10 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 match EnhancedStorageService::new(&app_handle).await {
                     Ok(service) => {
-                        if let Ok(mut enhanced_storage) = app_handle.state::<std::sync::Mutex<Option<Arc<EnhancedStorageService>>>>().lock() {
+                        if let Ok(mut enhanced_storage) = app_handle
+                            .state::<std::sync::Mutex<Option<Arc<EnhancedStorageService>>>>()
+                            .lock()
+                        {
                             *enhanced_storage = Some(Arc::new(service));
                         }
                         tracing::info!("Enhanced storage service initialized successfully");
@@ -77,7 +80,7 @@ pub fn run() {
                     }
                 }
             });
-            
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

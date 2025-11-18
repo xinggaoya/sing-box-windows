@@ -37,13 +37,31 @@ fn get_platform_priority(filename: &str) -> i32 {
 
     match platform {
         "windows" => {
-            if filename.ends_with(".exe") { 2 } else if filename.ends_with(".msi") { 1 } else { 0 }
+            if filename.ends_with(".exe") {
+                2
+            } else if filename.ends_with(".msi") {
+                1
+            } else {
+                0
+            }
         }
         "linux" => {
-            if filename.ends_with(".deb") { 2 } else if filename.ends_with(".AppImage") { 1 } else { 0 }
+            if filename.ends_with(".deb") {
+                2
+            } else if filename.ends_with(".AppImage") {
+                1
+            } else {
+                0
+            }
         }
         "macos" => {
-            if filename.ends_with(".dmg") { 2 } else if filename.ends_with(".app.tar.gz") { 1 } else { 0 }
+            if filename.ends_with(".dmg") {
+                2
+            } else if filename.ends_with(".app.tar.gz") {
+                1
+            } else {
+                0
+            }
         }
         _ => 0,
     }
@@ -214,7 +232,8 @@ pub async fn check_update(
 // 下载更新
 #[tauri::command]
 pub async fn download_update(app_handle: tauri::AppHandle) -> Result<(), String> {
-    let window = app_handle.get_webview_window("main")
+    let window = app_handle
+        .get_webview_window("main")
         .ok_or("无法获取主窗口")?;
 
     // 这里可以实现实际的下载逻辑
@@ -250,7 +269,8 @@ pub async fn download_and_install_update(
     app_handle: tauri::AppHandle,
     download_url: String,
 ) -> Result<(), String> {
-    let window = app_handle.get_webview_window("main")
+    let window = app_handle
+        .get_webview_window("main")
         .ok_or("无法获取主窗口")?;
     let work_dir = get_work_dir_sync();
 
@@ -381,7 +401,10 @@ pub async fn download_and_install_update(
             } else if download_url.ends_with(".deb") {
                 // DEB包: 使用pkexec安装（需要管理员权限）
                 let mut cmd = tokio::process::Command::new("pkexec");
-                cmd.arg("dpkg").arg("-i").arg(&download_path).arg("--force-architecture");
+                cmd.arg("dpkg")
+                    .arg("-i")
+                    .arg(&download_path)
+                    .arg("--force-architecture");
                 cmd.spawn()
             } else {
                 // 其他二进制文件

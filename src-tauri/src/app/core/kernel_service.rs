@@ -10,12 +10,12 @@ use crate::process::manager::ProcessManager;
 use crate::utils::http_client;
 use serde_json::json;
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::Notify;
+use tokio::sync::{Mutex, Notify};
 use tokio::task::JoinHandle;
 use tracing::{error, info, warn};
 
@@ -33,6 +33,76 @@ lazy_static::lazy_static! {
 // 内核启动通知器
 lazy_static::lazy_static! {
     static ref KERNEL_READY_NOTIFY: Arc<Notify> = Arc::new(Notify::new());
+}
+
+static KEEP_ALIVE_ENABLED: AtomicBool = AtomicBool::new(false);
+static GUARDED_API_PORT: AtomicU16 = AtomicU16::new(0);
+
+lazy_static::lazy_static! {
+    static ref KERNEL_GUARD_HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
+}
+
+async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16) {
+    GUARDED_API_PORT.store(api_port, Ordering::Relaxed);
+    if KEEP_ALIVE_ENABLED.swap(true, Ordering::Relaxed) {
+        return;
+    }
+
+    let mut handle_slot = KERNEL_GUARD_HANDLE.lock().await;
+    let guard_handle = tokio::spawn(async move {
+        info!("内核守护已启动");
+        loop {
+            if !KEEP_ALIVE_ENABLED.load(Ordering::Relaxed) {
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_secs(8)).await;
+
+            if !KEEP_ALIVE_ENABLED.load(Ordering::Relaxed) {
+                break;
+            }
+
+            match is_kernel_running().await {
+                Ok(true) => {
+                    continue;
+                }
+                _ => {
+                    info!("守护检测到内核停止，尝试自动重启...");
+                    if let Err(err) = PROCESS_MANAGER.start().await {
+                        warn!("守护重启内核失败: {}", err);
+                        continue;
+                    }
+
+                    let port_value = GUARDED_API_PORT.load(Ordering::Relaxed);
+                    if port_value > 0 {
+                        if let Err(e) =
+                            start_websocket_relay(app_handle.clone(), Some(port_value)).await
+                        {
+                            warn!("守护启动事件中继失败: {}", e);
+                        }
+                    }
+
+                    let _ = app_handle.emit("kernel-ready", ());
+                }
+            }
+        }
+
+        info!("内核守护任务结束");
+    });
+
+    *handle_slot = Some(guard_handle);
+}
+
+async fn disable_kernel_guard() {
+    if !KEEP_ALIVE_ENABLED.swap(false, Ordering::Relaxed) {
+        return;
+    }
+
+    GUARDED_API_PORT.store(0, Ordering::Relaxed);
+    let mut handle_slot = KERNEL_GUARD_HANDLE.lock().await;
+    if let Some(handle) = handle_slot.take() {
+        handle.abort();
+    }
 }
 
 // 获取最新内核版本号
@@ -80,7 +150,11 @@ async fn get_latest_kernel_version() -> Result<String, Box<dyn std::error::Error
                     info!("成功获取版本号: {} (来源: {})", version, api_url);
                     return Ok(version);
                 } else {
-                    warn!("API 返回错误状态: {} (来源: {})", response.status(), api_url);
+                    warn!(
+                        "API 返回错误状态: {} (来源: {})",
+                        response.status(),
+                        api_url
+                    );
                 }
             }
             Err(e) => {
@@ -1030,6 +1104,7 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
 // 停止内核
 #[tauri::command]
 pub async fn stop_kernel() -> Result<String, String> {
+    disable_kernel_guard().await;
     // 停止事件中继
     SHOULD_STOP_EVENTS.store(true, Ordering::Relaxed);
     cleanup_event_relay_tasks().await;
@@ -1598,17 +1673,15 @@ pub async fn get_system_uptime() -> Result<u64, String> {
                                     .as_secs();
 
                                 // 计算运行时间（毫秒）
-                                let uptime_seconds = current_timestamp.saturating_sub(boot_timestamp);
+                                let uptime_seconds =
+                                    current_timestamp.saturating_sub(boot_timestamp);
                                 return Ok(uptime_seconds * 1000);
                             }
                         }
                     }
                 }
                 // 如果sysctl失败，尝试使用uptime命令
-                match tokio::process::Command::new("uptime")
-                    .output()
-                    .await
-                {
+                match tokio::process::Command::new("uptime").output().await {
                     Ok(uptime_output) if uptime_output.status.success() => {
                         let uptime_str = String::from_utf8_lossy(&uptime_output.stdout);
                         // 解析uptime输出，提取运行时间
@@ -1641,22 +1714,28 @@ pub async fn kernel_start_enhanced(
     prefer_ipv6: Option<bool>,
     system_proxy_bypass: Option<String>,
     tun_options: Option<TunProxyOptions>,
+    keep_alive: Option<bool>,
 ) -> Result<serde_json::Value, String> {
     let resolved_mode = proxy_mode.unwrap_or_else(|| "manual".to_string());
     let resolved_api_port = api_port.unwrap_or(12081);
     let resolved_proxy_port = proxy_port.unwrap_or(12080);
     let resolved_ipv6_pref = prefer_ipv6.unwrap_or(false);
     let resolved_tun = tun_options.unwrap_or_default();
+    let keep_alive_enabled = keep_alive.unwrap_or(false);
 
     info!(
         "🚀 启动内核增强版，代理模式: {}, API端口: {}, 代理端口: {}",
         resolved_mode, resolved_api_port, resolved_proxy_port
     );
 
+    crate::app::system::config_service::ensure_singbox_config()
+        .map_err(|e| format!("准备内核配置失败: {}", e))?;
+
     // 同步端口配置，确保配置文件中的端口与UI一致
-    if let Err(e) =
-        crate::app::system::config_service::update_singbox_ports(resolved_proxy_port, resolved_api_port)
-    {
+    if let Err(e) = crate::app::system::config_service::update_singbox_ports(
+        resolved_proxy_port,
+        resolved_api_port,
+    ) {
         warn!("更新端口配置失败: {}", e);
     }
 
@@ -1680,6 +1759,11 @@ pub async fn kernel_start_enhanced(
 
     // 检查内核是否已在运行
     if is_kernel_running().await.unwrap_or(false) {
+        if keep_alive_enabled {
+            enable_kernel_guard(app_handle.clone(), resolved_api_port).await;
+        } else {
+            disable_kernel_guard().await;
+        }
         info!("内核已在运行中");
         return Ok(serde_json::json!({
             "success": true,
@@ -1697,6 +1781,12 @@ pub async fn kernel_start_enhanced(
                 Ok(_) => {
                     info!("✅ 事件中继启动成功");
 
+                    if keep_alive_enabled {
+                        enable_kernel_guard(app_handle.clone(), resolved_api_port).await;
+                    } else {
+                        disable_kernel_guard().await;
+                    }
+
                     // 发送内核就绪事件
                     let _ = app_handle.emit("kernel-ready", ());
 
@@ -1707,6 +1797,12 @@ pub async fn kernel_start_enhanced(
                 }
                 Err(e) => {
                     warn!("⚠️ 事件中继启动失败: {}, 但内核进程已启动", e);
+
+                    if keep_alive_enabled {
+                        enable_kernel_guard(app_handle.clone(), resolved_api_port).await;
+                    } else {
+                        disable_kernel_guard().await;
+                    }
 
                     // 即使事件中继失败，内核也已经启动了
                     let _ = app_handle.emit("kernel-ready", ());
@@ -1749,6 +1845,8 @@ fn apply_proxy_mode_configuration(
 #[tauri::command]
 pub async fn kernel_stop_enhanced() -> Result<serde_json::Value, String> {
     info!("🛑 停止内核增强版");
+
+    disable_kernel_guard().await;
 
     match stop_kernel().await {
         Ok(_) => Ok(serde_json::json!({

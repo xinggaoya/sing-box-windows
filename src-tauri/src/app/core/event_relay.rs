@@ -1,3 +1,4 @@
+use futures_util::StreamExt;
 use serde::Serialize;
 use serde_json::Value;
 use std::cmp::max;
@@ -6,7 +7,6 @@ use tauri::{AppHandle, Emitter};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tracing::{error, info, warn};
 use url::Url;
-use futures_util::StreamExt;
 
 /// 直接的事件发送器，不再使用WebSocket中继
 /// 后端直接连接到sing-box API，然后将数据作为Tauri事件发送到前端
@@ -58,14 +58,14 @@ impl<R: Send + Sync + 'static + Serialize> EventDirectRelay<R> {
         // 处理接收到的消息
         let receive_task = tokio::task::spawn(async move {
             let mut message_count = 0u64;
-            
+
             while let Some(msg) = read.next().await {
                 match msg {
                     Ok(Message::Text(text)) => {
                         match serde_json::from_str::<Value>(&text) {
                             Ok(data) => {
                                 let parsed_data = parser(data);
-                                
+
                                 // 直接发送Tauri事件到前端
                                 if let Err(e) = app_handle.emit(&event_name, &parsed_data) {
                                     error!("发送{}事件失败: {}", event_name, e);
@@ -73,7 +73,7 @@ impl<R: Send + Sync + 'static + Serialize> EventDirectRelay<R> {
                                 }
 
                                 message_count += 1;
-                                
+
                                 // 每100条消息记录一次
                                 if message_count % 100 == 0 {
                                     info!("已处理{}条数据", message_count);
@@ -190,8 +190,11 @@ pub async fn start_event_relay_with_retry(
     let mut retry_delay = std::time::Duration::from_secs(1);
     let max_retry_delay = std::time::Duration::from_secs(10);
 
-    info!("🔌 开始启动{}事件中继器，最大重试次数: {}", relay_type, max_retries);
-    
+    info!(
+        "🔌 开始启动{}事件中继器，最大重试次数: {}",
+        relay_type, max_retries
+    );
+
     loop {
         match relay.start().await {
             Ok(_) => {
@@ -200,36 +203,50 @@ pub async fn start_event_relay_with_retry(
             }
             Err(e) => {
                 retry_count += 1;
-                
+
                 if retry_count >= max_retries {
-                    error!("❌ {}事件中继器重试{}次后仍然失败: {}", relay_type, max_retries, e);
+                    error!(
+                        "❌ {}事件中继器重试{}次后仍然失败: {}",
+                        relay_type, max_retries, e
+                    );
                     break Err(e);
                 }
-                
+
                 // 根据重试次数调整延迟时间，但不超过最大延迟
                 if retry_count <= 3 {
                     retry_delay = std::time::Duration::from_secs(retry_count as u64);
                 } else {
                     retry_delay = max(retry_delay * 2, max_retry_delay);
                 }
-                
-                warn!("⚠️ {}事件中继器失败，{}秒后重试 ({}/{}): {}", 
-                      relay_type, retry_delay.as_secs(), retry_count, max_retries, e);
-                
+
+                warn!(
+                    "⚠️ {}事件中继器失败，{}秒后重试 ({}/{}): {}",
+                    relay_type,
+                    retry_delay.as_secs(),
+                    retry_count,
+                    max_retries,
+                    e
+                );
+
                 // 对于前几次重试，添加额外的系统检查
                 if retry_count <= 2 {
                     info!("🔍 执行系统环境检查（第{}次重试）", retry_count);
-                    
+
                     // 检查是否是开机自启动场景
-                    if let Ok(uptime) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+                    if let Ok(uptime) =
+                        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                    {
                         let uptime_minutes = uptime.as_secs() / 60;
                         if uptime_minutes < 5 {
-                            info!("🕐 检测到系统刚启动（{}分钟），增加额外等待时间", uptime_minutes);
+                            info!(
+                                "🕐 检测到系统刚启动（{}分钟），增加额外等待时间",
+                                uptime_minutes
+                            );
                             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                         }
                     }
                 }
-                
+
                 tokio::time::sleep(retry_delay).await;
             }
         }

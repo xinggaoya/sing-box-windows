@@ -11,7 +11,6 @@ import { useAppStore } from '@/stores'
 import { useSubStore } from '@/stores'
 import { useKernelStore } from '@/stores'
 import { useWindowStore } from '@/stores/app/WindowStore'
-import { ProxyService } from '@/services/proxy-service'
 import i18n from '@/locales'
 import type { ProxyMode } from '@/types'
 import { useRouter } from 'vue-router'
@@ -35,7 +34,6 @@ export const useTrayStore = defineStore('tray', () => {
   const router = useRouter()
   const kernelStore = useKernelStore()
   const windowStore = useWindowStore()
-  const proxyService = ProxyService.getInstance()
 
   // 添加一个内部状态，记录上次菜单刷新时的代理模式
   const lastProxyMode = ref<ProxyMode>(appStore.proxyMode)
@@ -164,134 +162,52 @@ export const useTrayStore = defineStore('tray', () => {
       })
 
       // 创建内核控制子菜单项
-      const startMenuItem = await MenuItem.new({
-        id: 'start',
-        text: t('tray.start'),
-        enabled: !appStore.isRunning,
-        action: async () => {
-          try {
-            await kernelStore.startKernel()
-            appStore.setRunningState(true)
-            await refreshTrayMenu() // 刷新菜单以更新状态
-          } catch (error) {
-            console.error('启动内核失败:', error)
-          }
-        },
-      })
-
-      const stopMenuItem = await MenuItem.new({
-        id: 'stop',
-        text: t('tray.stop'),
-        enabled: appStore.isRunning,
-        action: async () => {
-          await kernelStore.stopKernel()
-          appStore.setRunningState(false)
-          await refreshTrayMenu() // 刷新菜单以更新状态
-        },
-      })
-
       const restartMenuItem = await MenuItem.new({
         id: 'restart',
         text: t('home.restart'),
         enabled: appStore.isRunning,
         action: async () => {
-          await kernelStore.restartKernel()
+          await kernelStore.restartKernel({
+            keepAlive: appStore.autoStartKernel,
+          })
           await refreshTrayMenu() // 刷新菜单以更新状态
         },
+      })
+
+      const statusMenuItem = await MenuItem.new({
+        id: 'kernel_status',
+        text: appStore.isRunning ? t('status.running') : t('status.stopped'),
+        enabled: false,
       })
 
       // 创建内核控制子菜单
       const kernelSubmenu = await Submenu.new({
         id: 'kernel_control',
         text: t('setting.kernel.title'),
-        items: [startMenuItem, stopMenuItem, restartMenuItem],
+        items: [statusMenuItem, restartMenuItem],
       })
 
-      // 创建代理模式子菜单项 - 使用普通MenuItem而不是CheckMenuItem
-      const systemProxyMenuItem = await MenuItem.new({
-        id: 'system_proxy',
-        text: t('home.proxyMode.system'),
-        // 当前为系统代理模式时禁用按钮
-        enabled: currentProxyMode !== 'system',
-        action: async () => {
-          try {
-            await proxyService.switchMode('system')
-            appStore.proxyMode = 'system'
-            // 强制立即刷新菜单
-            await refreshTrayMenu()
-          } catch (error) {
-            console.error('切换到系统代理模式失败:', error)
-          }
-        },
-      })
+      const createProxyMenuItem = async (mode: ProxyMode, label: string) => {
+        const isActive = currentProxyMode === mode
+        return MenuItem.new({
+          id: `proxy_mode_${mode}`,
+          text: `${isActive ? '✓ ' : ''}${label}`,
+          enabled: !isActive,
+          action: async () => {
+            await switchProxyModeFromTray(mode)
+          },
+        })
+      }
 
-      // TUN模式菜单项
-      const tunProxyMenuItem = await MenuItem.new({
-        id: 'tun_mode',
-        text: t('home.proxyMode.tun'),
-        // 当前为TUN模式时禁用按钮
-        enabled: currentProxyMode !== 'tun',
-        action: async () => {
-          try {
-            // 检查是否有管理员权限
-            const isAdmin = await tauriApi.system.checkAdmin()
-            console.log('托盘切换TUN模式 - 当前管理员权限状态:', isAdmin)
-
-            if (!isAdmin) {
-              // 没有管理员权限，先设置模式然后以管理员重启
-              console.log('没有管理员权限，准备以管理员身份重启')
-              try {
-                // 先设置应用状态，以便重启后保持选择
-                appStore.setProxyMode('tun')
-                console.log('已设置应用状态为TUN模式，准备重启')
-
-                // 以管理员重启
-                await tauriApi.system.restartAsAdmin()
-                console.log('已发送管理员重启请求')
-              } catch (restartError) {
-                console.error('以管理员身份重启失败:', restartError)
-                // 重启失败时恢复之前的模式
-                appStore.proxyMode = currentProxyMode
-                await refreshTrayMenu()
-              }
-            } else {
-              // 有管理员权限，正常切换
-              console.log('有管理员权限，正常切换TUN模式')
-              const needClose = await proxyService.switchMode('tun')
-              appStore.proxyMode = 'tun'
-              // 强制立即刷新菜单
-              await refreshTrayMenu()
-              if (needClose) {
-                const appWindow = Window.getCurrent()
-                await appWindow.close()
-              }
-            }
-          } catch (error) {
-            console.error('切换到TUN模式失败:', error)
-            // 切换失败时恢复之前的模式
-            appStore.proxyMode = currentProxyMode
-            await refreshTrayMenu()
-          }
-        },
-      })
-
-      // 手动模式菜单项
-      const manualProxyMenuItem = await MenuItem.new({
-        id: 'manual_mode',
-        text: t('home.proxyMode.manual'),
-        // 当前为手动模式时禁用按钮
-        enabled: currentProxyMode !== 'manual',
-        action: async () => {
-          try {
-            await proxyService.switchMode('manual')
-            appStore.proxyMode = 'manual'
-            // 强制立即刷新菜单
-            await refreshTrayMenu()
-          } catch (error) {
-            console.error('切换到手动模式失败:', error)
-          }
-        },
-      })
+      const systemProxyMenuItem = await createProxyMenuItem(
+        'system',
+        t('home.proxyMode.system'),
+      )
+      const tunProxyMenuItem = await createProxyMenuItem('tun', t('home.proxyMode.tun'))
+      const manualProxyMenuItem = await createProxyMenuItem(
+        'manual',
+        t('home.proxyMode.manual'),
+      )
 
       // 当前模式指示器菜单项（仅作为标签，不可点击）
       const currentModeMenuItem = await MenuItem.new({
@@ -511,5 +427,49 @@ export const useTrayStore = defineStore('tray', () => {
     destroyTray,
     updateTrayTooltip,
     refreshTrayMenu,
+  }
+
+  /**
+   * 托盘代理模式切换
+   */
+  const switchProxyModeFromTray = async (targetMode: ProxyMode) => {
+    const previousMode = appStore.proxyMode as ProxyMode
+    if (previousMode === targetMode) {
+      return
+    }
+
+    if (targetMode === 'tun') {
+      const isAdmin = await tauriApi.system.checkAdmin()
+      if (!isAdmin) {
+        try {
+          await appStore.setProxyMode('tun')
+          await appStore.saveToBackend()
+          if (appStore.isRunning) {
+            await kernelStore.stopKernel({ force: true })
+          }
+          await tauriApi.system.restartAsAdmin()
+          return
+        } catch (error) {
+          console.error('以管理员身份重启以启用TUN失败:', error)
+          await appStore.setProxyMode(previousMode)
+          await refreshTrayMenu()
+          return
+        }
+      }
+    }
+
+    try {
+      await appStore.setProxyMode(targetMode)
+      const success = await kernelStore.switchProxyMode(targetMode)
+      if (!success) {
+        throw new Error(kernelStore.lastError || '代理模式切换失败')
+      }
+      await kernelStore.ensureKernelRunning()
+    } catch (error) {
+      console.error('托盘切换代理模式失败:', error)
+      await appStore.setProxyMode(previousMode)
+    } finally {
+      await refreshTrayMenu()
+    }
   }
 })

@@ -28,9 +28,7 @@ pub mod paths {
         } else {
             "sing-box"
         };
-        PathBuf::from(&work_dir)
-            .join("sing-box")
-            .join(exe_name)
+        PathBuf::from(&work_dir).join("sing-box").join(exe_name)
     }
 
     /// 获取 Sing-Box 工作目录

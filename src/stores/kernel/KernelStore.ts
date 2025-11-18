@@ -76,6 +76,8 @@ export const useKernelStore = defineStore(
       }
     })
 
+    const shouldKeepAlive = computed(() => appStore.autoStartKernel)
+
       // 检查内核安装状态
     const checkKernelInstallation = async () => {
       try {
@@ -155,7 +157,7 @@ export const useKernelStore = defineStore(
     }
 
     // 启动内核
-    const startKernel = async (options?: { forceRestart?: boolean }) => {
+    const startKernel = async (options?: { forceRestart?: boolean; keepAlive?: boolean }) => {
       if (isLoading.value) {
         console.log('内核正在操作中，忽略启动请求')
         return false
@@ -168,14 +170,14 @@ export const useKernelStore = defineStore(
         console.log('🚀 开始启动内核...')
         
         // 准备启动选项
-        const startOptions = {
-          config: config.value,
-          force_restart: options?.forceRestart || false,
-          timeout_ms: 30000,
-        }
+        const keepAlive = options?.keepAlive ?? shouldKeepAlive.value
 
         // 调用服务启动
-        const result = await kernelService.startKernel(startOptions)
+        const result = await kernelService.startKernel({
+          forceRestart: options?.forceRestart,
+          keepAlive,
+          config: config.value,
+        })
         
         if (result.success) {
           console.log('✅ 内核启动成功:', result.message)
@@ -253,7 +255,7 @@ export const useKernelStore = defineStore(
     }
 
     // 重启内核
-    const restartKernel = async (options?: { force?: boolean }) => {
+    const restartKernel = async (options?: { force?: boolean; keepAlive?: boolean }) => {
       console.log('🔄 开始重启内核...')
       
       const stopResult = await stopKernel({ force: options?.force })
@@ -264,7 +266,10 @@ export const useKernelStore = defineStore(
       // 短暂等待
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      return startKernel({ forceRestart: options?.force })
+      return startKernel({
+        forceRestart: options?.force,
+        keepAlive: options?.keepAlive ?? shouldKeepAlive.value,
+      })
     }
 
     // 切换代理模式
@@ -282,14 +287,18 @@ export const useKernelStore = defineStore(
         if (result.success) {
           console.log('✅ 代理模式切换成功:', result.message)
           
+          const previousMode = config.value.proxy_mode
+          config.value.proxy_mode = mode
+          
           // 同步配置
           await syncConfig()
-          
-          // 如果内核正在运行，提示需要重启
-          if (isRunning.value) {
-            console.log('内核正在运行，需要重启以应用新的代理模式')
-            // 可以自动重启或提示用户
-            await restartKernel()
+
+          const needsRestart = previousMode === 'tun' || mode === 'tun'
+          if (needsRestart && isRunning.value) {
+            console.log('代理模式切换涉及 TUN，自动重启内核')
+            await restartKernel({ keepAlive: shouldKeepAlive.value })
+          } else if (shouldKeepAlive.value) {
+            await ensureKernelRunning()
           }
           
           return true
@@ -359,9 +368,16 @@ export const useKernelStore = defineStore(
           await syncConfig()
           
           // 如果关键配置改变且内核正在运行，需要重启
-          const needRestart = updates.api_port || updates.proxy_port || updates.proxy_mode
+          const needRestart = Boolean(
+            updates.api_port ||
+            updates.proxy_port ||
+            updates.proxy_mode === 'tun' ||
+            config.value.proxy_mode === 'tun'
+          )
           if (needRestart && isRunning.value) {
-            await restartKernel()
+            await restartKernel({ keepAlive: shouldKeepAlive.value })
+          } else if (shouldKeepAlive.value) {
+            await ensureKernelRunning()
           }
           
           return true
@@ -415,6 +431,24 @@ export const useKernelStore = defineStore(
       }
     }
 
+    const ensureKernelRunning = async () => {
+      if (!isKernelInstalled.value || isRunning.value || isLoading.value) {
+        return isRunning.value
+      }
+
+      return startKernel({ keepAlive: shouldKeepAlive.value })
+    }
+
+    const handleAutoManageChange = async (enabled: boolean) => {
+      if (!isKernelInstalled.value) return
+
+      if (enabled) {
+        await ensureKernelRunning()
+      } else if (isRunning.value && !isLoading.value) {
+        await stopKernel({ force: true })
+      }
+    }
+
     // 健康检查
     const checkHealth = async () => {
       try {
@@ -458,6 +492,8 @@ export const useKernelStore = defineStore(
         if (isRunning.value) {
           await startDataCollection()
         }
+
+        await handleAutoManageChange(shouldKeepAlive.value)
 
         console.log('✅ KernelStore 初始化完成')
       } catch (error) {
@@ -518,6 +554,15 @@ export const useKernelStore = defineStore(
       }
     })
 
+    watch(
+      shouldKeepAlive,
+      value => {
+        handleAutoManageChange(value).catch(error => {
+          console.error('自动管理内核失败:', error)
+        })
+      }
+    )
+
     // 返回接口
     return {
       // 状态
@@ -546,6 +591,7 @@ export const useKernelStore = defineStore(
       syncStatus,
       syncConfig,
       initializeStore,
+      ensureKernelRunning,
       
       // 兼容旧接口
       hasVersionInfo: () => isKernelInstalled.value,

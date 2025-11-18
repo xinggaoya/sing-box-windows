@@ -265,10 +265,7 @@ fn check_admin_macos() -> bool {
     match std::env::var("USER") {
         Ok(user) => {
             // macOS上通常管理员用户不是root，但可以通过id命令检查
-            if let Ok(output) = std::process::Command::new("id")
-                .arg("-u")
-                .output()
-            {
+            if let Ok(output) = std::process::Command::new("id").arg("-u").output() {
                 if let Ok(uid_str) = String::from_utf8(output.stdout) {
                     if let Ok(uid) = uid_str.trim().parse::<u32>() {
                         // UID 0 为root，其他需要进一步检查
@@ -280,10 +277,7 @@ fn check_admin_macos() -> bool {
             }
 
             // 检查用户是否在admin组中
-            if let Ok(output) = std::process::Command::new("groups")
-                .arg(&user)
-                .output()
-            {
+            if let Ok(output) = std::process::Command::new("groups").arg(&user).output() {
                 let groups_str = String::from_utf8_lossy(&output.stdout);
                 groups_str.contains("admin") || groups_str.contains("wheel")
             } else {
@@ -343,11 +337,7 @@ pub fn is_devtools_open(app_handle: tauri::AppHandle) -> Result<bool, String> {
     Ok(main_window.is_devtools_open())
 }
 
-const TCP_PROBE_TARGETS: [(&str, u16); 3] = [
-    ("1.1.1.1", 443),
-    ("8.8.8.8", 53),
-    ("223.5.5.5", 53),
-];
+const TCP_PROBE_TARGETS: [(&str, u16); 3] = [("1.1.1.1", 443), ("8.8.8.8", 53), ("223.5.5.5", 53)];
 
 const HTTP_PROBE_URLS: [&str; 3] = [
     "https://connectivitycheck.gstatic.com/generate_204",

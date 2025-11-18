@@ -1,10 +1,68 @@
+use crate::app::constants::paths;
 use crate::utils::app_util::get_work_dir_sync;
 use serde_json::json;
 use serde_json::Value;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
-use tracing::{error, info};
+use tracing::{error, info, warn};
+
+const DEFAULT_SINGBOX_CONFIG: &str = include_str!("../../config/template.json");
+
+fn backup_corrupted_config(path: &Path) {
+    if !path.exists() {
+        return;
+    }
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+        .as_secs();
+    let backup_path = path.with_extension(format!("bak-{}", timestamp));
+
+    if let Err(e) = fs::rename(path, &backup_path) {
+        warn!("备份损坏的配置失败: {}", e);
+    } else {
+        info!("已备份损坏的配置到 {:?}", backup_path);
+    }
+}
+
+fn restore_default_config() -> Result<(), String> {
+    let config_path = paths::get_config_path();
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败: {}", e))?;
+    }
+    fs::write(&config_path, DEFAULT_SINGBOX_CONFIG)
+        .map_err(|e| format!("写入默认配置失败: {}", e))?;
+    info!("已恢复默认 sing-box 配置");
+    Ok(())
+}
+
+pub fn ensure_singbox_config() -> Result<(), String> {
+    let config_path = paths::get_config_path();
+
+    if !config_path.exists() {
+        info!("sing-box 配置文件不存在，使用默认模板恢复");
+        return restore_default_config();
+    }
+
+    match fs::read_to_string(&config_path) {
+        Ok(content) => {
+            if serde_json::from_str::<Value>(&content).is_ok() {
+                Ok(())
+            } else {
+                warn!("检测到 sing-box 配置损坏，正在恢复默认模板");
+                backup_corrupted_config(&config_path);
+                restore_default_config()
+            }
+        }
+        Err(e) => {
+            warn!("读取 sing-box 配置失败: {}，尝试恢复默认模板", e);
+            backup_corrupted_config(&config_path);
+            restore_default_config()
+        }
+    }
+}
 
 // 更新sing-box配置文件中的端口设置
 fn update_singbox_config_ports(proxy_port: u16, api_port: u16) -> Result<(), Box<dyn Error>> {
