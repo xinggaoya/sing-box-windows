@@ -28,4 +28,25 @@ export default defineConfig({
     port: 6221,
     strictPort: true,
   },
+  build: {
+    chunkSizeWarningLimit: 1000, // 增加警告阈值到 1MB
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // 将大型依赖分离到单独的 chunk
+          if (id.includes('node_modules')) {
+            if (id.includes('vue') || id.includes('pinia')) {
+              return 'vendor'
+            }
+            if (id.includes('naive-ui')) {
+              return 'naive-ui'
+            }
+            if (id.includes('@tauri-apps')) {
+              return 'tauri'
+            }
+          }
+        }
+      }
+    }
+  }
 })

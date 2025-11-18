@@ -4,7 +4,8 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { kernelService, type KernelStatus, type KernelConfig, type KernelAutoManageResult } from '@/services/kernel-service'
+import { kernelService, type KernelStatus, type KernelConfig } from '@/services/kernel-service'
+import type { KernelAutoManageResult } from '@/services/tauri/kernel'
 import { useAppStore } from '../app/AppStore'
 import { useConnectionStore } from './ConnectionStore'
 import { useTrafficStore } from './TrafficStore'

@@ -2154,7 +2154,7 @@ async fn auto_manage_kernel_internal(
         return Ok(AutoManageResult::invalid_config(err));
     }
 
-    let mut attempted_start = false;
+    let mut _attempted_start = false;
     let keep_alive_enabled = options.keep_alive.unwrap_or(true);
     let api_port = options.api_port.unwrap_or(12081);
 
@@ -2167,7 +2167,7 @@ async fn auto_manage_kernel_internal(
     }
 
     if !running {
-        attempted_start = true;
+        _attempted_start = true;
         let start_response = kernel_start_enhanced(
             app_handle.clone(),
             options.proxy_mode.clone(),

@@ -20,7 +20,7 @@ pub fn run() {
 
     fmt()
         .with_env_filter(env_filter)
-        .with_target(true)
+        .with_target(false)
         .with_thread_ids(true)
         .with_file(true)
         .with_line_number(true)

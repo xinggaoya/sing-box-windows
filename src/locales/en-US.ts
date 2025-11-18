@@ -65,7 +65,7 @@ export default {
     },
 
     // Status description
-    status: {
+    statusDescriptions: {
       runningDesc: 'Kernel is running, proxy service available',
       disconnectedDesc: 'Kernel started but connection abnormal, please check configuration',
     },
@@ -76,8 +76,8 @@ export default {
       nodeMode: 'Node Proxy Mode',
     },
 
-    // Status descriptions
-    status: {
+    // Kernel status descriptions
+    kernelStatusDescriptions: {
       startingDesc: 'Starting kernel, please wait...',
       stoppingDesc: 'Stopping kernel, please wait...',
       stoppedDesc: 'Kernel stopped, proxy service unavailable',
