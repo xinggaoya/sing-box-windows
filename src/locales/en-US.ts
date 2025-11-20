@@ -99,6 +99,7 @@ export default {
   proxy: {
     title: 'Proxy Settings',
     subtitle: 'Proxy node management and latency testing',
+    currentMode: 'Current Mode',
     nodes: 'Nodes',
     testNode: 'Test',
     testing: 'Testing...',

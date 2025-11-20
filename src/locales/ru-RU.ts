@@ -123,6 +123,7 @@ export default {
   proxy: {
     title: 'Настройки прокси',
     subtitle: 'Управление прокси-узлами и тестирование задержки',
+    currentMode: 'Текущий режим',
     nodes: 'Узлы',
     testNode: 'Тест',
     testing: 'Тестирование...',

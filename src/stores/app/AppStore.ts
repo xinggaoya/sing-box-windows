@@ -199,85 +199,6 @@ export const useAppStore = defineStore(
       }
     }
 
-    // 检查或等待网络连接状态
-    const checkNetworkReady = async (timeoutMs: number = 5000): Promise<boolean> => {
-      try {
-        console.log('🌐 检查网络连接状态...')
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-
-        try {
-          await fetch('https://1.1.1.1', {
-            method: 'HEAD',
-            mode: 'no-cors',
-            signal: controller.signal,
-          })
-          clearTimeout(timeoutId)
-          console.log('✅ 网络连接正常')
-          return true
-        } catch (networkError) {
-          clearTimeout(timeoutId)
-          // 即使外部网络不可达，本地网络可能已就绪
-          console.log('⚠️ 外部网络不可达，但可能本地网络已就绪')
-          return true
-        }
-      } catch (error) {
-        console.warn('网络检查失败:', error)
-        return true
-      }
-    }
-
-    // 延迟启动内核（用于开机自启动场景，支持重试）
-    const delayedKernelStart = async (
-      delayMs: number = 20000,
-      maxRetries: number = 3
-    ): Promise<boolean> => {
-      console.log(`⏰ 开机自启动场景，首次延迟${delayMs/1000}秒后启动内核（最多${maxRetries}次尝试）...`)
-      // 首次延迟
-      await new Promise(resolve => setTimeout(resolve, delayMs))
-
-      // 检查网络连接，必要时等待网络恢复
-      const networkReady = await checkNetworkReady()
-      if (!networkReady) {
-        console.warn('⚠️ 网络未就绪，可能无法成功启动内核')
-      }
-
-      // 尝试启动内核（带重试机制）
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`🚀 第 ${attempt}/${maxRetries} 次尝试启动内核...`)
-
-          // 动态导入避免循环依赖
-          const { useKernelStore } = await import('../kernel/KernelStore')
-          const kernelStore = useKernelStore()
-
-          // 等待应用Store数据完全恢复
-          await waitForDataRestore(5000)
-
-          const result = await kernelStore.startKernel()
-
-          if (result) {
-            console.log(`✅ 第 ${attempt} 次尝试成功启动内核！`)
-            return true
-          } else {
-            throw new Error(kernelStore.lastError || '内核启动返回false')
-          }
-        } catch (error) {
-          console.error(`❌ 第 ${attempt} 次尝试失败:`, error)
-
-          // 如果不是最后一次尝试，等待后重试
-          if (attempt < maxRetries) {
-            const retryDelay = delayMs * attempt // 递增延迟：20s, 40s, 60s
-            console.log(`⏳ ${retryDelay/1000} 秒后进行第 ${attempt + 1} 次尝试...`)
-            await new Promise(resolve => setTimeout(resolve, retryDelay))
-          }
-        }
-      }
-
-      console.error(`❌ 经过 ${maxRetries} 次尝试后，内核启动仍然失败`)
-      return false
-    }
-
     // Store清理方法
     const cleanupStore = () => {
       if (connectionCheckTimeout) {
@@ -523,9 +444,7 @@ export const useAppStore = defineStore(
       markDataRestored,
       waitForDataRestore,
       detectAutostartScenario,
-      delayedKernelStart,
       syncAutoStartWithSystem,
-      checkNetworkReady,
       loadFromBackend,
       saveToBackend,
     }

@@ -120,7 +120,7 @@ const drawChart = () => {
     const y = padding.top + chartHeight - (i / yAxisSteps) * chartHeight
     const value = (i / yAxisSteps) * maxValue.value
     const formattedValue = formatBandwidth(value * 1024 * 1024)
-    let speedLabel = `${formattedValue}/s`
+    const speedLabel = `${formattedValue}/s`
       .replace(' MB/s', 'MB/s')
       .replace(' KB/s', 'KB/s')
       .replace(' B/s', 'B/s')

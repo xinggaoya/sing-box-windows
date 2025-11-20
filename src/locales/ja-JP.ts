@@ -122,6 +122,7 @@ export default {
   proxy: {
     title: 'プロキシ設定',
     subtitle: 'プロキシノード管理と遅延テスト',
+    currentMode: '現在のモード',
     nodes: 'ノード',
     testNode: 'テスト',
     testing: 'テスト中...',

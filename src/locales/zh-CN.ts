@@ -99,6 +99,7 @@ export default {
   proxy: {
     title: '代理设置',
     subtitle: '代理节点管理与延迟测试',
+    currentMode: '当前模式',
     nodes: '节点',
     testNode: '测试',
     testing: '测试中...',

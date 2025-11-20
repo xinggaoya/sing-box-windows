@@ -97,7 +97,7 @@ export const useTrayStore = defineStore('tray', () => {
     const currentId = trayInstanceId.value ?? appStore.trayInstanceId
     if (currentId) {
       try {
-        const status = appStore.isRunning ? t('home.status.running') : t('home.status.stopped')
+        const status = appStore.isRunning ? t('status.running') : t('status.stopped')
         const mode =
           appStore.proxyMode === 'system'
             ? t('home.proxyMode.system')
@@ -167,9 +167,7 @@ export const useTrayStore = defineStore('tray', () => {
         text: t('home.restart'),
         enabled: appStore.isRunning,
         action: async () => {
-          await kernelStore.restartKernel({
-            keepAlive: appStore.autoStartKernel,
-          })
+          await kernelStore.restartKernel()
           await refreshTrayMenu() // 刷新菜单以更新状态
         },
       })
@@ -464,7 +462,7 @@ export const useTrayStore = defineStore('tray', () => {
       if (!success) {
         throw new Error(kernelStore.lastError || '代理模式切换失败')
       }
-      await kernelStore.ensureKernelRunning()
+      await kernelStore.refreshStatus()
     } catch (error) {
       console.error('托盘切换代理模式失败:', error)
       await appStore.setProxyMode(previousMode)

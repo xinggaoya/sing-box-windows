@@ -23,7 +23,7 @@
               <template #icon>
                 <n-icon><PowerOutline /></n-icon>
               </template>
-              {{ kernelRunning ? t('home.restart') : t('home.start') }}
+              {{ t('home.restart') }}
             </n-button>
           </template>
           {{ t('home.restart') }}
@@ -284,9 +284,7 @@ const restartKernel = async () => {
   if (kernelLoading.value) return
 
   try {
-    const result = await kernelStore.restartKernel({
-      keepAlive: appStore.autoStartKernel,
-    })
+    const result = await kernelStore.restartKernel()
     if (result) {
       message.success(t('home.restartSuccess'))
     } else {
@@ -340,7 +338,6 @@ const prepareTunModeWithAdminRestart = async () => {
   try {
     await appStore.setProxyMode('tun')
     await appStore.saveToBackend()
-    await kernelStore.syncConfig()
 
     if (appStore.isRunning) {
       await kernelStore.stopKernel()

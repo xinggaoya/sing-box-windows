@@ -30,8 +30,6 @@ import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
 import { useMessage } from 'naive-ui'
 import type { Router } from 'vue-router'
-import { tauriApi } from '@/services/tauri'
-
 // 导入主题配置
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 
@@ -64,6 +62,7 @@ const appStore = useAppStore()
 const localeStore = useLocaleStore()
 const windowStore = useWindowStore()
 const subStore = useSubStore()
+const kernelStore = useKernelStore()
 
 // 生产环境下禁用右键菜单
 
@@ -144,17 +143,14 @@ onMounted(async () => {
     // 3. 检查初始窗口状态和自启动情况
     await checkInitialWindowState()
 
+    // 3.5 初始化内核状态监听
+    await kernelStore.initializeStore()
+
     // 4. 初始化托盘
     const trayStore = useTrayStore()
     await trayStore.initTray()
 
-    // 5. 如果启用了自动启动，启动内核
-    if (appStore.autoStartKernel) {
-      console.log('🚀 检测到自动启动内核设置，准备启动内核...')
-      await startKernelWithRetry()
-    }
-
-    // 6. 执行自动更新检查
+    // 5. 执行自动更新检查
     await handleAutoUpdateCheck()
 
   } catch (error) {
@@ -201,104 +197,6 @@ async function checkInitialWindowState() {
   } catch (error) {
     console.error('检查初始窗口状态失败:', error)
   }
-}
-
-// 增强的内核自动启动函数（支持开机自启动检测和重试机制）
-async function startKernelWithRetry() {
-  console.log('🚀 检测到自动启动内核设置，开始启动...')
-
-  try {
-    // 检测是否是开机自启动场景
-    if (appStore.isAutostartScenario) {
-      console.log('🕐 检测到开机自启动场景，使用增强的延迟启动策略')
-
-      // 开机自启动场景：使用增强的延迟启动（20秒延迟 + 最多3次重试）
-      const success = await appStore.delayedKernelStart(20000, 3)
-
-      if (success) {
-        console.log('✅ 开机自启动成功启动内核！')
-        return
-      } else {
-        console.error('❌ 开机自启动经过3次尝试后仍然失败')
-
-        // 发送失败通知给用户
-        try {
-          mitt.emit('notification', {
-            type: 'warning',
-            title: '内核自动启动失败',
-            content: '开机自启动时内核启动失败，请手动启动或检查配置',
-            duration: 0, // 不自动关闭
-          })
-        } catch (notifyError) {
-          console.warn('发送通知失败:', notifyError)
-        }
-      }
-    } else {
-      // 正常启动流程（非开机自启动场景）
-      console.log('🖥️ 正常启动场景，直接使用标准启动流程')
-      await normalKernelStart()
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('❌ 内核自动启动失败:', errorMessage)
-
-    // 设置应用状态为未运行
-    appStore.setRunningState(false)
-
-    // 提示用户可以手动启动
-    console.log('💡 提示：您可以在主页手动启动内核')
-
-    // 发送错误通知
-    try {
-      mitt.emit('notification', {
-        type: 'error',
-        title: '内核启动失败',
-        content: `自动启动失败: ${errorMessage}`,
-        duration: 5000,
-      })
-    } catch (notifyError) {
-      console.warn('发送通知失败:', notifyError)
-    }
-  }
-}
-
-// 正常内核启动流程
-async function normalKernelStart() {
-  // 等待应用完全初始化
-  await new Promise((resolve) => setTimeout(resolve, 3000))
-
-  // 检查管理员权限和代理模式
-  const isAdmin = await tauriApi.system.checkAdmin()
-  const currentProxyMode = appStore.proxyMode || 'system'
-
-  console.log(`🔍 自启动检查 - 管理员权限: ${isAdmin}, 当前代理模式: ${currentProxyMode}`)
-
-  // 如果不是管理员权限且当前模式是TUN，则切换为system模式
-  if (!isAdmin && currentProxyMode === 'tun') {
-    console.log('⚠️ 检测到非管理员权限运行且为TUN模式，自动切换为system模式')
-
-    try {
-      // 切换为system模式
-      await tauriApi.proxy.setSystemProxy()
-      await appStore.switchProxyMode('system')
-      console.log('✅ 已自动切换为system模式')
-    } catch (error) {
-      console.error('❌ 切换为system模式失败:', error)
-      // 即使切换失败也继续尝试启动内核
-    }
-  }
-
-  // 获取内核Store实例
-  const kernelStore = useKernelStore()
-
-  // 初始化事件监听器（现在由各个Store自动管理）
-  console.log('🎧 事件监听器将由各个Store自动初始化...')
-
-  // 启动内核（后端已包含完整检查）
-  console.log('🚀 启动内核，后端将进行完整就绪检查...')
-  await kernelStore.startKernel()
-
-  console.log('✅ 内核自动启动成功！')
 }
 
 // 清理所有监听器
