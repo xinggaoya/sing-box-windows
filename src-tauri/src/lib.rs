@@ -74,6 +74,14 @@ pub fn run() {
                             *enhanced_storage = Some(Arc::new(service));
                         }
                         tracing::info!("Enhanced storage service initialized successfully");
+
+                        // 后端启动后立即尝试自动管理内核（尊重 auto_start_kernel 设置）
+                        crate::app::core::kernel_service::auto_manage_with_saved_config(
+                            &app_handle,
+                            false,
+                            "app-start",
+                        )
+                        .await;
                     }
                     Err(e) => {
                         tracing::error!("Failed to initialize enhanced storage service: {}", e);

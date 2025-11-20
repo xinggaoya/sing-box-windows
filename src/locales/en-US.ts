@@ -11,6 +11,7 @@ export default {
     delete: 'Delete',
     import: 'Import',
     export: 'Export',
+    refresh: 'Refresh',
   },
   nav: {
     home: 'Home',

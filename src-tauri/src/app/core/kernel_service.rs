@@ -2223,8 +2223,18 @@ pub async fn auto_manage_with_saved_config(
 ) {
     match db_get_app_config(app_handle.clone()).await {
         Ok(config) => {
+            if !config.auto_start_kernel && !force_restart {
+                info!(
+                    "自动管理({})跳过：auto_start_kernel 已禁用，确保守护已关闭",
+                    reason
+                );
+                disable_kernel_guard().await;
+                return;
+            }
+
             let mut options = AutoManageOptions::from_app_config(config);
             options.force_restart = force_restart;
+
             match auto_manage_kernel_internal(app_handle.clone(), options).await {
                 Ok(result) => {
                     info!(

@@ -1,4 +1,5 @@
 use super::DatabaseService;
+use crate::app::core::kernel_service::auto_manage_with_saved_config;
 use crate::app::storage::error::StorageResult;
 use crate::app::storage::state_model::{
     AppConfig, LocaleConfig, Subscription, ThemeConfig, UpdateConfig, WindowConfig,
@@ -194,7 +195,12 @@ pub async fn db_save_app_config(config: AppConfig, app: AppHandle) -> Result<(),
     storage
         .save_app_config(&config)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    // 应用配置更新后，根据最新设置自动管理内核运行状态
+    auto_manage_with_saved_config(&app, false, "app-config-updated").await;
+
+    Ok(())
 }
 
 #[tauri::command]

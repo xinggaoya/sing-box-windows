@@ -33,7 +33,18 @@ import type { Router } from 'vue-router'
 // 导入主题配置
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 
-import { useThemeStore, useAppStore, useLocaleStore, useWindowStore, useTrayStore, useKernelStore, useUpdateStore, useSubStore } from '@/stores'
+import {
+  useThemeStore,
+  useAppStore,
+  useLocaleStore,
+  useWindowStore,
+  useTrayStore,
+  useKernelStore,
+  useUpdateStore,
+  useSubStore,
+  useTrafficStore,
+  useConnectionStore,
+} from '@/stores'
 
 // 导入组件
 import UpdateNotification from '@/components/UpdateNotification.vue'
@@ -63,6 +74,8 @@ const localeStore = useLocaleStore()
 const windowStore = useWindowStore()
 const subStore = useSubStore()
 const kernelStore = useKernelStore()
+const trafficStore = useTrafficStore()
+const connectionStore = useConnectionStore()
 
 // 生产环境下禁用右键菜单
 
@@ -145,6 +158,12 @@ onMounted(async () => {
 
     // 3.5 初始化内核状态监听
     await kernelStore.initializeStore()
+
+    // 3.6 初始化内核事件数据（流量、连接）
+    await Promise.allSettled([
+      trafficStore.initializeStore(),
+      connectionStore.initializeStore(),
+    ])
 
     // 4. 初始化托盘
     const trayStore = useTrayStore()

@@ -55,8 +55,8 @@
         <div class="stats-row">
           <StatusCard
             :label="t('home.traffic.up')"
-            :value="trafficStore.traffic.up + '/s'"
-            :description="t('home.traffic.total') + ': ' + trafficStore.traffic.totalUp"
+            :value="formatSpeed(trafficStore.traffic.up)"
+            :description="t('home.traffic.total') + ': ' + formatBytes(trafficStore.traffic.totalUp)"
             type="primary"
           >
             <template #icon><ArrowUpOutline /></template>
@@ -64,8 +64,8 @@
           
           <StatusCard
             :label="t('home.traffic.down')"
-            :value="trafficStore.traffic.down + '/s'"
-            :description="t('home.traffic.total') + ': ' + trafficStore.traffic.totalDown"
+            :value="formatSpeed(trafficStore.traffic.down)"
+            :description="t('home.traffic.total') + ': ' + formatBytes(trafficStore.traffic.totalDown)"
             type="success"
           >
             <template #icon><ArrowDownOutline /></template>
@@ -74,7 +74,7 @@
           <StatusCard
             :label="t('nav.connections')"
             :value="connectionStore.connections.length"
-            :description="t('home.memory') + ': ' + connectionStore.memory.inuse"
+            :description="t('home.memory') + ': ' + formatBytes(connectionStore.memory.inuse)"
             type="warning"
           >
             <template #icon><PulseOutline /></template>
@@ -204,6 +204,16 @@ const { statusClass, statusState, isRunning: kernelRunning, isLoading: kernelLoa
 const isAdmin = ref(false)
 const currentNodeProxyMode = ref('rule')
 const modeSwitchPending = ref(false)
+
+const formatBytes = (bytes: number) => {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const value = bytes / Math.pow(1024, index)
+  return `${value.toFixed(2)} ${units[index]}`
+}
+
+const formatSpeed = (bytes: number) => `${formatBytes(bytes)}/s`
 
 const statusTitle = computed(() => {
   switch (statusState.value) {
