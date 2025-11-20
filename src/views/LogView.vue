@@ -1,188 +1,133 @@
 <template>
-  <div class="page-shell logs-page" :style="pageThemeStyle">
-    <section class="page-hero">
-      <div class="hero-row">
-        <div class="hero-left">
-          <div class="hero-icon">
-            <n-icon size="26">
-              <DocumentTextOutline />
-            </n-icon>
-          </div>
-          <div class="hero-meta">
-            <p class="hero-subtitle">{{ t('log.subtitle') }}</p>
-            <h2 class="hero-title">{{ t('log.title') }}</h2>
-          </div>
-        </div>
-        <div class="hero-actions">
-          <n-switch
-            v-model:value="autoScroll"
-            size="large"
-            class="auto-scroll-switch"
-          >
+  <div class="page-container">
+    <PageHeader :title="t('log.title')" :subtitle="t('log.subtitle')">
+      <template #actions>
+        <div class="header-controls">
+          <n-switch v-model:value="autoScroll" size="medium">
             <template #checked>{{ t('log.autoScroll') }}</template>
             <template #unchecked>{{ t('log.manualScroll') }}</template>
           </n-switch>
-        </div>
-      </div>
-      <div class="hero-stats">
-        <div
-          v-for="stat in logStats"
-          :key="stat.label"
-          class="stat-card"
-          :data-accent="stat.accent"
-        >
-          <div class="stat-icon">
-            <n-icon :size="20">
-              <component :is="stat.icon" />
-            </n-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stat.value }}</div>
-            <div class="stat-label">{{ stat.label }}</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="page-section">
-      <n-card class="surface-card filter-panel" :bordered="false">
-        <div class="filter-content">
-          <div class="filter-row">
-            <n-input
-              v-model:value="searchQuery"
-              :placeholder="t('log.searchLogs')"
-              clearable
-              size="large"
-              class="search-input"
-            >
-              <template #prefix>
-                <n-icon size="16">
-                  <SearchOutline />
-                </n-icon>
-              </template>
-            </n-input>
-            <n-select
-              v-model:value="filterType"
-              :options="logTypeOptions"
-              :placeholder="t('log.filterType')"
-              clearable
-              size="large"
-              class="filter-select"
-            />
-          </div>
-          <div class="filter-actions">
-            <n-button-group>
-              <n-button
-                @click="clearLogs"
-                :disabled="!displayedLogs.length"
-                type="error"
-                size="medium"
-              >
-                <template #icon>
-                  <n-icon size="16">
-                    <TrashOutline />
-                  </n-icon>
-                </template>
-                {{ t('log.clear') }}
-              </n-button>
-              <n-button
-                @click="copyLogs"
-                :disabled="!displayedLogs.length"
-                type="info"
-                size="medium"
-              >
-                <template #icon>
-                  <n-icon size="16">
-                    <CopyOutline />
-                  </n-icon>
-                </template>
-                {{ t('log.copy') }}
-              </n-button>
-              <n-button
-                @click="exportLogs"
-                :disabled="!displayedLogs.length"
-                type="success"
-                size="medium"
-              >
-                <template #icon>
-                  <n-icon size="16">
-                    <DownloadOutline />
-                  </n-icon>
-                </template>
-                {{ t('log.export') }}
-              </n-button>
-            </n-button-group>
-          </div>
-        </div>
-      </n-card>
-
-      <n-card class="surface-card logs-card" :bordered="false">
-        <div class="logs-content">
-          <div class="logs-header">
-            <div class="logs-info">
-              <span class="logs-count">
-                {{ displayedLogs.length }}/{{ totalLogs }} {{ t('log.records') }}
-              </span>
-              <span class="logs-time" v-if="displayedLogs.length > 0">
-                {{ getLatestLogTime() }}
-              </span>
-            </div>
-          </div>
-
-          <div v-if="displayedLogs.length > 0" class="logs-list">
-            <div
-              v-for="(log, index) in displayedLogs"
-              :key="log.key"
-              class="log-item"
-              :class="`log-${log.type}`"
-            >
-              <div class="log-header">
-                <div class="log-time">
-                  {{ formatLogTime(log.timestamp) }}
-                </div>
-                <div class="log-type">
-                  <n-tag :type="getLogTagType(log.type)" size="small">
-                    {{ getLogTypeLabel(log.type) }}
-                  </n-tag>
-                </div>
-              </div>
-              <div class="log-content">
-                <HighlightText
-                  v-if="searchQuery"
-                  :text="log.payload"
-                  :keyword="searchQuery"
-                />
-                <span v-else class="log-text">{{ log.payload }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 空状态 -->
-          <div v-else class="empty-state">
-            <div class="empty-icon">
-              <n-icon size="48">
-                <DocumentTextOutline />
-              </n-icon>
-            </div>
-            <div class="empty-title">
-              {{ searchQuery ? t('log.noSearchResults') : t('log.noLogs') }}
-            </div>
-            <div class="empty-desc">
-              {{ searchQuery ? t('log.adjustSearchFilters') : t('log.noLogsDesc') }}
-            </div>
+          
+          <n-button-group>
             <n-button
-              v-if="searchQuery"
-              @click="searchQuery = ''"
-              type="primary"
-              size="large"
-              class="empty-btn"
+              @click="clearLogs"
+              :disabled="!displayedLogs.length"
+              size="medium"
+              secondary
+              type="error"
             >
-              {{ t('log.clearSearch') }}
+              <template #icon>
+                <n-icon><TrashOutline /></n-icon>
+              </template>
             </n-button>
+            <n-button
+              @click="copyLogs"
+              :disabled="!displayedLogs.length"
+              size="medium"
+              secondary
+            >
+              <template #icon>
+                <n-icon><CopyOutline /></n-icon>
+              </template>
+            </n-button>
+            <n-button
+              @click="exportLogs"
+              :disabled="!displayedLogs.length"
+              size="medium"
+              secondary
+            >
+              <template #icon>
+                <n-icon><DownloadOutline /></n-icon>
+              </template>
+            </n-button>
+          </n-button-group>
+        </div>
+      </template>
+    </PageHeader>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <StatusCard
+        v-for="stat in logStats"
+        :key="stat.label"
+        :label="stat.label"
+        :value="stat.value"
+        :type="stat.type"
+      >
+        <template #icon>
+          <n-icon><component :is="stat.icon" /></n-icon>
+        </template>
+      </StatusCard>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section">
+      <div class="filter-bar">
+        <n-input
+          v-model:value="searchQuery"
+          :placeholder="t('log.searchLogs')"
+          clearable
+          round
+          class="search-input"
+        >
+          <template #prefix>
+            <n-icon><SearchOutline /></n-icon>
+          </template>
+        </n-input>
+        
+        <n-select
+          v-model:value="filterType"
+          :options="logTypeOptions"
+          :placeholder="t('log.filterType')"
+          clearable
+          class="filter-select"
+        />
+      </div>
+    </div>
+
+    <!-- Logs List -->
+    <div class="logs-section">
+      <div class="logs-container" ref="logListRef">
+        <div v-if="displayedLogs.length > 0" class="logs-list">
+          <div
+            v-for="log in displayedLogs"
+            :key="log.key"
+            class="log-entry"
+            :class="log.type"
+          >
+            <div class="log-meta">
+              <span class="log-time">{{ formatLogTime(log.timestamp) }}</span>
+              <span class="log-type-badge">{{ getLogTypeLabel(log.type) }}</span>
+            </div>
+            <div class="log-content">
+              <HighlightText
+                v-if="searchQuery"
+                :text="log.payload"
+                :keyword="searchQuery"
+              />
+              <span v-else>{{ log.payload }}</span>
+            </div>
           </div>
         </div>
-      </n-card>
-    </section>
+
+        <!-- Empty State -->
+        <div v-else class="empty-state">
+          <div class="empty-icon">
+            <n-icon size="48"><DocumentTextOutline /></n-icon>
+          </div>
+          <h3 class="empty-title">
+            {{ searchQuery ? t('log.noSearchResults') : t('log.noLogs') }}
+          </h3>
+          <n-button
+            v-if="searchQuery"
+            @click="searchQuery = ''"
+            secondary
+          >
+            {{ t('log.clearSearch') }}
+          </n-button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -202,8 +147,8 @@ import {
   CheckmarkCircleOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
-import { useThemeStore } from '@/stores/app/ThemeStore'
-import { usePageTheme } from '@/composables/usePageTheme'
+import PageHeader from '@/components/common/PageHeader.vue'
+import StatusCard from '@/components/common/StatusCard.vue'
 
 defineOptions({
   name: 'LogView'
@@ -219,37 +164,26 @@ interface FormattedLog extends Log {
   key: string
 }
 
-// 高亮文本组件
+// Highlight Component
 const HighlightText = defineComponent({
   name: 'HighlightText',
   props: {
-    text: {
-      type: String,
-      required: true,
-    },
-    keyword: {
-      type: String,
-      required: true,
-    },
+    text: { type: String, required: true },
+    keyword: { type: String, required: true },
   },
   setup(props) {
     return () => {
-      if (!props.keyword) {
-        return props.text
-      }
-
+      if (!props.keyword) return props.text
       const parts = props.text.split(new RegExp(`(${props.keyword})`, 'gi'))
-
       return h('span', {}, parts.map((part, index) => {
         if (part.toLowerCase() === props.keyword.toLowerCase()) {
           return h('mark', {
             key: index,
             style: {
-              backgroundColor: 'rgba(91, 76, 253, 0.2)',
-              color: '#5b4cfd',
-              padding: '2px 4px',
-              borderRadius: '4px',
-              fontWeight: '600'
+              backgroundColor: 'rgba(255, 255, 0, 0.2)',
+              color: 'inherit',
+              padding: '0 2px',
+              borderRadius: '2px',
             }
           }, part)
         }
@@ -262,20 +196,16 @@ const HighlightText = defineComponent({
 const logStore = useLogStore()
 const { t } = useI18n()
 const message = useMessage()
-const themeStore = useThemeStore()
-const pageThemeStyle = usePageTheme(themeStore)
 
-// 响应式数据
 const searchQuery = ref('')
 const filterType = ref<string | null>(null)
 const autoScroll = ref(true)
-const logListRef = ref()
+const logListRef = ref<HTMLElement | null>(null)
 
-// 计算属性
+// Computed
 const logs = computed(() => logStore.logs)
 const totalLogs = computed(() => logs.value.length)
 
-// 格式化日志数据
 const formattedLogs = computed<FormattedLog[]>(() => {
   return logs.value.map((log, index) => ({
     ...log,
@@ -283,27 +213,20 @@ const formattedLogs = computed<FormattedLog[]>(() => {
   }))
 })
 
-// 筛选后的日志
 const displayedLogs = computed<FormattedLog[]>(() => {
   let filteredLogs = formattedLogs.value
-
-  // 按类型筛选
   if (filterType.value) {
     filteredLogs = filteredLogs.filter((log) => log.type === filterType.value)
   }
-
-  // 按关键词搜索
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filteredLogs = filteredLogs.filter((log) =>
       log.payload.toLowerCase().includes(query)
     )
   }
-
   return filteredLogs
 })
 
-// 日志类型统计
 const logTypeCounts = computed(() => {
   const counts: Record<string, number> = {}
   displayedLogs.value.forEach((log) => {
@@ -314,30 +237,29 @@ const logTypeCounts = computed(() => {
 
 const logStats = computed(() => {
   const typeMap = [
-    { type: 'info', icon: InformationCircleOutline, accent: 'blue' },
-    { type: 'warning', icon: WarningOutline, accent: 'amber' },
-    { type: 'error', icon: AlertCircleOutline, accent: 'pink' },
-    { type: 'success', icon: CheckmarkCircleOutline, accent: 'purple' },
+    { type: 'info', icon: InformationCircleOutline, accent: 'primary' },
+    { type: 'warning', icon: WarningOutline, accent: 'warning' },
+    { type: 'error', icon: AlertCircleOutline, accent: 'error' },
+    { type: 'success', icon: CheckmarkCircleOutline, accent: 'success' },
   ]
 
   const stats = typeMap.map((config) => ({
     label: getLogTypeLabel(config.type),
     value: logTypeCounts.value[config.type] || 0,
     icon: config.icon,
-    accent: config.accent,
+    type: config.accent as any,
   }))
 
   stats.push({
     label: t('log.records'),
     value: totalLogs.value,
     icon: DocumentTextOutline,
-    accent: 'blue',
+    type: 'default',
   })
 
   return stats
 })
 
-// 日志类型选项
 const logTypeOptions = computed(() => {
   const types = new Set<string>()
   logs.value.forEach((log) => {
@@ -349,7 +271,7 @@ const logTypeOptions = computed(() => {
   }))
 })
 
-// 辅助方法
+// Methods
 const getLogTypeLabel = (type: string): string => {
   const typeMap: Record<string, string> = {
     info: t('log.types.info'),
@@ -360,27 +282,10 @@ const getLogTypeLabel = (type: string): string => {
   return typeMap[type] || type.toUpperCase()
 }
 
-const getLogTagType = (type: string): 'info' | 'warning' | 'error' | 'success' => {
-  const typeMap: Record<string, 'info' | 'warning' | 'error' | 'success'> = {
-    info: 'info',
-    warning: 'warning',
-    error: 'error',
-    success: 'success',
-  }
-  return typeMap[type] || 'info'
-}
-
 const formatLogTime = (timestamp: number): string => {
   return new Date(timestamp).toLocaleTimeString()
 }
 
-const getLatestLogTime = (): string => {
-  if (displayedLogs.value.length === 0) return ''
-  const latestLog = displayedLogs.value[0]
-  return t('log.latestAt', { time: formatLogTime(latestLog.timestamp) })
-}
-
-// 操作方法
 const clearLogs = () => {
   logStore.clearLogs()
   message.success(t('log.clearedSuccess'))
@@ -412,24 +317,21 @@ const exportLogs = () => {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-
   message.success(t('log.exportedSuccess'))
 }
 
-// 监听新日志，自动滚动到底部
 watch(
   () => displayedLogs.value.length,
   async () => {
     if (autoScroll.value) {
       await nextTick()
       if (logListRef.value) {
-        logListRef.value.scrollTo({ top: 999999, behavior: 'smooth' })
+        logListRef.value.scrollTop = logListRef.value.scrollHeight
       }
     }
   }
 )
 
-// 生命周期
 onMounted(() => {
   logStore.setupLogListener()
 })
@@ -440,124 +342,161 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.logs-page {
-  animation: fadeIn 0.4s ease both;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.filter-panel {
-  border-radius: 28px;
-}
-
-.filter-content {
+.page-container {
+  padding: 24px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 24px;
+  height: calc(100vh - 40px); /* Adjust for window controls */
 }
 
-.filter-row {
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.filter-section {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 16px;
+  flex-shrink: 0;
+}
+
+.filter-bar {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
 }
 
 .search-input {
-  flex: 1;
+  flex: 2;
+  min-width: 200px;
 }
 
 .filter-select {
-  min-width: 220px;
   flex: 1;
+  min-width: 160px;
 }
 
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.logs-card {
-  border-radius: 32px;
-}
-
-.logs-content {
+.logs-section {
+  flex: 1;
+  min-height: 0;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 18px;
 }
 
-.logs-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--divider-color);
-  padding-bottom: 12px;
-  color: var(--text-muted);
+.logs-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  scroll-behavior: smooth;
 }
 
 .logs-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 540px;
-  overflow-y: auto;
+  gap: 4px;
 }
 
-.log-item {
-  border-radius: 20px;
-  padding: 16px 20px;
-  background: rgba(15, 23, 42, 0.02);
-  border: 1px solid var(--panel-border);
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.log-item:hover {
-  border-color: rgba(91, 76, 253, 0.35);
-  transform: translateY(-2px);
-}
-
-.log-header {
+.log-entry {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
   gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  transition: background 0.1s ease;
+}
+
+.log-entry:hover {
+  background: var(--bg-tertiary);
+}
+
+.log-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 140px;
 }
 
 .log-time {
-  font-size: 13px;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
+  font-size: 12px;
 }
 
-.log-content {
-  font-size: 14px;
-  color: var(--text-primary);
-  line-height: 1.6;
-  word-break: break-word;
-}
-
-.log-item mark {
-  background: rgba(91, 76, 253, 0.2);
-  padding: 2px 4px;
+.log-type-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
   border-radius: 4px;
 }
 
-.logs-card .empty-state {
-  margin-top: 12px;
+.log-entry.info .log-type-badge {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
 }
 
-@media (max-width: 768px) {
-  .filter-select {
-    min-width: 160px;
-  }
+.log-entry.warning .log-type-badge {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.log-entry.error .log-type-badge {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.log-entry.success .log-type-badge {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.log-content {
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.log-entry.error .log-content {
+  color: #ef4444;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 0;
+  color: var(--text-secondary);
+  height: 100%;
+}
+
+.empty-icon {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--text-primary);
 }
 </style>

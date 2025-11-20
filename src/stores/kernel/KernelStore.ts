@@ -76,7 +76,7 @@ export const useKernelStore = defineStore(
       const seconds = Math.floor(ms / 1000)
       const minutes = Math.floor(seconds / 60)
       const hours = Math.floor(minutes / 60)
-      
+
       if (hours > 0) {
         return `${hours}小时${minutes % 60}分钟`
       } else if (minutes > 0) {
@@ -97,7 +97,7 @@ export const useKernelStore = defineStore(
         activeIndex < list.length
     })
 
-      // 检查内核安装状态
+    // 检查内核安装状态
     const checkKernelInstallation = async () => {
       try {
         const version = await kernelService.getKernelVersion()
@@ -144,7 +144,7 @@ export const useKernelStore = defineStore(
       try {
         // 等待AppStore数据恢复完成
         await appStore.waitForDataRestore(5000)
-        
+
         // 从AppStore同步配置到KernelStore
         config.value = {
           proxy_mode: appStore.proxyMode as any,
@@ -163,7 +163,7 @@ export const useKernelStore = defineStore(
             enable_ipv6: appStore.tunEnableIpv6,
           },
         }
-        
+
         console.log('📋 内核配置已同步:', {
           proxy_mode: config.value.proxy_mode,
           api_port: config.value.api_port,
@@ -302,7 +302,7 @@ export const useKernelStore = defineStore(
 
       try {
         console.log('🛑 开始停止内核...')
-        
+
         // 停止选项
         const stopOptions = {
           force: options?.force || false,
@@ -311,21 +311,21 @@ export const useKernelStore = defineStore(
 
         // 调用服务停止
         const result = await kernelService.stopKernel(stopOptions)
-        
+
         if (result.success) {
           console.log('✅ 内核停止成功:', result.message)
-          
+
           // 同步状态
           await syncStatus()
-          
+
           // 停止数据收集
           stopDataCollection()
-          
+
           // 重置相关数据
           connectionStore.resetData()
           trafficStore.resetStats()
           runtimeStore.resetRuntimeData()
-          
+
           return true
         } else {
           console.error('❌ 内核停止失败:', result.message)
@@ -384,15 +384,15 @@ export const useKernelStore = defineStore(
             '当前 Windows 版 sing-box 未启用 gVisor，若选择 Mixed 或 gVisor 栈会导致 TUN 无法连接，请在高级设置中切换到 System 栈。'
           )
         }
-        
+
         const result = await kernelService.switchProxyMode(mode)
-        
+
         if (result.success) {
           console.log('✅ 代理模式切换成功:', result.message)
-          
+
           const previousMode = config.value.proxy_mode
           config.value.proxy_mode = mode
-          
+
           // 同步配置
           await syncConfig()
 
@@ -403,7 +403,7 @@ export const useKernelStore = defineStore(
           } else if (shouldKeepAlive.value) {
             await ensureKernelRunning()
           }
-          
+
           return true
         } else {
           console.error('❌ 代理模式切换失败:', result.message)
@@ -460,16 +460,16 @@ export const useKernelStore = defineStore(
 
       try {
         console.log('🔧 更新内核配置:', updates)
-        
+
         const newConfig = { ...config.value, ...updates }
         const result = await kernelService.updateKernelConfig(newConfig)
-        
+
         if (result.success) {
           console.log('✅ 配置更新成功:', result.message)
-          
+
           // 同步配置
           await syncConfig()
-          
+
           // 如果关键配置改变且内核正在运行，需要重启
           const needRestart = Boolean(
             updates.api_port ||
@@ -482,7 +482,7 @@ export const useKernelStore = defineStore(
           } else if (shouldKeepAlive.value) {
             await ensureKernelRunning()
           }
-          
+
           return true
         } else {
           console.error('❌ 配置更新失败:', result.message)
@@ -500,15 +500,15 @@ export const useKernelStore = defineStore(
     const startDataCollection = async () => {
       try {
         console.log('📊 启动数据收集...')
-        
+
         // 初始化各个数据 store
         await connectionStore.initializeStore()
         await trafficStore.initializeStore()
         await logStore.initializeStore()
-        
+
         // 启动运行时间计数
         runtimeStore.startUptimeCounter()
-        
+
         console.log('✅ 数据收集启动完成')
       } catch (error) {
         console.error('❌ 数据收集启动失败:', error)
@@ -519,15 +519,15 @@ export const useKernelStore = defineStore(
     const stopDataCollection = () => {
       try {
         console.log('📊 停止数据收集...')
-        
+
         // 清理各个数据 store
         connectionStore.cleanupEventListeners()
         trafficStore.cleanupEventListeners()
         logStore.cleanupListeners()
-        
+
         // 停止运行时间计数
         runtimeStore.stopUptimeCounter()
-        
+
         console.log('✅ 数据收集停止完成')
       } catch (error) {
         console.error('❌ 数据收集停止失败:', error)
@@ -560,12 +560,12 @@ export const useKernelStore = defineStore(
     const checkHealth = async () => {
       try {
         const result = await kernelService.checkKernelHealth()
-        
+
         if (!result.healthy) {
           console.warn('⚠️ 内核健康检查发现问题:', result.issues)
           lastError.value = result.issues.join('; ')
         }
-        
+
         return result
       } catch (error) {
         console.error('❌ 健康检查失败:', error)
@@ -641,7 +641,7 @@ export const useKernelStore = defineStore(
       if (statusSyncInterval) {
         clearInterval(statusSyncInterval)
       }
-      
+
       statusSyncInterval = setInterval(() => {
         if (isRunning.value) {
           syncStatus()
@@ -703,7 +703,7 @@ export const useKernelStore = defineStore(
       isStarting,
       isStopping,
       uptime,
-      
+
       // 方法
       startKernel,
       stopKernel,
@@ -718,7 +718,7 @@ export const useKernelStore = defineStore(
       syncConfig,
       initializeStore,
       ensureKernelRunning,
-      
+
       // 兼容旧接口
       hasVersionInfo: () => isKernelInstalled.value,
       getVersionString: () => status.value.version || '',
@@ -731,6 +731,7 @@ export const useKernelStore = defineStore(
         // 检查更新逻辑
         return true
       },
+      checkKernelInstallation
     }
   }
 )

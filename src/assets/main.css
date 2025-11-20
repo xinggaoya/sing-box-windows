@@ -3,6 +3,100 @@
 @import 'vfonts/Lato.css';
 @import 'vfonts/FiraCode.css';
 
+:root {
+  /* Light Mode Variables */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
+  
+  --border-color: rgba(148, 163, 184, 0.2);
+  --border-hover: rgba(99, 102, 241, 0.3);
+  
+  --primary-color: #6366f1;
+  --primary-hover: #818cf8;
+  --primary-active: #4f46e5;
+  
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  
+  /* Page Layout specific */
+  --page-bg: #f8fafc;
+  --hero-bg: rgba(255, 255, 255, 0.9);
+  --hero-border: rgba(148, 163, 184, 0.1);
+  --hero-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.05);
+  
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-border: rgba(148, 163, 184, 0.1);
+  --panel-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+  
+  --chip-bg: rgba(99, 102, 241, 0.1);
+  --chip-text: #4338ca;
+}
+
+.dark, [data-theme='dark'] {
+  /* Dark Mode Variables */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #64748b;
+  
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-hover: rgba(99, 102, 241, 0.4);
+  
+  --primary-color: #818cf8;
+  --primary-hover: #a5b4fc;
+  --primary-active: #6366f1;
+  
+  /* Glassmorphism */
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  
+  /* Page Layout specific */
+  --page-bg: #0f172a;
+  --hero-bg: rgba(30, 41, 59, 0.6);
+  --hero-border: rgba(255, 255, 255, 0.08);
+  --hero-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
+  
+  --panel-bg: rgba(30, 41, 59, 0.6);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+  
+  --chip-bg: rgba(99, 102, 241, 0.2);
+  --chip-text: #e0e7ff;
+}
+
 #app {
   height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Global Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }

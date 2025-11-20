@@ -1,34 +1,29 @@
 export default {
-  // Common vocabulary
   common: {
     appName: 'Sing-Box Windows',
-    ok: 'OK',
     cancel: 'Cancel',
-    confirm: 'Confirm',
     save: 'Save',
+    saveSuccess: 'Saved successfully',
+    saveFailed: 'Save failed',
+    confirm: 'Confirm',
+    add: 'Add',
+    edit: 'Edit',
     delete: 'Delete',
-    error: 'Error',
-    refresh: 'Refresh',
-    unknown: 'Unknown',
-    search: 'Search',
-    minimizedToTray: 'Minimized to tray',
+    import: 'Import',
+    export: 'Export',
   },
-
-  // Navigation menu
   nav: {
-    navigation: 'Navigation',
     home: 'Home',
+    subscription: 'Subscription',
     proxy: 'Proxy',
     connections: 'Connections',
     logs: 'Logs',
     rules: 'Rules',
-    subscription: 'Subscription',
     settings: 'Settings',
+    navigation: 'Navigation',
     expand: 'Expand',
     collapse: 'Collapse',
   },
-
-  // Status related
   status: {
     running: 'Running',
     starting: 'Starting',
@@ -37,53 +32,37 @@ export default {
     connecting: 'Connecting',
     disconnected: 'Disconnected',
   },
-
-  // Home page
   home: {
-    // Basic operations
     start: 'Start',
     stop: 'Stop',
     restart: 'Restart',
     restartAsAdmin: 'Restart as Admin',
-
-    // Status messages
     restartFailed: 'Restart failed',
     nodeModeChangeSuccess: 'Node mode changed successfully',
     nodeModeChangeFailed: 'Node mode change failed',
     restartSuccess: 'Kernel restarted successfully.',
-
-    // WebSocket status
+    memory: 'Memory Usage',
     wsStatus: {
       connected: 'Connected',
       disconnected: 'Disconnected',
     },
-
-    // Admin status
     adminStatus: {
       admin: 'Administrator',
       normal: 'Normal User',
     },
-
-    // Status description
-    statusDescriptions: {
-      runningDesc: 'Kernel is running, proxy service available',
-      disconnectedDesc: 'Kernel started but connection abnormal, please check configuration',
-    },
-
-    // Proxy headers
     proxyHeader: {
       flowMode: 'Flow Proxy Mode',
       nodeMode: 'Node Proxy Mode',
     },
-
-    // Kernel status descriptions
+    statusDescriptions: {
+      runningDesc: 'Kernel is running, proxy service available',
+      disconnectedDesc: 'Kernel started but connection abnormal, please check configuration',
+    },
     kernelStatusDescriptions: {
       startingDesc: 'Starting kernel, please wait...',
       stoppingDesc: 'Stopping kernel, please wait...',
       stoppedDesc: 'Kernel stopped, proxy service unavailable',
     },
-
-    // Traffic statistics
     traffic: {
       title: 'Traffic Statistics',
       uploadSpeed: 'Upload Speed',
@@ -92,9 +71,10 @@ export default {
       downloadTotal: 'Total Download',
       memory: 'Memory Usage',
       connectionsLabel: 'connections',
+      up: 'Upload',
+      down: 'Download',
+      total: 'Total',
     },
-
-    // Traffic proxy mode
     proxyMode: {
       system: 'System Proxy',
       tun: 'TUN Mode',
@@ -103,26 +83,19 @@ export default {
       tunTip: 'Use TUN virtual network card to proxy all traffic, requires administrator privileges',
       manualTip: 'Requires manual configuration of system proxy',
     },
-
-    // Node proxy mode
     nodeMode: {
       global: 'Global Mode',
       rule: 'Rule Mode',
       globalTip: 'Route all traffic through proxy',
       ruleTip: 'Intelligent traffic routing based on rules',
     },
-
-    // Switch mode
     switchMode: 'Switch Mode',
-
     tunConfirm: {
       title: 'Administrator permission required',
       description: 'TUN mode needs the app to restart with administrator privileges. Restart as admin now?',
       confirm: 'Restart as admin',
     },
   },
-
-  // Proxy page
   proxy: {
     title: 'Proxy Settings',
     subtitle: 'Proxy node management and latency testing',
@@ -154,8 +127,6 @@ export default {
       testing: 'Testing',
     },
   },
-
-  // Connections page
   connections: {
     title: 'Connection Management',
     subtitle: 'Manage and monitor network connections',
@@ -178,8 +149,6 @@ export default {
     minutesAgo: '{count}m ago',
     hoursAgo: '{count}h ago',
   },
-
-  // Log page
   log: {
     title: 'Log Viewer',
     subtitle: 'Monitor system logs in real time',
@@ -208,8 +177,6 @@ export default {
     noSearchResults: 'No logs match your search.',
     adjustSearchFilters: 'Try adjusting your search or filters.',
   },
-
-  // Rules page
   rules: {
     title: 'Rule Management',
     subtitle: 'Manage proxy routing rules',
@@ -232,8 +199,6 @@ export default {
     fetchSuccess: 'Successfully fetched {count} rules.',
     fetchError: 'Failed to fetch rules: {error}',
   },
-
-  // Subscription page
   sub: {
     title: 'Subscription Management',
     subtitle: 'Manage your subscription configurations and proxy nodes',
@@ -282,29 +247,20 @@ export default {
     manualConfig: 'Manual Configuration',
     manualContent: 'Manual Configuration Content',
   },
-
-  // Settings page
   setting: {
     title: 'Settings',
     subtitle: 'Manage application configuration and system settings',
     appVersion: 'App Version',
-    kernelVersion: 'Kernel Version',
     notInstalled: 'Not Installed',
     newVersionFound: 'New Version Found',
-
-    // General settings
     general: {
       title: 'General Settings',
       description: 'Configure language, network and other application options',
     },
-
-    // Theme settings
     theme: {
       light: 'Light',
       dark: 'Dark',
     },
-
-    // Language settings
     language: {
       title: 'Language',
       auto: 'Auto',
@@ -312,8 +268,6 @@ export default {
       changeSuccess: 'Language changed successfully',
       description: 'Select application interface display language',
     },
-
-    // Network settings
     network: {
       ipv6: 'IPv6 Support',
       ipv4Only: 'IPv4 Only',
@@ -333,8 +287,6 @@ export default {
       portChanged: 'Port settings changed',
       portChangeSuccess: 'Port configuration updated successfully',
     },
-
-    // Update settings
     update: {
       title: 'Update Settings',
       description: 'Configure application auto-update and version check options',
@@ -377,15 +329,11 @@ export default {
       skipSuccess: 'Successfully skipped this version.',
       skipError: 'Failed to skip version: {error}',
     },
-
-    // Auto-start settings
     autoStart: {
       app: 'Startup with System',
       appDesc: 'Automatically run application on system startup',
+      error: 'Failed to set auto-start',
     },
-
-    
-    // Startup settings
     startup: {
       title: 'Startup Settings',
       description: 'Configure application startup and auto-run options',
@@ -394,11 +342,10 @@ export default {
       enableSuccess: 'Startup with system setting successful',
       disableSuccess: 'Startup with system disabled',
     },
-
-    // Kernel management
     kernel: {
       title: 'Kernel Management',
       description: 'Manage Sing-Box kernel version and download',
+      version: 'Kernel Version',
       download: 'Download Kernel',
       redownload: 'Redownload',
       update: 'Update Kernel',
@@ -406,7 +353,7 @@ export default {
       downloadComplete: 'Kernel download complete!',
       installSuccess: 'Kernel installation verification successful!',
       installFailed: 'No valid kernel file detected',
-    preparingDownload: 'Preparing download...',
+      preparingDownload: 'Preparing download...',
       downloading: 'Downloading kernel',
       downloadingDescription: 'Kernel file is downloading, please wait...',
       manualDownload: 'Manual Download',
@@ -414,6 +361,8 @@ export default {
       manualDownloadGuide: 'Please follow these steps:\n1. Visit https://github.com/SagerNet/sing-box/releases/latest\n2. Download the corresponding system version of sing-box\n3. Place the extracted executable file in the following directory:\nWindows: User directory/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: User directory/.local/share/sing-box-windows/sing-box/sing-box\n\nAfter completion, click "Check Installation" button to verify installation.',
       installPrompt: 'Please download and install kernel before use.',
       downloadFailedMessage: 'Kernel download failed: {error}',
+      downloadSuccess: 'Kernel downloaded successfully',
+      downloadFailed: 'Kernel download failed',
     },
     proxyAdvanced: {
       title: 'Advanced Proxy Settings',
@@ -443,8 +392,6 @@ export default {
         invalidStack: 'Please choose a valid stack mode',
       },
     },
-
-    // Developer tools
     developer: {
       title: 'Developer Tools',
       description: 'Developer debugging tools and options',
@@ -454,8 +401,6 @@ export default {
       opened: 'Developer tools opened',
       warning: 'Developer tools are mainly for development and debugging, no need to enable for normal use',
     },
-
-    // About
     about: {
       title: 'About',
       description: 'Application information and version details',
@@ -463,15 +408,11 @@ export default {
       license: 'License',
     },
   },
-
-  // Tray menu
   tray: {
     kernel: 'Kernel',
     show: 'Show Window',
     quit: 'Quit Application',
   },
-
-  // Notification messages
   notification: {
     proxyModeChanged: 'Proxy mode changed',
     proxyModeChangeFailed: 'Proxy mode change failed',

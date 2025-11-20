@@ -1,205 +1,153 @@
 <template>
-  <div class="page-shell connections-page" :style="pageThemeStyle">
-    <section class="page-hero">
-      <div class="hero-row">
-        <div class="hero-left">
-          <div class="hero-icon">
-            <n-icon size="26">
-              <LinkOutline />
-            </n-icon>
-          </div>
-          <div class="hero-meta">
-            <p class="hero-subtitle">{{ t('connections.subtitle') }}</p>
-            <h2 class="hero-title">{{ t('connections.title') }}</h2>
-          </div>
-        </div>
-        <div class="hero-actions">
-          <n-button
-            @click="refreshConnections"
-            :loading="loading"
-            type="primary"
-            size="large"
-          >
-            <template #icon>
-              <n-icon size="18">
-                <RefreshOutline />
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </div>
-      </div>
-      <div class="hero-stats">
-        <div
-          v-for="stat in connectionStats"
-          :key="stat.label"
-          class="stat-card"
-          :data-accent="stat.accent"
+  <div class="page-container">
+    <PageHeader :title="t('connections.title')" :subtitle="t('connections.subtitle')">
+      <template #actions>
+        <n-button
+          @click="refreshConnections"
+          :loading="loading"
+          type="primary"
+          secondary
+          round
         >
-          <div class="stat-icon">
-            <n-icon :size="20">
-              <component :is="stat.icon" />
-            </n-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stat.value }}</div>
-            <div class="stat-label">{{ stat.label }}</div>
-          </div>
-        </div>
+          <template #icon>
+            <n-icon><RefreshOutline /></n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </PageHeader>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <StatusCard
+        v-for="stat in connectionStats"
+        :key="stat.label"
+        :label="stat.label"
+        :value="stat.value"
+        :type="stat.type"
+      >
+        <template #icon>
+          <n-icon><component :is="stat.icon" /></n-icon>
+        </template>
+      </StatusCard>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section">
+      <div class="filter-bar">
+        <n-input
+          v-model:value="searchQuery"
+          :placeholder="t('connections.searchPlaceholder')"
+          clearable
+          round
+          class="search-input"
+        >
+          <template #prefix>
+            <n-icon><SearchOutline /></n-icon>
+          </template>
+        </n-input>
+        
+        <n-select
+          v-model:value="networkFilter"
+          :options="networkOptions"
+          :placeholder="t('connections.networkTypeFilter')"
+          clearable
+          class="filter-select"
+        />
+        
+        <n-select
+          v-model:value="ruleFilter"
+          :options="ruleOptions"
+          :placeholder="t('connections.ruleFilter')"
+          clearable
+          class="filter-select"
+        />
       </div>
-    </section>
+    </div>
 
-    <section class="page-section">
-      <n-card class="surface-card filter-panel" :bordered="false">
-        <div class="filter-content">
-          <div class="filter-row">
-            <n-input
-              v-model:value="searchQuery"
-              :placeholder="t('connections.searchPlaceholder')"
-              clearable
-              size="large"
-              class="search-input"
-            >
-              <template #prefix>
-                <n-icon size="16">
-                  <SearchOutline />
-                </n-icon>
-              </template>
-            </n-input>
-          </div>
-          <div class="filter-row">
-            <n-select
-              v-model:value="networkFilter"
-              :options="networkOptions"
-              :placeholder="t('connections.networkTypeFilter')"
-              clearable
-              size="large"
-              class="filter-select"
-            />
-            <n-select
-              v-model:value="ruleFilter"
-              :options="ruleOptions"
-              :placeholder="t('connections.ruleFilter')"
-              clearable
-              size="large"
-              class="filter-select"
-            />
-          </div>
-          <div class="active-filters" v-if="searchQuery || networkFilter || ruleFilter">
-            <n-tag v-if="searchQuery" size="small" round closable @close="searchQuery = ''">
-              {{ t('common.search') }}: {{ searchQuery }}
-            </n-tag>
-            <n-tag v-if="networkFilter" size="small" round closable @close="networkFilter = null">
-              {{ t('connections.networkTypeFilter') }}: {{ networkFilter }}
-            </n-tag>
-            <n-tag v-if="ruleFilter" size="small" round closable @close="ruleFilter = null">
-              {{ t('connections.ruleFilter') }}: {{ ruleFilter }}
-            </n-tag>
-          </div>
-        </div>
-      </n-card>
-
-      <n-card class="surface-card connections-card" :bordered="false">
-        <n-spin :show="loading">
-          <div v-if="filteredConnections.length > 0" class="connections-grid">
-            <div
-            v-for="(conn, index) in filteredConnections"
+    <!-- Connections List -->
+    <div class="connections-section">
+      <n-spin :show="loading">
+        <div v-if="filteredConnections.length > 0" class="connections-grid">
+          <div
+            v-for="conn in filteredConnections"
             :key="conn.id"
-            class="connection-item"
-            :class="{ 'connection-highlight': isConnectionHighlighted(conn) }"
+            class="connection-card"
           >
-            <!-- 连接头部 -->
-            <div class="connection-header">
-              <div class="connection-id">
-                <n-tag size="small" :type="getNetworkTagType(conn.metadata.network)">
-                  {{ getConnectionShortId(conn.id) }}
+            <div class="card-header">
+              <div class="header-left">
+                <n-tag size="small" :type="getNetworkTagType(conn.metadata.network)" round :bordered="false">
+                  {{ conn.metadata.network?.toUpperCase() || 'TCP' }}
                 </n-tag>
+                <span class="conn-id">#{{ getConnectionShortId(conn.id) }}</span>
               </div>
-              <div class="connection-time">
-                {{ formatConnectionTime(conn.start) }}
-              </div>
+              <span class="conn-time">{{ formatConnectionTime(conn.start) }}</span>
             </div>
 
-            <!-- 连接详情 -->
-            <div class="connection-details">
-              <div class="connection-row">
-                <div class="detail-item">
-                  <div class="detail-label">{{ t('connections.source') }}</div>
-                  <div class="detail-value" :title="getSourceText(conn)">
-                    {{ getSourceText(conn) }}
-                  </div>
+            <div class="card-body">
+              <div class="info-row">
+                <div class="info-item">
+                  <span class="label">{{ t('connections.source') }}</span>
+                  <span class="value" :title="getSourceText(conn)">{{ getSourceText(conn) }}</span>
                 </div>
-                <div class="detail-item">
-                  <div class="detail-label">{{ t('connections.destination') }}</div>
-                  <div class="detail-value" :title="getDestinationText(conn)">
-                    {{ getDestinationText(conn) }}
-                  </div>
+                <div class="info-item">
+                  <span class="label">{{ t('connections.destination') }}</span>
+                  <span class="value highlight" :title="getDestinationText(conn)">{{ getDestinationText(conn) }}</span>
                 </div>
               </div>
 
-              <div class="connection-row">
-                <div class="detail-item">
-                  <div class="detail-label">{{ t('connections.rule') }}</div>
-                  <div class="detail-value">
-                    <n-tag size="small" :type="getRuleTagType(conn.rule)">
+              <div class="info-row">
+                <div class="info-item">
+                  <span class="label">{{ t('connections.rule') }}</span>
+                  <span class="value">
+                    <n-tag size="small" :type="getRuleTagType(conn.rule)" :bordered="false">
                       {{ conn.rule }}
                     </n-tag>
-                  </div>
+                  </span>
                 </div>
-                <div class="detail-item">
-                  <div class="detail-label">{{ t('connections.traffic') }}</div>
-                  <div class="detail-value traffic-value">
-                    <span class="upload">↑{{ formatBytes(conn.upload) }}</span>
-                    <span class="download">↓{{ formatBytes(conn.download) }}</span>
+                <div class="info-item">
+                  <span class="label">{{ t('connections.traffic') }}</span>
+                  <div class="traffic-stats">
+                    <span class="up">
+                      <n-icon size="12"><ArrowUpOutline /></n-icon>
+                      {{ formatBytes(conn.upload) }}
+                    </span>
+                    <span class="down">
+                      <n-icon size="12"><ArrowDownOutline /></n-icon>
+                      {{ formatBytes(conn.download) }}
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
-
-            <!-- 连接状态指示器 -->
-            <div class="connection-indicator" :class="getNetworkClass(conn.metadata.network)"></div>
           </div>
         </div>
 
-        <!-- 空状态 -->
+        <!-- Empty State -->
         <div v-else class="empty-state">
           <div class="empty-icon">
-            <n-icon size="48">
-              <LinkOutline />
-            </n-icon>
+            <n-icon size="48"><LinkOutline /></n-icon>
           </div>
-          <div class="empty-title">
-            {{
-              searchQuery || networkFilter || ruleFilter
-                ? t('connections.noMatchingConnections2')
-                : t('connections.noActiveConnections')
-            }}
-          </div>
-          <div class="empty-desc">
-            {{
-              searchQuery || networkFilter || ruleFilter
-                ? t('connections.adjustSearchOrFilters')
-                : t('connections.refreshConnections')
-            }}
-          </div>
+          <h3 class="empty-title">
+            {{ searchQuery || networkFilter || ruleFilter ? t('connections.noMatchingConnections2') : t('connections.noActiveConnections') }}
+          </h3>
           <n-button
             v-if="!searchQuery && !networkFilter && !ruleFilter"
             @click="refreshConnections"
             type="primary"
-            size="large"
-            class="empty-btn"
           >
-            <template #icon>
-              <n-icon size="18">
-                <RefreshOutline />
-              </n-icon>
-            </template>
             {{ t('connections.refreshConnections') }}
+          </n-button>
+          <n-button
+            v-else
+            @click="clearFilters"
+            secondary
+          >
+            {{ t('rules.clearFilters') }}
           </n-button>
         </div>
       </n-spin>
-      </n-card>
-    </section>
+    </div>
   </div>
 </template>
 
@@ -216,8 +164,8 @@ import {
 } from '@vicons/ionicons5'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useI18n } from 'vue-i18n'
-import { useThemeStore } from '@/stores/app/ThemeStore'
-import { usePageTheme } from '@/composables/usePageTheme'
+import PageHeader from '@/components/common/PageHeader.vue'
+import StatusCard from '@/components/common/StatusCard.vue'
 
 defineOptions({
   name: 'ConnectionsView'
@@ -227,19 +175,12 @@ const message = useMessage()
 const loading = ref(false)
 const connectionStore = useConnectionStore()
 const { t } = useI18n()
-const themeStore = useThemeStore()
-const pageThemeStyle = usePageTheme(themeStore)
 
-// 搜索和筛选
 const searchQuery = ref('')
 const networkFilter = ref(null)
 const ruleFilter = ref(null)
 
-// 使用计算属性来获取连接信息
-const connections = computed(() => connectionStore.connections)
-const connectionsTotal = computed(() => connectionStore.connectionsTotal)
-
-// 定义连接数据接口
+// Interfaces
 interface ConnectionMetadata {
   destinationIP: string
   destinationPort: string
@@ -263,7 +204,10 @@ interface Connection {
   upload: number
 }
 
-// 筛选后的连接列表
+// Computed
+const connections = computed(() => connectionStore.connections)
+const connectionsTotal = computed(() => connectionStore.connectionsTotal)
+
 const filteredConnections = computed(() => {
   return connections.value.filter((conn) => {
     const matchesSearch =
@@ -291,7 +235,6 @@ const filteredConnections = computed(() => {
   })
 })
 
-// 网络类型选项
 const networkOptions = computed(() => {
   const networks = new Set<string>()
   connections.value.forEach((conn) => {
@@ -302,7 +245,6 @@ const networkOptions = computed(() => {
   return Array.from(networks).map((network) => ({ label: network, value: network.toLowerCase() }))
 })
 
-// 规则选项
 const ruleOptions = computed(() => {
   const rules = new Set<string>()
   connections.value.forEach((conn) => {
@@ -313,7 +255,34 @@ const ruleOptions = computed(() => {
   return Array.from(rules).map((rule) => ({ label: rule, value: rule }))
 })
 
-// 格式化字节大小的函数
+const connectionStats = computed(() => [
+  {
+    label: t('connections.activeConnections'),
+    value: connections.value.length,
+    icon: LinkOutline,
+    type: 'primary',
+  },
+  {
+    label: t('home.traffic.uploadTotal'),
+    value: formatBytes(connectionsTotal.value.upload),
+    icon: ArrowUpOutline,
+    type: 'warning',
+  },
+  {
+    label: t('home.traffic.downloadTotal'),
+    value: formatBytes(connectionsTotal.value.download),
+    icon: ArrowDownOutline,
+    type: 'success',
+  },
+  {
+    label: t('connections.matchedConnections'),
+    value: filteredConnections.value.length,
+    icon: FilterOutline,
+    type: 'default',
+  },
+])
+
+// Methods
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -322,34 +291,6 @@ const formatBytes = (bytes: number) => {
   return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i]
 }
 
-const connectionStats = computed(() => [
-  {
-    label: t('connections.activeConnections'),
-    value: connections.value.length,
-    icon: LinkOutline,
-    accent: 'purple',
-  },
-  {
-    label: t('home.traffic.uploadTotal'),
-    value: formatBytes(connectionsTotal.value.upload),
-    icon: ArrowUpOutline,
-    accent: 'pink',
-  },
-  {
-    label: t('home.traffic.downloadTotal'),
-    value: formatBytes(connectionsTotal.value.download),
-    icon: ArrowDownOutline,
-    accent: 'blue',
-  },
-  {
-    label: t('connections.matchedConnections'),
-    value: filteredConnections.value.length,
-    icon: FilterOutline,
-    accent: 'amber',
-  },
-])
-
-// 辅助方法
 const getConnectionShortId = (id: string): string => {
   if (!id) return 'N/A'
   return id.length > 8 ? id.substring(0, 8) + '...' : id
@@ -385,12 +326,6 @@ const getDestinationText = (conn: Connection): string => {
   return host || `${destinationIP}:${destinationPort}`
 }
 
-const getNetworkClass = (network: string): string => {
-  if (network === 'tcp') return 'network-tcp'
-  if (network === 'udp') return 'network-udp'
-  return 'network-other'
-}
-
 const getNetworkTagType = (network: string): 'info' | 'warning' | 'default' => {
   if (network === 'tcp') return 'info'
   if (network === 'udp') return 'warning'
@@ -405,31 +340,17 @@ const getRuleTagType = (rule: string): 'success' | 'error' | 'info' | 'warning' 
   return 'warning'
 }
 
-const isConnectionHighlighted = (conn: Connection): boolean => {
-  if (!searchQuery.value) return false
-
-  const searchText = searchQuery.value.toLowerCase()
-  const sourceText = getSourceText(conn).toLowerCase()
-  const destText = getDestinationText(conn).toLowerCase()
-
-  return (
-    conn.id.toLowerCase().includes(searchText) ||
-    sourceText.includes(searchText) ||
-    destText.includes(searchText) ||
-    (conn.rule && conn.rule.toLowerCase().includes(searchText)) ||
-    (conn.metadata.processPath?.toLowerCase() || '').includes(searchText)
-  )
+const clearFilters = () => {
+  searchQuery.value = ''
+  networkFilter.value = null
+  ruleFilter.value = null
 }
 
-// 刷新连接列表
 const refreshConnections = async () => {
   loading.value = true
   try {
-    // 这里实际上不需要做什么，因为connectionStore中的connections已经通过WebSocket自动更新
-    // 但我们仍然提供刷新按钮以便于用户手动刷新界面
     message.success(t('connections.refreshSuccess'))
   } catch (error) {
-    console.error(t('connections.refreshError'), error)
     message.error(t('connections.refreshError', { error: String(error) }))
   } finally {
     loading.value = false
@@ -437,180 +358,181 @@ const refreshConnections = async () => {
 }
 
 onMounted(async () => {
-  // 当组件挂载时，确保连接数据已经初始化
   if (!connections.value.length) {
-    // 设置连接监听器
     await connectionStore.setupEventListeners()
     refreshConnections()
   }
 })
 
-// 组件卸载时清理连接监听器
 onUnmounted(() => {
   connectionStore.cleanupEventListeners()
 })
 </script>
 
 <style scoped>
-.connections-page {
-  animation: fadeIn 0.4s ease both;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.filter-panel {
-  border-radius: 28px;
-}
-
-.filter-content {
+.page-container {
+  padding: 24px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 24px;
 }
 
-.filter-row {
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.filter-section {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.filter-bar {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
 }
 
 .search-input {
-  flex: 1;
+  flex: 2;
+  min-width: 200px;
 }
 
 .filter-select {
-  min-width: 200px;
   flex: 1;
-}
-
-.active-filters {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.connections-card {
-  border-radius: 32px;
+  min-width: 160px;
 }
 
 .connections-grid {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
-.connection-item {
-  position: relative;
-  border-radius: 24px;
-  padding: 20px;
-  background: rgba(15, 23, 42, 0.02);
+.connection-card {
+  background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  border-radius: 16px;
+  padding: 16px;
+  transition: all 0.2s ease;
 }
 
-.connection-item:hover {
-  transform: translateY(-3px);
-  border-color: rgba(91, 76, 253, 0.4);
-  box-shadow: 0 25px 40px rgba(15, 23, 42, 0.15);
+.connection-card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--panel-shadow);
 }
 
-.connection-highlight {
-  border-color: rgba(91, 76, 253, 0.45);
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.connection-header {
+.header-left {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
 }
 
-.connection-time {
-  font-size: 13px;
-  color: var(--text-muted);
+.conn-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
-.connection-details {
+.conn-time {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.card-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-
-.connection-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.detail-item {
-  flex: 1;
-  min-width: 220px;
-}
-
-.detail-label {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-}
-
-.detail-value {
-  font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 600;
-  word-break: break-word;
-}
-
-.traffic-value {
-  display: flex;
   gap: 12px;
-  font-weight: 600;
 }
 
-.traffic-value .upload {
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.info-item .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+}
+
+.info-item .value {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.info-item .value.highlight {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.traffic-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.traffic-stats .up {
   color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
-.traffic-value .download {
+.traffic-stats .down {
   color: #10b981;
-}
-
-.connection-indicator {
-  position: absolute;
-  inset: 0;
-  border-radius: 24px;
-  border: 1px solid transparent;
-  pointer-events: none;
-}
-
-.connection-highlight .connection-indicator {
-  border-color: rgba(91, 76, 253, 0.4);
-  box-shadow: inset 0 0 20px rgba(91, 76, 253, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .empty-state {
-  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 0;
+  color: var(--text-secondary);
 }
 
-@media (max-width: 768px) {
-  .connections-grid {
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  }
+.empty-icon {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
 
-  .filter-select {
-    min-width: 160px;
-  }
+.empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--text-primary);
 }
 </style>

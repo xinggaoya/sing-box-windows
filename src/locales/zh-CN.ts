@@ -1,34 +1,29 @@
 export default {
-  // 通用词汇
   common: {
     appName: 'Sing-Box Windows',
-    ok: '确定',
     cancel: '取消',
-    confirm: '确认',
     save: '保存',
+    saveSuccess: '保存成功',
+    saveFailed: '保存失败',
+    confirm: '确认',
+    add: '添加',
+    edit: '编辑',
     delete: '删除',
-    error: '错误',
-    refresh: '刷新',
-    unknown: '未知',
-    search: '搜索',
-    minimizedToTray: '已最小化到托盘',
+    import: '导入',
+    export: '导出',
   },
-
-  // 导航菜单
   nav: {
-    navigation: '导航',
     home: '首页',
+    subscription: '订阅',
     proxy: '代理',
     connections: '连接',
     logs: '日志',
     rules: '规则',
-    subscription: '订阅',
     settings: '设置',
+    navigation: '导航',
     expand: '展开',
     collapse: '收起',
   },
-
-  // 状态相关
   status: {
     running: '运行中',
     starting: '启动中',
@@ -37,49 +32,37 @@ export default {
     connecting: '连接中',
     disconnected: '已断开',
   },
-
-  // 首页
   home: {
-    // 基础操作
     start: '启动',
     stop: '停止',
     restart: '重启',
     restartAsAdmin: '以管理员重启',
-
-    // 状态信息
     restartFailed: '重启失败',
     nodeModeChangeSuccess: '节点模式切换成功',
     nodeModeChangeFailed: '节点模式切换失败',
     restartSuccess: '内核重启成功。',
-
-    // WebSocket状态
+    memory: '内存占用',
     wsStatus: {
       connected: '已连接',
       disconnected: '未连接',
     },
-
-    // 管理员状态
     adminStatus: {
       admin: '管理员',
       normal: '普通用户',
     },
-
-    // 代理头部
     proxyHeader: {
       flowMode: '流量代理模式',
       nodeMode: '节点代理模式',
     },
-
-    // 状态描述
-    status: {
+    statusDescriptions: {
       runningDesc: '内核正在运行，代理服务可用',
       disconnectedDesc: '内核已启动但连接异常，请检查配置',
+    },
+    kernelStatusDescriptions: {
       startingDesc: '正在启动内核，请稍候...',
       stoppingDesc: '正在停止内核，请稍候...',
       stoppedDesc: '内核已停止，代理服务不可用',
     },
-
-    // 流量统计
     traffic: {
       title: '流量统计',
       uploadSpeed: '上传速度',
@@ -88,9 +71,10 @@ export default {
       downloadTotal: '下载总流量',
       memory: '内存占用',
       connectionsLabel: '个连接',
+      up: '上传',
+      down: '下载',
+      total: '总计',
     },
-
-    // 流量代理模式
     proxyMode: {
       system: '系统代理',
       tun: 'TUN模式',
@@ -99,26 +83,19 @@ export default {
       tunTip: '使用TUN虚拟网卡代理所有流量，需要管理员权限',
       manualTip: '需要手动配置系统代理',
     },
-
-    // 节点代理模式
     nodeMode: {
       global: '全局模式',
       rule: '规则模式',
       globalTip: '全部流量走代理',
       ruleTip: '根据规则智能分流',
     },
-
-    // 切换模式
     switchMode: '切换模式',
-
     tunConfirm: {
       title: '需要管理员权限',
       description: '切换到 TUN 模式需要以管理员权限重启应用，是否立即以管理员身份重启？',
       confirm: '以管理员身份重启',
     },
   },
-
-  // 代理页面
   proxy: {
     title: '代理设置',
     subtitle: '代理节点管理与延迟测试',
@@ -150,8 +127,6 @@ export default {
       testing: '测试中',
     },
   },
-
-  // 连接页面
   connections: {
     title: '连接管理',
     subtitle: '管理和监控网络连接',
@@ -174,8 +149,6 @@ export default {
     minutesAgo: '{count}分钟前',
     hoursAgo: '{count}小时前',
   },
-
-  // 日志页面
   log: {
     title: '日志查看',
     subtitle: '实时监控系统日志',
@@ -204,8 +177,6 @@ export default {
     noSearchResults: '没有找到匹配的日志。',
     adjustSearchFilters: '请尝试调整您的搜索或筛选条件。',
   },
-
-  // 规则页面
   rules: {
     title: '规则管理',
     subtitle: '管理代理路由规则',
@@ -228,8 +199,6 @@ export default {
     fetchSuccess: '成功获取 {count} 条规则。',
     fetchError: '获取规则失败: {error}',
   },
-
-  // 订阅页面
   sub: {
     title: '订阅管理',
     subtitle: '管理您的订阅配置和代理节点',
@@ -278,29 +247,20 @@ export default {
     manualConfig: '手动配置',
     manualContent: '手动配置内容',
   },
-
-  // 设置页面
   setting: {
     title: '设置',
     subtitle: '管理应用程序配置和系统设置',
     appVersion: '应用版本',
-    kernelVersion: '内核版本',
     notInstalled: '未安装',
     newVersionFound: '发现新版本',
-
-    // 通用设置
     general: {
       title: '常规设置',
       description: '配置语言、网络和其他应用程序选项',
     },
-
-    // 主题设置
     theme: {
       light: '浅色',
       dark: '深色',
     },
-
-    // 语言设置
     language: {
       title: '语言',
       auto: '自动',
@@ -308,8 +268,6 @@ export default {
       changeSuccess: '语言已成功更改',
       description: '选择应用程序界面显示语言',
     },
-
-    // 网络设置
     network: {
       ipv6: 'IPv6 支持',
       ipv4Only: '仅使用 IPv4',
@@ -329,12 +287,10 @@ export default {
       portChanged: '端口设置已更改',
       portChangeSuccess: '端口配置已成功更新',
     },
-
-    // 更新设置
     update: {
       title: '更新设置',
       description: '配置应用自动更新和版本检查选项',
-        checkNow: '立即检查',
+      checkNow: '立即检查',
       checkAgain: '重新检查',
       checking: '检查中...',
       autoCheck: '自动检查更新',
@@ -373,14 +329,11 @@ export default {
       skipSuccess: '已成功跳过此版本。',
       skipError: '跳过版本失败: {error}',
     },
-
-    // 自启动设置
     autoStart: {
       app: '开机自启',
       appDesc: '系统启动时自动运行应用程序',
+      error: '设置开机自启失败',
     },
-
-    // 启动设置
     startup: {
       title: '启动设置',
       description: '配置应用启动和自动运行选项',
@@ -389,11 +342,10 @@ export default {
       enableSuccess: '开机自启动设置成功',
       disableSuccess: '开机自启动已禁用',
     },
-
-    // 内核管理
     kernel: {
       title: '内核管理',
       description: '管理 Sing-Box 内核版本和下载',
+      version: '内核版本',
       download: '下载内核',
       redownload: '重新下载',
       update: '更新内核',
@@ -401,7 +353,7 @@ export default {
       downloadComplete: '内核下载完成！',
       installSuccess: '内核安装验证成功！',
       installFailed: '未检测到有效的内核文件',
-        preparingDownload: '准备下载...',
+      preparingDownload: '准备下载...',
       downloading: '正在下载内核',
       downloadingDescription: '内核文件正在下载中，请稍候...',
       manualDownload: '手动下载',
@@ -409,6 +361,8 @@ export default {
       manualDownloadGuide: '请按照以下步骤操作：\n1. 访问 https://github.com/SagerNet/sing-box/releases/latest\n2. 下载对应系统版本的 sing-box\n3. 将解压后的可执行文件放置在以下目录：\nWindows: 用户目录/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: 用户目录/.local/share/sing-box-windows/sing-box/sing-box\n\n完成后点击"检查安装"按钮验证安装是否成功。',
       installPrompt: '请下载并安装内核后使用。',
       downloadFailedMessage: '内核下载失败: {error}',
+      downloadSuccess: '内核下载成功',
+      downloadFailed: '内核下载失败',
     },
     proxyAdvanced: {
       title: '代理高级设置',
@@ -438,8 +392,6 @@ export default {
         invalidStack: '请选择合法的协议栈模式',
       },
     },
-
-    // 开发者工具
     developer: {
       title: '开发者工具',
       description: '开发者调试工具和选项',
@@ -449,8 +401,6 @@ export default {
       opened: '开发者工具已打开',
       warning: '开发者工具主要用于开发和调试，正常使用无需开启',
     },
-
-    // 关于
     about: {
       title: '关于',
       description: '应用程序信息和版本详情',
@@ -458,16 +408,11 @@ export default {
       license: '许可证',
     },
   },
-
-  // 托盘菜单
   tray: {
     kernel: '内核',
     show: '显示窗口',
     quit: '退出应用',
   },
-
-  
-  // 通知消息
   notification: {
     proxyModeChanged: '代理模式已更改',
     proxyModeChangeFailed: '代理模式更改失败',

@@ -1,101 +1,78 @@
 <template>
-  <div class="page-shell proxy-page" :style="pageThemeStyle">
-    <section class="page-hero">
-      <div class="hero-row">
-        <div class="hero-left">
-          <div class="hero-icon">
-            <n-icon size="28">
-              <SwapHorizontalOutline />
-            </n-icon>
-          </div>
-          <div class="hero-meta">
-            <p class="hero-subtitle">{{ t('proxy.subtitle') }}</p>
-            <h2 class="hero-title">{{ t('proxy.title') }}</h2>
-          </div>
-        </div>
-        <div class="hero-actions">
-          <n-button
-            @click="init"
-            :loading="isLoading"
-            type="primary"
-            size="large"
-          >
-            <template #icon>
-              <n-icon size="18">
-                <RefreshOutline />
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </div>
-      </div>
-      <div class="hero-stats">
-        <div
-          v-for="stat in proxyStats"
-          :key="stat.label"
-          class="stat-card"
-          :data-accent="stat.accent"
+  <div class="page-container">
+    <PageHeader :title="t('proxy.title')" :subtitle="t('proxy.subtitle')">
+      <template #actions>
+        <n-button
+          @click="init"
+          :loading="isLoading"
+          type="primary"
+          secondary
+          round
         >
-          <div class="stat-icon">
-            <n-icon :size="20">
-              <component :is="stat.icon" />
-            </n-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stat.value }}</div>
-            <div class="stat-label">{{ stat.label }}</div>
-          </div>
-        </div>
-      </div>
-    </section>
+          <template #icon>
+            <n-icon><RefreshOutline /></n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </PageHeader>
 
-    <section class="page-section">
-      <n-spin :show="isLoading" class="loading-container">
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <StatusCard
+        v-for="stat in proxyStats"
+        :key="stat.label"
+        :label="stat.label"
+        :value="stat.value"
+        :type="stat.type"
+      >
+        <template #icon>
+          <n-icon><component :is="stat.icon" /></n-icon>
+        </template>
+      </StatusCard>
+    </div>
+
+    <!-- Content -->
+    <div class="content-section">
+      <n-spin :show="isLoading">
         <template #description>
           <span class="loading-text">{{ t('proxy.loadingInfo') }}</span>
         </template>
 
-        <!-- 空状态 -->
+        <!-- Empty State -->
         <div v-if="proxyGroups.length === 0 && !isLoading" class="empty-state">
           <div class="empty-icon">
             <n-icon size="48"><GlobeOutline /></n-icon>
           </div>
           <h3 class="empty-title">{{ t('proxy.noProxyGroups') }}</h3>
-          <p class="empty-description">{{ t('proxy.checkConfigOrRefresh') }}</p>
-          <n-button @click="init" type="primary" size="medium">
-            <template #icon>
-              <n-icon size="16"><RefreshOutline /></n-icon>
-            </template>
+          <p class="empty-desc">{{ t('proxy.checkConfigOrRefresh') }}</p>
+          <n-button @click="init" type="primary">
             {{ t('common.refresh') }}
           </n-button>
         </div>
 
-        <!-- 代理组列表 -->
+        <!-- Proxy Groups -->
         <div v-else class="proxy-groups">
           <div
             v-for="group in [...proxyGroups].reverse()"
             :key="group.name"
-            class="proxy-group"
+            class="group-card"
           >
-            <!-- 组头部 -->
+            <!-- Group Header -->
             <div class="group-header" @click="toggleGroup(group.name)">
               <div class="group-info">
-                <div class="group-main">
+                <div class="group-title-row">
                   <h3 class="group-name">{{ group.name }}</h3>
-                  <div class="group-badges">
-                    <n-tag size="small" type="info" round :bordered="false">
-                      {{ group.all.length }} {{ t('proxy.nodes') }}
-                    </n-tag>
-                    <n-tag size="small" type="default" round :bordered="false">
-                      {{ group.type }}
-                    </n-tag>
-                  </div>
-                </div>
-                <div class="group-current">
-                  <span class="current-label">{{ t('proxy.currentLabel') }}:</span>
-                  <n-tag type="success" size="small" round :bordered="false">
-                    {{ group.now }}
+                  <n-tag size="small" round :bordered="false" type="primary" secondary>
+                    {{ group.type }}
                   </n-tag>
+                  <n-tag size="small" round :bordered="false">
+                    {{ group.all.length }} {{ t('proxy.nodes') }}
+                  </n-tag>
+                </div>
+                <div class="group-status">
+                  <span class="label">{{ t('proxy.currentLabel') }}:</span>
+                  <span class="value">{{ group.now }}</span>
                 </div>
               </div>
 
@@ -103,58 +80,48 @@
                 <n-button
                   @click.stop="testNodeDelay(group.name)"
                   :loading="testingGroup === group.name"
-                  type="info"
                   size="small"
-                  class="test-btn"
+                  secondary
+                  round
                 >
                   <template #icon>
-                    <n-icon size="14"><SpeedometerOutline /></n-icon>
+                    <n-icon><SpeedometerOutline /></n-icon>
                   </template>
                   {{ t('proxy.testNode') }}
                 </n-button>
-                <div class="expand-icon" :class="{ expanded: expandedGroups.includes(group.name) }">
-                  <n-icon size="18">
-                    <ChevronDownOutline />
-                  </n-icon>
+                <div class="expand-btn" :class="{ expanded: expandedGroups.includes(group.name) }">
+                  <n-icon><ChevronDownOutline /></n-icon>
                 </div>
               </div>
             </div>
 
-            <!-- 节点网格 -->
-            <transition name="group-expand">
-              <div v-if="expandedGroups.includes(group.name)" class="nodes-container">
-                <div class="nodes-grid" :style="{ '--grid-columns': gridCols }">
+            <!-- Nodes Grid -->
+            <transition name="expand">
+              <div v-if="expandedGroups.includes(group.name)" class="nodes-area">
+                <div class="nodes-grid">
                   <div
                     v-for="(proxy, i) in group.all"
                     :key="`${group.name}-${proxy}-${i}`"
-                    class="node-card"
+                    class="node-item"
                     :class="{
-                      'node-active': group.now === proxy,
-                      'node-testing': testingNodes[proxy],
+                      active: group.now === proxy,
+                      testing: testingNodes[proxy],
+                      error: nodeErrors[proxy]
                     }"
                     @click="changeProxy(group.name, proxy)"
                   >
-                    <!-- 节点状态指示器 -->
-                    <div class="node-status" :class="getNodeStatusType(proxy)">
-                      <n-icon v-if="group.now === proxy" size="16">
-                        <CheckmarkCircleOutline />
-                      </n-icon>
-                      <n-icon v-else-if="testingNodes[proxy]" size="16" class="spin">
-                        <RefreshOutline />
-                      </n-icon>
-                      <div v-else class="status-dot"></div>
+                    <div class="node-status-icon">
+                      <n-icon v-if="group.now === proxy"><CheckmarkCircleOutline /></n-icon>
+                      <n-icon v-else-if="testingNodes[proxy]" class="spin"><RefreshOutline /></n-icon>
+                      <div v-else class="dot"></div>
                     </div>
-
-                    <!-- 节点信息 -->
-                    <div class="node-info">
+                    
+                    <div class="node-details">
                       <div class="node-name" :title="proxy">{{ proxy }}</div>
-                      <div class="node-delay" @click.stop="testSingleNode(proxy)">
-                        <span class="delay-value">{{ getNodeStatusText(proxy) }}</span>
+                      <div class="node-meta" @click.stop="testSingleNode(proxy)">
+                        {{ getNodeStatusText(proxy) }}
                       </div>
                     </div>
-
-                    <!-- 活跃指示线 -->
-                    <div v-if="group.now === proxy" class="active-indicator"></div>
                   </div>
                 </div>
               </div>
@@ -162,7 +129,7 @@
           </div>
         </div>
       </n-spin>
-    </section>
+    </div>
   </div>
 </template>
 
@@ -177,15 +144,14 @@ import {
   GlobeOutline,
   ChevronDownOutline,
 } from '@vicons/ionicons5'
-import { useWindowSize } from '@vueuse/core'
 import { tauriApi } from '@/services/tauri'
 import { listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
-import { useThemeStore } from '@/stores/app/ThemeStore'
-import { usePageTheme } from '@/composables/usePageTheme'
+import PageHeader from '@/components/common/PageHeader.vue'
+import StatusCard from '@/components/common/StatusCard.vue'
 
-// 接口定义
+// Interfaces
 interface ProxyHistory {
   time: string
   delay: number
@@ -200,10 +166,6 @@ interface ProxyData {
   udp: boolean
 }
 
-interface Proxies {
-  proxies: Record<string, ProxyData>
-}
-
 interface TestGroupResult {
   [proxyName: string]: number
 }
@@ -213,55 +175,31 @@ interface TestNodeResult {
   delay: number
 }
 
-// 状态定义
 defineOptions({
   name: 'ProxyView'
 })
 
 const message = useMessage()
 const isLoading = ref(false)
-const { width } = useWindowSize()
 const { t } = useI18n()
 const appStore = useAppStore()
-const themeStore = useThemeStore()
-const pageThemeStyle = usePageTheme(themeStore)
 
-// 代理数据
+// Data
 const rawProxies = ref<Record<string, ProxyData>>({})
 const proxyGroups = ref<ProxyData[]>([])
 const testingNodes = reactive<Record<string, boolean>>({})
 const expandedGroups = ref<string[]>([])
+const testingGroup = ref('')
+const testResults = reactive<Record<string, number>>({})
+const nodeErrors = reactive<Record<string, string>>({})
 
-// 注册事件监听器
+// Listeners
 let unlistenTestProgress: (() => void) | null = null
 let unlistenTestResult: (() => void) | null = null
 let unlistenTestComplete: (() => void) | null = null
 let unlistenNodeResult: (() => void) | null = null
 
-// 测试状态和结果
-const testingGroup = ref('')
-const testResults = reactive<Record<string, number>>({})
-const nodeErrors = reactive<Record<string, string>>({})
-
-// 切换组展开状态
-const toggleGroup = (groupName: string) => {
-  const index = expandedGroups.value.indexOf(groupName)
-  if (index > -1) {
-    expandedGroups.value.splice(index, 1)
-  } else {
-    expandedGroups.value.push(groupName)
-  }
-}
-
-// 根据窗口宽度调整网格列数
-const gridCols = computed(() => {
-  if (width.value < 640) return 1
-  if (width.value < 960) return 2
-  if (width.value < 1280) return 3
-  if (width.value < 1600) return 4
-  return 5
-})
-
+// Computed
 const proxyStats = computed(() => {
   const groups = proxyGroups.value
   const totalNodes = groups.reduce((sum, group) => sum + (group.all?.length ?? 0), 0)
@@ -273,30 +211,138 @@ const proxyStats = computed(() => {
       label: t('proxy.dashboard.groupTotal'),
       value: groups.length,
       icon: SwapHorizontalOutline,
-      accent: 'purple',
+      type: 'primary',
     },
     {
       label: t('proxy.dashboard.nodeTotal'),
       value: totalNodes,
       icon: GlobeOutline,
-      accent: 'blue',
+      type: 'success',
     },
     {
       label: t('proxy.dashboard.expanded'),
       value: expanded,
       icon: ChevronDownOutline,
-      accent: 'amber',
+      type: 'warning',
     },
     {
       label: t('proxy.dashboard.testing'),
       value: testingCount,
       icon: SpeedometerOutline,
-      accent: 'pink',
+      type: 'default',
     },
   ]
 })
 
-// 生命周期钩子
+// Methods
+const toggleGroup = (groupName: string) => {
+  const index = expandedGroups.value.indexOf(groupName)
+  if (index > -1) {
+    expandedGroups.value.splice(index, 1)
+  } else {
+    expandedGroups.value.push(groupName)
+  }
+}
+
+const getNodeStatusText = (name: string): string => {
+  if (testingNodes[name]) return t('proxy.testing')
+  if (nodeErrors[name]) return t('proxy.timeout')
+  const delay = testResults[name] || 0
+  return delay === 0 ? '--' : `${delay}ms`
+}
+
+const init = async () => {
+  isLoading.value = true
+  try {
+    const data = await tauriApi.proxy.getProxies()
+    rawProxies.value = data.proxies
+    const groups: ProxyData[] = []
+    Object.entries(data.proxies).forEach(([key, item]) => {
+      if (key === 'GLOBAL' || key === 'direct') return
+      if (item.type === 'Selector') {
+        groups.push(item)
+      }
+    })
+    proxyGroups.value = groups
+    if (groups.length > 0) {
+      message.success(t('proxy.loadSuccess'))
+    }
+  } catch (error) {
+    message.error(t('proxy.loadFailedCheck'))
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const testSingleNode = async (proxy: string) => {
+  if (testingNodes[proxy]) return
+  testingNodes[proxy] = true
+  try {
+    delete nodeErrors[proxy]
+    await tauriApi.proxy.testNodeDelay(proxy)
+  } catch (error) {
+    testingNodes[proxy] = false
+    nodeErrors[proxy] = t('proxy.timeout')
+  }
+}
+
+const testNodeDelay = async (group: string) => {
+  if (testingGroup.value === group) return
+  testingGroup.value = group
+  try {
+    await tauriApi.proxy.testGroupDelay(group)
+  } catch (error) {
+    message.error(`${t('proxy.testErrorMessage')}: ${group}`)
+    testingGroup.value = ''
+  }
+}
+
+const changeProxy = async (group: string, proxy: string) => {
+  try {
+    await tauriApi.proxy.changeProxy(group, proxy)
+    message.success(t('proxy.switchSuccess', { group, proxy }))
+    await init()
+    await testNodeDelay(group)
+  } catch (error) {
+    message.error(t('proxy.switchErrorMessage'))
+  }
+}
+
+const setupEventListeners = async () => {
+  unlistenTestProgress = await listen('test-nodes-progress', (event) => {
+    // Optional: Update progress
+  })
+
+  unlistenTestResult = await listen('proxy-group-delay-result', (event) => {
+    const data = event.payload as TestGroupResult
+    if (data && typeof data === 'object') {
+      Object.entries(data).forEach(([proxyName, delay]) => {
+        if (typeof delay === 'number') testResults[proxyName] = delay
+      })
+      message.success(t('proxy.groupTestComplete'))
+    }
+    testingGroup.value = ''
+  })
+
+  unlistenTestComplete = await listen('test-nodes-complete', () => {
+    message.success(t('proxy.batchTestComplete'))
+  })
+
+  unlistenNodeResult = await listen('proxy-delay-result', (event) => {
+    const data = event.payload as TestNodeResult
+    if (data && data.proxy) {
+      const { proxy, delay } = data
+      testingNodes[proxy] = false
+      if (delay !== undefined && delay > 0) {
+        testResults[proxy] = delay
+        delete nodeErrors[proxy]
+      } else {
+        nodeErrors[proxy] = t('proxy.timeout')
+      }
+    }
+  })
+}
+
 onMounted(() => {
   init()
   setupEventListeners()
@@ -308,428 +354,241 @@ onUnmounted(() => {
   if (unlistenTestComplete) unlistenTestComplete()
   if (unlistenNodeResult) unlistenNodeResult()
 })
-
-// 设置事件监听器
-const setupEventListeners = async () => {
-  unlistenTestProgress = await listen('test-nodes-progress', (event) => {
-    const data = event.payload as { current: number; total: number; node: string; status: string }
-    console.log(t('proxy.testProgress'), data)
-  })
-
-  unlistenTestResult = await listen('proxy-group-delay-result', (event) => {
-    const data = event.payload as TestGroupResult
-    console.log('收到组延迟测试结果:', data)
-
-    if (data && typeof data === 'object') {
-      Object.entries(data).forEach(([proxyName, delay]) => {
-        if (typeof delay === 'number') {
-          testResults[proxyName] = delay
-        }
-      })
-      message.success(t('proxy.groupTestComplete'))
-    } else {
-      message.error(`${t('proxy.testFailed')}: ${JSON.stringify(data)}`)
-    }
-    testingGroup.value = ''
-  })
-
-  unlistenTestComplete = await listen('test-nodes-complete', () => {
-    message.success(t('proxy.batchTestComplete'))
-  })
-
-  unlistenNodeResult = await listen('proxy-delay-result', (event) => {
-    const data = event.payload as TestNodeResult
-    console.log('收到节点延迟测试结果:', data)
-
-    if (data && data.proxy) {
-      const { proxy, delay } = data
-
-      testingNodes[proxy] = false
-
-      if (delay !== undefined && delay > 0) {
-        testResults[proxy] = delay
-        delete nodeErrors[proxy]
-        message.success(`${t('proxy.nodeTestComplete')}: ${proxy} (${delay}ms)`)
-      } else {
-        nodeErrors[proxy] = t('proxy.timeout')
-        message.warning(`${proxy}: ${t('proxy.timeout')}`)
-      }
-    } else {
-      message.error(`${t('proxy.nodeTestFailed')}: ${JSON.stringify(data)}`)
-    }
-  })
-}
-
-/**
- * 初始化并获取代理信息
- */
-const init = async () => {
-  isLoading.value = true
-  try {
-    const data = await tauriApi.proxy.getProxies()
-    rawProxies.value = data.proxies
-
-    // 提取代理组
-    const groups: ProxyData[] = []
-
-    Object.entries(data.proxies).forEach(([key, item]) => {
-      // 排除特殊组和直连
-      if (key === 'GLOBAL' || key === 'direct') return
-
-      // 只显示Selector类型的代理组
-      if (item.type === 'Selector') {
-        groups.push(item)
-      }
-    })
-
-    proxyGroups.value = groups
-
-    if (groups.length > 0) {
-      message.success(t('proxy.loadSuccess'))
-    }
-  } catch (error) {
-    console.error(t('proxy.loadFailed'), error)
-    message.error(t('proxy.loadFailedCheck'))
-  } finally {
-    isLoading.value = false
-  }
-}
-
-/**
- * 获取节点状态对应的颜色类型
- */
-const getNodeStatusType = (name: string): string => {
-  if (nodeErrors[name]) return 'error'
-  if (testingNodes[name]) return 'info'
-
-  const delay = testResults[name] || 0
-  if (delay === 0) return 'default'
-  if (delay < 100) return 'success'
-  if (delay < 200) return 'info'
-  if (delay < 300) return 'warning'
-  return 'error'
-}
-
-/**
- * 获取节点状态文本
- */
-const getNodeStatusText = (name: string): string => {
-  if (testingNodes[name]) return t('proxy.testing')
-  if (nodeErrors[name]) return t('proxy.timeout')
-
-  const delay = testResults[name] || 0
-  if (delay === 0) return '--'
-  return `${delay}ms`
-}
-
-/**
- * 测试单个节点延迟
- */
-const testSingleNode = async (proxy: string) => {
-  if (testingNodes[proxy]) return
-
-  testingNodes[proxy] = true
-
-  try {
-    delete nodeErrors[proxy]
-    console.log(`开始测试节点延迟: ${proxy}, API端口: ${appStore.apiPort}`)
-    await tauriApi.proxy.testNodeDelay(proxy)
-  } catch (error) {
-    console.error(`测试节点 ${proxy} 失败:`, error)
-    message.error(`${t('proxy.testErrorMessage')}: ${proxy}`)
-    testingNodes[proxy] = false
-    nodeErrors[proxy] = String(error)
-    testingNodes[proxy] = false
-    nodeErrors[proxy] = t('proxy.timeout')
-  }
-}
-
-/**
- * 测试节点延迟
- */
-const testNodeDelay = async (group: string) => {
-  if (testingGroup.value === group) return
-
-  testingGroup.value = group
-  try {
-    console.log(`开始测试组延迟: ${group}, API端口: ${appStore.apiPort}`)
-    await tauriApi.proxy.testGroupDelay(group)
-    console.log(`组延迟测试请求已发送: ${group}`)
-  } catch (error) {
-    console.error(`测试组 ${group} 失败:`, error)
-    message.error(`${t('proxy.testErrorMessage')}: ${group}`)
-    testingGroup.value = ''
-  }
-}
-
-/**
- * 切换代理
- */
-const changeProxy = async (group: string, proxy: string) => {
-  try {
-    await tauriApi.proxy.changeProxy(group, proxy)
-    message.success(t('proxy.switchSuccess', { group: group, proxy: proxy }))
-    // 重新加载数据
-    await init()
-    // 重新测试当前组
-    await testNodeDelay(group)
-  } catch (error) {
-    console.error(t('proxy.switchFailed'), error)
-    message.error(t('proxy.switchErrorMessage'))
-  }
-}
 </script>
 
 <style scoped>
-.proxy-page {
-  animation: fadeIn 0.4s ease both;
+.page-container {
+  padding: 24px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
 }
 
-.loading-container {
-  min-height: 320px;
+.content-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.loading-text {
-  color: var(--text-muted);
-  font-size: 14px;
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 0;
+  color: var(--text-secondary);
 }
 
+.empty-icon {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--text-primary);
+}
+
+.empty-desc {
+  margin: 0 0 24px;
+}
+
+/* Proxy Groups */
 .proxy-groups {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
-.proxy-group {
-  border-radius: 28px;
+.group-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  box-shadow: var(--panel-shadow);
+  border-radius: 16px;
   overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.group-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--panel-shadow);
 }
 
 .group-header {
+  padding: 16px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 22px 28px;
   cursor: pointer;
-  border-bottom: 1px solid var(--divider-color);
-  transition: background 0.2s ease;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .group-header:hover {
-  background: rgba(91, 76, 253, 0.08);
+  background: var(--bg-tertiary);
 }
 
 .group-info {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  flex: 1;
+  gap: 8px;
 }
 
-.group-main {
+.group-title-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
   align-items: center;
+  gap: 12px;
 }
 
 .group-name {
   margin: 0;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.group-badges {
+.group-status {
+  font-size: 13px;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.group-current {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  color: var(--text-muted);
+.group-status .label {
+  color: var(--text-tertiary);
+}
+
+.group-status .value {
+  color: var(--success-color, #10b981);
+  font-weight: 500;
 }
 
 .group-actions {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
-.expand-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--chip-bg);
-  color: var(--text-primary);
+.expand-btn {
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.25s ease;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
 }
 
-.expand-icon.expanded {
+.expand-btn.expanded {
   transform: rotate(180deg);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
-.nodes-container {
-  padding: 24px 28px 32px;
+/* Nodes Grid */
+.nodes-area {
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
 }
 
 .nodes-grid {
   display: grid;
-  grid-template-columns: repeat(var(--grid-columns, 4), minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
 }
 
-.node-card {
-  position: relative;
-  border-radius: 20px;
-  padding: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--panel-border);
+.node-item {
   display: flex;
-  gap: 14px;
   align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--panel-bg);
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
 }
 
-.node-card:hover {
+.node-item:hover {
+  border-color: var(--primary-color);
   transform: translateY(-2px);
-  box-shadow: 0 25px 40px rgba(15, 23, 42, 0.12);
 }
 
-.node-card.node-active {
+.node-item.active {
+  background: rgba(16, 185, 129, 0.1);
   border-color: #10b981;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.22));
 }
 
-.node-card.node-testing {
-  border-color: #6366f1;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(59, 130, 246, 0.18));
+.node-item.error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.05);
 }
 
-.node-status {
-  width: 36px;
-  height: 36px;
-  border-radius: 14px;
-  background: var(--chip-bg);
-  color: var(--text-primary);
+.node-status-icon {
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.node-status.success {
-  background: rgba(16, 185, 129, 0.18);
-  color: #059669;
+.node-item.active .node-status-icon {
+  color: #10b981;
 }
 
-.node-status.info {
-  background: rgba(59, 130, 246, 0.18);
-  color: #2563eb;
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-color);
 }
 
-.node-status.warning {
-  background: rgba(251, 191, 36, 0.2);
-  color: #b45309;
+.node-item:hover .dot {
+  background: var(--primary-color);
 }
 
-.node-status.error {
-  background: rgba(248, 113, 113, 0.2);
-  color: #dc2626;
-}
-
-.node-info {
+.node-details {
   flex: 1;
   min-width: 0;
 }
 
 .node-name {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.node-delay {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--text-muted);
+.node-meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
 }
 
-.active-indicator {
-  position: absolute;
-  inset: 0;
-  border-radius: 20px;
-  border: 1px solid rgba(16, 185, 129, 0.6);
-  pointer-events: none;
-}
-
-.group-expand-enter-active,
-.group-expand-leave-active {
-  overflow: hidden;
+.expand-enter-active,
+.expand-leave-active {
   transition: all 0.3s ease;
+  max-height: 1000px;
+  opacity: 1;
 }
 
-.group-expand-enter-from,
-.group-expand-leave-to {
+.expand-enter-from,
+.expand-leave-to {
+  max-height: 0;
   opacity: 0;
-  transform: translateY(-12px);
-}
-
-@media (max-width: 1024px) {
-  .group-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .group-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
-@media (max-width: 768px) {
-  .nodes-grid {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  }
-}
-
-@media (max-width: 560px) {
-  .nodes-container {
-    padding: 18px;
-  }
-
-  .group-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
+  padding-top: 0;
+  padding-bottom: 0;
 }
 </style>
