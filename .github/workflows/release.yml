@@ -86,6 +86,20 @@ jobs:
             pnpm exec tauri build --target ${{ matrix.target }}
           fi
 
+      - name: Create Windows portable zip
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $exePath = "src-tauri/target/${{ matrix.target }}/release/sing-box-windows.exe"
+          if (-not (Test-Path $exePath)) {
+            Write-Error "可执行文件未找到: $exePath"
+            exit 1
+          }
+          $portableDir = "src-tauri/target/${{ matrix.target }}/release/bundle/portable"
+          New-Item -ItemType Directory -Path $portableDir -Force | Out-Null
+          $zipPath = Join-Path $portableDir "sing-box-windows-portable.zip"
+          Compress-Archive -Path $exePath -DestinationPath $zipPath -Force
+
       - name: List build artifacts
         shell: bash
         run: |
@@ -156,5 +170,6 @@ jobs:
             macos-artifacts/macos/sing-box-windows.app.tar.gz*
             macos-intel-artifacts/dmg/sing-box-windows_*.dmg*
             macos-intel-artifacts/macos/sing-box-windows.app.tar.gz*
+            windows-artifacts/portable/sing-box-windows-portable.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
