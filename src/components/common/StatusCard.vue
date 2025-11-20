@@ -15,12 +15,18 @@
 </template>
 
 <script lang="ts" setup>
-defineProps<{
+import type { StatusCardType } from '@/types'
+
+interface StatusCardProps {
   label: string
   value: string | number
   description?: string
-  type?: 'default' | 'primary' | 'success' | 'warning' | 'error'
-}>()
+  type?: StatusCardType
+}
+
+withDefaults(defineProps<StatusCardProps>(), {
+  type: 'default'
+})
 </script>
 
 <style scoped>

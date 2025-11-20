@@ -211,25 +211,25 @@ const proxyStats = computed(() => {
       label: t('proxy.dashboard.groupTotal'),
       value: groups.length,
       icon: SwapHorizontalOutline,
-      type: 'primary',
+      type: 'primary' as const,
     },
     {
       label: t('proxy.dashboard.nodeTotal'),
       value: totalNodes,
       icon: GlobeOutline,
-      type: 'success',
+      type: 'success' as const,
     },
     {
       label: t('proxy.dashboard.expanded'),
       value: expanded,
       icon: ChevronDownOutline,
-      type: 'warning',
+      type: 'warning' as const,
     },
     {
       label: t('proxy.dashboard.testing'),
       value: testingCount,
       icon: SpeedometerOutline,
-      type: 'default',
+      type: 'default' as const,
     },
   ]
 })

@@ -450,12 +450,12 @@ const handleCheckUpdate = async () => {
   }
 }
 
-const onPrereleaseSettingChange = () => {
-  updateStore.saveUpdateSettings()
+const onPrereleaseSettingChange = async () => {
+  await updateStore.saveToBackend()
 }
 
 const showPortSettings = () => {
-  tempProxyPort.value = appStore.mixedPort
+  tempProxyPort.value = appStore.proxyPort
   tempApiPort.value = appStore.apiPort
   showPortModal.value = true
 }
@@ -463,7 +463,7 @@ const showPortSettings = () => {
 const savePortSettings = async () => {
   portSettingsLoading.value = true
   try {
-    appStore.mixedPort = tempProxyPort.value
+    appStore.proxyPort = tempProxyPort.value
     appStore.apiPort = tempApiPort.value
     await appStore.saveToBackend()
     message.success(t('common.saveSuccess'))

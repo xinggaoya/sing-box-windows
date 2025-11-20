@@ -260,25 +260,25 @@ const connectionStats = computed(() => [
     label: t('connections.activeConnections'),
     value: connections.value.length,
     icon: LinkOutline,
-    type: 'primary',
+    type: 'primary' as const,
   },
   {
     label: t('home.traffic.uploadTotal'),
     value: formatBytes(connectionsTotal.value.upload),
     icon: ArrowUpOutline,
-    type: 'warning',
+    type: 'warning' as const,
   },
   {
     label: t('home.traffic.downloadTotal'),
     value: formatBytes(connectionsTotal.value.download),
     icon: ArrowDownOutline,
-    type: 'success',
+    type: 'success' as const,
   },
   {
     label: t('connections.matchedConnections'),
     value: filteredConnections.value.length,
     icon: FilterOutline,
-    type: 'default',
+    type: 'default' as const,
   },
 ])
 

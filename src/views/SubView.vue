@@ -271,13 +271,13 @@ const subscriptionStats = computed(() => [
     label: t('sub.total'),
     value: subStore.list.length,
     icon: LinkOutline,
-    type: 'primary',
+    type: 'primary' as const,
   },
   {
     label: t('sub.active'),
     value: subStore.activeIndex !== null && subStore.activeIndex >= 0 ? 1 : 0,
     icon: CheckmarkCircleOutline,
-    type: 'success',
+    type: 'success' as const,
   },
 ])
 

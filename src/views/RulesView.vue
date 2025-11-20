@@ -220,25 +220,25 @@ const ruleStats = computed(() => [
     label: t('rules.totalRules'),
     value: rules.value.length,
     icon: FilterOutline,
-    type: 'primary',
+    type: 'primary' as const,
   },
   {
     label: t('rules.matchingRules'),
     value: filteredRules.value.length,
     icon: CheckmarkCircleOutline,
-    type: 'success',
+    type: 'success' as const,
   },
   {
     label: t('rules.ruleTypes'),
     value: typeOptions.value.length,
     icon: ExtensionPuzzleOutline,
-    type: 'warning',
+    type: 'warning' as const,
   },
   {
     label: t('rules.proxyTargets'),
     value: proxyOptions.value.length,
     icon: GlobeOutline,
-    type: 'default',
+    type: 'default' as const,
   },
 ])
 
