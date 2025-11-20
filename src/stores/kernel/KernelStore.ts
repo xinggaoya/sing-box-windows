@@ -19,6 +19,7 @@ export const useKernelStore = defineStore('kernel', () => {
   const isLoading = ref(false)
   const isKernelInstalled = ref(false)
   let statusUnlisten: (() => void) | null = null
+  let lastEventTime = 0
 
   const applyStatus = (next: KernelStatus) => {
     status.value = next
@@ -32,8 +33,16 @@ export const useKernelStore = defineStore('kernel', () => {
   }
 
   const refreshStatus = async () => {
+    const startTime = Date.now()
     try {
       const latest = await kernelService.getKernelStatus()
+
+      // 如果在请求期间收到了事件更新，且状态不一致，优先信任事件（因为它通常更新）
+      if (lastEventTime > startTime && latest.process_running !== status.value.process_running) {
+        console.log('⚠️ 忽略过期的状态刷新，因为已收到更新的事件')
+        return status.value
+      }
+
       applyStatus(latest)
       return latest
     } catch (error) {
@@ -44,11 +53,29 @@ export const useKernelStore = defineStore('kernel', () => {
   }
 
   const initializeStore = async () => {
-    await refreshStatus()
+    // 1. 先设置监听器，防止漏掉启动时的事件
     if (!statusUnlisten) {
       statusUnlisten = await kernelService.onKernelStatusChange((nextStatus) => {
+        lastEventTime = Date.now()
         applyStatus(nextStatus)
       })
+    }
+
+    // 2. 获取当前状态
+    await refreshStatus()
+
+    // 3. 如果当前状态是停止，但可能正在自动启动中，进行短时间的轮询检查
+    if (!status.value.process_running) {
+      let checkCount = 0
+      const maxChecks = 5
+      const intervalId = setInterval(async () => {
+        checkCount++
+        if (checkCount > maxChecks || status.value.process_running) {
+          clearInterval(intervalId)
+          return
+        }
+        await refreshStatus()
+      }, 1000)
     }
   }
 
