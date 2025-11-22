@@ -1,113 +1,114 @@
 <template>
   <n-config-provider :theme="theme" :theme-overrides="themeOverrides">
-    <n-layout class="app-layout" has-sider position="absolute">
-      <!-- Modern Sidebar -->
-      <n-layout-sider
-        class="app-sider"
-        :width="240"
-        :collapsed-width="72"
-        :collapsed="collapsed"
-        collapse-mode="width"
-        :native-scrollbar="false"
-        :show-trigger="false"
-        bordered
-      >
-        <div class="sider-inner">
-          <!-- Brand / Logo Area -->
-          <div class="sider-brand" data-tauri-drag-region>
-            <div class="brand-logo-wrapper" @click="onSelect('home')">
-              <img
-                :src="logo"
-                alt="Logo"
-                class="brand-logo"
-                :class="{ 'is-running': kernelStatusClass === 'running' }"
-              />
+    <n-layout class="app-layout" position="absolute">
+      <!-- Top Header -->
+      <n-layout-header class="app-header" bordered data-tauri-drag-region>
+        <div class="header-brand">
+          <div class="brand-logo-wrapper" @click="onSelect('home')">
+            <img
+              :src="logo"
+              alt="Logo"
+              class="brand-logo"
+              :class="{ 'is-running': kernelStatusClass === 'running' }"
+            />
+          </div>
+          <div class="brand-text">
+            <h1 class="app-name">{{ t('common.appName') }}</h1>
+            <div class="app-status" :class="kernelStatusClass">
+              <span class="status-dot"></span>
+              {{ appStatusLabel }}
             </div>
-            <transition name="fade-slide">
-              <div v-if="!collapsed" class="brand-text">
-                <h1 class="app-name">{{ t('common.appName') }}</h1>
-                <div class="app-status" :class="kernelStatusClass">
-                  <span class="status-dot"></span>
-                  {{ appStatusLabel }}
+          </div>
+        </div>
+
+        <!-- Window Controls -->
+        <div class="window-controls">
+          <button class="control-btn minimize" @click="windowStore.minimizeWindow">
+            <n-icon size="16"><RemoveOutline /></n-icon>
+          </button>
+          <button class="control-btn maximize" @click="windowStore.toggleMaximize">
+            <n-icon size="14"><SquareOutline /></n-icon>
+          </button>
+          <button class="control-btn close" @click="() => windowStore.hideWindow(router)">
+            <n-icon size="16"><CloseOutline /></n-icon>
+          </button>
+        </div>
+      </n-layout-header>
+
+      <!-- Main Layout with Sidebar and Content -->
+      <n-layout has-sider position="absolute" style="top: 50px; bottom: 0">
+        <!-- Modern Sidebar -->
+        <n-layout-sider
+          class="app-sider"
+          :width="240"
+          :collapsed-width="72"
+          :collapsed="collapsed"
+          collapse-mode="width"
+          :native-scrollbar="false"
+          :show-trigger="false"
+          bordered
+        >
+          <div class="sider-inner">
+            <!-- Navigation Menu -->
+            <div class="sider-menu">
+              <div class="menu-group">
+                <div class="menu-label" v-if="!collapsed">{{ t('nav.navigation') }}</div>
+                <div
+                  v-for="item in menuItems"
+                  :key="item.key"
+                  class="menu-item"
+                  :class="{ active: currentMenu === item.key, disabled: item.disabled }"
+                  @click="!item.disabled && onSelect(item.key)"
+                >
+                  <n-icon :size="22" class="menu-icon">
+                    <component :is="item.icon" />
+                  </n-icon>
+                  <transition name="fade-slide">
+                    <span v-if="!collapsed" class="menu-text">{{ item.label }}</span>
+                  </transition>
+                  <div class="active-indicator" v-if="currentMenu === item.key"></div>
                 </div>
               </div>
-            </transition>
-          </div>
+            </div>
 
-          <!-- Navigation Menu -->
-          <div class="sider-menu">
-            <div class="menu-group">
-              <div class="menu-label" v-if="!collapsed">{{ t('nav.navigation') }}</div>
-              <div
-                v-for="item in menuItems"
-                :key="item.key"
-                class="menu-item"
-                :class="{ active: currentMenu === item.key, disabled: item.disabled }"
-                @click="!item.disabled && onSelect(item.key)"
-              >
-                <n-icon :size="22" class="menu-icon">
-                  <component :is="item.icon" />
-                </n-icon>
-                <transition name="fade-slide">
-                  <span v-if="!collapsed" class="menu-text">{{ item.label }}</span>
-                </transition>
-                <div class="active-indicator" v-if="currentMenu === item.key"></div>
+            <!-- Bottom Actions -->
+            <div class="sider-footer">
+              <div class="footer-actions">
+                <n-tooltip placement="right" trigger="hover" :disabled="!collapsed">
+                  <template #trigger>
+                    <button class="action-btn" @click="themeStore.toggleTheme">
+                      <n-icon :size="20">
+                        <MoonOutline v-if="themeStore.isDark" />
+                        <SunnyOutline v-else />
+                      </n-icon>
+                    </button>
+                  </template>
+                  {{ themeStore.isDark ? t('setting.theme.light') : t('setting.theme.dark') }}
+                </n-tooltip>
+
+                <button class="action-btn" @click="collapsed = !collapsed">
+                  <n-icon :size="20">
+                    <ChevronForwardOutline v-if="collapsed" />
+                    <ChevronBackOutline v-else />
+                  </n-icon>
+                </button>
               </div>
             </div>
           </div>
+        </n-layout-sider>
 
-          <!-- Bottom Actions -->
-          <div class="sider-footer">
-            <div class="footer-actions">
-              <n-tooltip placement="right" trigger="hover" :disabled="!collapsed">
-                <template #trigger>
-                  <button class="action-btn" @click="themeStore.toggleTheme">
-                    <n-icon :size="20">
-                      <MoonOutline v-if="themeStore.isDark" />
-                      <SunnyOutline v-else />
-                    </n-icon>
-                  </button>
-                </template>
-                {{ themeStore.isDark ? t('setting.theme.light') : t('setting.theme.dark') }}
-              </n-tooltip>
-
-              <button class="action-btn" @click="collapsed = !collapsed">
-                <n-icon :size="20">
-                  <ChevronForwardOutline v-if="collapsed" />
-                  <ChevronBackOutline v-else />
-                </n-icon>
-              </button>
-            </div>
+        <!-- Main Content Area -->
+        <n-layout-content class="app-content" :native-scrollbar="false">
+          <!-- Page Content -->
+          <div class="content-container">
+            <router-view v-slot="{ Component }">
+              <transition name="page-fade" mode="out-in">
+                <component :is="Component" :key="$route.path" />
+              </transition>
+            </router-view>
           </div>
-        </div>
-      </n-layout-sider>
-
-      <!-- Main Content Area -->
-      <n-layout-content class="app-content" :native-scrollbar="false">
-        <!-- Window Controls (Floating) -->
-        <div class="window-controls-bar" data-tauri-drag-region>
-          <div class="window-controls">
-            <button class="control-btn minimize" @click="windowStore.minimizeWindow">
-              <n-icon size="16"><RemoveOutline /></n-icon>
-            </button>
-            <button class="control-btn maximize" @click="windowStore.toggleMaximize">
-              <n-icon size="14"><SquareOutline /></n-icon>
-            </button>
-            <button class="control-btn close" @click="() => windowStore.hideWindow(router)">
-              <n-icon size="16"><CloseOutline /></n-icon>
-            </button>
-          </div>
-        </div>
-
-        <!-- Page Content -->
-        <div class="content-container">
-          <router-view v-slot="{ Component }">
-            <transition name="page-fade" mode="out-in">
-              <component :is="Component" :key="$route.path" />
-            </transition>
-          </router-view>
-        </div>
-      </n-layout-content>
+        </n-layout-content>
+      </n-layout>
     </n-layout>
 
     <!-- Update Modal -->
@@ -305,33 +306,29 @@ onUnmounted(() => {
   background: transparent;
 }
 
-/* Sidebar Styles */
-.app-sider {
+/* Header Styles */
+.app-header {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
   background: var(--glass-bg) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-right: 1px solid var(--border-color);
-  z-index: 100;
+  z-index: 200;
 }
 
-.sider-inner {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 20px 16px;
-}
-
-.sider-brand {
+.header-brand {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 8px 32px;
+  gap: 12px;
   cursor: default;
 }
 
 .brand-logo-wrapper {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -344,8 +341,8 @@ onUnmounted(() => {
 }
 
 .brand-logo {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
   transition: all 0.3s ease;
@@ -357,17 +354,18 @@ onUnmounted(() => {
 
 .brand-text {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
   white-space: nowrap;
 }
 
 .app-name {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
-  line-height: 1.2;
+  line-height: 1;
 }
 
 .app-status {
@@ -413,6 +411,52 @@ onUnmounted(() => {
 .app-status.stopped .status-dot {
   background-color: var(--error-color, #ef4444);
   box-shadow: 0 0 6px var(--error-color, #ef4444);
+}
+
+/* Window Controls */
+.window-controls {
+  display: flex;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.control-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.control-btn.close:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* Sidebar Styles */
+.app-sider {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100;
+}
+
+.sider-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
 }
 
 /* Menu Styles */
@@ -526,52 +570,9 @@ onUnmounted(() => {
   position: relative;
 }
 
-.window-controls-bar {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 40px;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 0 16px;
-  z-index: 1000;
-}
-
-.window-controls {
-  display: flex;
-  gap: 8px;
-  -webkit-app-region: no-drag;
-}
-
-.control-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.control-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.control-btn.close:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
-
 .content-container {
   height: 100%;
-  padding-top: 40px; /* Space for window controls */
+  /* padding-top: 40px; Removed as window controls are now in header */
   overflow-y: auto;
   overflow-x: hidden;
 }
