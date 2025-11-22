@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "sing-box-windows",
-        "width": 960,
-        "height": 640,
-        "minWidth": 800,
-        "minHeight": 600,
+        "width": 1024,
+        "height": 700,
+        "minWidth": 1024,
+        "minHeight": 700,
         "resizable": true,
         "fullscreen": false,
         "decorations": false,

@@ -134,6 +134,86 @@ export const useTrayStore = defineStore('tray', () => {
   }
 
   /**
+   * 托盘代理模式切换
+   */
+  const switchProxyModeFromTray = async (targetMode: ProxyMode) => {
+    const previousMode = appStore.proxyMode as ProxyMode
+    if (previousMode === targetMode) {
+      return
+    }
+
+    // TUN模式特殊处理
+    if (targetMode === 'tun') {
+      const isAdmin = await tauriApi.system.checkAdmin()
+      if (!isAdmin) {
+        try {
+          // 保存TUN启用状态
+          await appStore.toggleTun(true)
+          await appStore.saveToBackend()
+
+          if (appStore.isRunning) {
+            await kernelStore.stopKernel({ force: true })
+          }
+          await tauriApi.system.restartAsAdmin()
+          return
+        } catch (error) {
+          console.error('以管理员身份重启以启用TUN失败:', error)
+          await appStore.toggleTun(false)
+          await refreshTrayMenu()
+          return
+        }
+      } else {
+        // 已是管理员，直接启用TUN
+        try {
+          await appStore.toggleTun(true)
+          await appStore.toggleSystemProxy(false) // 互斥：关闭系统代理
+
+          const success = await kernelStore.restartKernel()
+          if (!success) {
+            throw new Error(kernelStore.lastError || '内核重启失败')
+          }
+        } catch (error) {
+          console.error('启用TUN模式失败:', error)
+          await appStore.toggleTun(false)
+          await refreshTrayMenu()
+        }
+        return
+      }
+    }
+
+    // 其他模式（System/Manual）
+    try {
+      if (targetMode === 'system') {
+        await appStore.toggleSystemProxy(true)
+        await appStore.toggleTun(false)
+      } else if (targetMode === 'manual') {
+        await appStore.toggleSystemProxy(false)
+        await appStore.toggleTun(false)
+      }
+
+      // 切换非TUN模式不需要重启内核，直接调用后端API
+      const success = await kernelStore.switchProxyMode(targetMode)
+      if (!success) {
+        throw new Error(kernelStore.lastError || '代理模式切换失败')
+      }
+      await kernelStore.refreshStatus()
+    } catch (error) {
+      console.error('托盘切换代理模式失败:', error)
+      // 恢复之前的状态
+      if (previousMode === 'tun') {
+        await appStore.toggleTun(true)
+      } else if (previousMode === 'system') {
+        await appStore.toggleSystemProxy(true)
+      } else {
+        await appStore.toggleSystemProxy(false)
+        await appStore.toggleTun(false)
+      }
+    } finally {
+      await refreshTrayMenu()
+    }
+  }
+
+  /**
    * 创建托盘菜单
    */
   const createTrayMenu = async () => {
@@ -210,13 +290,12 @@ export const useTrayStore = defineStore('tray', () => {
       // 当前模式指示器菜单项（仅作为标签，不可点击）
       const currentModeMenuItem = await MenuItem.new({
         id: 'current_mode',
-        text: `${t('proxy.currentMode')} ${
-          currentProxyMode === 'system'
+        text: `${t('proxy.currentMode')} ${currentProxyMode === 'system'
             ? t('home.proxyMode.system')
             : currentProxyMode === 'manual'
               ? t('home.proxyMode.manual')
               : t('home.proxyMode.tun')
-        }`,
+          }`,
         enabled: false,
       })
 
@@ -427,47 +506,5 @@ export const useTrayStore = defineStore('tray', () => {
     refreshTrayMenu,
   }
 
-  /**
-   * 托盘代理模式切换
-   */
-  const switchProxyModeFromTray = async (targetMode: ProxyMode) => {
-    const previousMode = appStore.proxyMode as ProxyMode
-    if (previousMode === targetMode) {
-      return
-    }
 
-    if (targetMode === 'tun') {
-      const isAdmin = await tauriApi.system.checkAdmin()
-      if (!isAdmin) {
-        try {
-          await appStore.setProxyMode('tun')
-          await appStore.saveToBackend()
-          if (appStore.isRunning) {
-            await kernelStore.stopKernel({ force: true })
-          }
-          await tauriApi.system.restartAsAdmin()
-          return
-        } catch (error) {
-          console.error('以管理员身份重启以启用TUN失败:', error)
-          await appStore.setProxyMode(previousMode)
-          await refreshTrayMenu()
-          return
-        }
-      }
-    }
-
-    try {
-      await appStore.setProxyMode(targetMode)
-      const success = await kernelStore.switchProxyMode(targetMode)
-      if (!success) {
-        throw new Error(kernelStore.lastError || '代理模式切换失败')
-      }
-      await kernelStore.refreshStatus()
-    } catch (error) {
-      console.error('托盘切换代理模式失败:', error)
-      await appStore.setProxyMode(previousMode)
-    } finally {
-      await refreshTrayMenu()
-    }
-  }
 })
