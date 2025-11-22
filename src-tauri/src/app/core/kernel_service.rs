@@ -1942,6 +1942,98 @@ pub async fn kernel_stop_enhanced(app_handle: AppHandle) -> Result<serde_json::V
     }
 }
 
+/// 后台停止内核：快速返回，具体停止逻辑在后台执行
+#[tauri::command]
+pub async fn kernel_stop_background(app_handle: AppHandle) -> Result<serde_json::Value, String> {
+    info!("🛑 后台请求停止内核（快速返回）");
+
+    let handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        // 为停止设置超时，超时后尝试强制清理进程
+        let stop_result = tokio::time::timeout(Duration::from_secs(6), stop_kernel()).await;
+        match stop_result {
+            Ok(Ok(_)) => {
+                info!("✅ 后台停止内核完成");
+            }
+            Ok(Err(e)) => {
+                error!("❌ 后台停止内核失败: {}", e);
+                let _ = handle.emit("kernel-error", json!({
+                    "error": format!("停止失败: {}", e)
+                }));
+            }
+            Err(_) => {
+                warn!("⏳ 停止内核超时，尝试强制清理");
+                if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+                    error!("强制清理内核进程失败: {}", e);
+                }
+            }
+        }
+
+        // 无论结果如何，发送停止/状态事件，便于前端同步
+        let _ = handle.emit("kernel-stopped", json!({
+            "process_running": false,
+            "api_ready": false,
+            "websocket_ready": false
+        }));
+        let _ = handle.emit("kernel-status-changed", json!({
+            "process_running": false,
+            "api_ready": false,
+            "websocket_ready": false
+        }));
+    });
+
+    Ok(json!({
+        "success": true,
+        "message": "已在后台请求停止内核"
+    }))
+}
+
+/// 强制停止内核并退出应用：快速响应，后台执行停止逻辑
+#[tauri::command]
+pub async fn force_stop_and_exit(app_handle: AppHandle) -> Result<serde_json::Value, String> {
+    info!("🛑 收到强制退出请求，后台停止内核并退出应用");
+
+    let handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        // 停止事件转发
+        SHOULD_STOP_EVENTS.store(true, Ordering::Relaxed);
+        cleanup_event_relay_tasks().await;
+
+        // 尝试正常停止，超时则强杀
+        let stop_result = tokio::time::timeout(Duration::from_secs(4), stop_kernel()).await;
+        match stop_result {
+            Ok(Ok(_)) => info!("✅ 内核正常停止"),
+            Ok(Err(e)) => warn!("停止内核失败，尝试强制清理: {}", e),
+            Err(_) => warn!("停止内核超时，尝试强制清理"),
+        }
+
+        // 强制兜底清理内核进程
+        if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+            error!("强制清理内核进程失败: {}", e);
+        }
+
+        // 通知前端状态（若仍在运行）
+        let _ = handle.emit("kernel-stopped", json!({
+            "process_running": false,
+            "api_ready": false,
+            "websocket_ready": false
+        }));
+        let _ = handle.emit("kernel-status-changed", json!({
+            "process_running": false,
+            "api_ready": false,
+            "websocket_ready": false
+        }));
+
+        // 退出应用
+        handle.exit(0);
+    });
+
+    Ok(json!({
+        "success": true,
+        "message": "正在后台停止内核并退出"
+    }))
+}
+
 /// 重构版本的状态查询命令 - 增强版
 #[tauri::command]
 pub async fn kernel_get_status_enhanced(

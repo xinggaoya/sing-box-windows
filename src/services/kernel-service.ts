@@ -178,6 +178,36 @@ class KernelService {
   }
 
   /**
+   * 后台快速停止内核：仅发起请求，立即返回
+   */
+  async stopKernelFast(): Promise<{ success: boolean; message: string }> {
+    try {
+      return await kernelApi.stopKernelFast()
+    } catch (error) {
+      console.error('后台停止内核失败:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : '后台停止内核失败'
+      }
+    }
+  }
+
+  /**
+   * 强制停止内核并退出应用（后端后台执行，前端快速返回）
+   */
+  async forceStopAndExit(): Promise<{ success: boolean; message: string }> {
+    try {
+      return await kernelApi.forceStopAndExit()
+    } catch (error) {
+      console.error('强制停止并退出失败:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : '强制停止并退出失败'
+      }
+    }
+  }
+
+  /**
    * 监听内核状态变化 - 推荐使用
    * 后端会主动推送状态变化，无需轮询
    */

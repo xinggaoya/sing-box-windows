@@ -193,6 +193,28 @@ export const kernelApi = {
     })
   },
 
+  /**
+   * 后台停止内核，快速返回，不阻塞前端退出流程
+   */
+  stopKernelFast() {
+    return invokeWithAppContext<{ success: boolean; message: string }>(
+      'kernel_stop_background',
+      undefined,
+      { skipDataRestore: true }
+    )
+  },
+
+  /**
+   * 强制停止内核并退出应用（后端后台执行，快速返回）
+   */
+  forceStopAndExit() {
+    return invokeWithAppContext<{ success: boolean; message: string }>(
+      'force_stop_and_exit',
+      undefined,
+      { skipDataRestore: true }
+    )
+  },
+
   isKernelRunning() {
     return invokeWithAppContext<boolean>('is_kernel_running', undefined, {
       skipDataRestore: true

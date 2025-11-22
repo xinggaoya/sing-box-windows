@@ -252,7 +252,7 @@ impl ProcessManager {
     }
 
     // 检查并终止系统中已存在的sing-box进程
-    async fn kill_existing_processes(&self) -> std::io::Result<()> {
+    pub async fn kill_existing_processes(&self) -> std::io::Result<()> {
         info!("检查系统中是否有sing-box进程在运行");
 
         #[cfg(target_os = "windows")]
