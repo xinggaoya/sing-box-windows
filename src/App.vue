@@ -141,6 +141,15 @@ onMounted(async () => {
       mitt.off('message-instance-ready', handleMessageReady)
     })
 
+    // 1.1 监听清理消息事件，托盘/空白页切换时强制销毁悬挂的提示
+    const handleClearMessages = () => {
+      appStore.clearMessages()
+    }
+    mitt.on('clear-ui-messages', handleClearMessages)
+    cleanupFunctions.push(() => {
+      mitt.off('clear-ui-messages', handleClearMessages)
+    })
+
     // 2. 监听语言变化
     const stopWatchingLocale = watch(
       () => localeStore.currentLocale,
@@ -152,6 +161,17 @@ onMounted(async () => {
       { immediate: true },
     )
     cleanupFunctions.push(stopWatchingLocale)
+
+    // 2.1 当路由切到空白页时，再次清理消息，避免自动关闭定时器被清掉导致提示残留
+    const stopWatchingRoute = watch(
+      () => router.currentRoute.value.path,
+      (newPath) => {
+        if (newPath === '/blank') {
+          appStore.clearMessages()
+        }
+      },
+    )
+    cleanupFunctions.push(stopWatchingRoute)
 
     // 3. 检查初始窗口状态和自启动情况
     await checkInitialWindowState()
@@ -198,12 +218,6 @@ async function checkInitialWindowState() {
         windowStore.windowState.lastVisiblePath = router.currentRoute.value.path
         await router.push('/blank')
       }
-
-      // 延迟触发内存清理
-      setTimeout(() => {
-        console.log('🧹 自启动模式下触发内存清理')
-        mitt.emit('memory-cleanup-requested')
-      }, 1000)
     } else if (
       visible &&
       router.currentRoute.value.path === '/blank' &&

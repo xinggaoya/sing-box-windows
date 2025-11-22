@@ -14,11 +14,16 @@ export function useAppMessaging() {
     instanceRef.value?.[method](content)
   }
 
+  const clearMessages = () => {
+    instanceRef.value?.destroyAll()
+  }
+
   return {
     setMessageInstance,
     showSuccessMessage: dispatch('success'),
     showErrorMessage: dispatch('error'),
     showWarningMessage: dispatch('warning'),
-    showInfoMessage: dispatch('info')
+    showInfoMessage: dispatch('info'),
+    clearMessages,
   }
 }

@@ -4,6 +4,7 @@ import { Window } from '@tauri-apps/api/window'
 import type { Router } from 'vue-router'
 import { DatabaseService } from '@/services/database-service'
 import type { WindowConfig } from '@/types/database'
+import { useAppStore } from './AppStore'
 
 // 窗口状态类型
 export interface WindowState {
@@ -16,6 +17,8 @@ export interface WindowState {
 export const useWindowStore = defineStore(
   'window',
   () => {
+    const appStore = useAppStore()
+
     // 窗口状态
     const windowState = ref<WindowState>({
       isVisible: true,
@@ -76,6 +79,9 @@ export const useWindowStore = defineStore(
       const appWindow = getAppWindow()
       await appWindow.hide()
       windowState.value.isVisible = false
+
+      // 隐藏到托盘时立即清理所有消息，避免进入空白页后消息无法自行消失
+      appStore.clearMessages()
       
       // 保存到数据库
       await saveToBackend()
@@ -83,12 +89,6 @@ export const useWindowStore = defineStore(
       // 如果提供了router，保存当前路由并切换到空白页
       if (router) {
         saveRouteAndGoBlank(router)
-
-        // 延迟触发内存清理 - 现在通过Store方法处理
-        setTimeout(() => {
-          // 可以通过StoreManager触发内存清理
-          console.log('请求内存清理')
-        }, 1000)
       }
     }
 
