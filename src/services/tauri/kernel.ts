@@ -42,84 +42,64 @@ export interface KernelAutoManageResult {
 }
 
 export const kernelApi = {
+  /**
+   * 启动内核 - 简化版
+   * 后端会自动从数据库读取配置，前端无需传递
+   */
   async startKernel(options: KernelStartOptions = {}) {
     return withAppStore(async store => {
       await store.waitForDataRestore()
-      const tunOptions = options.config?.tun ?? {
-        ipv4_address: store.tunIpv4,
-        ipv6_address: store.tunIpv6,
-        mtu: store.tunMtu,
-        auto_route: store.tunAutoRoute,
-        strict_route: store.tunStrictRoute,
-        stack: store.tunStack,
-        enable_ipv6: store.tunEnableIpv6,
+
+      // 仅传递必要的参数覆盖，其他由后端从数据库读取
+      const args: Record<string, any> = {}
+
+      if (options.config?.proxy_mode) {
+        args.proxy_mode = options.config.proxy_mode
+        args.proxyMode = options.config.proxy_mode
       }
-      const systemProxyBypass =
-        options.config?.system_proxy_bypass ?? store.systemProxyBypass
-      const keepAlive = options.keepAlive ?? store.autoStartKernel
-      const args = {
-        proxyMode: options.config?.proxy_mode ?? store.proxyMode,
-        proxy_mode: options.config?.proxy_mode ?? store.proxyMode,
-        apiPort: options.config?.api_port ?? store.apiPort,
-        api_port: options.config?.api_port ?? store.apiPort,
-        proxyPort: options.config?.proxy_port ?? store.proxyPort,
-        proxy_port: options.config?.proxy_port ?? store.proxyPort,
-        preferIpv6: options.config?.prefer_ipv6 ?? store.preferIpv6,
-        prefer_ipv6: options.config?.prefer_ipv6 ?? store.preferIpv6,
-        systemProxyBypass,
-        system_proxy_bypass: systemProxyBypass,
-        tunOptions,
-        tun_options: tunOptions,
-        keepAlive,
-        keep_alive: keepAlive,
+
+      if (options.config?.api_port) {
+        args.api_port = options.config.api_port
+        args.apiPort = options.config.api_port
+      }
+
+      if (options.config?.proxy_port) {
+        args.proxy_port = options.config.proxy_port
+        args.proxyPort = options.config.proxy_port
+      }
+
+      if (options.keepAlive !== undefined) {
+        args.keep_alive = options.keepAlive
+        args.keepAlive = options.keepAlive
       }
 
       return invokeWithAppContext<{ success: boolean; message: string }>(
         'kernel_start_enhanced',
-        args,
+        Object.keys(args).length > 0 ? args : undefined,
         { skipDataRestore: true }
       )
     })
   },
 
+  /**
+   * 自动管理内核 - 简化版
+   * 后端会自动从数据库读取配置
+   */
   autoManageKernel(options: KernelStartOptions & { forceRestart?: boolean } = {}) {
     return withAppStore(async store => {
       await store.waitForDataRestore()
-      const tunOptions = options.config?.tun ?? {
-        ipv4_address: store.tunIpv4,
-        ipv6_address: store.tunIpv6,
-        mtu: store.tunMtu,
-        auto_route: store.tunAutoRoute,
-        strict_route: store.tunStrictRoute,
-        stack: store.tunStack,
-        enable_ipv6: store.tunEnableIpv6,
-      }
-      const systemProxyBypass =
-        options.config?.system_proxy_bypass ?? store.systemProxyBypass
-      const keepAlive = options.keepAlive ?? store.autoStartKernel
-      const forceRestart = options.forceRestart ?? false
-      const args = {
-        proxyMode: options.config?.proxy_mode ?? store.proxyMode,
-        proxy_mode: options.config?.proxy_mode ?? store.proxyMode,
-        apiPort: options.config?.api_port ?? store.apiPort,
-        api_port: options.config?.api_port ?? store.apiPort,
-        proxyPort: options.config?.proxy_port ?? store.proxyPort,
-        proxy_port: options.config?.proxy_port ?? store.proxyPort,
-        preferIpv6: options.config?.prefer_ipv6 ?? store.preferIpv6,
-        prefer_ipv6: options.config?.prefer_ipv6 ?? store.preferIpv6,
-        systemProxyBypass,
-        system_proxy_bypass: systemProxyBypass,
-        tunOptions,
-        tun_options: tunOptions,
-        keepAlive,
-        keep_alive: keepAlive,
-        forceRestart,
-        force_restart: forceRestart,
+
+      // 仅传递覆盖参数
+      const args: Record<string, any> = {}
+
+      if (options.forceRestart !== undefined) {
+        args.force_restart = options.forceRestart
+        args.forceRestart = options.forceRestart
       }
 
       return invokeWithAppContext<KernelAutoManageResult>(
         'kernel_auto_manage',
-        args,
+        Object.keys(args).length > 0 ? args : undefined,
         { skipDataRestore: true }
       )
     })

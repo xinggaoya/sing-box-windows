@@ -23,7 +23,8 @@ export class ProxyService {
   }
 
   /**
-   * 切换代理模式
+   * 切换代理模式 - 简化版
+   * 后端会从数据库读取配置，前端只需指定模式
    * @param mode 代理模式
    * @param messageCallback 消息回调
    * @returns 是否需要关闭应用（重启管理员）
@@ -33,7 +34,7 @@ export class ProxyService {
     messageCallback?: (type: 'success' | 'info' | 'error', content: string) => void,
   ): Promise<boolean> {
     try {
-      // 根据模式设置代理
+      // 根据模式设置代理（后端会从数据库读取配置）
       if (mode === 'system') {
         await tauriApi.proxy.setSystemProxy(this.appStore.systemProxyBypass)
         await this.appStore.toggleSystemProxy(true)
@@ -49,7 +50,7 @@ export class ProxyService {
           messageCallback('info', '手动代理模式已启用，请手动设置系统代理')
         }
       } else {
-        // TUN模式
+        // TUN模式 - 仍需传递配置，因为这些配置可能实时变化
         await tauriApi.proxy.setTunProxy({
           ipv4_address: this.appStore.tunIpv4,
           ipv6_address: this.appStore.tunIpv6,

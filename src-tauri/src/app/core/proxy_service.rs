@@ -146,7 +146,7 @@ fn set_tun_proxy_impl(port: u16, options: TunProxyOptions) -> Result<(), Box<dyn
         warn!("关闭系统代理失败: {}", err);
     }
 
-    info!("TUN代理模式已设置");
+    info!("✅ TUN代理模式已设置");
     Ok(())
 }
 
@@ -192,7 +192,7 @@ pub fn toggle_ip_version(prefer_ipv6: bool) -> Result<(), String> {
     update_dns_strategy(prefer_ipv6)?;
 
     info!(
-        "IP版本模式已成功切换为: {}",
+        "✅ IP版本模式已成功切换为: {}",
         if prefer_ipv6 { "IPv6优先" } else { "仅IPv4" }
     );
 

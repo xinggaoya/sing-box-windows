@@ -1,12 +1,11 @@
 /**
- * 内核管理服务
- * 负责协调 Tauri 命令、事件服务与状态缓存
+ * 内核管理服务 - 简化版
+ * 职责：提供简洁的API调用接口和事件监听
+ * 状态管理：由后端负责，前端通过事件获取
  */
 import { eventService } from './event-service'
 import { kernelApi } from './tauri'
 import type { KernelStartOptions, KernelStopOptions, KernelAutoManageResult } from './tauri/kernel'
-import { StatusCache } from './kernel/status-cache'
-import { KernelLifecycleController } from './kernel/lifecycle-controller'
 
 export interface KernelStatus {
   process_running: boolean
@@ -38,31 +37,20 @@ export interface KernelConfig {
 }
 
 class KernelService {
-  private readonly lifecycle = new KernelLifecycleController()
-  private readonly statusCache = new StatusCache<KernelStatus>(2000)
-
+  /**
+   * 启动内核 - 直接调用后端API
+   * 状态变化通过事件推送，无需手动刷新
+   */
   async startKernel(options: KernelStartOptions = {}): Promise<{ success: boolean; message: string }> {
-    return this.lifecycle.run(
-      'start',
-      active => ({ success: false, message: active === 'start' ? '内核正在启动中，请稍候' : '内核正在停止中，请稍候' }),
-      async () => {
-        const result = await kernelApi.startKernel(options)
-        this.clearStatusCache()
-        return result
-      }
-    )
+    return kernelApi.startKernel(options)
   }
 
+  /**
+   * 停止内核 - 直接调用后端API
+   * 状态变化通过事件推送，无需手动刷新
+   */
   async stopKernel(options: KernelStopOptions = {}): Promise<{ success: boolean; message: string }> {
-    return this.lifecycle.run(
-      'stop',
-      active => ({ success: false, message: active === 'stop' ? '内核正在停止中，请稍候' : '内核正在启动中，请稍候' }),
-      async () => {
-        const result = await kernelApi.stopKernel(options)
-        this.clearStatusCache()
-        return result
-      }
-    )
+    return kernelApi.stopKernel(options)
   }
 
   async restartKernel(options: KernelStartOptions & KernelStopOptions = {}): Promise<{ success: boolean; message: string }> {
@@ -76,16 +64,13 @@ class KernelService {
     return this.startKernel(options)
   }
 
+  /**
+   * 获取内核状态 - 仅用于主动查询
+   * 推荐：使用 onKernelStatusChange 监听状态变化
+   */
   async getKernelStatus(): Promise<KernelStatus> {
-    const cached = this.statusCache.get('kernel_status')
-    if (cached) {
-      return cached
-    }
-
     try {
-      const status = await kernelApi.getKernelStatus<KernelStatus>()
-      this.statusCache.set('kernel_status', status)
-      return status
+      return await kernelApi.getKernelStatus<KernelStatus>()
     } catch (error) {
       console.error('获取内核状态失败:', error)
       return {
@@ -111,10 +96,12 @@ class KernelService {
     }
   }
 
+  /**
+   * 切换代理模式
+   */
   async switchProxyMode(mode: 'system' | 'tun' | 'manual'): Promise<{ success: boolean; message: string }> {
     try {
       await kernelApi.switchProxyMode(mode)
-      this.clearStatusCache()
       return { success: true, message: `代理模式已切换到 ${mode}` }
     } catch (error) {
       console.error('切换代理模式失败:', error)
@@ -125,10 +112,12 @@ class KernelService {
     }
   }
 
+  /**
+   * 切换IP版本
+   */
   async toggleIpVersion(preferIpv6: boolean): Promise<{ success: boolean; message: string }> {
     try {
       await kernelApi.toggleIpVersion(preferIpv6)
-      this.clearStatusCache()
       return { success: true, message: preferIpv6 ? '已切换到IPv6优先模式' : '已切换到IPv4优先模式' }
     } catch (error) {
       console.error('切换IP版本失败:', error)
@@ -188,14 +177,10 @@ class KernelService {
     return kernelApi.autoManageKernel(options)
   }
 
-  private clearStatusCache(): void {
-    this.statusCache.clear()
-  }
-
-  async forceRefreshStatus(): Promise<KernelStatus> {
-    this.clearStatusCache()
-    return this.getKernelStatus()
-  }
+  /**
+   * 监听内核状态变化 - 推荐使用
+   * 后端会主动推送状态变化，无需轮询
+   */
 
   async onKernelStatusChange(callback: (status: KernelStatus) => void): Promise<() => void> {
     return eventService.on('kernel-status-changed', (data: unknown) => {
@@ -207,10 +192,29 @@ class KernelService {
     return eventService.on('kernel-ready', callback)
   }
 
-  async onKernelError(callback: (error: string) => void): Promise<() => void> {
-    return eventService.on('kernel-error', (data: unknown) => {
-      callback(data as string)
-    })
+  async onKernelError(callback: (error: any) => void): Promise<() => void> {
+    return eventService.on('kernel-error', callback)
+  }
+
+  /**
+   * 监听内核启动中事件
+   */
+  async onKernelStarting(callback: (data: any) => void): Promise<() => void> {
+    return eventService.on('kernel-starting', callback)
+  }
+
+  /**
+   * 监听内核已启动事件
+   */
+  async onKernelStarted(callback: (data: any) => void): Promise<() => void> {
+    return eventService.on('kernel-started', callback)
+  }
+
+  /**
+   * 监听内核已停止事件
+   */
+  async onKernelStopped(callback: (data: any) => void): Promise<() => void> {
+    return eventService.on('kernel-stopped', callback)
   }
 }
 

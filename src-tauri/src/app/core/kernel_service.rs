@@ -72,6 +72,19 @@ async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16) {
                 }
                 _ => {
                     info!("守护检测到内核停止，尝试自动重启...");
+                    
+                    // 发送内核停止事件
+                    let _ = app_handle.emit("kernel-stopped", json!({
+                        "process_running": false,
+                        "api_ready": false,
+                        "websocket_ready": false
+                    }));
+                    let _ = app_handle.emit("kernel-status-changed", json!({
+                        "process_running": false,
+                        "api_ready": false,
+                        "websocket_ready": false
+                    }));
+                    
                     if let Err(err) = PROCESS_MANAGER.start().await {
                         warn!("守护重启内核失败: {}", err);
                         continue;
@@ -86,6 +99,17 @@ async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16) {
                         }
                     }
 
+                    // 发送内核已启动事件
+                    let _ = app_handle.emit("kernel-started", json!({
+                        "process_running": true,
+                        "api_ready": true,
+                        "auto_restarted": true
+                    }));
+                    let _ = app_handle.emit("kernel-status-changed", json!({
+                        "process_running": true,
+                        "api_ready": true,
+                        "websocket_ready": true
+                    }));
                     let _ = app_handle.emit("kernel-ready", ());
                 }
             }
@@ -1734,6 +1758,13 @@ pub async fn kernel_start_enhanced(
         resolved_mode, resolved_api_port, resolved_proxy_port
     );
 
+    // 发送启动中事件
+    let _ = app_handle.emit("kernel-starting", json!({
+        "proxy_mode": resolved_mode,
+        "api_port": resolved_api_port,
+        "proxy_port": resolved_proxy_port
+    }));
+
     crate::app::system::config_service::ensure_singbox_config()
         .map_err(|e| format!("准备内核配置失败: {}", e))?;
 
@@ -1795,6 +1826,22 @@ pub async fn kernel_start_enhanced(
 
                     // 发送内核就绪事件
                     let _ = app_handle.emit("kernel-ready", ());
+                    
+                    // 发送内核已启动事件（包含完整状态）
+                    let _ = app_handle.emit("kernel-started", json!({
+                        "proxy_mode": resolved_mode,
+                        "api_port": resolved_api_port,
+                        "proxy_port": resolved_proxy_port,
+                        "process_running": true,
+                        "api_ready": true
+                    }));
+                    
+                    // 发送内核状态变化事件
+                    let _ = app_handle.emit("kernel-status-changed", json!({
+                        "process_running": true,
+                        "api_ready": true,
+                        "websocket_ready": true
+                    }));
 
                     Ok(serde_json::json!({
                         "success": true,
@@ -1822,6 +1869,12 @@ pub async fn kernel_start_enhanced(
         }
         Err(e) => {
             error!("❌ 内核启动失败: {}", e);
+            
+            // 发送内核错误事件
+            let _ = app_handle.emit("kernel-error", json!({
+                "error": format!("启动失败: {}", e)
+            }));
+            
             Ok(serde_json::json!({
                 "success": false,
                 "message": format!("内核启动失败: {}", e)
@@ -1849,20 +1902,43 @@ fn apply_proxy_mode_configuration(
 
 /// 重构版本的停止命令 - 增强版
 #[tauri::command]
-pub async fn kernel_stop_enhanced() -> Result<serde_json::Value, String> {
+pub async fn kernel_stop_enhanced(app_handle: AppHandle) -> Result<serde_json::Value, String> {
     info!("🛑 停止内核增强版");
 
     disable_kernel_guard().await;
 
     match stop_kernel().await {
-        Ok(_) => Ok(serde_json::json!({
-            "success": true,
-            "message": "内核停止成功".to_string()
-        })),
-        Err(e) => Ok(serde_json::json!({
-            "success": false,
-            "message": format!("内核停止失败: {}", e)
-        })),
+        Ok(_) => {
+            // 发送内核已停止事件
+            let _ = app_handle.emit("kernel-stopped", json!({
+                "process_running": false,
+                "api_ready": false,
+                "websocket_ready": false
+            }));
+            
+            // 发送内核状态变化事件
+            let _ = app_handle.emit("kernel-status-changed", json!({
+                "process_running": false,
+                "api_ready": false,
+                "websocket_ready": false
+            }));
+            
+            Ok(serde_json::json!({
+                "success": true,
+                "message": "内核停止成功".to_string()
+            }))
+        },
+        Err(e) => {
+            // 发送内核错误事件
+            let _ = app_handle.emit("kernel-error", json!({
+                "error": format!("停止失败: {}", e)
+            }));
+            
+            Ok(serde_json::json!({
+                "success": false,
+                "message": format!("内核停止失败: {}", e)
+            }))
+        },
     }
 }
 
