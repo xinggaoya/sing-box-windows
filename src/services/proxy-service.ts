@@ -13,7 +13,7 @@ export class ProxyService {
   private notificationService = NotificationService.getInstance()
   private t = i18n.global.t
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): ProxyService {
     if (!ProxyService.instance) {
@@ -36,13 +36,15 @@ export class ProxyService {
       // 根据模式设置代理
       if (mode === 'system') {
         await tauriApi.proxy.setSystemProxy(this.appStore.systemProxyBypass)
-        this.appStore.proxyMode = 'system'
+        await this.appStore.toggleSystemProxy(true)
+        await this.appStore.toggleTun(false)
         if (messageCallback) {
           messageCallback('success', '系统代理模式已启用')
         }
       } else if (mode === 'manual') {
         await tauriApi.proxy.setManualProxy()
-        this.appStore.proxyMode = 'manual'
+        await this.appStore.toggleSystemProxy(false)
+        await this.appStore.toggleTun(false)
         if (messageCallback) {
           messageCallback('info', '手动代理模式已启用，请手动设置系统代理')
         }
@@ -57,7 +59,8 @@ export class ProxyService {
           stack: this.appStore.tunStack,
           enable_ipv6: this.appStore.tunEnableIpv6,
         })
-        this.appStore.proxyMode = 'tun'
+        await this.appStore.toggleSystemProxy(false)
+        await this.appStore.toggleTun(true)
         if (messageCallback) {
           messageCallback('success', 'TUN模式已启用')
         }

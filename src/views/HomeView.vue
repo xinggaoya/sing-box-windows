@@ -230,8 +230,8 @@ const statusTitle = computed(() => {
   }
 })
 
-const systemProxyEnabled = computed(() => appStore.proxyMode === 'system')
-const tunProxyEnabled = computed(() => appStore.proxyMode === 'tun')
+const systemProxyEnabled = computed(() => appStore.systemProxyEnabled)
+const tunProxyEnabled = computed(() => appStore.tunEnabled)
 
 const nodeProxyModes = [
   {
@@ -250,8 +250,20 @@ const nodeProxyModes = [
 
 // Methods
 const toggleSystemProxy = async (value: boolean) => {
-  const targetMode: ProxyMode = value ? 'system' : tunProxyEnabled.value ? 'tun' : 'manual'
-  await switchProxyModeAndRefreshKernel(targetMode)
+  if (modeSwitchPending.value) return
+  
+  try {
+    modeSwitchPending.value = true
+    await appStore.toggleSystemProxy(value)
+    
+    // 切换系统代理不需要重启内核，直接调用后端API
+    await kernelStore.switchProxyMode(appStore.proxyMode)
+    message.success(t('notification.proxyModeChanged'))
+  } catch (error) {
+    message.error(t('notification.proxyModeChangeFailed'))
+  } finally {
+    modeSwitchPending.value = false
+  }
 }
 
 const confirmTunSwitch = () => {
@@ -263,17 +275,27 @@ const confirmTunSwitch = () => {
       negativeText: t('common.cancel'),
       maskClosable: false,
       onPositiveClick: async () => {
-        if (!isAdmin.value) {
-          modeSwitchPending.value = true
-          try {
+        modeSwitchPending.value = true
+        try {
+          if (!isAdmin.value) {
+            // 不是管理员，保存TUN状态并重启为管理员
             const success = await prepareTunModeWithAdminRestart()
             resolve(success)
-          } finally {
-            modeSwitchPending.value = false
+          } else {
+            // 是管理员，启用TUN并重启内核
+            await appStore.toggleTun(true)
+            const success = await kernelStore.restartKernel()
+            if (success) {
+              message.success(t('notification.proxyModeChanged'))
+              resolve(true)
+            } else {
+              await appStore.toggleTun(false)
+              message.error(t('home.restartFailed'))
+              resolve(false)
+            }
           }
-        } else {
-          const success = await switchProxyModeAndRefreshKernel('tun')
-          resolve(success)
+        } finally {
+          modeSwitchPending.value = false
         }
       },
       onNegativeClick: () => resolve(false),
@@ -282,11 +304,32 @@ const confirmTunSwitch = () => {
 }
 
 const toggleTunProxy = async (value: boolean) => {
+  if (modeSwitchPending.value) return
+  
   if (value) {
+    // 启用TUN模式
     await confirmTunSwitch()
   } else {
-    const fallbackMode: ProxyMode = systemProxyEnabled.value ? 'system' : 'manual'
-    await switchProxyModeAndRefreshKernel(fallbackMode)
+    // 禁用TUN模式 - 需要重启内核
+    try {
+      modeSwitchPending.value = true
+      await appStore.toggleTun(false)
+      
+      // TUN模式切换需要重启内核
+      const success = await kernelStore.restartKernel()
+      if (success) {
+        message.success(t('notification.proxyModeChanged'))
+      } else {
+        // 如果重启失败，恢复状态
+        await appStore.toggleTun(true)
+        message.error(t('home.restartFailed'))
+      }
+    } catch (error) {
+      await appStore.toggleTun(true)
+      message.error(t('notification.proxyModeChangeFailed'))
+    } finally {
+      modeSwitchPending.value = false
+    }
   }
 }
 
@@ -314,49 +357,24 @@ const restartAsAdmin = async () => {
   }
 }
 
-const switchProxyModeAndRefreshKernel = async (mode: ProxyMode) => {
-  const previousMode = appStore.proxyMode as ProxyMode
-  if (modeSwitchPending.value || previousMode === mode) {
-    return previousMode === mode
-  }
-
-  modeSwitchPending.value = true
-
-  try {
-    await appStore.setProxyMode(mode)
-    const success = await kernelStore.switchProxyMode(mode)
-
-    if (!success) {
-      await appStore.setProxyMode(previousMode)
-      return false
-    }
-
-    message.success(t('notification.proxyModeChanged'))
-    return true
-  } catch (error) {
-    await appStore.setProxyMode(previousMode)
-    message.error(t('notification.proxyModeChangeFailed'))
-    return false
-  } finally {
-    modeSwitchPending.value = false
-  }
-}
+// 已移除switchProxyModeAndRefreshKernel - 不再需要，因为System Proxy和TUN是独立的
 
 const prepareTunModeWithAdminRestart = async () => {
-  const previousMode = appStore.proxyMode as ProxyMode
-
   try {
-    await appStore.setProxyMode('tun')
+    // 保存TUN启用状态
+    await appStore.toggleTun(true)
     await appStore.saveToBackend()
 
+    // 停止内核
     if (appStore.isRunning) {
       await kernelStore.stopKernel()
     }
 
+    // 重启为管理员
     await restartAsAdmin()
     return true
   } catch (error) {
-    await appStore.setProxyMode(previousMode)
+    await appStore.toggleTun(false)
     message.error(t('home.restartFailed'))
     return false
   }

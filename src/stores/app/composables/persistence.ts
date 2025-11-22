@@ -3,7 +3,8 @@ import { DatabaseService } from '@/services/database-service'
 import type { AppConfig } from '@/types/database'
 
 export interface PersistenceState {
-  proxyMode: Ref<string>
+  systemProxyEnabled: Ref<boolean>
+  tunEnabled: Ref<boolean>
   autoStartKernel: Ref<boolean>
   autoStartApp: Ref<boolean>
   preferIpv6: Ref<boolean>
@@ -73,7 +74,23 @@ export function createAppPersistence(state: PersistenceState) {
   const loadFromBackend = async () => {
     try {
       const appConfig = await DatabaseService.getAppConfig()
-      state.proxyMode.value = appConfig.proxy_mode
+
+      // 加载新的独立开关字段（如果数据库有的话）
+      // 如果数据库没有，则从旧的proxy_mode派生
+      if (appConfig.system_proxy_enabled !== undefined) {
+        state.systemProxyEnabled.value = appConfig.system_proxy_enabled
+      } else {
+        // 向后兼容：从旧的proxy_mode派生
+        state.systemProxyEnabled.value = appConfig.proxy_mode === 'system'
+      }
+
+      if (appConfig.tun_enabled !== undefined) {
+        state.tunEnabled.value = appConfig.tun_enabled
+      } else {
+        // 向后兼容：从旧的proxy_mode派生
+        state.tunEnabled.value = appConfig.proxy_mode === 'tun'
+      }
+
       state.autoStartKernel.value = appConfig.auto_start_kernel
       state.autoStartApp.value = appConfig.auto_start_app
       state.preferIpv6.value = appConfig.prefer_ipv6
@@ -97,8 +114,18 @@ export function createAppPersistence(state: PersistenceState) {
 
   const saveToBackend = async () => {
     try {
+      // Derive proxyMode from independent toggles for backward compatibility
+      let proxyMode = 'manual'
+      if (state.tunEnabled.value) {
+        proxyMode = 'tun'
+      } else if (state.systemProxyEnabled.value) {
+        proxyMode = 'system'
+      }
+
       const config: AppConfig = {
-        proxy_mode: state.proxyMode.value,
+        proxy_mode: proxyMode,
+        system_proxy_enabled: state.systemProxyEnabled.value,
+        tun_enabled: state.tunEnabled.value,
         auto_start_kernel: state.autoStartKernel.value,
         auto_start_app: state.autoStartApp.value,
         prefer_ipv6: state.preferIpv6.value,
@@ -123,7 +150,8 @@ export function createAppPersistence(state: PersistenceState) {
 
   const stopAutoSave = watch(
     [
-      state.proxyMode,
+      state.systemProxyEnabled,
+      state.tunEnabled,
       state.autoStartKernel,
       state.autoStartApp,
       state.preferIpv6,

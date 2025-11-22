@@ -6,6 +6,8 @@ export interface AppConfig {
   proxy_port: number
   api_port: number
   proxy_mode: string
+  system_proxy_enabled?: boolean  // 新字段：System Proxy独立开关
+  tun_enabled?: boolean           // 新字段：TUN独立开关
   tray_instance_id?: string | null
   system_proxy_bypass: string
   tun_auto_route: boolean

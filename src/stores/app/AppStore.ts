@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart'
 import type { MessageApi } from 'naive-ui/es/message'
 import { config as configApi, tauriApi } from '@/services/tauri'
@@ -46,8 +46,16 @@ export const useAppStore = defineStore(
     // 托盘实例ID - 由TrayStore使用
     const trayInstanceId = ref<string | null>(null)
 
-    // 代理模式
-    const proxyMode = ref<ProxyMode>('system')
+    // 代理模式 - 独立的System Proxy和TUN开关
+    const systemProxyEnabled = ref(false)
+    const tunEnabled = ref(false)
+
+    // 向后兼容：从独立开关派生proxyMode
+    const proxyMode = computed<ProxyMode>(() => {
+      if (tunEnabled.value) return 'tun'
+      if (systemProxyEnabled.value) return 'system'
+      return 'manual'
+    })
 
     const autoStartKernel = ref(true)
 
@@ -83,7 +91,8 @@ export const useAppStore = defineStore(
       markDataRestored,
       stopAutoSave,
     } = createAppPersistence({
-      proxyMode,
+      systemProxyEnabled,
+      tunEnabled,
       autoStartKernel,
       autoStartApp,
       preferIpv6,
@@ -168,13 +177,13 @@ export const useAppStore = defineStore(
         // 检查系统启动时间
         const systemUptime = await getSystemUptime()
         const isRecentStartup = systemUptime < 180 // 3分钟内认为是开机自启动
-        
+
         // 检查应用启动时间
         const appStartTime = Date.now() - performance.now()
         const isRecentAppStart = (Date.now() - appStartTime) < 30000 // 30秒内启动的应用
-        
+
         isAutostartScenario.value = isRecentStartup && isRecentAppStart
-        
+
         if (isAutostartScenario.value) {
           console.log(`🕐 检测到开机自启动场景: 系统运行${systemUptime}秒, 应用启动${Math.round((Date.now() - appStartTime) / 1000)}秒前`)
         } else {
@@ -289,8 +298,8 @@ export const useAppStore = defineStore(
         // 检测已知的无害错误，功能实际生效时仍然抛出错误以保持一致性
         const errorMessage = String(error)
         const isHarmlessError = errorMessage.includes('os error 2') ||
-                               errorMessage.includes('system') ||
-                               errorMessage.includes('No such file or directory')
+          errorMessage.includes('system') ||
+          errorMessage.includes('No such file or directory')
 
         if (isHarmlessError) {
           console.log('Autostart 插件已知的无害错误，功能已生效:', error)
@@ -315,22 +324,43 @@ export const useAppStore = defineStore(
       }
     }
 
-    // 代理模式切换
+    // 切换系统代理
+    const toggleSystemProxy = async (enabled: boolean) => {
+      systemProxyEnabled.value = enabled
+      await waitForSaveCompletion()
+      console.log('系统代理已', enabled ? '启用' : '禁用')
+    }
+
+    // 切换TUN模式
+    const toggleTun = async (enabled: boolean) => {
+      tunEnabled.value = enabled
+      await waitForSaveCompletion()
+      console.log('TUN模式已', enabled ? '启用' : '禁用')
+    }
+
+    // 向后兼容：代理模式切换（已弃用，使用toggleSystemProxy和toggleTun）
     const switchProxyMode = async (targetMode: ProxyMode) => {
-      // 如果当前模式与目标模式相同，则不需要切换
-      if (proxyMode.value === targetMode) return
-
-      // 更新状态
-      proxyMode.value = targetMode
-
-      // 保存会在 watch 中自动处理
+      switch (targetMode) {
+        case 'system':
+          systemProxyEnabled.value = true
+          tunEnabled.value = false
+          break
+        case 'tun':
+          systemProxyEnabled.value = false
+          tunEnabled.value = true
+          break
+        case 'manual':
+          systemProxyEnabled.value = false
+          tunEnabled.value = false
+          break
+      }
+      await waitForSaveCompletion()
       console.log('代理模式已切换到:', targetMode)
     }
 
-    // 设置代理模式
+    // 向后兼容：设置代理模式（已弃用）
     const setProxyMode = async (mode: 'system' | 'tun' | 'manual') => {
-      proxyMode.value = mode
-      // 保存会在 watch 中自动处理
+      await switchProxyMode(mode)
     }
 
     // 更新端口配置
@@ -407,6 +437,8 @@ export const useAppStore = defineStore(
       isConnecting,
       isDataRestored,
       trayInstanceId,
+      systemProxyEnabled,
+      tunEnabled,
       proxyMode,
       autoStartKernel,
       autoStartApp,
@@ -426,6 +458,8 @@ export const useAppStore = defineStore(
       setConnectingState,
       toggleAutoStart,
       toggleAutoStartKernel,
+      toggleSystemProxy,
+      toggleTun,
       switchProxyMode,
       startWebSocketCheck,
       setProxyMode,
