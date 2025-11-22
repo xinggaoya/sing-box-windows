@@ -44,6 +44,7 @@ import {
   useSubStore,
   useTrafficStore,
   useConnectionStore,
+  useLogStore,
 } from '@/stores'
 
 // 导入组件
@@ -76,6 +77,7 @@ const subStore = useSubStore()
 const kernelStore = useKernelStore()
 const trafficStore = useTrafficStore()
 const connectionStore = useConnectionStore()
+const logStore = useLogStore()
 
 // 生产环境下禁用右键菜单
 
@@ -178,6 +180,10 @@ onMounted(async () => {
 
     // 3.5 初始化内核状态监听
     await kernelStore.initializeStore()
+
+    // 3.55 初始化日志监听，确保不打开日志页也能持续收集
+    await logStore.initializeStore()
+    cleanupFunctions.push(() => logStore.cleanupListeners())
 
     // 3.6 初始化内核事件数据（流量、连接）
     await Promise.allSettled([

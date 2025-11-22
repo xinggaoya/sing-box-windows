@@ -122,6 +122,8 @@ export default {
     checkConfigOrRefresh: 'Please check configuration file or refresh page',
     currentLabel: 'Current node:',
     switchSuccess: 'Switched group \'{group}\' to \'{proxy}\'.',
+    loadMoreNodes: 'Load more nodes',
+    loadedCount: 'Showing {loaded}/{total}',
     dashboard: {
       groupTotal: 'Groups',
       nodeTotal: 'Nodes',

@@ -145,6 +145,8 @@ export default {
     checkConfigOrRefresh: 'Пожалуйста проверьте файл конфигурации или обновите страницу',
     currentLabel: 'Текущий узел:',
     switchSuccess: 'Группа \'{group}\' переключена на \'{proxy}\'.',
+    loadMoreNodes: 'Загрузить ещё узлы',
+    loadedCount: 'Показано {loaded} из {total}',
     dashboard: {
       groupTotal: 'Группы',
       nodeTotal: 'Узлы',

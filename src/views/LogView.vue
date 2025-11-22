@@ -133,7 +133,7 @@
 
 <script setup lang="ts">
 import { useLogStore } from '@/stores/kernel/LogStore'
-import { onMounted, ref, computed, onUnmounted, watch, nextTick, defineComponent, h } from 'vue'
+import { ref, computed, watch, nextTick, defineComponent, h } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   TrashOutline,
@@ -331,14 +331,6 @@ watch(
     }
   }
 )
-
-onMounted(() => {
-  logStore.setupLogListener()
-})
-
-onUnmounted(() => {
-  logStore.cleanupListeners()
-})
 </script>
 
 <style scoped>

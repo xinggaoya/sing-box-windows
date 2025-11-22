@@ -144,6 +144,8 @@ export default {
     checkConfigOrRefresh: '設定ファイルを確認するかページを更新してください',
     currentLabel: '現在のノード:',
     switchSuccess: 'グループ「{group}」を「{proxy}」に切り替えました。',
+    loadMoreNodes: 'ノードをさらに読み込む',
+    loadedCount: '表示中 {loaded}/{total}',
     dashboard: {
       groupTotal: 'グループ',
       nodeTotal: 'ノード',

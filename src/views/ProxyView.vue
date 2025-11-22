@@ -59,7 +59,7 @@
             class="group-card"
           >
             <!-- Group Header -->
-            <div class="group-header" @click="toggleGroup(group.name)">
+            <div class="group-header" @click="toggleGroup(group)">
               <div class="group-info">
                 <div class="group-title-row">
                   <h3 class="group-name">{{ group.name }}</h3>
@@ -100,7 +100,7 @@
               <div v-if="expandedGroups.includes(group.name)" class="nodes-area">
                 <div class="nodes-grid">
                   <div
-                    v-for="(proxy, i) in group.all"
+                    v-for="(proxy, i) in getVisibleNodes(group)"
                     :key="`${group.name}-${proxy}-${i}`"
                     class="node-item"
                     :class="{
@@ -123,6 +123,19 @@
                       </div>
                     </div>
                   </div>
+                </div>
+                <div class="nodes-footer">
+                  <div class="nodes-count">
+                    {{ t('proxy.loadedCount', { loaded: getVisibleNodes(group).length, total: group.all.length }) }}
+                  </div>
+                  <n-button
+                    v-if="hasMoreNodes(group)"
+                    size="small"
+                    tertiary
+                    @click.stop="loadMoreNodes(group)"
+                  >
+                    {{ t('proxy.loadMoreNodes') }}
+                  </n-button>
                 </div>
               </div>
             </transition>
@@ -192,6 +205,8 @@ const expandedGroups = ref<string[]>([])
 const testingGroup = ref('')
 const testResults = reactive<Record<string, number>>({})
 const nodeErrors = reactive<Record<string, string>>({})
+const groupNodeState = reactive<Record<string, { list: string[]; loaded: number }>>({})
+const NODE_BATCH_SIZE = 60
 
 // Listeners
 let unlistenTestProgress: (() => void) | null = null
@@ -235,13 +250,59 @@ const proxyStats = computed(() => {
 })
 
 // Methods
-const toggleGroup = (groupName: string) => {
-  const index = expandedGroups.value.indexOf(groupName)
-  if (index > -1) {
-    expandedGroups.value.splice(index, 1)
-  } else {
-    expandedGroups.value.push(groupName)
+// 懒加载节点，按批次渲染减少展开大组时的卡顿
+const ensureGroupState = (group: ProxyData) => {
+  if (!groupNodeState[group.name]) {
+    groupNodeState[group.name] = { list: [], loaded: 0 }
   }
+  return groupNodeState[group.name]
+}
+
+const loadNextBatch = (group: ProxyData) => {
+  const state = ensureGroupState(group)
+  if (state.loaded >= (group.all?.length ?? 0)) return
+  const next = group.all.slice(state.loaded, state.loaded + NODE_BATCH_SIZE)
+  state.list.push(...next)
+  state.loaded += next.length
+}
+
+const getVisibleNodes = (group: ProxyData) => {
+  const state = groupNodeState[group.name]
+  return state ? state.list : []
+}
+
+const hasMoreNodes = (group: ProxyData) => {
+  const state = groupNodeState[group.name]
+  return (state?.loaded ?? 0) < (group.all?.length ?? 0)
+}
+
+const loadMoreNodes = (group: ProxyData) => {
+  loadNextBatch(group)
+}
+
+const resetGroupNodeState = (groups: ProxyData[]) => {
+  Object.keys(groupNodeState).forEach((key) => delete groupNodeState[key])
+  groups.forEach((group) => {
+    groupNodeState[group.name] = { list: [], loaded: 0 }
+  })
+}
+
+const collapseGroup = (groupName: string) => {
+  const index = expandedGroups.value.indexOf(groupName)
+  if (index > -1) expandedGroups.value.splice(index, 1)
+  delete groupNodeState[groupName]
+}
+
+const toggleGroup = (group: ProxyData) => {
+  const isExpanded = expandedGroups.value.includes(group.name)
+  if (isExpanded) {
+    collapseGroup(group.name)
+    return
+  }
+  // 仅保持一个展开的组，避免同时渲染多个组造成卡顿
+  expandedGroups.value.forEach((name) => collapseGroup(name))
+  expandedGroups.value = [group.name]
+  loadNextBatch(group)
 }
 
 const getNodeStatusText = (name: string): string => {
@@ -264,6 +325,8 @@ const init = async () => {
       }
     })
     proxyGroups.value = groups
+    expandedGroups.value = []
+    resetGroupNodeState(groups)
     if (groups.length > 0) {
       message.success(t('proxy.loadSuccess'))
     }
@@ -504,6 +567,20 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 12px;
+}
+
+.nodes-footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.nodes-count {
+  flex: 1;
 }
 
 .node-item {

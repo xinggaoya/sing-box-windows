@@ -122,6 +122,8 @@ export default {
     checkConfigOrRefresh: '请检查配置文件或刷新页面',
     currentLabel: '当前节点:',
     switchSuccess: '已将代理组 \'{group}\' 切换到 \'{proxy}\'.',
+    loadMoreNodes: '加载更多节点',
+    loadedCount: '已展示 {loaded}/{total}',
     dashboard: {
       groupTotal: '代理组',
       nodeTotal: '可用节点',
