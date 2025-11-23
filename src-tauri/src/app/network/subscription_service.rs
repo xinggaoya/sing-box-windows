@@ -1,5 +1,6 @@
 use crate::app::constants::{messages, network_config, paths};
-use crate::app::core::tun_profile::TUN_ROUTE_EXCLUDES;
+use crate::app::core::proxy_service::ProxyRuntimeState;
+use crate::app::core::tun_profile::{TunProxyOptions, TUN_ROUTE_EXCLUDES};
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use crate::app::storage::state_model::AppConfig;
 use crate::utils::app_util::get_work_dir_sync;
@@ -13,6 +14,25 @@ use std::path::Path;
 use tauri::path::BaseDirectory;
 use tauri::Manager;
 use tracing::{error, info, warn};
+
+fn runtime_state_from_config(app_config: &AppConfig) -> ProxyRuntimeState {
+    ProxyRuntimeState {
+        proxy_port: app_config.proxy_port,
+        system_proxy_enabled: app_config.system_proxy_enabled,
+        tun_enabled: app_config.tun_enabled,
+        system_proxy_bypass: app_config.system_proxy_bypass.clone(),
+        tun_options: TunProxyOptions {
+            ipv4_address: app_config.tun_ipv4.clone(),
+            ipv6_address: app_config.tun_ipv6.clone(),
+            mtu: app_config.tun_mtu,
+            auto_route: app_config.tun_auto_route,
+            strict_route: app_config.tun_strict_route,
+            stack: app_config.tun_stack.clone(),
+            enable_ipv6: app_config.tun_enable_ipv6,
+            interface_name: None,
+        },
+    }
+}
 
 // 下载订阅
 #[tauri::command]
@@ -40,12 +60,10 @@ pub async fn download_subscription(
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
 
-    // 使用传入的代理端口
-    if let Err(e) = crate::app::core::proxy_service::set_system_proxy(
-        app_config.proxy_port,
-        Some(app_config.system_proxy_bypass.clone()),
-    ) {
-        warn!("设置系统代理失败: {}", e);
+    // 按当前数据库配置应用代理（无需前端额外参数）
+    let runtime_state = runtime_state_from_config(&app_config);
+    if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(&runtime_state) {
+        warn!("应用代理配置失败: {}", e);
     }
     crate::app::core::kernel_service::auto_manage_with_saved_config(
         &app_handle,
@@ -81,11 +99,9 @@ pub async fn add_manual_subscription(
     process_subscription_content(content, use_original_config, &app_handle, &app_config)
         .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
 
-    if let Err(e) = crate::app::core::proxy_service::set_system_proxy(
-        app_config.proxy_port,
-        Some(app_config.system_proxy_bypass.clone()),
-    ) {
-        warn!("设置系统代理失败: {}", e);
+    let runtime_state = runtime_state_from_config(&app_config);
+    if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(&runtime_state) {
+        warn!("应用代理配置失败: {}", e);
     }
     crate::app::core::kernel_service::auto_manage_with_saved_config(
         &app_handle,
@@ -1377,75 +1393,32 @@ fn apply_inbounds_settings(
         tun_addresses.push(app_config.tun_ipv6.clone());
     }
 
-    let inbounds = config_obj
-        .entry("inbounds".to_string())
-        .or_insert(json!([]));
+    let mut inbounds = Vec::new();
+    inbounds.push(json!({
+        "type": "mixed",
+        "tag": "mixed-in",
+        "listen": "127.0.0.1",
+        "listen_port": app_config.proxy_port,
+        "sniff": true,
+        "set_system_proxy": app_config.system_proxy_enabled
+    }));
 
-    if let Some(inbound_array) = inbounds.as_array_mut() {
-        let mut mixed_found = false;
-        let mut tun_found = false;
-
-        for inbound in inbound_array.iter_mut() {
-            if let Some(obj) = inbound.as_object_mut() {
-                match obj.get("tag").and_then(|t| t.as_str()) {
-                    Some("mixed-in") => {
-                        mixed_found = true;
-                        obj.insert("listen_port".to_string(), json!(app_config.proxy_port));
-                        obj.insert(
-                            "set_system_proxy".to_string(),
-                            json!(app_config.proxy_mode == "system"),
-                        );
-                    }
-                    Some("tun-in") => {
-                        tun_found = true;
-                        obj.insert(
-                            "address".to_string(),
-                            json!(tun_addresses.clone()),
-                        );
-                        obj.insert("auto_route".to_string(), json!(app_config.tun_auto_route));
-                        obj.insert(
-                            "strict_route".to_string(),
-                            json!(app_config.tun_strict_route),
-                        );
-                        obj.insert("stack".to_string(), json!(app_config.tun_stack));
-                        obj.insert("mtu".to_string(), json!(app_config.tun_mtu));
-                        obj.insert("sniff_override_destination".to_string(), json!(true));
-                        obj.insert(
-                            "route_exclude_address".to_string(),
-                            json!(TUN_ROUTE_EXCLUDES),
-                        );
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        if !mixed_found {
-            inbound_array.push(json!({
-                "type": "mixed",
-                "tag": "mixed-in",
-                "listen": "127.0.0.1",
-                "listen_port": app_config.proxy_port,
-                "sniff": true,
-                "set_system_proxy": app_config.proxy_mode == "system"
-            }));
-        }
-
-        if !tun_found {
-            inbound_array.push(json!({
-                "type": "tun",
-                "tag": "tun-in",
-                "address": tun_addresses,
-                "auto_route": app_config.tun_auto_route,
-                "strict_route": app_config.tun_strict_route,
-                "stack": app_config.tun_stack,
-                "mtu": app_config.tun_mtu,
-                "sniff": true,
-                "sniff_override_destination": true,
-                "route_exclude_address": TUN_ROUTE_EXCLUDES
-            }));
-        }
+    if app_config.tun_enabled {
+        inbounds.push(json!({
+            "type": "tun",
+            "tag": "tun-in",
+            "address": tun_addresses,
+            "auto_route": app_config.tun_auto_route,
+            "strict_route": app_config.tun_strict_route,
+            "stack": app_config.tun_stack,
+            "mtu": app_config.tun_mtu,
+            "sniff": true,
+            "sniff_override_destination": true,
+            "route_exclude_address": TUN_ROUTE_EXCLUDES
+        }));
     }
+
+    config_obj.insert("inbounds".to_string(), json!(inbounds));
 }
 
 // 获取当前代理模式

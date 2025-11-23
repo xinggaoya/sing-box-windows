@@ -2,36 +2,53 @@ use crate::app::constants::{config, messages, network_config, paths};
 use crate::app::core::tun_profile::{TunProfile, TunProxyOptions};
 use crate::app::system::config_service;
 use crate::entity::config_model;
-use crate::utils::app_util::get_work_dir_sync;
 use crate::utils::config_util::ConfigUtil;
 use crate::utils::http_client;
 use crate::utils::proxy_util::{disable_system_proxy, enable_system_proxy, DEFAULT_BYPASS_LIST};
 use serde_json::{json, Value};
 use std::error::Error;
 use std::fs;
-use std::path::Path;
 use std::time::Duration;
 use tauri::{Emitter, Runtime};
 use tracing::{error, info, warn};
 
-// 修改代理模式为系统代理
-#[tauri::command]
-pub fn set_system_proxy(port: u16, system_proxy_bypass: Option<String>) -> Result<(), String> {
-    config_service::ensure_singbox_config().map_err(|e| format!("准备配置失败: {}", e))?;
-    let config_path = paths::get_config_path();
-    let config_path_str = config_path.to_str().ok_or("配置文件路径包含无效字符")?;
+#[derive(Debug, Clone)]
+pub struct ProxyRuntimeState {
+    pub proxy_port: u16,
+    pub system_proxy_enabled: bool,
+    pub tun_enabled: bool,
+    pub system_proxy_bypass: String,
+    pub tun_options: TunProxyOptions,
+}
 
-    let json_util = ConfigUtil::new(config_path_str)
-        .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
+impl ProxyRuntimeState {
+    pub fn derived_mode(&self) -> String {
+        if self.tun_enabled {
+            "tun".to_string()
+        } else if self.system_proxy_enabled {
+            "system".to_string()
+        } else {
+            "manual".to_string()
+        }
+    }
+}
 
-    let mut json_util = json_util;
-    let target_keys = vec!["inbounds"];
-    let new_structs = vec![config_model::Inbound {
+fn build_inbounds_for_state(state: &ProxyRuntimeState) -> Vec<config_model::Inbound> {
+    if state.tun_enabled {
+        let mut inbounds = TunProfile::from_options(&state.tun_options).to_inbounds(state.proxy_port);
+        if let Some(mixed) = inbounds.get_mut(0) {
+            mixed.listen = Some(network_config::DEFAULT_CLASH_API_ADDRESS.to_string());
+            mixed.set_system_proxy = Some(state.system_proxy_enabled);
+        }
+        return inbounds;
+    }
+
+    vec![config_model::Inbound {
         r#type: config::DEFAULT_INBOUND_TYPE.to_string(),
         tag: config::DEFAULT_INBOUND_TAG.to_string(),
         listen: Some(network_config::DEFAULT_CLASH_API_ADDRESS.to_string()),
         interface_name: None,
-        listen_port: Some(port),
+        listen_port: Some(state.proxy_port),
         address: None,
         auto_route: None,
         strict_route: None,
@@ -41,113 +58,92 @@ pub fn set_system_proxy(port: u16, system_proxy_bypass: Option<String>) -> Resul
         mtu: None,
         route_address: None,
         route_exclude_address: None,
-        set_system_proxy: Some(true),
-    }];
+        set_system_proxy: Some(state.system_proxy_enabled),
+    }]
+}
 
+pub fn apply_proxy_runtime_state(state: &ProxyRuntimeState) -> Result<(), String> {
+    config_service::ensure_singbox_config().map_err(|e| format!("准备配置失败: {}", e))?;
+    let config_path = paths::get_config_path();
+    let config_path_str = config_path
+        .to_str()
+        .ok_or_else(|| "配置文件路径包含无效字符".to_string())?;
+
+    let mut json_util = ConfigUtil::new(config_path_str)
+        .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
+
+    let inbounds = build_inbounds_for_state(state);
     json_util.update_key(
-        target_keys.clone(),
-        serde_json::to_value(new_structs).map_err(|e| format!("序列化配置失败: {}", e))?,
+        vec!["inbounds"],
+        serde_json::to_value(inbounds).map_err(|e| format!("序列化配置失败: {}", e))?,
     );
     json_util
         .save_to_file()
         .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
 
-    let bypass_value = system_proxy_bypass.filter(|b| !b.trim().is_empty());
-    enable_system_proxy(
-        network_config::DEFAULT_CLASH_API_ADDRESS,
-        port,
-        bypass_value.as_deref(),
-    )
-    .map_err(|e| format!("设置系统代理失败: {}", e))?;
+    if state.system_proxy_enabled {
+        let bypass = state.system_proxy_bypass.trim();
+        let normalized_bypass = if bypass.is_empty() {
+            DEFAULT_BYPASS_LIST.to_string()
+        } else {
+            bypass.to_string()
+        };
+        enable_system_proxy(
+            network_config::DEFAULT_CLASH_API_ADDRESS,
+            state.proxy_port,
+            Some(normalized_bypass.as_str()),
+        )
+        .map_err(|e| format!("设置系统代理失败: {}", e))?;
+        info!(
+            "系统代理已启用，端口 {}，绕过列表: {}",
+            state.proxy_port,
+            normalized_bypass
+        );
+    } else if let Err(err) = disable_system_proxy() {
+        warn!("关闭系统代理失败: {}", err);
+    }
 
-    info!(
-        "系统代理模式已启用，端口 {}，绕过列表: {}",
-        port,
-        bypass_value.unwrap_or_else(|| DEFAULT_BYPASS_LIST.to_string())
-    );
     Ok(())
+}
+
+// 修改代理模式为系统代理
+#[tauri::command]
+pub fn set_system_proxy(port: u16, system_proxy_bypass: Option<String>) -> Result<(), String> {
+    let runtime_state = ProxyRuntimeState {
+        proxy_port: port,
+        system_proxy_enabled: true,
+        tun_enabled: false,
+        system_proxy_bypass: system_proxy_bypass
+            .unwrap_or_else(|| DEFAULT_BYPASS_LIST.to_string()),
+        tun_options: TunProxyOptions::default(),
+    };
+    apply_proxy_runtime_state(&runtime_state)
 }
 
 // 设置手动代理模式（不自动设置系统代理）
 #[tauri::command]
 pub fn set_manual_proxy(port: u16) -> Result<(), String> {
-    config_service::ensure_singbox_config().map_err(|e| format!("准备配置失败: {}", e))?;
-    let config_path = paths::get_config_path();
-    let config_path_str = config_path.to_str().ok_or("配置文件路径包含无效字符")?;
-
-    let json_util = ConfigUtil::new(config_path_str)
-        .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
-
-    let mut json_util = json_util;
-    let target_keys = vec!["inbounds"];
-    let new_structs = vec![config_model::Inbound {
-        r#type: config::DEFAULT_INBOUND_TYPE.to_string(),
-        tag: config::DEFAULT_INBOUND_TAG.to_string(),
-        listen: Some(network_config::DEFAULT_CLASH_API_ADDRESS.to_string()),
-        interface_name: None,
-        listen_port: Some(port),
-        address: None,
-        auto_route: None,
-        strict_route: None,
-        stack: None,
-        sniff: Some(true),
-        sniff_override_destination: Some(true),
-        mtu: None,
-        route_address: None,
-        route_exclude_address: None,
-        set_system_proxy: Some(false),
-    }];
-
-    json_util.update_key(
-        target_keys.clone(),
-        serde_json::to_value(new_structs).map_err(|e| format!("序列化配置失败: {}", e))?,
-    );
-    json_util
-        .save_to_file()
-        .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
-
-    if let Err(err) = disable_system_proxy() {
-        warn!("关闭系统代理失败: {}", err);
-    }
-
-    info!("手动代理模式已启用，需要手动设置系统代理");
-    Ok(())
+    let runtime_state = ProxyRuntimeState {
+        proxy_port: port,
+        system_proxy_enabled: false,
+        tun_enabled: false,
+        system_proxy_bypass: DEFAULT_BYPASS_LIST.to_string(),
+        tun_options: TunProxyOptions::default(),
+    };
+    apply_proxy_runtime_state(&runtime_state)
 }
 
 // 修改TUN 模式为代理模式
 #[tauri::command]
 pub fn set_tun_proxy(port: u16, tun_options: Option<TunProxyOptions>) -> Result<(), String> {
-    set_tun_proxy_impl(port, tun_options.unwrap_or_default())
-        .map_err(|e| format!("设置TUN代理失败: {}", e))
-}
-
-fn set_tun_proxy_impl(port: u16, options: TunProxyOptions) -> Result<(), Box<dyn Error>> {
-    config_service::ensure_singbox_config().map_err(|e| format!("准备配置失败: {}", e))?;
-    let work_dir = get_work_dir_sync();
-    let path = Path::new(&work_dir).join("sing-box/config.json");
-    let path_str = path.to_str().ok_or("配置文件路径包含无效字符")?;
-    let mut json_util = ConfigUtil::new(path_str)?;
-    let profile = TunProfile::from_options(&options);
-
-    let mut inbounds = profile.to_inbounds(port);
-    if let Some(mixed) = inbounds.get_mut(0) {
-        mixed.listen = Some(network_config::DEFAULT_CLASH_API_ADDRESS.to_string());
-    }
-
-    json_util.modify_property(
-        &["inbounds"],
-        serde_json::to_value(inbounds).map_err(|e| format!("序列化配置失败: {}", e))?,
-    );
-    json_util
-        .save()
-        .map_err(|e| format!("保存配置文件失败: {}", e))?;
-
-    if let Err(err) = disable_system_proxy() {
-        warn!("关闭系统代理失败: {}", err);
-    }
-
-    info!("✅ TUN代理模式已设置");
-    Ok(())
+    let runtime_state = ProxyRuntimeState {
+        proxy_port: port,
+        system_proxy_enabled: false,
+        tun_enabled: true,
+        system_proxy_bypass: DEFAULT_BYPASS_LIST.to_string(),
+        tun_options: tun_options.unwrap_or_default(),
+    };
+    apply_proxy_runtime_state(&runtime_state)
 }
 
 pub fn update_dns_strategy(prefer_ipv6: bool) -> Result<(), String> {

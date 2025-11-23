@@ -156,6 +156,21 @@ export const useKernelStore = defineStore('kernel', () => {
     }
   }
 
+  const applyProxySettings = async () => {
+    try {
+      const result = await kernelService.applyProxySettings()
+      if (!result.success) {
+        lastError.value = result.message
+        return false
+      }
+      await refreshStatus()
+      return true
+    } catch (error) {
+      lastError.value = error instanceof Error ? error.message : '应用代理配置失败'
+      return false
+    }
+  }
+
   const checkKernelInstallation = async () => {
     try {
       const version = await kernelService.getKernelVersion()
@@ -211,6 +226,7 @@ export const useKernelStore = defineStore('kernel', () => {
     stopKernelFast,
     forceStopAndExit,
     switchProxyMode,
+    applyProxySettings,
     checkKernelInstallation,
     hasVersionInfo,
     getVersionString,

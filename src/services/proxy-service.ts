@@ -1,7 +1,5 @@
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
-import { useProxyStore } from '@/stores/kernel/ProxyStore'
-import { tauriApi } from './tauri'
 import { NotificationService } from './notification-service'
 import i18n from '@/locales'
 
@@ -9,7 +7,6 @@ export class ProxyService {
   private static instance: ProxyService
   private appStore = useAppStore()
   private kernelStore = useKernelStore()
-  private proxyStore = useProxyStore()
   private notificationService = NotificationService.getInstance()
   private t = i18n.global.t
 
@@ -34,37 +31,33 @@ export class ProxyService {
     messageCallback?: (type: 'success' | 'info' | 'error', content: string) => void,
   ): Promise<boolean> {
     try {
-      // 根据模式设置代理（后端会从数据库读取配置）
+      // 根据模式同步独立开关，具体配置由后端从数据库读取
       if (mode === 'system') {
-        await tauriApi.proxy.setSystemProxy(this.appStore.systemProxyBypass)
         await this.appStore.toggleSystemProxy(true)
         await this.appStore.toggleTun(false)
-        if (messageCallback) {
-          messageCallback('success', '系统代理模式已启用')
-        }
       } else if (mode === 'manual') {
-        await tauriApi.proxy.setManualProxy()
         await this.appStore.toggleSystemProxy(false)
         await this.appStore.toggleTun(false)
-        if (messageCallback) {
-          messageCallback('info', '手动代理模式已启用，请手动设置系统代理')
-        }
       } else {
-        // TUN模式 - 仍需传递配置，因为这些配置可能实时变化
-        await tauriApi.proxy.setTunProxy({
-          ipv4_address: this.appStore.tunIpv4,
-          ipv6_address: this.appStore.tunIpv6,
-          mtu: this.appStore.tunMtu,
-          auto_route: this.appStore.tunAutoRoute,
-          strict_route: this.appStore.tunStrictRoute,
-          stack: this.appStore.tunStack,
-          enable_ipv6: this.appStore.tunEnableIpv6,
-        })
         await this.appStore.toggleSystemProxy(false)
         await this.appStore.toggleTun(true)
-        if (messageCallback) {
-          messageCallback('success', 'TUN模式已启用')
-        }
+      }
+
+      const applied = await this.kernelStore.applyProxySettings()
+      if (!applied) {
+        const errorText = '应用代理配置失败'
+        if (messageCallback) messageCallback('error', errorText)
+        return false
+      }
+
+      if (messageCallback) {
+        const content =
+          mode === 'system'
+            ? '系统代理模式已启用'
+            : mode === 'tun'
+              ? 'TUN模式已启用'
+              : '手动代理模式已启用，请手动设置系统代理'
+        messageCallback(mode === 'manual' ? 'info' : 'success', content)
       }
 
       // 如果内核正在运行，需要重启

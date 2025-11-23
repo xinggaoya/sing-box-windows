@@ -112,6 +112,19 @@ class KernelService {
     }
   }
 
+  async applyProxySettings(): Promise<{ success: boolean; message: string }> {
+    try {
+      await kernelApi.applyProxySettings()
+      return { success: true, message: '代理配置已应用' }
+    } catch (error) {
+      console.error('应用代理配置失败:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : '应用代理配置失败'
+      }
+    }
+  }
+
   /**
    * 切换IP版本
    */

@@ -4,7 +4,7 @@ use crate::app::core::event_relay::{
     create_traffic_event_relay, start_event_relay_with_retry,
 };
 use crate::app::core::proxy_service::{
-    set_manual_proxy, set_system_proxy, set_tun_proxy, update_dns_strategy,
+    apply_proxy_runtime_state, update_dns_strategy, ProxyRuntimeState,
 };
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
@@ -1734,70 +1734,143 @@ pub async fn get_system_uptime() -> Result<u64, String> {
 
 // ========== 新增的重构版本命令 ==========
 
-/// 重构版本的启动命令 - 增强版
-#[tauri::command]
-pub async fn kernel_start_enhanced(
-    app_handle: AppHandle,
+#[derive(Debug, Clone, Default)]
+struct ProxyOverrides {
     proxy_mode: Option<String>,
     api_port: Option<u16>,
     proxy_port: Option<u16>,
     prefer_ipv6: Option<bool>,
     system_proxy_bypass: Option<String>,
     tun_options: Option<TunProxyOptions>,
+    system_proxy_enabled: Option<bool>,
+    tun_enabled: Option<bool>,
     keep_alive: Option<bool>,
-) -> Result<serde_json::Value, String> {
-    let resolved_mode = proxy_mode.unwrap_or_else(|| "manual".to_string());
-    let resolved_api_port = api_port.unwrap_or(12081);
-    let resolved_proxy_port = proxy_port.unwrap_or(12080);
-    let resolved_ipv6_pref = prefer_ipv6.unwrap_or(false);
-    let resolved_tun = tun_options.unwrap_or_default();
-    let keep_alive_enabled = keep_alive.unwrap_or(false);
+}
 
+#[derive(Debug, Clone)]
+struct ResolvedProxyState {
+    proxy: ProxyRuntimeState,
+    api_port: u16,
+    prefer_ipv6: bool,
+    auto_start_kernel: bool,
+}
+
+impl ResolvedProxyState {
+    fn derived_mode(&self) -> String {
+        self.proxy.derived_mode()
+    }
+}
+
+async fn resolve_proxy_runtime_state(
+    app_handle: &AppHandle,
+    overrides: ProxyOverrides,
+) -> Result<ResolvedProxyState, String> {
+    let mut app_config = db_get_app_config(app_handle.clone()).await?;
+
+    if let Some(api_port) = overrides.api_port {
+        app_config.api_port = api_port;
+    }
+    if let Some(proxy_port) = overrides.proxy_port {
+        app_config.proxy_port = proxy_port;
+    }
+    if let Some(prefer_ipv6) = overrides.prefer_ipv6 {
+        app_config.prefer_ipv6 = prefer_ipv6;
+    }
+
+    if let Some(proxy_mode) = overrides.proxy_mode {
+        match proxy_mode.as_str() {
+            "system" => {
+                app_config.system_proxy_enabled = true;
+                app_config.tun_enabled = false;
+            }
+            "tun" => {
+                app_config.system_proxy_enabled = false;
+                app_config.tun_enabled = true;
+            }
+            _ => {
+                app_config.system_proxy_enabled = false;
+                app_config.tun_enabled = false;
+            }
+        }
+    }
+
+    if let Some(enabled) = overrides.system_proxy_enabled {
+        app_config.system_proxy_enabled = enabled;
+    }
+    if let Some(enabled) = overrides.tun_enabled {
+        app_config.tun_enabled = enabled;
+    }
+
+    let tun_options = overrides.tun_options.unwrap_or_else(|| TunProxyOptions {
+        ipv4_address: app_config.tun_ipv4.clone(),
+        ipv6_address: app_config.tun_ipv6.clone(),
+        mtu: app_config.tun_mtu,
+        auto_route: app_config.tun_auto_route,
+        strict_route: app_config.tun_strict_route,
+        stack: app_config.tun_stack.clone(),
+        enable_ipv6: app_config.tun_enable_ipv6,
+        interface_name: None,
+    });
+
+    let proxy_state = ProxyRuntimeState {
+        proxy_port: app_config.proxy_port,
+        system_proxy_enabled: app_config.system_proxy_enabled,
+        tun_enabled: app_config.tun_enabled,
+        system_proxy_bypass: overrides
+            .system_proxy_bypass
+            .unwrap_or_else(|| app_config.system_proxy_bypass.clone()),
+        tun_options,
+    };
+
+    Ok(ResolvedProxyState {
+        proxy: proxy_state,
+        api_port: app_config.api_port,
+        prefer_ipv6: app_config.prefer_ipv6,
+        auto_start_kernel: app_config.auto_start_kernel,
+    })
+}
+
+async fn start_kernel_with_state(
+    app_handle: AppHandle,
+    resolved: &ResolvedProxyState,
+    keep_alive_enabled: bool,
+) -> Result<serde_json::Value, String> {
     info!(
         "🚀 启动内核增强版，代理模式: {}, API端口: {}, 代理端口: {}",
-        resolved_mode, resolved_api_port, resolved_proxy_port
+        resolved.derived_mode(),
+        resolved.api_port,
+        resolved.proxy.proxy_port
     );
 
-    // 发送启动中事件
     let _ = app_handle.emit("kernel-starting", json!({
-        "proxy_mode": resolved_mode,
-        "api_port": resolved_api_port,
-        "proxy_port": resolved_proxy_port
+        "proxy_mode": resolved.derived_mode(),
+        "api_port": resolved.api_port,
+        "proxy_port": resolved.proxy.proxy_port
     }));
 
     crate::app::system::config_service::ensure_singbox_config()
         .map_err(|e| format!("准备内核配置失败: {}", e))?;
-
-    // 同步端口配置，确保配置文件中的端口与UI一致
     if let Err(e) = crate::app::system::config_service::update_singbox_ports(
-        resolved_proxy_port,
-        resolved_api_port,
+        resolved.proxy.proxy_port,
+        resolved.api_port,
     ) {
         warn!("更新端口配置失败: {}", e);
     }
 
-    // 根据代理模式更新配置文件
-    if let Err(e) = apply_proxy_mode_configuration(
-        &resolved_mode,
-        resolved_proxy_port,
-        system_proxy_bypass.clone(),
-        resolved_tun.clone(),
-    ) {
+    if let Err(e) = apply_proxy_runtime_state(&resolved.proxy) {
         return Ok(json!({
             "success": false,
-            "message": format!("应用代理模式配置失败: {}", e)
+            "message": format!("应用代理配置失败: {}", e)
         }));
     }
 
-    // 调整DNS策略
-    if let Err(e) = update_dns_strategy(resolved_ipv6_pref) {
+    if let Err(e) = update_dns_strategy(resolved.prefer_ipv6) {
         warn!("更新DNS策略失败: {}", e);
     }
 
-    // 检查内核是否已在运行
     if is_kernel_running().await.unwrap_or(false) {
         if keep_alive_enabled {
-            enable_kernel_guard(app_handle.clone(), resolved_api_port).await;
+            enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
         } else {
             disable_kernel_guard().await;
         }
@@ -1808,35 +1881,29 @@ pub async fn kernel_start_enhanced(
         }));
     }
 
-    // 启动内核进程
     match PROCESS_MANAGER.start().await {
         Ok(_) => {
             info!("✅ 内核进程启动成功");
 
-            info!("🔌 启动事件中继服务，端口: {}", resolved_api_port);
-            match start_websocket_relay(app_handle.clone(), Some(resolved_api_port)).await {
+            info!("🔌 启动事件中继服务，端口: {}", resolved.api_port);
+            match start_websocket_relay(app_handle.clone(), Some(resolved.api_port)).await {
                 Ok(_) => {
                     info!("✅ 事件中继启动成功");
 
                     if keep_alive_enabled {
-                        enable_kernel_guard(app_handle.clone(), resolved_api_port).await;
+                        enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
                     } else {
                         disable_kernel_guard().await;
                     }
 
-                    // 发送内核就绪事件
                     let _ = app_handle.emit("kernel-ready", ());
-                    
-                    // 发送内核已启动事件（包含完整状态）
                     let _ = app_handle.emit("kernel-started", json!({
-                        "proxy_mode": resolved_mode,
-                        "api_port": resolved_api_port,
-                        "proxy_port": resolved_proxy_port,
+                        "proxy_mode": resolved.derived_mode(),
+                        "api_port": resolved.api_port,
+                        "proxy_port": resolved.proxy.proxy_port,
                         "process_running": true,
                         "api_ready": true
                     }));
-                    
-                    // 发送内核状态变化事件
                     let _ = app_handle.emit("kernel-status-changed", json!({
                         "process_running": true,
                         "api_ready": true,
@@ -1852,12 +1919,11 @@ pub async fn kernel_start_enhanced(
                     warn!("⚠️ 事件中继启动失败: {}, 但内核进程已启动", e);
 
                     if keep_alive_enabled {
-                        enable_kernel_guard(app_handle.clone(), resolved_api_port).await;
+                        enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
                     } else {
                         disable_kernel_guard().await;
                     }
 
-                    // 即使事件中继失败，内核也已经启动了
                     let _ = app_handle.emit("kernel-ready", ());
 
                     Ok(serde_json::json!({
@@ -1869,12 +1935,11 @@ pub async fn kernel_start_enhanced(
         }
         Err(e) => {
             error!("❌ 内核启动失败: {}", e);
-            
-            // 发送内核错误事件
+
             let _ = app_handle.emit("kernel-error", json!({
                 "error": format!("启动失败: {}", e)
             }));
-            
+
             Ok(serde_json::json!({
                 "success": false,
                 "message": format!("内核启动失败: {}", e)
@@ -1883,21 +1948,70 @@ pub async fn kernel_start_enhanced(
     }
 }
 
-fn apply_proxy_mode_configuration(
-    mode: &str,
-    proxy_port: u16,
-    bypass: Option<String>,
-    tun_options: TunProxyOptions,
-) -> Result<(), String> {
-    match mode {
-        "system" => set_system_proxy(proxy_port, bypass),
-        "tun" => set_tun_proxy(proxy_port, Some(tun_options)),
-        "manual" => set_manual_proxy(proxy_port),
-        _ => {
-            warn!("未知的代理模式: {}，将回退到手动模式", mode);
-            set_manual_proxy(proxy_port)
-        }
+/// 重构版本的启动命令 - 增强版
+#[tauri::command]
+pub async fn kernel_start_enhanced(
+    app_handle: AppHandle,
+    proxy_mode: Option<String>,
+    api_port: Option<u16>,
+    proxy_port: Option<u16>,
+    prefer_ipv6: Option<bool>,
+    system_proxy_bypass: Option<String>,
+    tun_options: Option<TunProxyOptions>,
+    keep_alive: Option<bool>,
+    system_proxy_enabled: Option<bool>,
+    tun_enabled: Option<bool>,
+) -> Result<serde_json::Value, String> {
+    let overrides = ProxyOverrides {
+        proxy_mode,
+        api_port,
+        proxy_port,
+        prefer_ipv6,
+        system_proxy_bypass,
+        tun_options,
+        system_proxy_enabled,
+        tun_enabled,
+        keep_alive,
+    };
+
+    let resolved = resolve_proxy_runtime_state(&app_handle, overrides.clone()).await?;
+    let keep_alive_enabled = overrides.keep_alive.unwrap_or(resolved.auto_start_kernel);
+
+    start_kernel_with_state(app_handle, &resolved, keep_alive_enabled).await
+}
+
+/// 仅应用代理配置，不进行内核重启
+#[tauri::command]
+pub async fn apply_proxy_settings(
+    app_handle: AppHandle,
+    system_proxy_enabled: Option<bool>,
+    tun_enabled: Option<bool>,
+) -> Result<serde_json::Value, String> {
+    let overrides = ProxyOverrides {
+        system_proxy_enabled,
+        tun_enabled,
+        ..Default::default()
+    };
+
+    let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
+
+    if let Err(e) = apply_proxy_runtime_state(&resolved.proxy) {
+        return Ok(json!({
+            "success": false,
+            "message": format!("应用代理配置失败: {}", e)
+        }));
     }
+
+    if let Err(e) = update_dns_strategy(resolved.prefer_ipv6) {
+        warn!("更新DNS策略失败: {}", e);
+    }
+
+    Ok(json!({
+        "success": true,
+        "mode": resolved.derived_mode(),
+        "system_proxy_enabled": resolved.proxy.system_proxy_enabled,
+        "tun_enabled": resolved.proxy.tun_enabled
+    }))
 }
 
 /// 重构版本的停止命令 - 增强版
@@ -2186,6 +2300,8 @@ struct AutoManageOptions {
     prefer_ipv6: Option<bool>,
     system_proxy_bypass: Option<String>,
     tun_options: Option<TunProxyOptions>,
+    system_proxy_enabled: Option<bool>,
+    tun_enabled: Option<bool>,
     keep_alive: Option<bool>,
     force_restart: bool,
 }
@@ -2208,8 +2324,24 @@ impl AutoManageOptions {
                 enable_ipv6: config.tun_enable_ipv6,
                 interface_name: None,
             }),
+            system_proxy_enabled: Some(config.system_proxy_enabled),
+            tun_enabled: Some(config.tun_enabled),
             keep_alive: Some(config.auto_start_kernel),
             force_restart: false,
+        }
+    }
+
+    fn to_overrides(&self) -> ProxyOverrides {
+        ProxyOverrides {
+            proxy_mode: self.proxy_mode.clone(),
+            api_port: self.api_port,
+            proxy_port: self.proxy_port,
+            prefer_ipv6: self.prefer_ipv6,
+            system_proxy_bypass: self.system_proxy_bypass.clone(),
+            tun_options: self.tun_options.clone(),
+            system_proxy_enabled: self.system_proxy_enabled,
+            tun_enabled: self.tun_enabled,
+            keep_alive: self.keep_alive,
         }
     }
 }
@@ -2311,6 +2443,12 @@ async fn auto_manage_kernel_internal(
     app_handle: AppHandle,
     options: AutoManageOptions,
 ) -> Result<AutoManageResult, String> {
+    let resolved_state = resolve_proxy_runtime_state(&app_handle, options.to_overrides()).await?;
+    let keep_alive_enabled = options
+        .keep_alive
+        .unwrap_or(resolved_state.auto_start_kernel);
+    let api_port = resolved_state.api_port;
+
     let kernel_installed = kernel_binary_exists();
     if !kernel_installed {
         return Ok(AutoManageResult::missing_kernel());
@@ -2326,8 +2464,10 @@ async fn auto_manage_kernel_internal(
     }
 
     let mut _attempted_start = false;
-    let keep_alive_enabled = options.keep_alive.unwrap_or(true);
-    let api_port = options.api_port.unwrap_or(12081);
+
+    if let Err(e) = apply_proxy_runtime_state(&resolved_state.proxy) {
+        warn!("自动管理应用代理配置失败: {}", e);
+    }
 
     let mut running = is_kernel_running().await.unwrap_or(false);
     if options.force_restart && running {
@@ -2339,17 +2479,9 @@ async fn auto_manage_kernel_internal(
 
     if !running {
         _attempted_start = true;
-        let start_response = kernel_start_enhanced(
-            app_handle.clone(),
-            options.proxy_mode.clone(),
-            Some(api_port),
-            options.proxy_port,
-            options.prefer_ipv6,
-            options.system_proxy_bypass.clone(),
-            options.tun_options.clone(),
-            Some(keep_alive_enabled),
-        )
-        .await?;
+        let start_response =
+            start_kernel_with_state(app_handle.clone(), &resolved_state, keep_alive_enabled)
+                .await?;
 
         let success = start_response
             .get("success")
@@ -2434,6 +2566,8 @@ pub async fn kernel_auto_manage(
     system_proxy_bypass: Option<String>,
     tun_options: Option<TunProxyOptions>,
     keep_alive: Option<bool>,
+    system_proxy_enabled: Option<bool>,
+    tun_enabled: Option<bool>,
     force_restart: Option<bool>,
 ) -> Result<serde_json::Value, String> {
     let options = AutoManageOptions {
@@ -2444,6 +2578,8 @@ pub async fn kernel_auto_manage(
         system_proxy_bypass,
         tun_options,
         keep_alive,
+        system_proxy_enabled,
+        tun_enabled,
         force_restart: force_restart.unwrap_or(false),
     };
 

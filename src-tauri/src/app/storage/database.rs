@@ -46,6 +46,8 @@ impl DatabaseService {
                 proxy_port INTEGER DEFAULT 12080,
                 api_port INTEGER DEFAULT 12081,
                 proxy_mode TEXT DEFAULT 'manual',
+                system_proxy_enabled BOOLEAN DEFAULT FALSE,
+                tun_enabled BOOLEAN DEFAULT FALSE,
                 tray_instance_id TEXT,
                 system_proxy_bypass TEXT DEFAULT 'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*',
                 tun_auto_route BOOLEAN DEFAULT TRUE,
@@ -74,6 +76,8 @@ impl DatabaseService {
             "ALTER TABLE app_config ADD COLUMN tun_ipv6 TEXT DEFAULT 'fdfe:dcba:9876::1/126'",
             "ALTER TABLE app_config ADD COLUMN tun_stack TEXT DEFAULT 'mixed'",
             "ALTER TABLE app_config ADD COLUMN tun_enable_ipv6 BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN system_proxy_enabled BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE app_config ADD COLUMN tun_enabled BOOLEAN DEFAULT FALSE",
         ];
 
         for statement in alter_statements {
@@ -173,6 +177,12 @@ impl DatabaseService {
                 proxy_port: row.get("proxy_port"),
                 api_port: row.get("api_port"),
                 proxy_mode: row.get("proxy_mode"),
+                system_proxy_enabled: row
+                    .try_get("system_proxy_enabled")
+                    .unwrap_or(default_config.system_proxy_enabled),
+                tun_enabled: row
+                    .try_get("tun_enabled")
+                    .unwrap_or(default_config.tun_enabled),
                 tray_instance_id: row.get("tray_instance_id"),
                 system_proxy_bypass: row
                     .try_get("system_proxy_bypass")
@@ -206,8 +216,8 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO app_config
-            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_start_kernel)
@@ -216,6 +226,8 @@ impl DatabaseService {
         .bind(config.proxy_port)
         .bind(config.api_port)
         .bind(&config.proxy_mode)
+        .bind(config.system_proxy_enabled)
+        .bind(config.tun_enabled)
         .bind(&config.tray_instance_id)
         .bind(&config.system_proxy_bypass)
         .bind(config.tun_auto_route)

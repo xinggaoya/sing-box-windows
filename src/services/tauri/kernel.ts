@@ -18,6 +18,8 @@ export interface KernelStartConfig {
   auto_start: boolean
   system_proxy_bypass: string
   tun: TunSettings
+  system_proxy_enabled?: boolean
+  tun_enabled?: boolean
 }
 
 export interface KernelStartOptions {
@@ -68,6 +70,14 @@ export const kernelApi = {
         args.proxyPort = options.config.proxy_port
       }
 
+      if (typeof options.config?.system_proxy_enabled === 'boolean') {
+        args.system_proxy_enabled = options.config.system_proxy_enabled
+      }
+
+      if (typeof options.config?.tun_enabled === 'boolean') {
+        args.tun_enabled = options.config.tun_enabled
+      }
+
       if (options.keepAlive !== undefined) {
         args.keep_alive = options.keepAlive
         args.keepAlive = options.keepAlive
@@ -95,6 +105,15 @@ export const kernelApi = {
       if (options.forceRestart !== undefined) {
         args.force_restart = options.forceRestart
         args.forceRestart = options.forceRestart
+      }
+
+      if (options.config) {
+        if (typeof options.config.system_proxy_enabled === 'boolean') {
+          args.system_proxy_enabled = options.config.system_proxy_enabled
+        }
+        if (typeof options.config.tun_enabled === 'boolean') {
+          args.tun_enabled = options.config.tun_enabled
+        }
       }
 
       return invokeWithAppContext<KernelAutoManageResult>(
@@ -137,34 +156,37 @@ export const kernelApi = {
   },
 
   switchProxyMode(mode: 'system' | 'tun' | 'manual') {
-    const command =
-      mode === 'system' ? 'set_system_proxy' : mode === 'tun' ? 'set_tun_proxy' : 'set_manual_proxy'
+    const overrides: Record<string, boolean> = {}
+    if (mode === 'system') {
+      overrides.system_proxy_enabled = true
+      overrides.tun_enabled = false
+    } else if (mode === 'tun') {
+      overrides.system_proxy_enabled = false
+      overrides.tun_enabled = true
+    } else {
+      overrides.system_proxy_enabled = false
+      overrides.tun_enabled = false
+    }
 
-    return withAppStore(async store => {
-      await store.waitForDataRestore()
-      const args: Record<string, unknown> = {}
+    return invokeWithAppContext<string | void>(
+      'apply_proxy_settings',
+      overrides
+    )
+  },
 
-      if (mode === 'system') {
-        args.systemProxyBypass = store.systemProxyBypass
-        args.system_proxy_bypass = store.systemProxyBypass
-      } else if (mode === 'tun') {
-        const tunOptions = {
-          ipv4_address: store.tunIpv4,
-          ipv6_address: store.tunIpv6,
-          mtu: store.tunMtu,
-          auto_route: store.tunAutoRoute,
-          strict_route: store.tunStrictRoute,
-          stack: store.tunStack as 'system' | 'gvisor' | 'mixed',
-          enable_ipv6: store.tunEnableIpv6,
-        }
-        args.tunOptions = tunOptions
-        args.tun_options = tunOptions
-      }
+  applyProxySettings(options?: { system_proxy_enabled?: boolean; tun_enabled?: boolean }) {
+    const args: Record<string, unknown> = {}
+    if (typeof options?.system_proxy_enabled === 'boolean') {
+      args.system_proxy_enabled = options.system_proxy_enabled
+    }
+    if (typeof options?.tun_enabled === 'boolean') {
+      args.tun_enabled = options.tun_enabled
+    }
 
-      return invokeWithAppContext<string | void>(command, args, {
-        withProxyPort: 'port',
-      })
-    })
+    return invokeWithAppContext<{ success: boolean; mode: string }>(
+      'apply_proxy_settings',
+      Object.keys(args).length ? args : undefined
+    )
   },
 
   switchNodeProxyMode(mode: 'global' | 'rule') {

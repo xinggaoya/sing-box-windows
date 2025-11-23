@@ -180,7 +180,6 @@ import { useThemeStore } from '@/stores/app/ThemeStore'
 import { kernelApi } from '@/services/tauri'
 import StatusCard from '@/components/common/StatusCard.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
-import type { ProxyMode } from '@/stores/app/AppStore'
 import { useKernelStatus } from '@/composables/useKernelStatus'
 
 defineOptions({
@@ -255,10 +254,13 @@ const toggleSystemProxy = async (value: boolean) => {
   try {
     modeSwitchPending.value = true
     await appStore.toggleSystemProxy(value)
-    
-    // 切换系统代理不需要重启内核，直接调用后端API
-    await kernelStore.switchProxyMode(appStore.proxyMode)
-    message.success(t('notification.proxyModeChanged'))
+
+    const success = await kernelStore.applyProxySettings()
+    if (success) {
+      message.success(t('notification.proxyModeChanged'))
+    } else {
+      message.error(kernelStore.lastError || t('notification.proxyModeChangeFailed'))
+    }
   } catch (error) {
     message.error(t('notification.proxyModeChangeFailed'))
   } finally {
@@ -310,6 +312,13 @@ const enableTunWithKernelRestart = async () => {
     modeSwitchPending.value = true
     await appStore.toggleTun(true)
 
+    const applied = await kernelStore.applyProxySettings()
+    if (!applied) {
+      await appStore.toggleTun(false)
+      message.error(t('notification.proxyModeChangeFailed'))
+      return false
+    }
+
     const success = await kernelStore.restartKernel()
     if (success) {
       message.success(t('notification.proxyModeChanged'))
@@ -345,6 +354,13 @@ const toggleTunProxy = async (value: boolean) => {
     try {
       modeSwitchPending.value = true
       await appStore.toggleTun(false)
+
+      const applied = await kernelStore.applyProxySettings()
+      if (!applied) {
+        await appStore.toggleTun(true)
+        message.error(t('notification.proxyModeChangeFailed'))
+        return
+      }
       
       // TUN模式切换需要重启内核
       const success = await kernelStore.restartKernel()
@@ -394,6 +410,12 @@ const prepareTunModeWithAdminRestart = async () => {
   try {
     // 保存TUN启用状态
     await appStore.toggleTun(true)
+    const applied = await kernelStore.applyProxySettings()
+    if (!applied) {
+      await appStore.toggleTun(false)
+      message.error(t('notification.proxyModeChangeFailed'))
+      return false
+    }
     await appStore.saveToBackend()
 
     // 停止内核
