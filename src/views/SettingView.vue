@@ -292,8 +292,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
-import { useMessage, useDialog } from 'naive-ui'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
+import { useMessage } from 'naive-ui'
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useAppStore } from '@/stores/app/AppStore'
@@ -313,6 +313,7 @@ import {
   OptionsOutline,
 } from '@vicons/ionicons5'
 import { tauriApi } from '@/services/tauri'
+import { eventService } from '@/services/event-service'
 import { supportedLocales } from '@/locales'
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -351,6 +352,11 @@ const proxyAdvancedForm = reactive({
 
 const hasNewVersion = computed(() => false) // Placeholder logic
 const downloadError = ref('')
+type KernelDownloadPayload = {
+  status?: 'downloading' | 'extracting' | 'completed' | 'error'
+  progress?: number
+  message?: string
+}
 
 const languageOptions = computed(() => [
   { label: t('setting.language.auto'), value: 'auto' },
@@ -362,6 +368,8 @@ const tunStackOptions = [
   { label: 'System', value: 'system' },
   { label: 'Mixed', value: 'mixed' },
 ]
+
+let downloadListener: (() => void) | null = null
 
 // Methods
 const formatVersion = (version: string) => {
@@ -414,18 +422,70 @@ const onIpVersionChange = async (value: boolean) => {
   }
 }
 
+const cleanupDownloadListener = () => {
+  if (downloadListener) {
+    downloadListener()
+    downloadListener = null
+  }
+}
+
 const downloadTheKernel = async () => {
+  if (downloading.value) return
+  let downloadCompleted = false
   loading.value = true
   downloading.value = true
+  downloadProgress.value = 0
+  downloadMessage.value = t('setting.kernel.preparingDownload')
+  downloadError.value = ''
+
+  // 监听后端推送的下载进度，实时刷新 UI
+  cleanupDownloadListener()
+  downloadListener = await eventService.on('kernel-download-progress', (payload) => {
+    const data = payload as KernelDownloadPayload
+    if (typeof data.progress === 'number') {
+      downloadProgress.value = Math.min(100, Math.max(0, data.progress))
+    }
+    if (data.message) {
+      downloadMessage.value = data.message
+    }
+
+    if (data.status === 'completed') {
+      downloadCompleted = true
+      downloading.value = false
+      loading.value = false
+      message.success(t('setting.kernel.downloadSuccess'))
+      kernelStore.checkKernelInstallation()
+      cleanupDownloadListener()
+    } else if (data.status === 'error') {
+      downloading.value = false
+      loading.value = false
+      downloadError.value = data.message || t('setting.kernel.downloadFailed')
+      message.error(downloadError.value)
+      cleanupDownloadListener()
+    } else {
+      downloadMessage.value ||= t('setting.kernel.downloadingDescription')
+    }
+  })
+
   try {
-    // Mock download logic
-    await new Promise(r => setTimeout(r, 2000))
-    message.success(t('setting.kernel.downloadSuccess'))
+    await tauriApi.downloadLatestKernel()
+    // 如果后端未推送完成事件，也主动校验一次安装结果
+    if (!downloadCompleted) {
+      await kernelStore.checkKernelInstallation()
+    }
   } catch (e) {
-    message.error(t('setting.kernel.downloadFailed'))
-  } finally {
-    loading.value = false
+    console.error('下载内核失败:', e)
+    downloadError.value = e instanceof Error ? e.message : t('setting.kernel.downloadFailed')
+    message.error(downloadError.value)
     downloading.value = false
+    loading.value = false
+    cleanupDownloadListener()
+  } finally {
+    // 最终状态由事件驱动更新；若未收到事件则确保按钮可再次点击
+    if (downloading.value) {
+      loading.value = false
+      downloading.value = false
+    }
   }
 }
 
@@ -492,6 +552,10 @@ const savePortSettings = async () => {
 onMounted(async () => {
   autoStart.value = await isEnabled()
   await kernelStore.checkKernelInstallation()
+})
+
+onUnmounted(() => {
+  cleanupDownloadListener()
 })
 </script>
 
