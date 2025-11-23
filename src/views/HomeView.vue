@@ -160,7 +160,7 @@
 <script lang="ts" setup>
 import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useDialog, useMessage } from 'naive-ui'
+import { useDialog, useMessage, type DialogReactive } from 'naive-ui'
 import {
   PowerOutline,
   ShieldCheckmarkOutline,
@@ -267,48 +267,79 @@ const toggleSystemProxy = async (value: boolean) => {
 }
 
 const confirmTunSwitch = () => {
+  let dialogReactive: DialogReactive | null = null
+  let resolved = false
+
   return new Promise<boolean>((resolve) => {
-    dialog.warning({
+    const finish = (result: boolean) => {
+      if (resolved) return
+      resolved = true
+      resolve(result)
+    }
+
+    const handlePositiveClick = async () => {
+      modeSwitchPending.value = true
+      if (dialogReactive) dialogReactive.loading = true // 显示加载条，提示正在以管理员方式重启
+
+      try {
+        // 非管理员场景下先准备好配置并请求以管理员重启
+        const success = await prepareTunModeWithAdminRestart()
+        finish(success)
+        return success
+      } finally {
+        modeSwitchPending.value = false
+        if (dialogReactive) dialogReactive.loading = false
+      }
+    }
+
+    dialogReactive = dialog.warning({
       title: t('home.tunConfirm.title'),
       content: t('home.tunConfirm.description'),
       positiveText: t('home.tunConfirm.confirm'),
       negativeText: t('common.cancel'),
       maskClosable: false,
-      onPositiveClick: async () => {
-        modeSwitchPending.value = true
-        try {
-          if (!isAdmin.value) {
-            // 不是管理员，保存TUN状态并重启为管理员
-            const success = await prepareTunModeWithAdminRestart()
-            resolve(success)
-          } else {
-            // 是管理员，启用TUN并重启内核
-            await appStore.toggleTun(true)
-            const success = await kernelStore.restartKernel()
-            if (success) {
-              message.success(t('notification.proxyModeChanged'))
-              resolve(true)
-            } else {
-              await appStore.toggleTun(false)
-              message.error(t('home.restartFailed'))
-              resolve(false)
-            }
-          }
-        } finally {
-          modeSwitchPending.value = false
-        }
-      },
-      onNegativeClick: () => resolve(false),
+      onPositiveClick: handlePositiveClick,
+      onNegativeClick: () => finish(false),
+      onClose: () => finish(false),
     })
   })
+}
+
+const enableTunWithKernelRestart = async () => {
+  try {
+    modeSwitchPending.value = true
+    await appStore.toggleTun(true)
+
+    const success = await kernelStore.restartKernel()
+    if (success) {
+      message.success(t('notification.proxyModeChanged'))
+      return true
+    }
+
+    await appStore.toggleTun(false)
+    message.error(t('home.restartFailed'))
+    return false
+  } catch (error) {
+    await appStore.toggleTun(false)
+    message.error(t('notification.proxyModeChangeFailed'))
+    return false
+  } finally {
+    modeSwitchPending.value = false
+  }
 }
 
 const toggleTunProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
   
   if (value) {
-    // 启用TUN模式
-    await confirmTunSwitch()
+    // 启用TUN模式前先刷新管理员状态，有权限时不弹窗直接处理
+    await checkAdmin()
+
+    if (isAdmin.value) {
+      await enableTunWithKernelRestart()
+    } else {
+      await confirmTunSwitch()
+    }
   } else {
     // 禁用TUN模式 - 需要重启内核
     try {
