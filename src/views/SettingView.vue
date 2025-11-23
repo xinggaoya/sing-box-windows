@@ -292,9 +292,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useMessage } from 'naive-ui'
-import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useUpdateStore } from '@/stores/app/UpdateStore'
@@ -380,9 +379,8 @@ const formatVersion = (version: string) => {
 
 const onAutoStartChange = async (value: boolean) => {
   try {
-    if (value) await enable()
-    else await disable()
-    autoStart.value = await isEnabled()
+    await appStore.toggleAutoStart(value)
+    autoStart.value = value
   } catch (e) {
     message.error(t('setting.autoStart.error'))
     autoStart.value = !value
@@ -550,7 +548,16 @@ const savePortSettings = async () => {
 }
 
 onMounted(async () => {
-  autoStart.value = await isEnabled()
+  await appStore.waitForDataRestore()
+  await appStore.syncAutoStartWithSystem()
+  autoStart.value = appStore.autoStartApp
+  watch(
+    () => appStore.autoStartApp,
+    (enabled) => {
+      autoStart.value = enabled
+    },
+    { immediate: false },
+  )
   await kernelStore.checkKernelInstallation()
 })
 
