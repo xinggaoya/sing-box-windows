@@ -396,8 +396,22 @@ const handleChangeLanguage = async (value: string) => {
   locale.value = localeStore.currentLocale
 }
 
-const onIpVersionChange = () => {
-  appStore.saveToBackend()
+const onIpVersionChange = async (value: boolean) => {
+  try {
+    // 先更新偏好并持久化，保证后端读取到最新配置
+    await appStore.setPreferIpv6(value)
+    await appStore.saveToBackend()
+
+    const toggled = await kernelStore.toggleIpVersion(value)
+    if (!toggled) {
+      throw new Error(kernelStore.lastError || '切换IP版本失败')
+    }
+
+    message.success(t('common.saveSuccess'))
+  } catch (error) {
+    console.error('切换IPv6优先失败:', error)
+    message.error(t('notification.proxyModeChangeFailed'))
+  }
 }
 
 const downloadTheKernel = async () => {

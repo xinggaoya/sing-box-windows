@@ -6,7 +6,6 @@ use crate::utils::config_util::ConfigUtil;
 use crate::utils::http_client;
 use crate::utils::proxy_util::{disable_system_proxy, enable_system_proxy, DEFAULT_BYPASS_LIST};
 use serde_json::{json, Value};
-use std::error::Error;
 use std::fs;
 use std::time::Duration;
 use tauri::{Emitter, Runtime};
@@ -35,7 +34,8 @@ impl ProxyRuntimeState {
 
 fn build_inbounds_for_state(state: &ProxyRuntimeState) -> Vec<config_model::Inbound> {
     if state.tun_enabled {
-        let mut inbounds = TunProfile::from_options(&state.tun_options).to_inbounds(state.proxy_port);
+        let mut inbounds =
+            TunProfile::from_options(&state.tun_options).to_inbounds(state.proxy_port);
         if let Some(mixed) = inbounds.get_mut(0) {
             mixed.listen = Some(network_config::DEFAULT_CLASH_API_ADDRESS.to_string());
             mixed.set_system_proxy = Some(state.system_proxy_enabled);
@@ -96,8 +96,7 @@ pub fn apply_proxy_runtime_state(state: &ProxyRuntimeState) -> Result<(), String
         .map_err(|e| format!("设置系统代理失败: {}", e))?;
         info!(
             "系统代理已启用，端口 {}，绕过列表: {}",
-            state.proxy_port,
-            normalized_bypass
+            state.proxy_port, normalized_bypass
         );
     } else if let Err(err) = disable_system_proxy() {
         warn!("关闭系统代理失败: {}", err);
@@ -113,8 +112,7 @@ pub fn set_system_proxy(port: u16, system_proxy_bypass: Option<String>) -> Resul
         proxy_port: port,
         system_proxy_enabled: true,
         tun_enabled: false,
-        system_proxy_bypass: system_proxy_bypass
-            .unwrap_or_else(|| DEFAULT_BYPASS_LIST.to_string()),
+        system_proxy_bypass: system_proxy_bypass.unwrap_or_else(|| DEFAULT_BYPASS_LIST.to_string()),
         tun_options: TunProxyOptions::default(),
     };
     apply_proxy_runtime_state(&runtime_state)
@@ -159,16 +157,48 @@ pub fn update_dns_strategy(prefer_ipv6: bool) -> Result<(), String> {
         "ipv4_only"
     };
 
-    let dns_object = config
+    // 兼容不同用户的配置：如果没有 dns 区块则补充一个基础结构
+    let dns_object = if let Some(obj) = config
         .as_object_mut()
         .and_then(|obj| obj.get_mut("dns"))
         .and_then(|dns| dns.as_object_mut())
-        .ok_or_else(|| "配置文件缺少DNS配置".to_string())?;
+    {
+        obj
+    } else {
+        let dns_value = json!({
+            "servers": [],
+            "strategy": strategy_value
+        });
+        config
+            .as_object_mut()
+            .ok_or_else(|| "配置文件结构异常，无法写入DNS配置".to_string())?
+            .insert("dns".to_string(), dns_value);
+        config
+            .as_object_mut()
+            .and_then(|obj| obj.get_mut("dns"))
+            .and_then(|dns| dns.as_object_mut())
+            .ok_or_else(|| "创建DNS配置失败".to_string())?
+    };
 
     dns_object.insert(
         "strategy".to_string(),
         Value::String(strategy_value.to_string()),
     );
+
+    // 同步更新所有 DNS 服务器的 strategy，确保优先级实时生效
+    if let Some(servers) = dns_object.get_mut("servers").and_then(|s| s.as_array_mut()) {
+        for server in servers.iter_mut() {
+            if let Some(server_obj) = server.as_object_mut() {
+                // 只在存在 address 的条目上更新，避免污染特殊类型（如 rcode）
+                if server_obj.get("address").is_some() {
+                    server_obj.insert(
+                        "strategy".to_string(),
+                        Value::String(strategy_value.to_string()),
+                    );
+                }
+            }
+        }
+    }
 
     let serialized =
         serde_json::to_string_pretty(&config).map_err(|e| format!("序列化配置失败: {}", e))?;

@@ -171,6 +171,20 @@ export const useKernelStore = defineStore('kernel', () => {
     }
   }
 
+  const toggleIpVersion = async (preferIpv6: boolean) => {
+    try {
+      const result = await kernelService.toggleIpVersion(preferIpv6)
+      if (!result.success) {
+        lastError.value = result.message
+        return false
+      }
+      return true
+    } catch (error) {
+      lastError.value = error instanceof Error ? error.message : '切换IP版本失败'
+      return false
+    }
+  }
+
   const checkKernelInstallation = async () => {
     try {
       const version = await kernelService.getKernelVersion()
@@ -227,6 +241,7 @@ export const useKernelStore = defineStore('kernel', () => {
     forceStopAndExit,
     switchProxyMode,
     applyProxySettings,
+    toggleIpVersion,
     checkKernelInstallation,
     hasVersionInfo,
     getVersionString,
