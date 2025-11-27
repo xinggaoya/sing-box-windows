@@ -378,6 +378,7 @@ import {
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore } from '@/stores'
+import type { Locale } from '@/stores/app/LocaleStore'
 import { systemService } from '@/services/system-service'
 import { eventService } from '@/services/event-service'
 import { supportedLocales } from '@/locales'
@@ -420,11 +421,13 @@ const proxyAdvancedForm = reactive({
 })
 
 // Options
-const languageOptions = supportedLocales.map((item) => ({
-  label: item.name,
-  value: item.code,
-}))
-languageOptions.unshift({ label: t('setting.language.auto'), value: 'auto' })
+const languageOptions: { label: string; value: Locale }[] = [
+  { label: t('setting.language.auto'), value: 'auto' },
+  ...supportedLocales.map((item) => ({
+    label: item.name,
+    value: item.code as Locale,
+  })),
+]
 
 const tunStackOptions = [
   { label: 'System', value: 'system' },
