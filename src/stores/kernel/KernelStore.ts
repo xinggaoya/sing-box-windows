@@ -37,8 +37,9 @@ export const useKernelStore = defineStore('kernel', () => {
     try {
       const latest = await kernelService.getKernelStatus()
 
-      // 如果在请求期间收到了事件更新，且状态不一致，优先信任事件（因为它通常更新）
-      if (lastEventTime > startTime && latest.process_running !== status.value.process_running) {
+      // 如果在请求期间收到了事件更新，优先信任事件（因为它通常更新）
+      // 只要有新事件到来，就认为主动查询的结果可能已经过时，特别是当涉及 api_ready 等状态变化时
+      if (lastEventTime > startTime) {
         console.log('⚠️ 忽略过期的状态刷新，因为已收到更新的事件')
         return status.value
       }
@@ -64,19 +65,8 @@ export const useKernelStore = defineStore('kernel', () => {
     // 2. 获取当前状态
     await refreshStatus()
 
-    // 3. 如果当前状态是停止，但可能正在自动启动中，进行短时间的轮询检查
-    if (!status.value.process_running) {
-      let checkCount = 0
-      const maxChecks = 5
-      const intervalId = setInterval(async () => {
-        checkCount++
-        if (checkCount > maxChecks || status.value.process_running) {
-          clearInterval(intervalId)
-          return
-        }
-        await refreshStatus()
-      }, 1000)
-    }
+    // 3. 移除主动轮询，完全依赖后端事件推送
+    // 用户反馈：直接选用推送即可，无需主动定时查询
   }
 
   const restartKernel = async () => {
@@ -88,7 +78,7 @@ export const useKernelStore = defineStore('kernel', () => {
         lastError.value = result.message
         return false
       }
-      await refreshStatus()
+      // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : '内核重启失败'
@@ -105,7 +95,7 @@ export const useKernelStore = defineStore('kernel', () => {
         lastError.value = result.message
         return false
       }
-      await refreshStatus()
+      // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : '内核停止失败'
@@ -148,7 +138,7 @@ export const useKernelStore = defineStore('kernel', () => {
         lastError.value = result.message
         return false
       }
-      await refreshStatus()
+      // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : '切换代理模式失败'
@@ -163,7 +153,7 @@ export const useKernelStore = defineStore('kernel', () => {
         lastError.value = result.message
         return false
       }
-      await refreshStatus()
+      // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : '应用代理配置失败'

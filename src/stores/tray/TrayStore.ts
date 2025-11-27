@@ -196,7 +196,7 @@ export const useTrayStore = defineStore('tray', () => {
       if (!success) {
         throw new Error(kernelStore.lastError || '代理模式切换失败')
       }
-      await kernelStore.refreshStatus()
+      // kernelStore.switchProxyMode 内部会处理状态更新（或通过事件），无需再次手动刷新
     } catch (error) {
       console.error('托盘切换代理模式失败:', error)
       // 恢复之前的状态
