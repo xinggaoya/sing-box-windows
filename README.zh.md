@@ -71,104 +71,26 @@ Sing-Box GUI 客户端是一款尖端的跨平台应用程序（支持 Windows�
 
 ---
 
-## 🚀 安装指南
+## 🚀 安装
 
-### 📥 系统要求
+从 [GitHub Releases](https://github.com/xinggaoya/sing-box-windows/releases) 下载对应平台的安装包：
 
-#### Windows
-- **操作系统**: Windows 10/11 (x64)
-- **内存**: 最低 4GB RAM (推荐 8GB)
-- **存储空间**: 100MB 可用磁盘空间
-- **网络**: 订阅和更新需要网络连接
+- **Windows**: `.exe` 安装程序
+- **Linux**: `.deb` 包或 `.AppImage` 便携版
+- **macOS**: `.dmg` 镜像文件或 `.app` 压缩包
 
-#### Linux
-- **操作系统**: Ubuntu 20.04+, Fedora 36+, Debian 11+, 或等效发行版
-- **内存**: 最低 4GB RAM (推荐 8GB)
-- **存储空间**: 100MB 可用磁盘空间
-- **网络**: 订阅和更新需要网络连接
-- **依赖**: libwebkit2gtk-4.1-0, libssl3, libgtk-3-0（使用 .deb 包时自动安装）
-
-### 🎯 安装方式
-
-#### 方式一：下载安装包（推荐）
-
-**Windows:**
-1. 访问 [发布页面](https://github.com/xinggaoya/sing-box-windows/releases)
-2. 下载最新的 `sing-box-windows-x.x.x-setup.exe`
-3. 运行安装程序并按照向导操作
-4. 从开始菜单或桌面快捷方式启动应用
-
-**Linux (.deb - Debian/Ubuntu):**
-1. 访问 [发布页面](https://github.com/xinggaoya/sing-box-windows/releases)
-2. 下载最新的 `sing-box-windows_x.x.x_amd64.deb`
-3. 使用命令安装：`sudo dpkg -i sing-box-windows_x.x.x_amd64.deb`
-4. 如果缺少依赖，运行：`sudo apt-get install -f`
-5. 从应用程序菜单启动或运行 `sing-box-windows`
-
-**Linux (.AppImage - 通用版):**
-1. 访问 [发布页面](https://github.com/xinggaoya/sing-box-windows/releases)
-2. 下载最新的 `sing-box-windows-x.x.x.AppImage`
-3. 添加执行权限：`chmod +x sing-box-windows-x.x.x.AppImage`
-4. 运行：`./sing-box-windows-x.x.x.AppImage`
-
-**Linux (源码编译):**
-1. 克隆仓库：`git clone https://github.com/xinggaoya/sing-box-windows.git`
-2. 安装依赖：
-   ```bash
-   # Ubuntu/Debian
-   sudo apt update
-   sudo apt install build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-   ```
-3. 安装 Node.js 和 Rust（如果尚未安装）
-4. 构建应用：`cd sing-box-windows && pnpm tauri build`
-5. 在 `src-tauri/target/release/` 目录中找到构建好的应用程序
-
-#### 方式二：包管理器
-
-**Windows（即将支持）：**
-```powershell
-# 使用 winget（计划中）
-winget install sing-box-windows
-
-# 使用 Chocolatey（计划中）
-choco install sing-box-windows
-```
-
-**Linux（暂时不可用）：**
-```bash
-# 注意：目前不提供 APT/DNF/Snap 仓库
-# 请使用 GitHub Releases 的预编译二进制文件或从源码编译
-```
+详细安装说明请参考项目文档。
 
 ---
 
 ## 🎯 快速开始
 
-### 1. 初始设置
-安装完成后，应用程序将引导您完成初始设置：
+1. **安装应用**：下载并安装 sing-box-windows
+2. **添加订阅**：在订阅页面添加您的订阅链接
+3. **选择代理**：在代理页面选择节点并设置代理模式
+4. **开始使用**：启用代理，享受网络访问
 
-1. **语言选择**: 选择您偏好的语言
-2. **主题配置**: 选择明亮/暗黑/自动主题
-3. **网络设置**: 配置基本网络设置
-
-### 2. 添加订阅
-1. 导航到 **订阅** 选项卡
-2. 点击 **添加订阅**
-3. 输入您的订阅 URL 和名称
-4. 配置更新设置
-5. 点击 **保存并更新**
-
-### 3. 配置代理
-1. 转到 **代理** 选项卡
-2. 从列表中选择您偏好的服务器
-3. 选择代理模式（全局/规则/直连）
-4. 切换 **连接** 按钮以激活
-
-### 4. 监控连接
-1. 访问 **连接** 选项卡
-2. 查看实时连接统计
-3. 监控带宽使用情况
-4. 过滤和搜索连接
+详细使用教程请参考项目文档。
 
 ---
 
@@ -182,176 +104,46 @@ choco install sing-box-windows
 
 ---
 
-## 🛠️ 开发指南
-
-### 📋 开发环境要求
-
-- **Node.js**: 18+ (推荐使用 [pnpm](https://pnpm.io/))
-- **Rust**: 1.70+ 带有 nightly 工具链
-- **Tauri CLI**: 最新版本
-
-### 🚀 搭建开发环境
-
-1. **克隆仓库**
-   ```bash
-   git clone https://github.com/xinggaoya/sing-box-windows.git
-   cd sing-box-windows
-   ```
-
-2. **安装依赖**
-   ```bash
-   # 安装前端依赖
-   pnpm install
-
-   # 安装 Rust 依赖（自动）
-   ```
-
-3. **启动开发服务器**
-   ```bash
-   # 启动开发模式（热重载）
-   pnpm tauri dev
-   ```
-
-4. **构建生产版本**
-   ```bash
-   # 构建发布版本
-   pnpm tauri build
-   ```
-
-### 🧪 开发命令
+## 🛠️ 开发
 
 ```bash
-# 开发
-pnpm tauri dev          # 启动开发服务器（热重载）
+# 克隆仓库
+git clone https://github.com/xinggaoya/sing-box-windows.git
+cd sing-box-windows
 
-# 构建
-pnpm tauri build        # 构建发布版本
+# 安装依赖
+pnpm install
 
-# 代码质量
-pnpm lint               # 运行 ESLint 和 OXLint 自动修复
-pnpm format             # 使用 Prettier 格式化代码
-pnpm type-check         # TypeScript 类型检查
+# 启动开发模式
+pnpm tauri dev
 
-# 仅前端
-pnpm dev                # 启动 Vite 开发服务器
-pnpm build              # 仅构建前端
+# 构建发布版本
+pnpm tauri build
 ```
 
-### 🏗️ 项目结构
-
-```
-sing-box-windows/
-├── 📁 src/                    # 前端 (Vue 3)
-│   ├── 📁 components/         # 可复用组件
-│   │   ├── 📁 home/          # 仪表板组件
-│   │   ├── 📁 layout/        # 布局组件
-│   │   └── 📁 common/        # 通用 UI 组件
-│   ├── 📁 stores/            # Pinia 状态管理
-│   ├── 📁 services/          # 业务逻辑服务
-│   ├── 📁 utils/             # 工具函数
-│   ├── 📁 locales/           # 国际化
-│   └── 📁 views/             # 页面组件
-├── 📁 src-tauri/             # 后端 (Rust)
-│   ├── 📁 src/
-│   │   ├── 📁 app/           # 应用模块
-│   │   │   ├── 📁 core/      # 核心功能
-│   │   │   ├── 📁 network/   # 网络操作
-│   │   │   └── 📁 system/    # 系统集成
-│   │   └── 📄 main.rs        # 应用入口点
-│   └── 📄 Cargo.toml         # Rust 依赖
-└── 📁 docs/                  # 文档
-```
+详细开发文档请参考项目说明。
 
 ---
 
-## 🔧 配置说明
+## 🔧 存储
 
-### 📄 存储系统
+应用采用 **本地存储** 方案，所有配置和订阅数据都保存在本地：
 
-本应用使用 **Tauri Store 插件** 进行后端数据持久化，提供安全高效的二进制数据库文件存储。
+- **Windows**: `%APPDATA%\sing-box-windows\`
+- **Linux**: `~/.local/share/sing-box-windows/`
+- **macOS**: `~/Library/Application Support/sing-box-windows/`
 
-### 🗄️ 存储位置
-
-- **Windows**: `%APPDATA%\sing-box-windows\*.bin` (二进制数据库文件)
-- **Linux**: `~/.local/share/sing-box-windows/*.bin` (二进制数据库文件)
-- **便携版**: `<应用目录>\*.bin` (二进制数据库文件)
-
-### ⚙️ 配置结构
-
-应用使用 Tauri Store 插件将配置数据存储在结构化的二进制文件中。主要配置区域包括：
-
-#### 应用设置 (`app.bin`)
-```typescript
-{
-  language: "en-US" | "zh-CN" | "ja-JP" | "ru-RU",
-  theme: "light" | "dark" | "auto",
-  proxyMode: "system" | "tun" | "manual",
-  autoStartKernel: boolean,
-  preferIpv6: boolean,
-  proxyPort: number,      // 默认: 12080
-  apiPort: number         // 默认: 12081
-}
-```
-
-#### 主题设置 (`theme.bin`)
-```typescript
-{
-  primaryColor: string,
-  isDark: boolean,
-  followSystem: boolean
-}
-```
-
-#### 订阅数据 (`subscription.bin`)
-```typescript
-{
-  subscriptions: Array<{
-    id: string,
-    name: string,
-    url: string,
-    autoUpdate: boolean,
-    lastUpdate: string
-  }>
-}
-```
-
-### 🔧 数据持久化特性
-
-- **二进制存储**: 使用高效的二进制格式进行快速读写操作
-- **自动同步**: 前端和后端之间的实时数据同步
-- **内存优化**: 针对大数据集的智能缓存和懒加载
-- **数据完整性**: 内置验证和错误恢复机制
-- **跨会话持久化**: 所有设置和数据在应用重启后保持不变
+数据包括应用设置、订阅信息、主题配置等，确保用户隐私和数据安全。
 
 ---
 
-## 🤝 贡献指南
+## 🤝 贡献
 
-我们欢迎社区贡献！以下是如何参与的方式：
+欢迎提交 Issue 和 Pull Request！
 
-### 🎯 贡献方式
-
-1. **🐛 报告问题**: 发现了问题？[提交 issue](https://github.com/xinggaoya/sing-box-windows/issues)
-2. **💡 功能建议**: 有好的想法？[在讨论区提出](https://github.com/xinggaoya/sing-box-windows/discussions)
-3. **🔧 代码贡献**: Fork 并提交 Pull Request
-4. **📖 文档改进**: 帮助完善文档
-5. **🌐 本地化**: 参与 [翻译工作](src/locales/)
-
-### 🚀 开发流程
-
-1. 从 [GitHub](https://github.com/xinggaoya/sing-box-windows) Fork 仓库
-2. 创建功能分支: `git checkout -b feature/amazing-feature`
-3. 进行修改并充分测试
-4. 提交更改: `git commit -m 'Add amazing feature'`
-5. 推送到分支: `git push origin feature/amazing-feature`
-6. 创建 Pull Request
-
-### 📋 代码规范
-
-- **前端**: 遵循 [Vue 3 风格指南](https://vuejs.org/style-guide/)
-- **后端**: 遵循 [Rust API 指南](https://rust-lang.github.io/api-guidelines/)
-- **提交**: 使用 [约定式提交](https://www.conventionalcommits.org/zh-hans/)
-- **代码检查**: 代码需通过 ESLint 和 OXLint 检查
+1. **报告问题**: [提交 Issue](https://github.com/xinggaoya/sing-box-windows/issues)
+2. **功能建议**: [参与讨论](https://github.com/xinggaoya/sing-box-windows/discussions)
+3. **代码贡献**: Fork 并提交 PR
 
 ---
 
@@ -364,10 +156,6 @@ sing-box-windows/
 - [Vite](https://vitejs.dev/) - 快速的构建工具和开发服务器
 
 ---
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
 ---
 
@@ -382,5 +170,9 @@ sing-box-windows/
     <a href="https://github.com/xinggaoya/sing-box-windows/fork">
       <img src="https://img.shields.io/github/forks/xinggaoya/sing-box-windows?style=social" alt="GitHub forks">
     </a>
+  </p>
+  <p style="font-size: 0.85em; color: #666;">
+    <strong>📝 声明：</strong>本项目仅用于学习和交流目的，所有数据均采用本地存储，不会上传到云端。<br>
+    请遵守当地法律法规，合理使用本软件。
   </p>
 </div>
