@@ -124,6 +124,7 @@ export default {
     switchSuccess: '已将代理组 \'{group}\' 切换到 \'{proxy}\'.',
     loadMoreNodes: '加载更多节点',
     loadedCount: '已展示 {loaded}/{total}',
+    clickToTest: '点击测试',
     dashboard: {
       groupTotal: '代理组',
       nodeTotal: '可用节点',

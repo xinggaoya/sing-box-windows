@@ -124,6 +124,7 @@ export default {
     switchSuccess: 'Switched group \'{group}\' to \'{proxy}\'.',
     loadMoreNodes: 'Load more nodes',
     loadedCount: 'Showing {loaded}/{total}',
+    clickToTest: 'Click to test',
     dashboard: {
       groupTotal: 'Groups',
       nodeTotal: 'Nodes',

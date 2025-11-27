@@ -146,6 +146,7 @@ export default {
     switchSuccess: 'グループ「{group}」を「{proxy}」に切り替えました。',
     loadMoreNodes: 'ノードをさらに読み込む',
     loadedCount: '表示中 {loaded}/{total}',
+    clickToTest: 'クリックしてテスト',
     dashboard: {
       groupTotal: 'グループ',
       nodeTotal: 'ノード',

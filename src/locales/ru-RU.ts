@@ -147,6 +147,7 @@ export default {
     switchSuccess: 'Группа \'{group}\' переключена на \'{proxy}\'.',
     loadMoreNodes: 'Загрузить ещё узлы',
     loadedCount: 'Показано {loaded} из {total}',
+    clickToTest: 'Нажмите для теста',
     dashboard: {
       groupTotal: 'Группы',
       nodeTotal: 'Узлы',
