@@ -18,6 +18,7 @@ export const useKernelStore = defineStore('kernel', () => {
   const lastError = ref('')
   const isLoading = ref(false)
   const isKernelInstalled = ref(false)
+  const latestAvailableVersion = ref('')
   let statusUnlisten: (() => void) | null = null
   let lastEventTime = 0
 
@@ -178,9 +179,10 @@ export const useKernelStore = defineStore('kernel', () => {
   const checkKernelInstallation = async () => {
     try {
       const version = await kernelService.getKernelVersion()
-      isKernelInstalled.value = Boolean(version)
-      if (version) {
-        status.value.version = version
+      const cleaned = normalizeKernelVersion(version)
+      isKernelInstalled.value = Boolean(cleaned)
+      if (cleaned) {
+        status.value.version = cleaned
       }
       return isKernelInstalled.value
     } catch (error) {
@@ -190,7 +192,24 @@ export const useKernelStore = defineStore('kernel', () => {
   }
 
   const hasVersionInfo = () => Boolean(status.value.version)
-  const getVersionString = () => status.value.version || ''
+  const getVersionString = () => normalizeKernelVersion(status.value.version || '')
+
+  const fetchLatestKernelVersion = async () => {
+    try {
+      const latest = await kernelService.getLatestKernelVersion()
+      latestAvailableVersion.value = normalizeKernelVersion(latest)
+      return latestAvailableVersion.value
+    } catch (error) {
+      lastError.value = error instanceof Error ? error.message : '获取最新内核版本失败'
+      return ''
+    }
+  }
+
+  const hasKernelUpdate = computed(() => {
+    if (!latestAvailableVersion.value) return false
+    if (!status.value.version) return true
+    return compareVersion(latestAvailableVersion.value, status.value.version) > 0
+  })
 
   const isRunning = computed(() => status.value.process_running)
   const isReady = computed(
@@ -235,5 +254,45 @@ export const useKernelStore = defineStore('kernel', () => {
     checkKernelInstallation,
     hasVersionInfo,
     getVersionString,
+    fetchLatestKernelVersion,
+    hasKernelUpdate,
+    latestAvailableVersion,
   }
 })
+
+// 将后端返回的版本字符串进行裁剪，避免携带多余 JSON 或前缀
+function normalizeKernelVersion(raw: string): string {
+  const input = (raw || '').trim()
+  if (!input) return ''
+
+  try {
+    const parsed = JSON.parse(input) as { version?: string }
+    if (parsed?.version) {
+      return trimPrefix(parsed.version)
+    }
+  } catch {
+    // 非 JSON 格式按字符串处理
+  }
+
+  return trimPrefix(input)
+}
+
+function trimPrefix(version: string): string {
+  let v = version.trim()
+  if (v.toLowerCase().startsWith('sing-box')) {
+    v = v.slice('sing-box'.length).trim()
+  }
+  return v.replace(/^v/, '')
+}
+
+// 简单的语义版本比较：>0 表示 a > b，0 表示相等，<0 表示 a < b
+function compareVersion(a: string, b: string): number {
+  const partsA = trimPrefix(a).split('.').map(n => parseInt(n, 10) || 0)
+  const partsB = trimPrefix(b).split('.').map(n => parseInt(n, 10) || 0)
+  const maxLen = Math.max(partsA.length, partsB.length)
+  for (let i = 0; i < maxLen; i += 1) {
+    const diff = (partsA[i] || 0) - (partsB[i] || 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}

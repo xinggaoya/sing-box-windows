@@ -184,6 +184,17 @@ class KernelService {
     }
   }
 
+  async getLatestKernelVersion(): Promise<string> {
+    try {
+      return await invokeWithAppContext<string>('get_latest_kernel_version_cmd', undefined, {
+        skipDataRestore: true
+      })
+    } catch (error) {
+      console.error('获取最新内核版本失败:', error)
+      return ''
+    }
+  }
+
   /**
    * 切换代理模式
    */

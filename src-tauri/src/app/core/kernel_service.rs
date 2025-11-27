@@ -194,6 +194,66 @@ async fn get_latest_kernel_version() -> Result<String, Box<dyn std::error::Error
     Err("所有 API 源都获取版本失败".into())
 }
 
+// 规范化版本字符串，移除前缀与非版本信息
+fn normalize_version_str(raw: &str) -> String {
+    let mut cleaned = raw.trim();
+    if cleaned.starts_with("sing-box") {
+        cleaned = cleaned.trim_start_matches("sing-box").trim();
+    }
+    if cleaned.is_empty() {
+        return String::new();
+    }
+
+    if let Some(token) = cleaned
+        .split_whitespace()
+        .find(|part| part.chars().all(|c| c.is_ascii_digit() || c == '.' || c == 'v'))
+    {
+        return token.trim_start_matches('v').to_string();
+    }
+
+    cleaned.trim_start_matches('v').to_string()
+}
+
+// 截取 sing-box 输出中的版本号，避免把环境信息等冗余内容返回给前端
+fn extract_clean_version(output: &str) -> String {
+    let trimmed = output.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    // 如果返回的是 JSON 格式（部分发行版会带上 meta/premium 信息），优先解析
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        if let Some(ver) = value.get("version").and_then(|v| v.as_str()) {
+            return normalize_version_str(ver);
+        }
+    }
+
+    if let Some(pos) = trimmed.find("version") {
+        let after_version = trimmed[pos + "version".len()..]
+            .trim_start_matches(|c: char| c == ':' || c.is_whitespace());
+
+        if let Some(token) = after_version.split_whitespace().next() {
+            if !token.is_empty() {
+                return normalize_version_str(token);
+            }
+        }
+    }
+
+    if let Some(token) = trimmed
+        .split_whitespace()
+        .find(|part| part.chars().all(|c| c.is_ascii_digit() || c == '.' || c == 'v'))
+    {
+        return normalize_version_str(token);
+    }
+
+    normalize_version_str(
+        trimmed
+        .split("Environment")
+        .next()
+        .unwrap_or(trimmed),
+    )
+}
+
 // 检查内核版本
 #[tauri::command]
 pub async fn check_kernel_version() -> Result<String, String> {
@@ -220,7 +280,8 @@ pub async fn check_kernel_version() -> Result<String, String> {
     }
 
     let version_info = String::from_utf8_lossy(&output.stdout);
-    Ok(version_info.to_string())
+    let version = extract_clean_version(&version_info);
+    Ok(version)
 }
 
 // 检查配置是否正常
@@ -1154,6 +1215,14 @@ pub async fn stop_kernel() -> Result<String, String> {
     } else {
         Err(messages::ERR_PROCESS_STOP_FAILED.to_string())
     }
+}
+
+// 获取最新内核版本号（提供给前端显示）
+#[tauri::command]
+pub async fn get_latest_kernel_version_cmd() -> Result<String, String> {
+    get_latest_kernel_version()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // 重启内核

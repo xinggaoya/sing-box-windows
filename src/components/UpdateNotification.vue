@@ -21,8 +21,9 @@ const router = useRouter()
 let activeNotification: NotificationReactive | null = null
 
 // 跳转到设置页面
+// 跳转到设置页面（实际路径为 /setting）
 const handleGoToSettings = () => {
-  router.push('/settings')
+  router.push('/setting')
   if (activeNotification) {
     activeNotification.destroy()
     activeNotification = null

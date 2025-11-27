@@ -201,7 +201,7 @@ const setupProgressListener = async () => {
     unlisten = await listen('update-progress', (event: any) => {
       const { status, progress, message: msg } = event.payload
       updateProgress.value = progress
-      progressMessage.value = msg
+      progressMessage.value = status === 'installing' ? t('setting.update.installStarted') : msg
 
       if (status === 'downloading') updateStatus.value = 'downloading'
       else if (status === 'completed') {

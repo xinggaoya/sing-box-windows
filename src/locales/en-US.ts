@@ -330,6 +330,7 @@ export default {
       prereleaseDisabledDesc: 'You will only receive stable version update notifications',
       newVersionFound: 'New version {version} found!',
       downloadStarted: 'Update download started in the background.',
+      installStarted: 'Installer has started, please follow the prompts to finish installation',
       downloadError: 'Update download failed: {error}',
       skipSuccess: 'Successfully skipped this version.',
       skipError: 'Failed to skip version: {error}',

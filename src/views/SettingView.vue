@@ -28,7 +28,13 @@
 
           <div v-if="hasNewVersion || !kernelStore.hasVersionInfo()" class="alert-box warning">
             <n-icon size="18"><WarningOutline /></n-icon>
-            <span>{{ hasNewVersion ? t('setting.newVersionFound') : t('setting.kernel.installPrompt') }}</span>
+            <span>
+              {{
+                hasNewVersion
+                  ? t('setting.update.newVersionFound', { version: kernelLatestVersion || t('setting.newVersionFound') })
+                  : t('setting.kernel.installPrompt')
+              }}
+            </span>
           </div>
 
           <div v-if="downloading" class="download-box">
@@ -217,6 +223,71 @@
             </n-button>
           </div>
 
+          <div v-if="updateStore.hasUpdate" class="update-alert-card">
+            <div class="update-meta">
+              <div class="meta-box">
+                <div class="meta-label">{{ t('setting.update.newVersion') }}</div>
+                <div class="meta-value">v{{ updateStore.latestVersion }}</div>
+              </div>
+              <div class="meta-box">
+                <div class="meta-label">{{ t('setting.update.currentVersion') }}</div>
+                <div class="meta-value">v{{ updateStore.appVersion }}</div>
+              </div>
+            </div>
+
+            <div v-if="updateStore.releaseNotes" class="update-notes-preview">
+              <span class="meta-label">{{ t('setting.update.releaseNotes') }}</span>
+              <div class="notes custom-scrollbar">
+                {{ updateStore.releaseNotes }}
+              </div>
+            </div>
+
+            <div class="update-actions">
+              <n-button
+                type="primary"
+                strong
+                :loading="isUpdating"
+                :disabled="isUpdating"
+                @click="handleUpdateNow"
+              >
+                <template #icon><n-icon><DownloadOutline /></n-icon></template>
+                {{
+                  updateStatus === 'installing'
+                    ? t('setting.update.installing')
+                    : isUpdating
+                      ? t('setting.update.downloading')
+                      : t('setting.update.updateNow')
+                }}
+              </n-button>
+              <n-button
+                size="small"
+                text
+                @click="handleCheckUpdate"
+                :disabled="checkingUpdate || isUpdating"
+              >
+                {{ t('setting.update.checkAgain') }}
+              </n-button>
+            </div>
+
+            <div v-if="showUpdateProgress" class="update-progress">
+              <div class="progress-header">
+                <span class="progress-text">{{ updateMessage || t('setting.update.downloading') }}</span>
+                <span class="progress-value">{{ updateProgress.toFixed(0) }}%</span>
+              </div>
+              <n-progress
+                type="line"
+                :percentage="updateProgress"
+                :processing="updateStatus === 'downloading'"
+                :status="updateStatus === 'error' ? 'error' : 'default'"
+                :show-indicator="false"
+              />
+            </div>
+
+            <div v-else-if="updateStatus === 'error'" class="update-error">
+              {{ updateMessage || t('setting.update.updateFailed') }}
+            </div>
+          </div>
+
           <div class="setting-row">
             <div class="setting-info">
               <div class="setting-label">{{ t('setting.update.autoCheck') }}</div>
@@ -309,6 +380,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore } from '@/stores'
 import { systemService } from '@/services/system-service'
 import { eventService } from '@/services/event-service'
+import { supportedLocales } from '@/locales'
 import type { KernelDownloadPayload } from '@/services/kernel-service'
 import PageHeader from '@/components/common/PageHeader.vue'
 
@@ -326,6 +398,7 @@ const downloadProgress = ref(0)
 const downloadMessage = ref('')
 const downloadError = ref('')
 let downloadListener: (() => void) | null = null
+let updateProgressListener: (() => void) | null = null
 
 const autoStart = ref(false)
 const locale = ref(localeStore.locale)
@@ -341,16 +414,17 @@ const proxyAdvancedForm = reactive({
   systemProxyBypass: '',
   tunMtu: 9000,
   tunStack: 'mixed' as 'system' | 'gvisor' | 'mixed',
-  tunEnableIpv6: true,
+  tunEnableIpv6: false,
   tunAutoRoute: true,
   tunStrictRoute: true
 })
 
 // Options
-const languageOptions = [
-  { label: 'English', value: 'en-US' },
-  { label: '简体中文', value: 'zh-CN' }
-]
+const languageOptions = supportedLocales.map((item) => ({
+  label: item.name,
+  value: item.code,
+}))
+languageOptions.unshift({ label: t('setting.language.auto'), value: 'auto' })
 
 const tunStackOptions = [
   { label: 'System', value: 'system' },
@@ -359,7 +433,15 @@ const tunStackOptions = [
 ]
 
 // Computed
-const hasNewVersion = computed(() => updateStore.hasUpdate)
+const kernelLatestVersion = computed(() => kernelStore.latestAvailableVersion || '')
+const hasNewVersion = computed(() => kernelStore.hasKernelUpdate)
+const updateStatus = computed(() => updateStore.updateState.status)
+const updateProgress = computed(() => updateStore.updateState.progress || 0)
+const updateMessage = computed(() => updateStore.updateState.message)
+const isUpdating = computed(() => ['downloading', 'installing'].includes(updateStatus.value))
+const showUpdateProgress = computed(() =>
+  ['downloading', 'installing', 'completed'].includes(updateStatus.value) || updateProgress.value > 0
+)
 
 // Methods
 const formatVersion = (v: string) => v.replace(/^v/, '')
@@ -392,7 +474,8 @@ const handleChangeLanguage = async (value: string) => {
     return
   }
 
-  await localeStore.setLocale(value as any)
+  const nextLocale = value === 'auto' ? localeStore.locale : value
+  await localeStore.setLocale(nextLocale as any)
   locale.value = localeStore.currentLocale
 }
 
@@ -489,6 +572,22 @@ const checkManualInstall = async () => {
   await kernelStore.checkKernelInstallation()
 }
 
+const handleUpdateNow = async () => {
+  if (!updateStore.hasUpdate) {
+    message.info(t('setting.update.alreadyLatest'))
+    return
+  }
+
+  try {
+    updateStore.updateProgress('downloading', 0, t('setting.update.preparingDownload'))
+    await updateStore.downloadAndInstallUpdate()
+  } catch (error) {
+    console.error('启动更新失败:', error)
+    const errMsg = error instanceof Error ? error.message : t('setting.update.updateFailed')
+    message.error(`${t('setting.update.updateFailed')}: ${errMsg}`)
+  }
+}
+
 const saveProxyAdvancedSettings = async () => {
   savingAdvanced.value = true
   try {
@@ -541,6 +640,36 @@ const savePortSettings = async () => {
   }
 }
 
+// 监听更新下载进度，保持设置页状态与后端事件同步
+const setupUpdateProgressListener = async () => {
+  try {
+    updateProgressListener = await eventService.on('update-progress', (payload) => {
+      const data = payload as { status?: string; progress?: number; message?: string }
+      const progress = typeof data.progress === 'number' ? data.progress : updateProgress.value
+      const status = data.status || updateStatus.value
+      const rawMessage = data.message || ''
+      const localizedMessage = status === 'installing' ? t('setting.update.installStarted') : rawMessage
+
+      updateStore.updateProgress(status, progress, localizedMessage)
+
+      if (status === 'completed') {
+        message.success(t('notification.updateDownloaded'))
+      } else if (status === 'error') {
+        message.error(localizedMessage || t('setting.update.updateFailed'))
+      }
+    })
+  } catch (error) {
+    console.error('监听更新进度失败:', error)
+  }
+}
+
+const cleanupUpdateProgressListener = () => {
+  if (updateProgressListener) {
+    updateProgressListener()
+    updateProgressListener = null
+  }
+}
+
 onMounted(async () => {
   await appStore.waitForDataRestore()
   await appStore.syncAutoStartWithSystem()
@@ -553,10 +682,16 @@ onMounted(async () => {
     { immediate: false },
   )
   await kernelStore.checkKernelInstallation()
+  if (kernelStore.fetchLatestKernelVersion) {
+    await kernelStore.fetchLatestKernelVersion()
+  }
+  await updateStore.initializeStore?.()
+  await setupUpdateProgressListener()
 })
 
 onUnmounted(() => {
   cleanupDownloadListener()
+  cleanupUpdateProgressListener()
 })
 </script>
 
@@ -747,6 +882,90 @@ onUnmounted(() => {
   margin-top: 8px;
   display: flex;
   justify-content: center;
+}
+
+.update-alert-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 182, 212, 0.1));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.update-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.meta-box {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.meta-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+
+.meta-value {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.update-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.update-notes-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-notes-preview .notes {
+  max-height: 120px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.update-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.progress-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.update-error {
+  font-size: 13px;
+  color: #ef4444;
 }
 
 @media (max-width: 768px) {

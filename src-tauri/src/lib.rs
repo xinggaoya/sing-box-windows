@@ -113,6 +113,7 @@ pub fn run() {
             crate::app::core::kernel_service::restart_kernel,
             crate::app::core::kernel_service::download_latest_kernel,
             crate::app::core::kernel_service::install_kernel,
+            crate::app::core::kernel_service::get_latest_kernel_version_cmd,
             crate::app::core::kernel_service::check_kernel_version,
             crate::app::core::kernel_service::start_websocket_relay,
             crate::app::core::kernel_service::is_kernel_running,

@@ -74,7 +74,7 @@ export const useAppStore = defineStore(
     const tunAutoRoute = ref(true)
     const tunStrictRoute = ref(true)
     const tunStack = ref<'system' | 'gvisor' | 'mixed'>('mixed')
-    const tunEnableIpv6 = ref(true)
+    const tunEnableIpv6 = ref(false)
 
     const {
       isDataRestored,

@@ -330,6 +330,7 @@ export default {
       prereleaseDisabledDesc: '您将只接收正式版本的更新通知',
       newVersionFound: '发现新版本 {version}！',
       downloadStarted: '更新已开始在后台下载。',
+      installStarted: '安装程序已启动，请按照提示完成安装',
       downloadError: '更新下载失败: {error}',
       skipSuccess: '已成功跳过此版本。',
       skipError: '跳过版本失败: {error}',

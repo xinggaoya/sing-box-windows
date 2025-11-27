@@ -373,6 +373,7 @@ export default {
       prereleaseDisabledDesc: '安定版の更新通知のみを受信します',
       newVersionFound: '新しいバージョン {version} が見つかりました！',
       downloadStarted: 'アップデートのダウンロードがバックグラウンドで開始されました。',
+      installStarted: 'インストーラーが起動しました。案内に従ってインストールを完了してください',
       downloadError: 'アップデートのダウンロードに失敗しました: {error}',
       skipSuccess: 'このバージョンを正常にスキップしました。',
       skipError: 'バージョンのスキップに失敗しました: {error}',
