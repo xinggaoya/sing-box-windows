@@ -98,7 +98,7 @@ fn disable_system_proxy_linux() -> io::Result<()> {
     std::env::remove_var("no_proxy");
     std::env::remove_var("NO_PROXY");
 
-    // 尝试使用gsettings重置代理设置 (如果可用)
+    // 尝试使用gsettings重置代理设置 (GNOME/Unity/XFCE等)
     if let Ok(_) = std::process::Command::new("which")
         .arg("gsettings")
         .output()
@@ -118,6 +118,25 @@ fn disable_system_proxy_linux() -> io::Result<()> {
         let _ = std::process::Command::new("gsettings")
             .args(&["set", "org.gnome.system.proxy", "mode", "'none'"])
             .output();
+    }
+
+    // 尝试使用kwriteconfig5/6重置代理设置 (KDE Plasma)
+    for kwriteconfig in &["kwriteconfig6", "kwriteconfig5"] {
+        if let Ok(_) = std::process::Command::new("which")
+            .arg(kwriteconfig)
+            .output()
+        {
+            // 设置代理模式为无代理 (0)
+            let _ = std::process::Command::new(kwriteconfig)
+                .args(&["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "ProxyType", "0"])
+                .output();
+            
+            // 通知KDE配置已更改
+            let _ = std::process::Command::new("dbus-send")
+                .args(&["--type=signal", "/KIO/Scheduler", "org.kde.KIO.Scheduler.reparseSlaveConfiguration", "string:''"])
+                .output();
+            break;
+        }
     }
 
     Ok(())
@@ -212,7 +231,7 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
     std::env::set_var("no_proxy", &no_proxy);
     std::env::set_var("NO_PROXY", &no_proxy);
 
-    // 尝试使用gsettings设置代理 (如果可用)
+    // 尝试使用gsettings设置代理 (GNOME/Unity/XFCE等)
     if let Ok(_) = std::process::Command::new("which")
         .arg("gsettings")
         .output()
@@ -242,6 +261,37 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
         let _ = std::process::Command::new("gsettings")
             .args(&["set", "org.gnome.system.proxy", "mode", "'manual'"])
             .output();
+    }
+
+    // 尝试使用kwriteconfig5/6设置代理 (KDE Plasma)
+    for kwriteconfig in &["kwriteconfig6", "kwriteconfig5"] {
+        if let Ok(_) = std::process::Command::new("which")
+            .arg(kwriteconfig)
+            .output()
+        {
+            let proxy_url = format!("http://{}:{}", host, port);
+            
+            // 设置HTTP代理
+            let _ = std::process::Command::new(kwriteconfig)
+                .args(&["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "httpProxy", &proxy_url])
+                .output();
+
+            // 设置HTTPS代理
+            let _ = std::process::Command::new(kwriteconfig)
+                .args(&["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "httpsProxy", &proxy_url])
+                .output();
+
+            // 设置代理模式为手动 (1)
+            let _ = std::process::Command::new(kwriteconfig)
+                .args(&["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "ProxyType", "1"])
+                .output();
+            
+            // 通知KDE配置已更改
+            let _ = std::process::Command::new("dbus-send")
+                .args(&["--type=signal", "/KIO/Scheduler", "org.kde.KIO.Scheduler.reparseSlaveConfiguration", "string:''"])
+                .output();
+            break;
+        }
     }
 
     Ok(())

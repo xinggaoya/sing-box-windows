@@ -1259,6 +1259,11 @@ async fn is_system_recently_started() -> bool {
 // 检查内核是否正在运行 (跨平台实现)
 #[tauri::command]
 pub async fn is_kernel_running() -> Result<bool, String> {
+    // 首先检查内部进程管理器，这是最准确的
+    if PROCESS_MANAGER.is_running().await {
+        return Ok(true);
+    }
+
     #[cfg(target_os = "windows")]
     {
         is_kernel_running_windows().await
@@ -1294,16 +1299,29 @@ async fn is_kernel_running_windows() -> Result<bool, String> {
         .unwrap_or("sing-box.exe");
 
     let mut cmd = tokio::process::Command::new("tasklist");
-    cmd.args(&["/FI", "IMAGENAME eq", kernel_filename, "/FO", "CSV", "/NH"]);
+    // 修复参数格式：/FI 后面的过滤器必须作为一个完整的字符串参数
+    cmd.args(&["/FI", &format!("IMAGENAME eq {}", kernel_filename), "/FO", "CSV", "/NH"]);
 
     #[cfg(target_os = "windows")]
     cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
 
     if let Ok(output) = cmd.output().await {
         let stdout = String::from_utf8_lossy(&output.stdout);
-        if stdout.contains(kernel_filename) {
-            info!("内核进程正在运行 (tasklist检测): {}", kernel_filename);
-            return Ok(true);
+        // 解析 CSV 格式: "Image Name","PID","Session Name","Session#","Mem Usage"
+        // "sing-box.exe","1234","Console","1","12,345 K"
+        for line in stdout.lines() {
+            if line.contains(kernel_filename) {
+                // 简单的包含检查可能不够，最好是分割 CSV
+                let parts: Vec<&str> = line.split(',').collect();
+                if let Some(name) = parts.first() {
+                    // 去除引号
+                    let clean_name = name.trim_matches('"');
+                    if clean_name == kernel_filename {
+                        info!("内核进程正在运行 (tasklist检测): {}", kernel_filename);
+                        return Ok(true);
+                    }
+                }
+            }
         }
     }
 
@@ -1323,24 +1341,8 @@ async fn is_kernel_running_windows() -> Result<bool, String> {
         }
     }
 
-    // 方法3: 使用PowerShell Get-Process
-    {
-        let mut cmd = tokio::process::Command::new("powershell");
-        cmd.args(&[
-            "-Command",
-            "Get-Process sing-box -ErrorAction SilentlyContinue",
-        ]);
-
-        #[cfg(target_os = "windows")]
-        cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
-
-        if let Ok(output) = cmd.output().await {
-            if output.status.success() {
-                info!("内核进程正在运行 (PowerShell检测): true");
-                return Ok(true);
-            }
-        }
-    }
+    // 方法3: 移除 PowerShell 检测，因为可能在某些 Windows 版本上不可用或被禁用
+    // 如果前两种方法都失败了，通常意味着进程确实没有运行，或者系统环境受到严重限制
 
     info!("内核运行状态检查: false (未找到相关进程)");
     Ok(false)

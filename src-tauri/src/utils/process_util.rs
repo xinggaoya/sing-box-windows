@@ -97,11 +97,6 @@ pub mod windows {
         create_hidden_async_command("wmic")
     }
 
-    /// 创建 PowerShell 命令
-    pub fn create_powershell_command() -> tokio::process::Command {
-        create_hidden_async_command("powershell")
-    }
-
     /// 创建 cmd 命令
     pub fn create_cmd_command() -> tokio::process::Command {
         create_hidden_async_command("cmd")
