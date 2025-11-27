@@ -1,11 +1,9 @@
 /**
- * 内核管理服务 - 简化版
- * 职责：提供简洁的API调用接口和事件监听
- * 状态管理：由后端负责，前端通过事件获取
+ * 内核管理服务
+ * 职责：提供内核控制、状态查询、配置管理等功能
  */
 import { eventService } from './event-service'
-import { kernelApi } from './tauri'
-import type { KernelStartOptions, KernelStopOptions, KernelAutoManageResult } from './tauri/kernel'
+import { invokeWithAppContext, withAppStore } from './invoke-client'
 
 export interface KernelStatus {
   process_running: boolean
@@ -36,21 +34,103 @@ export interface KernelConfig {
   tun: TunSettings
 }
 
+export interface KernelStartConfig {
+  proxy_mode: string
+  api_port: number
+  proxy_port: number
+  prefer_ipv6: boolean
+  auto_start: boolean
+  system_proxy_bypass: string
+  tun: TunSettings
+  system_proxy_enabled?: boolean
+  tun_enabled?: boolean
+}
+
+export interface KernelStartOptions {
+  config?: Partial<KernelStartConfig>
+  forceRestart?: boolean
+  timeoutMs?: number
+  keepAlive?: boolean
+}
+
+export interface KernelStopOptions {
+  force?: boolean
+  timeoutMs?: number
+}
+
+export interface KernelAutoManageResult {
+  state: 'missing_kernel' | 'missing_config' | 'invalid_config' | 'running' | 'error'
+  message: string
+  kernel_installed: boolean
+  config_ready: boolean
+  attempted_start: boolean
+  last_start_message?: string
+}
+
+export interface KernelDownloadPayload {
+  progress?: number
+  message?: string
+  status?: 'downloading' | 'completed' | 'error'
+}
+
 class KernelService {
   /**
-   * 启动内核 - 直接调用后端API
-   * 状态变化通过事件推送，无需手动刷新
+   * 启动内核
    */
   async startKernel(options: KernelStartOptions = {}): Promise<{ success: boolean; message: string }> {
-    return kernelApi.startKernel(options)
+    return withAppStore(async store => {
+      await store.waitForDataRestore()
+
+      // 仅传递必要的参数覆盖，其他由后端从数据库读取
+      const args: Record<string, any> = {}
+
+      if (options.config?.proxy_mode) {
+        args.proxy_mode = options.config.proxy_mode
+        args.proxyMode = options.config.proxy_mode
+      }
+
+      if (options.config?.api_port) {
+        args.api_port = options.config.api_port
+        args.apiPort = options.config.api_port
+      }
+
+      if (options.config?.proxy_port) {
+        args.proxy_port = options.config.proxy_port
+        args.proxyPort = options.config.proxy_port
+      }
+
+      if (typeof options.config?.system_proxy_enabled === 'boolean') {
+        args.system_proxy_enabled = options.config.system_proxy_enabled
+      }
+
+      if (typeof options.config?.tun_enabled === 'boolean') {
+        args.tun_enabled = options.config.tun_enabled
+      }
+
+      if (options.keepAlive !== undefined) {
+        args.keep_alive = options.keepAlive
+        args.keepAlive = options.keepAlive
+      }
+
+      return invokeWithAppContext<{ success: boolean; message: string }>(
+        'kernel_start_enhanced',
+        Object.keys(args).length > 0 ? args : undefined,
+        { skipDataRestore: true }
+      )
+    })
   }
 
   /**
-   * 停止内核 - 直接调用后端API
-   * 状态变化通过事件推送，无需手动刷新
+   * 停止内核
    */
   async stopKernel(options: KernelStopOptions = {}): Promise<{ success: boolean; message: string }> {
-    return kernelApi.stopKernel(options)
+    // 如果是强制停止，可能需要调用不同的后端API，或者传递参数
+    // 目前后端 kernel_stop_enhanced 似乎不接受参数，但我们保留 options 接口以备将来扩展
+    return invokeWithAppContext<{ success: boolean; message: string }>(
+      'kernel_stop_enhanced',
+      undefined,
+      { skipDataRestore: true }
+    )
   }
 
   async restartKernel(options: KernelStartOptions & KernelStopOptions = {}): Promise<{ success: boolean; message: string }> {
@@ -65,12 +145,13 @@ class KernelService {
   }
 
   /**
-   * 获取内核状态 - 仅用于主动查询
-   * 推荐：使用 onKernelStatusChange 监听状态变化
+   * 获取内核状态
    */
   async getKernelStatus(): Promise<KernelStatus> {
     try {
-      return await kernelApi.getKernelStatus<KernelStatus>()
+      return await invokeWithAppContext<KernelStatus>('kernel_get_status_enhanced', undefined, {
+        withApiPort: true
+      })
     } catch (error) {
       console.error('获取内核状态失败:', error)
       return {
@@ -83,13 +164,20 @@ class KernelService {
   }
 
   async isKernelRunning(): Promise<boolean> {
-    const status = await this.getKernelStatus()
-    return status.process_running
+    try {
+      return await invokeWithAppContext<boolean>('is_kernel_running', undefined, {
+        skipDataRestore: true
+      })
+    } catch (error) {
+      return false
+    }
   }
 
   async getKernelVersion(): Promise<string> {
     try {
-      return await kernelApi.getKernelVersion()
+      return await invokeWithAppContext<string>('check_kernel_version', undefined, {
+        skipDataRestore: true
+      })
     } catch (error) {
       console.error('获取内核版本失败:', error)
       return ''
@@ -101,7 +189,19 @@ class KernelService {
    */
   async switchProxyMode(mode: 'system' | 'tun' | 'manual'): Promise<{ success: boolean; message: string }> {
     try {
-      await kernelApi.switchProxyMode(mode)
+      const overrides: Record<string, boolean> = {}
+      if (mode === 'system') {
+        overrides.system_proxy_enabled = true
+        overrides.tun_enabled = false
+      } else if (mode === 'tun') {
+        overrides.system_proxy_enabled = false
+        overrides.tun_enabled = true
+      } else {
+        overrides.system_proxy_enabled = false
+        overrides.tun_enabled = false
+      }
+
+      await invokeWithAppContext<string | void>('apply_proxy_settings', overrides)
       return { success: true, message: `代理模式已切换到 ${mode}` }
     } catch (error) {
       console.error('切换代理模式失败:', error)
@@ -112,9 +212,20 @@ class KernelService {
     }
   }
 
-  async applyProxySettings(): Promise<{ success: boolean; message: string }> {
+  async applyProxySettings(options?: { system_proxy_enabled?: boolean; tun_enabled?: boolean }): Promise<{ success: boolean; message: string }> {
     try {
-      await kernelApi.applyProxySettings()
+      const args: Record<string, unknown> = {}
+      if (typeof options?.system_proxy_enabled === 'boolean') {
+        args.system_proxy_enabled = options.system_proxy_enabled
+      }
+      if (typeof options?.tun_enabled === 'boolean') {
+        args.tun_enabled = options.tun_enabled
+      }
+
+      await invokeWithAppContext<{ success: boolean; mode: string }>(
+        'apply_proxy_settings',
+        Object.keys(args).length ? args : undefined
+      )
       return { success: true, message: '代理配置已应用' }
     } catch (error) {
       console.error('应用代理配置失败:', error)
@@ -126,11 +237,22 @@ class KernelService {
   }
 
   /**
+   * 切换节点代理模式 (Global/Rule)
+   */
+  async switchNodeProxyMode(mode: 'global' | 'rule'): Promise<string> {
+    return invokeWithAppContext<string>('toggle_proxy_mode', { mode }, {
+      skipDataRestore: true
+    })
+  }
+
+  /**
    * 切换IP版本
    */
   async toggleIpVersion(preferIpv6: boolean): Promise<{ success: boolean; message: string }> {
     try {
-      await kernelApi.toggleIpVersion(preferIpv6)
+      await invokeWithAppContext<void>('toggle_ip_version', { preferIpv6 }, {
+        skipDataRestore: true
+      })
       return { success: true, message: preferIpv6 ? '已切换到IPv6优先模式' : '已切换到IPv4优先模式' }
     } catch (error) {
       console.error('切换IP版本失败:', error)
@@ -142,6 +264,7 @@ class KernelService {
   }
 
   async getKernelConfig(): Promise<KernelConfig> {
+    // 暂时保留空实现，如果需要从后端获取完整配置再实现
     return {
       proxy_mode: 'manual',
       api_port: 9090,
@@ -176,7 +299,9 @@ class KernelService {
 
   async checkKernelHealth(): Promise<{ healthy: boolean; issues: string[] }> {
     try {
-      return await kernelApi.checkKernelHealth()
+      return await invokeWithAppContext<{ healthy: boolean; issues: string[] }>('kernel_check_health', undefined, {
+        withApiPort: true
+      })
     } catch (error) {
       console.error('检查内核健康状态失败:', error)
       return {
@@ -187,7 +312,32 @@ class KernelService {
   }
 
   autoManageKernel(options: KernelStartOptions & { forceRestart?: boolean } = {}): Promise<KernelAutoManageResult> {
-    return kernelApi.autoManageKernel(options)
+    return withAppStore(async store => {
+      await store.waitForDataRestore()
+
+      // 仅传递覆盖参数
+      const args: Record<string, any> = {}
+
+      if (options.forceRestart !== undefined) {
+        args.force_restart = options.forceRestart
+        args.forceRestart = options.forceRestart
+      }
+
+      if (options.config) {
+        if (typeof options.config.system_proxy_enabled === 'boolean') {
+          args.system_proxy_enabled = options.config.system_proxy_enabled
+        }
+        if (typeof options.config.tun_enabled === 'boolean') {
+          args.tun_enabled = options.config.tun_enabled
+        }
+      }
+
+      return invokeWithAppContext<KernelAutoManageResult>(
+        'kernel_auto_manage',
+        Object.keys(args).length > 0 ? args : undefined,
+        { skipDataRestore: true }
+      )
+    })
   }
 
   /**
@@ -195,7 +345,11 @@ class KernelService {
    */
   async stopKernelFast(): Promise<{ success: boolean; message: string }> {
     try {
-      return await kernelApi.stopKernelFast()
+      return await invokeWithAppContext<{ success: boolean; message: string }>(
+        'kernel_stop_background',
+        undefined,
+        { skipDataRestore: true }
+      )
     } catch (error) {
       console.error('后台停止内核失败:', error)
       return {
@@ -210,7 +364,11 @@ class KernelService {
    */
   async forceStopAndExit(): Promise<{ success: boolean; message: string }> {
     try {
-      return await kernelApi.forceStopAndExit()
+      return await invokeWithAppContext<{ success: boolean; message: string }>(
+        'force_stop_and_exit',
+        undefined,
+        { skipDataRestore: true }
+      )
     } catch (error) {
       console.error('强制停止并退出失败:', error)
       return {
@@ -220,11 +378,25 @@ class KernelService {
     }
   }
 
-  /**
-   * 监听内核状态变化 - 推荐使用
-   * 后端会主动推送状态变化，无需轮询
-   */
+  async getApiToken(): Promise<string> {
+    return invokeWithAppContext<string>('get_api_token')
+  }
 
+  async downloadKernel(): Promise<void> {
+    return invokeWithAppContext<void>('download_kernel', undefined, {
+      skipDataRestore: true
+    })
+  }
+
+  async installKernel(): Promise<void> {
+    return invokeWithAppContext<void>('install_kernel', undefined, {
+      skipDataRestore: true
+    })
+  }
+
+  /**
+   * 监听内核状态变化
+   */
   async onKernelStatusChange(callback: (status: KernelStatus) => void): Promise<() => void> {
     return eventService.on('kernel-status-changed', (data: unknown) => {
       callback(data as KernelStatus)
@@ -239,25 +411,20 @@ class KernelService {
     return eventService.on('kernel-error', callback)
   }
 
-  /**
-   * 监听内核启动中事件
-   */
   async onKernelStarting(callback: (data: any) => void): Promise<() => void> {
     return eventService.on('kernel-starting', callback)
   }
 
-  /**
-   * 监听内核已启动事件
-   */
   async onKernelStarted(callback: (data: any) => void): Promise<() => void> {
     return eventService.on('kernel-started', callback)
   }
 
-  /**
-   * 监听内核已停止事件
-   */
   async onKernelStopped(callback: (data: any) => void): Promise<() => void> {
     return eventService.on('kernel-stopped', callback)
+  }
+
+  async updateSingboxPorts(proxyPort: number, apiPort: number): Promise<void> {
+    return invokeWithAppContext<void>('update_singbox_ports', { proxyPort, apiPort })
   }
 }
 

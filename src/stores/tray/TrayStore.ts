@@ -14,7 +14,7 @@ import { useWindowStore } from '@/stores/app/WindowStore'
 import i18n from '@/locales'
 import type { ProxyMode } from '@/types'
 import { useRouter } from 'vue-router'
-import { tauriApi } from '@/services/tauri'
+import { systemService } from '@/services/system-service'
 
 // 自定义菜单项类型定义
 export interface TrayMenuOptions {
@@ -144,7 +144,7 @@ export const useTrayStore = defineStore('tray', () => {
 
     // TUN模式特殊处理
     if (targetMode === 'tun') {
-      const isAdmin = await tauriApi.system.checkAdmin()
+      const isAdmin = await systemService.checkAdmin()
       if (!isAdmin) {
         try {
           // 保存TUN启用状态
@@ -154,7 +154,7 @@ export const useTrayStore = defineStore('tray', () => {
           if (appStore.isRunning) {
             await kernelStore.stopKernel({ force: true })
           }
-          await tauriApi.system.restartAsAdmin()
+          await systemService.restartAsAdmin()
           return
         } catch (error) {
           console.error('以管理员身份重启以启用TUN失败:', error)
@@ -291,10 +291,10 @@ export const useTrayStore = defineStore('tray', () => {
       const currentModeMenuItem = await MenuItem.new({
         id: 'current_mode',
         text: `${t('proxy.currentMode')} ${currentProxyMode === 'system'
-            ? t('home.proxyMode.system')
-            : currentProxyMode === 'manual'
-              ? t('home.proxyMode.manual')
-              : t('home.proxyMode.tun')
+          ? t('home.proxyMode.system')
+          : currentProxyMode === 'manual'
+            ? t('home.proxyMode.manual')
+            : t('home.proxyMode.tun')
           }`,
         enabled: false,
       })

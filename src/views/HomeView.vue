@@ -177,7 +177,7 @@ import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useThemeStore } from '@/stores/app/ThemeStore'
-import { kernelApi } from '@/services/tauri'
+import { kernelService } from '@/services/kernel-service'
 import StatusCard from '@/components/common/StatusCard.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
@@ -397,8 +397,8 @@ const restartKernel = async () => {
 
 const restartAsAdmin = async () => {
   try {
-    const { systemApi } = await import('@/services/tauri')
-    await systemApi.restartAsAdmin()
+    const { systemService } = await import('@/services/system-service')
+    await systemService.restartAsAdmin()
   } catch (error) {
     message.error(t('home.restartFailed'))
   }
@@ -437,7 +437,7 @@ const handleNodeProxyModeChange = async (mode: string) => {
   if (currentNodeProxyMode.value === mode) return
 
   try {
-    await kernelApi.switchNodeProxyMode(mode as 'global' | 'rule')
+    await kernelService.switchNodeProxyMode(mode as 'global' | 'rule')
     currentNodeProxyMode.value = mode
     message.success(t('home.nodeModeChangeSuccess'))
   } catch (error) {
@@ -447,8 +447,8 @@ const handleNodeProxyModeChange = async (mode: string) => {
 
 const checkAdmin = async () => {
   try {
-    const { systemApi } = await import('@/services/tauri')
-    isAdmin.value = await systemApi.checkAdmin()
+    const { systemService } = await import('@/services/system-service')
+    isAdmin.value = await systemService.checkAdmin()
   } catch (error) {
     isAdmin.value = false
   }

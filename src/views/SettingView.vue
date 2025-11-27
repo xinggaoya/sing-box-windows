@@ -292,113 +292,107 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
 import { useMessage } from 'naive-ui'
-import { useKernelStore } from '@/stores/kernel/KernelStore'
-import { useAppStore } from '@/stores/app/AppStore'
-import { useUpdateStore } from '@/stores/app/UpdateStore'
-import { useLocaleStore } from '@/stores/app/LocaleStore'
-import type { Locale } from '@/stores/app/LocaleStore'
-import { useThemeStore } from '@/stores/app/ThemeStore'
 import {
-  DownloadOutline,
   SettingsOutline,
+  WarningOutline,
+  DownloadOutline,
   PowerOutline,
+  GlobeOutline,
+  OptionsOutline,
+  RefreshOutline,
   InformationCircleOutline,
   LogoGithub,
-  GlobeOutline,
-  RefreshOutline,
-  WarningOutline,
-  OptionsOutline,
 } from '@vicons/ionicons5'
-import { tauriApi } from '@/services/tauri'
-import { eventService } from '@/services/event-service'
-import { supportedLocales } from '@/locales'
 import { useI18n } from 'vue-i18n'
+import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore } from '@/stores'
+import { systemService } from '@/services/system-service'
+import { eventService } from '@/services/event-service'
+import type { KernelDownloadPayload } from '@/services/kernel-service'
 import PageHeader from '@/components/common/PageHeader.vue'
 
-defineOptions({
-  name: 'SettingView'
-})
-
 const message = useMessage()
+const { t } = useI18n()
 const appStore = useAppStore()
 const kernelStore = useKernelStore()
 const updateStore = useUpdateStore()
 const localeStore = useLocaleStore()
-const { t, locale } = useI18n()
 
-const autoStart = ref(false)
+// State
 const loading = ref(false)
 const downloading = ref(false)
 const downloadProgress = ref(0)
 const downloadMessage = ref('')
-const savingAdvanced = ref(false)
-const checkingUpdate = ref(false)
-const showPortModal = ref(false)
-const tempProxyPort = ref(7890)
-const tempApiPort = ref(9090)
-const portSettingsLoading = ref(false)
-
-const proxyAdvancedForm = reactive({
-  systemProxyBypass: appStore.systemProxyBypass,
-  tunMtu: appStore.tunMtu,
-  tunAutoRoute: appStore.tunAutoRoute,
-  tunStrictRoute: appStore.tunStrictRoute,
-  tunStack: appStore.tunStack,
-  tunEnableIpv6: appStore.tunEnableIpv6,
-})
-
-const hasNewVersion = computed(() => false) // Placeholder logic
 const downloadError = ref('')
-type KernelDownloadPayload = {
-  status?: 'downloading' | 'extracting' | 'completed' | 'error'
-  progress?: number
-  message?: string
-}
-
-const languageOptions = computed(() => [
-  { label: t('setting.language.auto'), value: 'auto' },
-  ...supportedLocales.map((l) => ({ label: l.name, value: l.code })),
-])
-
-const tunStackOptions = [
-  { label: 'gVisor', value: 'gvisor' },
-  { label: 'System', value: 'system' },
-  { label: 'Mixed', value: 'mixed' },
-]
-
 let downloadListener: (() => void) | null = null
 
+const autoStart = ref(false)
+const locale = ref(localeStore.locale)
+const checkingUpdate = ref(false)
+
+const showPortModal = ref(false)
+const tempProxyPort = ref(12080)
+const tempApiPort = ref(12081)
+const portSettingsLoading = ref(false)
+
+const savingAdvanced = ref(false)
+const proxyAdvancedForm = reactive({
+  systemProxyBypass: '',
+  tunMtu: 9000,
+  tunStack: 'mixed' as 'system' | 'gvisor' | 'mixed',
+  tunEnableIpv6: true,
+  tunAutoRoute: true,
+  tunStrictRoute: true
+})
+
+// Options
+const languageOptions = [
+  { label: 'English', value: 'en-US' },
+  { label: '简体中文', value: 'zh-CN' }
+]
+
+const tunStackOptions = [
+  { label: 'System', value: 'system' },
+  { label: 'gVisor', value: 'gvisor' },
+  { label: 'Mixed', value: 'mixed' }
+]
+
+// Computed
+const hasNewVersion = computed(() => updateStore.hasUpdate)
+
 // Methods
-const formatVersion = (version: string) => {
-  if (!version) return ''
-  const match = version.match(/\d+\.\d+\.\d+(?:-[\w.]+)?/)
-  return match ? match[0] : version
-}
+const formatVersion = (v: string) => v.replace(/^v/, '')
+const isSupportedLocale = (l: string) => languageOptions.some(opt => opt.value === l)
+
+// Initialize form data
+watch(() => appStore.isDataRestored, (restored) => {
+  if (restored) {
+    proxyAdvancedForm.systemProxyBypass = appStore.systemProxyBypass
+    proxyAdvancedForm.tunMtu = appStore.tunMtu
+    proxyAdvancedForm.tunStack = appStore.tunStack as 'system' | 'gvisor' | 'mixed'
+    proxyAdvancedForm.tunEnableIpv6 = appStore.tunEnableIpv6
+    proxyAdvancedForm.tunAutoRoute = appStore.tunAutoRoute
+    proxyAdvancedForm.tunStrictRoute = appStore.tunStrictRoute
+  }
+}, { immediate: true })
 
 const onAutoStartChange = async (value: boolean) => {
   try {
     await appStore.toggleAutoStart(value)
-    autoStart.value = value
-  } catch (e) {
-    message.error(t('setting.autoStart.error'))
+    message.success(t('common.saveSuccess'))
+  } catch (error) {
+    message.error(t('common.saveFailed'))
     autoStart.value = !value
   }
 }
-
-const isSupportedLocale = (value: string): value is Locale => {
-  if (value === 'auto') return true
-  return supportedLocales.some((loc) => loc.code === value)
-}
-
 const handleChangeLanguage = async (value: string) => {
   if (!isSupportedLocale(value)) {
     console.warn('选择了不受支持的语言:', value)
     return
   }
 
-  await localeStore.setLocale(value)
+  await localeStore.setLocale(value as any)
   locale.value = localeStore.currentLocale
 }
 
@@ -466,7 +460,7 @@ const downloadTheKernel = async () => {
   })
 
   try {
-    await tauriApi.downloadLatestKernel()
+    await systemService.downloadLatestKernel()
     // 如果后端未推送完成事件，也主动校验一次安装结果
     if (!downloadCompleted) {
       await kernelStore.checkKernelInstallation()

@@ -126,25 +126,21 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+<script lang="ts" setup>
+import { onMounted, ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   RefreshOutline,
-  SearchOutline,
   FilterOutline,
+  SearchOutline,
   CheckmarkCircleOutline,
   ExtensionPuzzleOutline,
   GlobeOutline,
 } from '@vicons/ionicons5'
-import { tauriApi } from '@/services/tauri'
+import { proxyService } from '@/services/proxy-service'
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusCard from '@/components/common/StatusCard.vue'
-
-defineOptions({
-  name: 'RulesView'
-})
 
 interface Rule {
   type: string
@@ -156,10 +152,13 @@ interface RulesResponse {
   rules: Rule[]
 }
 
-const message = useMessage()
-const loading = ref(false)
-const { t } = useI18n()
+defineOptions({
+  name: 'RulesView'
+})
 
+const message = useMessage()
+const { t } = useI18n()
+const loading = ref(false)
 const rules = ref<Rule[]>([])
 const searchQuery = ref('')
 const typeFilter = ref<string | null>(null)
@@ -168,38 +167,29 @@ const proxyFilter = ref<string | null>(null)
 // Computed
 const filteredRules = computed(() => {
   return rules.value.filter((rule) => {
-    const matchesSearch =
+    const matchSearch =
       !searchQuery.value ||
       rule.payload.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      rule.proxy.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      rule.type.toLowerCase().includes(searchQuery.value.toLowerCase())
-
-    const matchesType = !typeFilter.value || rule.type === typeFilter.value
-
-    const matchesProxy =
-      !proxyFilter.value ||
-      (proxyFilter.value === 'direct' && rule.proxy === t('rules.directConnect')) ||
-      (proxyFilter.value === 'reject' && rule.proxy === 'reject') ||
-      (proxyFilter.value !== 'direct' &&
-        proxyFilter.value !== 'reject' &&
-        rule.proxy.includes(proxyFilter.value))
-
-    return matchesSearch && matchesType && matchesProxy
+      rule.proxy.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchType = !typeFilter.value || rule.type === typeFilter.value
+    const matchProxy = !proxyFilter.value || rule.proxy === proxyFilter.value
+    return matchSearch && matchType && matchProxy
   })
 })
 
 const typeOptions = computed(() => {
-  const types = [...new Set(rules.value.map((rule) => rule.type))]
-  return types.map((type) => ({ label: type, value: type }))
+  const types = new Set(rules.value.map((r) => r.type))
+  return Array.from(types).map((type) => ({ label: type, value: type }))
 })
 
 const proxyOptions = computed(() => {
   const proxies = new Set<string>()
-  proxies.add('direct')
-  proxies.add('reject')
   rules.value.forEach((rule) => {
     let proxyName = rule.proxy
-    if (proxyName.startsWith('route(') && proxyName.endsWith(')')) {
+    if (proxyName.startsWith('[') && proxyName.endsWith(']')) {
+      proxyName = proxyName.substring(1, proxyName.length - 1)
+    }
+    if (proxyName.startsWith('Proxy(') && proxyName.endsWith(')')) {
       proxyName = proxyName.substring(6, proxyName.length - 1)
     }
     if (proxyName !== t('rules.directConnect') && proxyName !== 'reject') {
@@ -273,7 +263,7 @@ const clearFilters = () => {
 const fetchRules = async () => {
   loading.value = true
   try {
-    const response = await tauriApi.getRules() as RulesResponse
+    const response = await proxyService.getRules() as RulesResponse
     rules.value = response.rules
     message.success(t('rules.fetchSuccess', { count: response.rules.length }))
   } catch (error) {

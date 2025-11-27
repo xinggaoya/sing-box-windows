@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart'
 import type { MessageApi } from 'naive-ui/es/message'
-import { config as configApi } from '@/services/tauri'
+import { kernelService } from '@/services/kernel-service'
 import { useAppMessaging } from './composables/messaging'
 import { createAppPersistence } from './composables/persistence'
 
@@ -363,7 +363,7 @@ export const useAppStore = defineStore(
     // 同步端口配置到sing-box配置文件
     const syncPortsToSingbox = async () => {
       try {
-        await configApi.updateSingboxPorts(proxyPort.value, apiPort.value)
+        await kernelService.updateSingboxPorts(proxyPort.value, apiPort.value)
         console.log('端口配置已同步到sing-box配置文件')
       } catch (error) {
         console.error('同步端口配置到sing-box失败:', error)

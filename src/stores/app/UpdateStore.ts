@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch, computed } from 'vue'
-import { tauriApi } from '@/services/tauri'
+import { systemService } from '@/services/system-service'
 import { getVersion } from '@tauri-apps/api/app'
 import { DatabaseService } from '@/services/database-service'
 import type { UpdateConfig } from '@/types/database'
@@ -63,14 +63,14 @@ export const useUpdateStore = defineStore(
       try {
         console.log('🔄 从数据库加载更新配置...')
         const updateConfig = await DatabaseService.getUpdateConfig()
-        
+
         // 更新响应式状态
         autoCheckUpdate.value = updateConfig.auto_check
         skipVersion.value = updateConfig.skip_version || ''
-        
+
         // 获取当前版本
         await fetchAppVersion()
-        
+
         console.log('🔄 更新配置加载完成：', {
           appVersion: appVersion.value,
           autoCheckUpdate: autoCheckUpdate.value,
@@ -152,8 +152,8 @@ export const useUpdateStore = defineStore(
         if (!appVersion.value) {
           await fetchAppVersion()
         }
-        
-        const updateInfo = await tauriApi.system.checkUpdate(
+
+        const updateInfo = await systemService.checkUpdate(
           appVersion.value,
           acceptPrerelease.value
         ) as UpdateInfo | null
@@ -212,7 +212,7 @@ export const useUpdateStore = defineStore(
         })
 
         // 开始下载和安装
-        const result = await tauriApi.system.downloadAndInstallUpdate(downloadUrl.value)
+        const result = await systemService.downloadAndInstallUpdate(downloadUrl.value)
         return result
       } catch (error) {
         console.error('下载更新失败:', error)
@@ -289,7 +289,7 @@ export const useUpdateStore = defineStore(
 
     // 标记是否正在初始化
     let isInitializing = false
-    
+
     // 监听更新配置变化并自动保存到数据库
     watch(
       [autoCheckUpdate, skipVersion],

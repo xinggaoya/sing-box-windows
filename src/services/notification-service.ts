@@ -7,7 +7,10 @@ import { useLogStore } from '@/stores/kernel/LogStore'
 export class NotificationService {
   private static instance: NotificationService
   private messageHandler: ((type: MessageType, content: string) => void) | null = null
-  private logStore = useLogStore()
+
+  private get logStore() {
+    return useLogStore()
+  }
 
   private constructor() {
     // 私有构造函数，防止外部直接创建实例

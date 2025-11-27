@@ -157,7 +157,7 @@ import {
   GlobeOutline,
   ChevronDownOutline,
 } from '@vicons/ionicons5'
-import { tauriApi } from '@/services/tauri'
+import { proxyService } from '@/services/proxy-service'
 import { listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
@@ -250,72 +250,55 @@ const proxyStats = computed(() => {
 })
 
 // Methods
-// 懒加载节点，按批次渲染减少展开大组时的卡顿
-const ensureGroupState = (group: ProxyData) => {
-  if (!groupNodeState[group.name]) {
-    groupNodeState[group.name] = { list: [], loaded: 0 }
-  }
-  return groupNodeState[group.name]
-}
-
-const loadNextBatch = (group: ProxyData) => {
-  const state = ensureGroupState(group)
-  if (state.loaded >= (group.all?.length ?? 0)) return
-  const next = group.all.slice(state.loaded, state.loaded + NODE_BATCH_SIZE)
-  state.list.push(...next)
-  state.loaded += next.length
+const resetGroupNodeState = (groups: ProxyData[]) => {
+  groups.forEach(group => {
+    groupNodeState[group.name] = {
+      list: group.all || [],
+      loaded: NODE_BATCH_SIZE
+    }
+  })
 }
 
 const getVisibleNodes = (group: ProxyData) => {
   const state = groupNodeState[group.name]
-  return state ? state.list : []
+  if (!state) return []
+  return state.list.slice(0, state.loaded)
 }
 
 const hasMoreNodes = (group: ProxyData) => {
   const state = groupNodeState[group.name]
-  return (state?.loaded ?? 0) < (group.all?.length ?? 0)
+  if (!state) return false
+  return state.loaded < state.list.length
 }
 
 const loadMoreNodes = (group: ProxyData) => {
-  loadNextBatch(group)
-}
-
-const resetGroupNodeState = (groups: ProxyData[]) => {
-  Object.keys(groupNodeState).forEach((key) => delete groupNodeState[key])
-  groups.forEach((group) => {
-    groupNodeState[group.name] = { list: [], loaded: 0 }
-  })
-}
-
-const collapseGroup = (groupName: string) => {
-  const index = expandedGroups.value.indexOf(groupName)
-  if (index > -1) expandedGroups.value.splice(index, 1)
-  delete groupNodeState[groupName]
+  const state = groupNodeState[group.name]
+  if (state) {
+    state.loaded += NODE_BATCH_SIZE
+  }
 }
 
 const toggleGroup = (group: ProxyData) => {
-  const isExpanded = expandedGroups.value.includes(group.name)
-  if (isExpanded) {
-    collapseGroup(group.name)
-    return
+  const index = expandedGroups.value.indexOf(group.name)
+  if (index === -1) {
+    expandedGroups.value.push(group.name)
+  } else {
+    expandedGroups.value.splice(index, 1)
   }
-  // 仅保持一个展开的组，避免同时渲染多个组造成卡顿
-  expandedGroups.value.forEach((name) => collapseGroup(name))
-  expandedGroups.value = [group.name]
-  loadNextBatch(group)
 }
 
-const getNodeStatusText = (name: string): string => {
-  if (testingNodes[name]) return t('proxy.testing')
-  if (nodeErrors[name]) return t('proxy.timeout')
-  const delay = testResults[name] || 0
-  return delay === 0 ? '--' : `${delay}ms`
+const getNodeStatusText = (proxy: string) => {
+  if (testingNodes[proxy]) return t('proxy.testing')
+  if (nodeErrors[proxy]) return nodeErrors[proxy]
+  const delay = testResults[proxy]
+  if (delay !== undefined) return `${delay} ms`
+  return t('proxy.clickToTest')
 }
 
 const init = async () => {
   isLoading.value = true
   try {
-    const data = await tauriApi.proxy.getProxies()
+    const data = await proxyService.getProxies()
     rawProxies.value = data.proxies
     const groups: ProxyData[] = []
     Object.entries(data.proxies).forEach(([key, item]) => {
@@ -342,7 +325,7 @@ const testSingleNode = async (proxy: string) => {
   testingNodes[proxy] = true
   try {
     delete nodeErrors[proxy]
-    await tauriApi.proxy.testNodeDelay(proxy)
+    await proxyService.testNodeDelay(proxy)
   } catch (error) {
     testingNodes[proxy] = false
     nodeErrors[proxy] = t('proxy.timeout')
@@ -353,7 +336,7 @@ const testNodeDelay = async (group: string) => {
   if (testingGroup.value === group) return
   testingGroup.value = group
   try {
-    await tauriApi.proxy.testGroupDelay(group)
+    await proxyService.testGroupDelay(group)
   } catch (error) {
     message.error(`${t('proxy.testErrorMessage')}: ${group}`)
     testingGroup.value = ''
@@ -362,25 +345,29 @@ const testNodeDelay = async (group: string) => {
 
 const changeProxy = async (group: string, proxy: string) => {
   try {
-    await tauriApi.proxy.changeProxy(group, proxy)
+    await proxyService.changeProxy(group, proxy)
     message.success(t('proxy.switchSuccess', { group, proxy }))
     await init()
-    await testNodeDelay(group)
   } catch (error) {
     message.error(t('proxy.switchErrorMessage'))
   }
 }
 
 const setupEventListeners = async () => {
-  unlistenTestProgress = await listen('test-nodes-progress', (event) => {
-    // Optional: Update progress
+  unlistenTestProgress = await listen('test-delay-progress', (event) => {
+    // 处理进度事件
   })
 
-  unlistenTestResult = await listen('proxy-group-delay-result', (event) => {
+  unlistenTestResult = await listen('group-delay-result', (event) => {
     const data = event.payload as TestGroupResult
-    if (data && typeof data === 'object') {
-      Object.entries(data).forEach(([proxyName, delay]) => {
-        if (typeof delay === 'number') testResults[proxyName] = delay
+    if (data) {
+      Object.entries(data).forEach(([proxy, delay]) => {
+        if (delay > 0) {
+          testResults[proxy] = delay
+          delete nodeErrors[proxy]
+        } else {
+          nodeErrors[proxy] = t('proxy.timeout')
+        }
       })
       message.success(t('proxy.groupTestComplete'))
     }

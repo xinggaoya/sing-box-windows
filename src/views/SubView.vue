@@ -209,7 +209,8 @@ import { ref, computed, onMounted, h } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useSubStore } from '@/stores/subscription/SubStore'
 import { useAppStore } from '@/stores'
-import { tauriApi } from '@/services/tauri'
+import { subscriptionService } from '@/services/subscription-service'
+import { kernelService } from '@/services/kernel-service'
 import { useI18n } from 'vue-i18n'
 import {
   AddOutline,
@@ -360,14 +361,14 @@ const handleConfirm = () => {
         
         if (isManual && formValue.value.manualContent) {
           if (editIndex.value === null) {
-            await tauriApi.subscription.addManualSubscription(
+            await subscriptionService.addManualSubscription(
               formValue.value.manualContent,
               formValue.value.useOriginalConfig
             )
           }
         } else if (!isManual) {
           if (editIndex.value === null) {
-            await tauriApi.subscription.downloadSubscription(
+            await subscriptionService.downloadSubscription(
               formValue.value.url,
               formValue.value.useOriginalConfig
             )
@@ -425,15 +426,15 @@ const useSubscription = async (url: string, index: number) => {
     subStore.list[index].isLoading = true
     const item = subStore.list[index]
     if (item.isManual && item.manualContent) {
-      await tauriApi.subscription.addManualSubscription(item.manualContent, item.useOriginalConfig)
+      await subscriptionService.addManualSubscription(item.manualContent, item.useOriginalConfig)
     } else {
-      await tauriApi.subscription.downloadSubscription(url, item.useOriginalConfig)
+      await subscriptionService.downloadSubscription(url, item.useOriginalConfig)
     }
     subStore.list[index].lastUpdate = Date.now()
     await subStore.setActiveIndex(index)
     message.success(t('sub.useSuccess'))
     if (appStore.isRunning) {
-      await tauriApi.kernel.restartKernel()
+      await kernelService.restartKernel()
     }
   } catch (error) {
     message.error(t('sub.useFailed') + error)
@@ -456,7 +457,7 @@ const formatTime = (timestamp: number): string => {
 const editCurrentConfig = async () => {
   try {
     isConfigLoading.value = true
-    const config = await tauriApi.subscription.getCurrentConfig()
+    const config = await subscriptionService.getCurrentConfig()
     if (typeof config === 'string') {
       currentConfig.value = config
       showConfigModal.value = true
@@ -471,7 +472,7 @@ const editCurrentConfig = async () => {
 const saveCurrentConfig = async () => {
   try {
     isConfigLoading.value = true
-    await tauriApi.subscription.addManualSubscription(currentConfig.value, false)
+    await subscriptionService.addManualSubscription(currentConfig.value, false)
     if (subStore.activeIndex !== null) {
       const activeItem = subStore.list[subStore.activeIndex]
       if (activeItem.isManual) {
