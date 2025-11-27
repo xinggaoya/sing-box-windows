@@ -157,10 +157,24 @@ jobs:
         id: tag
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+      - name: Summarize artifacts
+        shell: bash
+        run: |
+          echo "🧾 准备发布预发布版本: ${{ steps.tag.outputs.tag }}"
+          echo "✅ 产物列表预览："
+          find windows-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
+          find linux-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
+          find macos-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
+          find macos-intel-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
+
       - name: Update Release Assets
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          prerelease: true
+          generate_release_notes: true
+          name: "[Pre-release] ${{ steps.tag.outputs.tag }}"
+          tag_name: ${{ steps.tag.outputs.tag }}
           files: |
             windows-artifacts/msi/*.msi
             windows-artifacts/nsis/*.exe

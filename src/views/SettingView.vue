@@ -474,7 +474,8 @@ const handleChangeLanguage = async (value: string) => {
     return
   }
 
-  const nextLocale = value === 'auto' ? localeStore.locale : value
+  // 选择 auto 时明确切回自动模式，避免保留旧值
+  const nextLocale = value === 'auto' ? 'auto' : value
   await localeStore.setLocale(nextLocale as any)
   locale.value = localeStore.currentLocale
 }
@@ -615,8 +616,15 @@ const handleCheckUpdate = async () => {
   }
 }
 
-const onPrereleaseSettingChange = async () => {
-  await updateStore.saveToBackend()
+const onPrereleaseSettingChange = async (value: boolean) => {
+  try {
+    await updateStore.setAcceptPrerelease(value)
+  } catch (error) {
+    console.error('保存接收测试版本设置失败:', error)
+    message.error(t('common.saveFailed'))
+    // 回滚切换状态，避免 UI 与实际状态不一致
+    updateStore.acceptPrerelease = !value
+  }
 }
 
 const showPortSettings = () => {

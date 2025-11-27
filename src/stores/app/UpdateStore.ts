@@ -53,7 +53,7 @@ export const useUpdateStore = defineStore(
     // 用户设置
     const autoCheckUpdate = ref(true)
     const skipVersion = ref('')
-    const acceptPrerelease = ref(false) // 是否接收预发布版本（保留，但不同步到数据库）
+    const acceptPrerelease = ref(false) // 是否接收预发布版本，持久化到数据库
 
     // 当前版本信息
     const isPrerelease = ref(false) // 当前检测到的版本是否为预发布版本
@@ -67,6 +67,7 @@ export const useUpdateStore = defineStore(
         // 更新响应式状态
         autoCheckUpdate.value = updateConfig.auto_check
         skipVersion.value = updateConfig.skip_version || ''
+        acceptPrerelease.value = updateConfig.accept_prerelease ?? false
 
         // 获取当前版本
         await fetchAppVersion()
@@ -91,6 +92,7 @@ export const useUpdateStore = defineStore(
           last_check: Math.floor(Date.now() / 1000),
           last_version: appVersion.value,
           skip_version: skipVersion.value || null,
+          accept_prerelease: acceptPrerelease.value,
         }
         await DatabaseService.saveUpdateConfig(config)
         console.log('✅ 更新配置已保存到数据库')
@@ -284,7 +286,8 @@ export const useUpdateStore = defineStore(
     // 设置接受预发布版本
     const setAcceptPrerelease = async (accept: boolean) => {
       acceptPrerelease.value = accept
-      // 注意：这个字段不同步到数据库，所以不需要自动保存
+      // 直接持久化，避免依赖 watch 触发时机导致遗漏
+      await saveToBackend()
     }
 
     // 标记是否正在初始化
@@ -292,7 +295,7 @@ export const useUpdateStore = defineStore(
 
     // 监听更新配置变化并自动保存到数据库
     watch(
-      [autoCheckUpdate, skipVersion],
+      [autoCheckUpdate, skipVersion, acceptPrerelease],
       async () => {
         // 初始化期间不保存
         if (isInitializing) return

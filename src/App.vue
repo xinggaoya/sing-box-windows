@@ -75,6 +75,7 @@ const localeStore = useLocaleStore()
 const windowStore = useWindowStore()
 const subStore = useSubStore()
 const kernelStore = useKernelStore()
+const updateStore = useUpdateStore()
 const trafficStore = useTrafficStore()
 const connectionStore = useConnectionStore()
 const logStore = useLogStore()
@@ -93,7 +94,6 @@ let updateIntervalId: number | undefined
 
 // 自动检查更新
 async function handleAutoUpdateCheck() {
-  const updateStore = useUpdateStore()
   if (updateStore.autoCheckUpdate) {
     console.log('🚀 自动检查更新已启用，将在后台执行...')
     // 立即执行一次静默检查
@@ -133,6 +133,10 @@ onMounted(async () => {
 
     // 0.1 初始化订阅数据，确保跨会话持久化生效
     await subStore.initializeStore()
+
+    // 0.2 初始化语言与更新配置，保证刷新后保留用户选择
+    await localeStore.initializeStore()
+    await updateStore.initializeStore()
 
     // 1. 注册消息实例
     const handleMessageReady = (message: unknown) => {

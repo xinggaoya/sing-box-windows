@@ -93,6 +93,7 @@ pub struct UpdateConfig {
     pub last_check: i64,
     pub last_version: Option<String>,
     pub skip_version: Option<String>,
+    pub accept_prerelease: bool,
 }
 
 impl Default for UpdateConfig {
@@ -102,6 +103,7 @@ impl Default for UpdateConfig {
             last_check: 0,
             last_version: None,
             skip_version: None,
+            accept_prerelease: false,
         }
     }
 }

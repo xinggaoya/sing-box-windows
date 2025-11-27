@@ -38,6 +38,7 @@ export interface UpdateConfig {
   last_check: number
   last_version?: string | null
   skip_version?: string | null
+  accept_prerelease: boolean
 }
 
 export interface Subscription {

@@ -137,6 +137,7 @@ impl DatabaseService {
                 last_check INTEGER DEFAULT 0,
                 last_version TEXT,
                 skip_version TEXT,
+                accept_prerelease BOOLEAN DEFAULT FALSE,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -144,6 +145,13 @@ impl DatabaseService {
         )
         .execute(pool)
         .await?;
+
+        // 更新配置兼容字段补充（确保旧表增加接收预发布字段）
+        let alter_update_statements =
+            ["ALTER TABLE update_config ADD COLUMN accept_prerelease BOOLEAN DEFAULT FALSE"];
+        for statement in alter_update_statements {
+            sqlx::query(statement).execute(pool).await.ok();
+        }
 
         // 通用配置表
         sqlx::query(
@@ -348,11 +356,15 @@ impl DatabaseService {
             .await?;
 
         if let Some(row) = row {
+            let default_config = UpdateConfig::default();
             Ok(Some(UpdateConfig {
                 auto_check: row.get("auto_check"),
                 last_check: row.get("last_check"),
                 last_version: row.get("last_version"),
                 skip_version: row.get("skip_version"),
+                accept_prerelease: row
+                    .try_get("accept_prerelease")
+                    .unwrap_or(default_config.accept_prerelease),
             }))
         } else {
             Ok(None)
@@ -363,14 +375,15 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO update_config 
-            (id, auto_check, last_check, last_version, skip_version, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?)
+            (id, auto_check, last_check, last_version, skip_version, accept_prerelease, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_check)
         .bind(config.last_check)
         .bind(&config.last_version)
         .bind(&config.skip_version)
+        .bind(config.accept_prerelease)
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;
