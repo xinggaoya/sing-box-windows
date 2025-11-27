@@ -1366,6 +1366,7 @@ async fn is_kernel_running_windows() -> Result<bool, String> {
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("sing-box.exe");
+    let kernel_lower = kernel_filename.to_ascii_lowercase();
 
     let mut cmd = tokio::process::Command::new("tasklist");
     // 修复参数格式：/FI 后面的过滤器必须作为一个完整的字符串参数
@@ -1403,10 +1404,13 @@ async fn is_kernel_running_windows() -> Result<bool, String> {
         cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
 
         if let Ok(output) = cmd.output().await {
-            if !output.stdout.is_empty() {
+            // Win10 上 wmic 在未命中时也会输出 “No Instance(s) Available.”，因此必须确认输出中真的包含目标进程
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if !stdout.is_empty() && stdout.to_ascii_lowercase().contains(&kernel_lower) {
                 info!("内核进程正在运行 (wmic检测): true");
                 return Ok(true);
             }
+            info!("WMIC 未检测到 sing-box 进程，输出: {}", stdout.trim());
         }
     }
 
