@@ -5,10 +5,11 @@ import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
-import vueDevTools from 'vite-plugin-vue-devtools'
+// 注释掉 vueDevTools 导入以避免生产构建时的 localStorage 错误
+// import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
     AutoImport({
@@ -17,7 +18,8 @@ export default defineConfig({
     Components({
       resolvers: [NaiveUiResolver()],
     }),
-    vueDevTools(),
+    // Vue DevTools 已被注释以避免生产构建时的 localStorage 错误
+    // 如需在开发时使用，可以取消注释导入并添加条件判断
   ],
   resolve: {
     alias: {
@@ -50,4 +52,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))
