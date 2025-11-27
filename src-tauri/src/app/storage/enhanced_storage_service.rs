@@ -186,7 +186,32 @@ impl EnhancedStorageService {
 #[tauri::command]
 pub async fn db_get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     let storage = get_enhanced_storage(&app).await?;
-    storage.get_app_config().await.map_err(|e| e.to_string())
+    let mut config = storage.get_app_config().await.map_err(|e| e.to_string())?;
+
+    // 非管理员启动时自动关闭 TUN，避免因缺少权限导致内核无法拉起
+    if config.tun_enabled && !crate::app::system::system_service::check_admin() {
+        let previous_mode = config.proxy_mode.clone();
+        config.tun_enabled = false;
+        config.proxy_mode = if config.system_proxy_enabled {
+            "system".to_string()
+        } else {
+            "manual".to_string()
+        };
+
+        if let Err(err) = storage.save_app_config(&config).await {
+            tracing::warn!(
+                "在非管理员模式下写入关闭 TUN 设置失败: {}",
+                err
+            );
+        } else {
+            tracing::info!(
+                "检测到当前未获得管理员权限，已自动关闭 TUN 模式（原模式: {}）",
+                previous_mode
+            );
+        }
+    }
+
+    Ok(config)
 }
 
 #[tauri::command]
