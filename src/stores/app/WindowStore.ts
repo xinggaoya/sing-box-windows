@@ -30,7 +30,7 @@ export const useWindowStore = defineStore(
     // 从数据库加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('🪟 从数据库加载窗口配置...')
+        console.log('?? 从数据库加载窗口配置...')
         const windowConfig = await DatabaseService.getWindowConfig()
         
         // 更新响应式状态
@@ -41,23 +41,34 @@ export const useWindowStore = defineStore(
           lastVisiblePath: '/', // 数据库没有last_visible_path，使用默认值
         }
         
-        console.log('🪟 窗口配置加载完成：', windowState.value)
+        console.log('?? 窗口配置加载完成：', windowState.value)
       } catch (error) {
         console.error('从数据库加载窗口配置失败:', error)
         // 加载失败时使用默认值
       }
     }
 
+    const resolveWindowSize = async (): Promise<{ width: number, height: number }> => {
+      try {
+        const size = await getAppWindow().innerSize()
+        return { width: size.width, height: size.height }
+      } catch (error) {
+        console.warn('读取窗口大小失败，使用默认值', error)
+        return { width: 1000, height: 700 }
+      }
+    }
+
     // 保存配置到数据库
     const saveToBackend = async () => {
       try {
+        const { width, height } = await resolveWindowSize()
         const config: WindowConfig = {
           is_maximized: windowState.value.isMaximized,
-          width: 1000, // 默认宽度
-          height: 700, // 默认高度
+          width,
+          height,
         }
         await DatabaseService.saveWindowConfig(config)
-        console.log('✅ 窗口配置已保存到数据库')
+        console.log('? 窗口配置已保存到数据库')
       } catch (error) {
         console.error('保存窗口配置到数据库失败:', error)
       }

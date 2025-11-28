@@ -1,7 +1,9 @@
 use crate::utils::proxy_util::DEFAULT_BYPASS_LIST;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../src/types/generated/AppConfig.ts")]
 pub struct AppConfig {
     pub auto_start_kernel: bool,
     pub auto_start_app: bool,
@@ -46,7 +48,8 @@ impl Default for AppConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../src/types/generated/ThemeConfig.ts")]
 pub struct ThemeConfig {
     pub is_dark: bool,
 }
@@ -57,7 +60,8 @@ impl Default for ThemeConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../src/types/generated/LocaleConfig.ts")]
 pub struct LocaleConfig {
     pub locale: String,
 }
@@ -70,7 +74,8 @@ impl Default for LocaleConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../src/types/generated/WindowConfig.ts")]
 pub struct WindowConfig {
     pub is_maximized: bool,
     pub width: u32,
@@ -87,7 +92,8 @@ impl Default for WindowConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../src/types/generated/UpdateConfig.ts")]
 pub struct UpdateConfig {
     pub auto_check: bool,
     pub last_check: i64,
@@ -108,7 +114,8 @@ impl Default for UpdateConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../src/types/generated/Subscription.ts")]
 pub struct Subscription {
     pub name: String,
     pub url: String,

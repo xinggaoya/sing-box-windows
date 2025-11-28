@@ -8,6 +8,7 @@ import type { ThemeConfig } from '@/types/database'
 export const useThemeStore = defineStore(
   'theme',
   () => {
+    let isInitializing = true
     // 主题相关状态
     const osTheme = useOsTheme()
     const isDark = ref(osTheme.value === 'dark')
@@ -57,6 +58,7 @@ export const useThemeStore = defineStore(
     watch(
       isDark,
       async (newValue) => {
+        if (isInitializing) return
         applyThemeClass(newValue)
         // 自动保存到数据库
         await saveToBackend()
@@ -85,6 +87,8 @@ export const useThemeStore = defineStore(
     // 初始化方法
     const initializeStore = async () => {
       await loadFromBackend()
+      applyThemeClass(isDark.value)
+      isInitializing = false
     }
 
     return {

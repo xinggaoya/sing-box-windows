@@ -24,10 +24,12 @@ export interface PersistenceState {
 export function createAppPersistence(state: PersistenceState) {
   const isDataRestored = ref(false)
   const isInitializing = ref(false)
+  const SAVE_DEBOUNCE_MS = 300
 
   let dataRestorePromise: Promise<void> | null = null
   let dataRestoreResolve: (() => void) | null = null
   let lastSavePromise: Promise<void> | null = null
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
 
   const initializeDataRestore = () => {
     if (!dataRestorePromise) {
@@ -148,6 +150,19 @@ export function createAppPersistence(state: PersistenceState) {
     }
   }
 
+  const scheduleSave = () => {
+    if (isInitializing.value) {
+      return
+    }
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+    }
+    saveTimer = setTimeout(() => {
+      const savePromise = saveToBackend()
+      lastSavePromise = savePromise
+    }, SAVE_DEBOUNCE_MS)
+  }
+
   const stopAutoSave = watch(
     [
       state.systemProxyEnabled,
@@ -167,19 +182,15 @@ export function createAppPersistence(state: PersistenceState) {
       state.tunStack,
       state.tunEnableIpv6,
     ],
-    async () => {
-      if (isInitializing.value) {
-        return
-      }
-      const savePromise = saveToBackend()
-      lastSavePromise = savePromise
-      await savePromise
-    },
+    scheduleSave,
     { deep: true }
   )
 
   const waitForSaveCompletion = async () => {
     await nextTick()
+    if (saveTimer) {
+      await new Promise(resolve => setTimeout(resolve, SAVE_DEBOUNCE_MS))
+    }
     if (lastSavePromise) {
       await lastSavePromise
     }

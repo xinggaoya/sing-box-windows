@@ -421,8 +421,6 @@ async fn download_and_process_subscription(
 
     apply_app_settings_to_config(&mut config, app_config);
 
-    apply_app_settings_to_config(&mut config, app_config);
-
     // 保存配置到文件
     let config_path = Path::new(&work_dir).join("sing-box/config.json");
     info!("正在保存配置到: {:?}", config_path);

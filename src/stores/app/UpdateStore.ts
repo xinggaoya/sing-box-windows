@@ -54,6 +54,7 @@ export const useUpdateStore = defineStore(
     const autoCheckUpdate = ref(true)
     const skipVersion = ref('')
     const acceptPrerelease = ref(false) // 是否接收预发布版本，持久化到数据库
+    const lastCheck = ref(0)
 
     // 当前版本信息
     const isPrerelease = ref(false) // 当前检测到的版本是否为预发布版本
@@ -61,52 +62,59 @@ export const useUpdateStore = defineStore(
     // 从数据库加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('🔄 从数据库加载更新配置...')
+        console.log('?? 从数据库加载更新配置...')
         const updateConfig = await DatabaseService.getUpdateConfig()
 
         // 更新响应式状态
         autoCheckUpdate.value = updateConfig.auto_check
         skipVersion.value = updateConfig.skip_version || ''
         acceptPrerelease.value = updateConfig.accept_prerelease ?? false
+        lastCheck.value = updateConfig.last_check ?? 0
 
-        // 获取当前版本
-        await fetchAppVersion()
+        // 获取当前版本（不触发写入）
+        await fetchAppVersion(false)
 
-        console.log('🔄 更新配置加载完成：', {
+        console.log('?? 更新配置加载完成：', {
           appVersion: appVersion.value,
           autoCheckUpdate: autoCheckUpdate.value,
           skipVersion: skipVersion.value,
+          lastCheck: lastCheck.value,
         })
       } catch (error) {
         console.error('从数据库加载更新配置失败:', error)
         // 加载失败时获取当前版本
-        await fetchAppVersion()
+        await fetchAppVersion(false)
       }
     }
 
     // 保存配置到数据库
-    const saveToBackend = async () => {
+    const saveToBackend = async (options?: { touchLastCheck?: boolean }) => {
       try {
+        const nextLastCheck = options?.touchLastCheck
+          ? Math.floor(Date.now() / 1000)
+          : lastCheck.value
+        lastCheck.value = nextLastCheck
         const config: UpdateConfig = {
           auto_check: autoCheckUpdate.value,
-          last_check: Math.floor(Date.now() / 1000),
-          last_version: appVersion.value,
+          last_check: nextLastCheck,
+          last_version: appVersion.value || null,
           skip_version: skipVersion.value || null,
           accept_prerelease: acceptPrerelease.value,
         }
         await DatabaseService.saveUpdateConfig(config)
-        console.log('✅ 更新配置已保存到数据库')
+        console.log('? 更新配置已保存到数据库')
       } catch (error) {
         console.error('保存更新配置到数据库失败:', error)
       }
     }
 
     // 获取应用版本
-    const fetchAppVersion = async () => {
+    const fetchAppVersion = async (persist: boolean = false) => {
       try {
         appVersion.value = await getVersion()
-        // 保存版本到后端
-        await saveToBackend()
+        if (persist) {
+          await saveToBackend({ touchLastCheck: false })
+        }
         return appVersion.value
       } catch (error) {
         console.error('获取应用版本失败:', error)
@@ -152,7 +160,7 @@ export const useUpdateStore = defineStore(
 
         // 确保当前版本已获取
         if (!appVersion.value) {
-          await fetchAppVersion()
+          await fetchAppVersion(false)
         }
 
         const updateInfo = await systemService.checkUpdate(
@@ -193,6 +201,7 @@ export const useUpdateStore = defineStore(
         if (updateState.value.status === 'checking') {
           updateState.value.status = 'idle'
         }
+        await saveToBackend({ touchLastCheck: true })
       }
     }
 
@@ -287,7 +296,7 @@ export const useUpdateStore = defineStore(
     const setAcceptPrerelease = async (accept: boolean) => {
       acceptPrerelease.value = accept
       // 直接持久化，避免依赖 watch 触发时机导致遗漏
-      await saveToBackend()
+      await saveToBackend({ touchLastCheck: false })
     }
 
     // 标记是否正在初始化

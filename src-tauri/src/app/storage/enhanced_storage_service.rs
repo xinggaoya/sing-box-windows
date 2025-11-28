@@ -6,40 +6,26 @@ use crate::app::storage::state_model::{
 };
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
+use tokio::sync::OnceCell;
 
-/// 获取数据库服务的辅助函数
+/// 获取数据库服务的辅助函数（单例初始化）
 async fn get_enhanced_storage(app: &AppHandle) -> Result<Arc<EnhancedStorageService>, String> {
-    // 尝试从状态中获取已初始化的服务
-    if let Ok(enhanced_storage_guard) = app
-        .state::<std::sync::Mutex<Option<Arc<EnhancedStorageService>>>>()
-        .lock()
-    {
-        if let Some(service) = enhanced_storage_guard.as_ref() {
-            tracing::info!("✅ 使用已初始化的数据库服务");
-            return Ok(service.clone());
-        }
-    }
+    let cell_state = app.state::<Arc<OnceCell<Arc<EnhancedStorageService>>>>();
+    let cell = Arc::clone(&*cell_state);
 
-    // 如果没有初始化，创建新的服务
-    tracing::info!("🔧 初始化新的数据库服务...");
-    match EnhancedStorageService::new(app).await {
-        Ok(service) => {
-            tracing::info!("✅ 数据库服务初始化成功");
-            let arc_service = Arc::new(service);
-            // 保存到状态中
-            if let Ok(mut enhanced_storage_guard) = app
-                .state::<std::sync::Mutex<Option<Arc<EnhancedStorageService>>>>()
-                .lock()
-            {
-                *enhanced_storage_guard = Some(arc_service.clone());
-            }
-            Ok(arc_service)
-        }
-        Err(e) => {
-            tracing::error!("❌ 数据库服务初始化失败: {}", e);
-            Err(format!("Failed to initialize enhanced storage: {}", e))
-        }
-    }
+    cell.get_or_try_init(|| async {
+        tracing::info!("?? 初始化新的数据库服务...");
+        EnhancedStorageService::new(app).await.map(Arc::new)
+    })
+    .await
+    .map(|svc| {
+        tracing::info!("? 使用已初始化的数据库服务");
+        svc.clone()
+    })
+    .map_err(|e| {
+        tracing::error!("? 数据库服务初始化失败: {}", e);
+        format!("Failed to initialize enhanced storage: {}", e)
+    })
 }
 
 /// 增强版存储服务 - 使用 SQLite 数据库
@@ -298,7 +284,7 @@ pub async fn db_get_subscriptions(app: AppHandle) -> Result<Vec<Subscription>, S
 pub async fn db_save_subscriptions(
     subscriptions: Vec<Subscription>,
     app: AppHandle,
-) -> Result<(), String> {
+    ) -> Result<(), String> {
     let storage = get_enhanced_storage(&app).await?;
     storage
         .save_subscriptions(&subscriptions)
