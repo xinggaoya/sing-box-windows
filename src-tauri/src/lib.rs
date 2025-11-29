@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tracing_subscriber::{fmt, EnvFilter}; // 重新启用数据库存储
+use tokio::sync::OnceCell;
 
 pub mod app;
 pub mod entity;
@@ -58,35 +59,35 @@ pub fn run() {
             }
 
             // 重新启用增强版存储服务（数据库）
-            let enhanced_storage =
-                std::sync::Mutex::new(None as Option<Arc<EnhancedStorageService>>);
+            let enhanced_storage: Arc<OnceCell<Arc<EnhancedStorageService>>> =
+                Arc::new(OnceCell::const_new());
             app.manage(enhanced_storage);
 
-            // 异步初始化数据库服务
+            // 异步初始化数据库服务（单例）
             let app_handle = app.handle().clone();
+            let storage_cell_state =
+                app.state::<Arc<OnceCell<Arc<EnhancedStorageService>>>>();
+            let storage_cell = Arc::clone(&*storage_cell_state);
             tauri::async_runtime::spawn(async move {
-                match EnhancedStorageService::new(&app_handle).await {
-                    Ok(service) => {
-                        if let Ok(mut enhanced_storage) = app_handle
-                            .state::<std::sync::Mutex<Option<Arc<EnhancedStorageService>>>>()
-                            .lock()
-                        {
-                            *enhanced_storage = Some(Arc::new(service));
-                        }
-                        tracing::info!("Enhanced storage service initialized successfully");
-
-                        // 后端启动后立即尝试自动管理内核（尊重 auto_start_kernel 设置）
-                        crate::app::core::kernel_service::auto_manage_with_saved_config(
-                            &app_handle,
-                            false,
-                            "app-start",
-                        )
-                        .await;
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to initialize enhanced storage service: {}", e);
-                    }
+                if let Err(e) = storage_cell
+                    .get_or_try_init(|| async {
+                        EnhancedStorageService::new(&app_handle).await.map(Arc::new)
+                    })
+                    .await
+                {
+                    tracing::error!("Failed to initialize enhanced storage service: {}", e);
+                    return;
                 }
+
+                tracing::info!("Enhanced storage service initialized successfully");
+
+                // 后端启动后立即尝试自动管理内核（尊重 auto_start_kernel 设置）
+                crate::app::core::kernel_service::auto_manage_with_saved_config(
+                    &app_handle,
+                    false,
+                    "app-start",
+                )
+                .await;
             });
 
             Ok(())

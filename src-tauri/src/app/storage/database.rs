@@ -5,6 +5,9 @@ use crate::app::storage::state_model::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::{migrate::MigrateDatabase, sqlite::Sqlite, sqlite::SqlitePool, Row};
+use tokio::sync::OnceCell;
+
+static SCHEMA_INIT: OnceCell<()> = OnceCell::const_new();
 
 #[derive(Debug, Clone)]
 pub struct DatabaseService {
@@ -13,25 +16,32 @@ pub struct DatabaseService {
 
 impl DatabaseService {
     pub async fn new(database_path: &str) -> Result<Self, StorageError> {
-        tracing::info!("🗄️ 初始化数据库: {}", database_path);
+        tracing::info!("??? 初始化数据库: {}", database_path);
         let database_url = format!("sqlite:{}", database_path);
 
         // 创建数据库
         if !Sqlite::database_exists(&database_url).await? {
-            tracing::info!("📁 创建新数据库");
+            tracing::info!("?? 创建新数据库");
             Sqlite::create_database(&database_url).await?;
         } else {
-            tracing::info!("📁 数据库已存在");
+            tracing::info!("?? 数据库已存在");
         }
 
         let pool = SqlitePool::connect(&database_url).await?;
-        tracing::info!("✅ 数据库连接成功");
+        tracing::info!("? 数据库连接成功");
 
-        // 创建表结构
-        Self::create_tables(&pool).await?;
-        tracing::info!("✅ 数据库表创建完成");
+        // 创建表结构（仅执行一次）
+        Self::create_tables_once(&pool).await?;
+        tracing::info!("? 数据库表创建完成");
 
         Ok(Self { pool })
+    }
+
+    async fn create_tables_once(pool: &SqlitePool) -> Result<(), StorageError> {
+        SCHEMA_INIT
+            .get_or_try_init(|| async { Self::create_tables(pool).await })
+            .await
+            .map(|_| ())
     }
 
     async fn create_tables(pool: &SqlitePool) -> Result<(), StorageError> {
@@ -400,19 +410,6 @@ impl DatabaseService {
 
         sqlx::query(
             r#"
-            CREATE TABLE IF NOT EXISTS generic_config (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        sqlx::query(
-            r#"
             INSERT OR REPLACE INTO generic_config 
             (key, value, updated_at)
             VALUES (?, ?, ?)
@@ -451,7 +448,7 @@ impl DatabaseService {
             .bind(key)
             .execute(&self.pool)
             .await
-            .map_err(|e| StorageError::Database(e))?;
+            .map_err(StorageError::Database)?;
 
         Ok(())
     }
