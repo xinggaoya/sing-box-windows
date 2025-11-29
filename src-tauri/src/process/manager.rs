@@ -4,7 +4,7 @@ use crate::utils::proxy_util::disable_system_proxy;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
@@ -201,6 +201,9 @@ impl ProcessManager {
                 .to_str()
                 .ok_or_else(|| ProcessError::StartFailed("工作目录路径包含无效字符".to_string()))?,
         ]);
+
+        // 避免内核 stdout/stderr 继承到 Tauri 控制台，防止开发日志被内核日志淹没
+        cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
         #[cfg(target_os = "windows")]
         cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
