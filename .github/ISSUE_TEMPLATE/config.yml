@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 文档和Wiki
+    url: https://github.com/your-username/sing-box-windows/wiki
+    about: 查看项目文档和使用指南
+  - name: 💬 讨论区
+    url: https://github.com/your-username/sing-box-windows/discussions
+    about: 在社区讨论区提问和交流
+  - name: 🐛 问题排查指南
+    url: https://github.com/your-username/sing-box-windows/wiki/Troubleshooting
+    about: 常见问题解决方案和排查步骤
+  - name: 🌟 功能建议投票
+    url: https://github.com/your-username/sing-box-windows/discussions/categories/ideas
+    about: 在讨论区提出功能建议并获得社区反馈
