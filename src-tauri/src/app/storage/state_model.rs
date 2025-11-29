@@ -52,11 +52,19 @@ impl Default for AppConfig {
 #[ts(export, export_to = "../src/types/generated/ThemeConfig.ts")]
 pub struct ThemeConfig {
     pub is_dark: bool,
+    pub mode: String,
+    pub accent_color: String,
+    pub compact_mode: bool,
 }
 
 impl Default for ThemeConfig {
     fn default() -> Self {
-        Self { is_dark: true }
+        Self {
+            is_dark: true,
+            mode: "system".to_string(),
+            accent_color: "#6366f1".to_string(),
+            compact_mode: false,
+        }
     }
 }
 

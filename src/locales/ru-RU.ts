@@ -299,10 +299,18 @@ export default {
       description: 'Настройка языка, сети и других параметров приложения',
     },
 
-    // 主题设置
+    // 翋枙扢离
     theme: {
-      light: 'Светлая',
-      dark: 'Темная',
+      title: 'Appearance & Theme',
+      mode: 'Theme Mode',
+      modeDesc: 'Follow system or force light / dark',
+      system: 'System',
+      light: 'Light',
+      dark: 'Dark',
+      accent: 'Accent Color',
+      accentDesc: 'Set the primary accent color for controls',
+      compactMode: 'Compact Layout',
+      compactDesc: 'Tighter paddings and smaller controls for dense UI',
     },
 
     // 语言设置

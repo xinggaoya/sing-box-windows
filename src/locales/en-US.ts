@@ -263,8 +263,16 @@ export default {
       description: 'Configure language, network and other application options',
     },
     theme: {
+      title: 'Appearance & Theme',
+      mode: 'Theme Mode',
+      modeDesc: 'Follow system preference or lock to light / dark',
+      system: 'System',
       light: 'Light',
       dark: 'Dark',
+      accent: 'Accent Color',
+      accentDesc: 'Set the primary accent color for controls and highlights',
+      compactMode: 'Compact Layout',
+      compactDesc: 'Tighten paddings and control heights for dense screens',
     },
     language: {
       title: 'Language',

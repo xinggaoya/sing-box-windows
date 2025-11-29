@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme="themeStore.theme" :theme-overrides="themeOverrides">
+  <n-config-provider :theme="configProviderTheme" :theme-overrides="themeOverrides">
     <n-global-style />
     <n-dialog-provider>
       <n-modal-provider>
@@ -23,15 +23,13 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent, onMounted, onBeforeUnmount, watch } from 'vue'
+import { computed, defineComponent, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Window } from '@tauri-apps/api/window'
 import mitt from '@/utils/mitt'
 import { useMessage } from 'naive-ui'
 import type { Router } from 'vue-router'
-// 导入主题配置
-import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 
 import {
   useThemeStore,
@@ -79,6 +77,8 @@ const updateStore = useUpdateStore()
 const trafficStore = useTrafficStore()
 const connectionStore = useConnectionStore()
 const logStore = useLogStore()
+const configProviderTheme = computed(() => themeStore.naiveTheme)
+const themeOverrides = computed(() => themeStore.themeOverrides)
 
 // 生产环境下禁用右键菜单
 
@@ -127,6 +127,7 @@ onMounted(async () => {
   })
 
   try {
+    await themeStore.initializeStore()
     // 0. 初始化 AppStore 以确保持久化数据已加载
     console.log('📋 初始化 AppStore...')
     await appStore.initializeStore()

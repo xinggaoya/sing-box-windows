@@ -37,6 +37,7 @@
   
   --chip-bg: rgba(99, 102, 241, 0.1);
   --chip-text: #4338ca;
+
 }
 
 .dark, [data-theme='dark'] {
@@ -73,6 +74,22 @@
   
   --chip-bg: rgba(99, 102, 241, 0.2);
   --chip-text: #e0e7ff;
+}
+
+:root.compact-mode,
+.compact-mode {
+  /* Compact layout variables */
+  --layout-page-padding-x: 20px;
+  --layout-page-padding-y: 14px;
+  --layout-page-gap: 16px;
+  --layout-grid-gap: 16px;
+  --layout-page-max-width: 1100px;
+  --layout-card-padding: 14px;
+  --layout-card-radius: 12px;
+  --layout-row-gap: 12px;
+  --layout-inline-gap: 10px;
+  --layout-inline-gap-tight: 6px;
+  --layout-subscription-gap: 14px;
 }
 
 #app {

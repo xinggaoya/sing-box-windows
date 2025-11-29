@@ -127,6 +127,67 @@
         </div>
       </div>
 
+      <!-- Theme Settings -->
+      <div class="settings-section">
+        <div class="section-header">
+          <n-icon size="20"><ColorPaletteOutline /></n-icon>
+          <h3>{{ t('setting.theme.title') }}</h3>
+        </div>
+        <div class="section-card theme-card">
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">{{ t('setting.theme.mode') }}</div>
+              <div class="setting-desc">{{ t('setting.theme.modeDesc') }}</div>
+            </div>
+            <n-radio-group
+              v-model:value="themeForm.mode"
+              size="small"
+              class="theme-mode-selector"
+              @update:value="onThemeModeChange"
+            >
+              <n-radio-button value="system">{{ t('setting.theme.system') }}</n-radio-button>
+              <n-radio-button value="light">{{ t('setting.theme.light') }}</n-radio-button>
+              <n-radio-button value="dark">{{ t('setting.theme.dark') }}</n-radio-button>
+            </n-radio-group>
+          </div>
+
+          <div class="setting-row align-start">
+            <div class="setting-info">
+              <div class="setting-label">{{ t('setting.theme.accent') }}</div>
+              <div class="setting-desc">{{ t('setting.theme.accentDesc') }}</div>
+            </div>
+            <div class="theme-accent">
+              <n-color-picker
+                v-model:value="themeForm.accentColor"
+                :modes="['hex']"
+                size="small"
+                :show-alpha="false"
+                @update:value="onAccentChange"
+              />
+              <div class="preset-swatches">
+                <button
+                  v-for="color in accentPresets"
+                  :key="color"
+                  class="preset-swatch"
+                  :style="{ background: color }"
+                  @click="selectAccentPreset(color)"
+                >
+                  <span v-if="color === themeForm.accentColor" class="swatch-active"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">{{ t('setting.theme.compactMode') }}</div>
+              <div class="setting-desc">{{ t('setting.theme.compactDesc') }}</div>
+            </div>
+            <n-switch v-model:value="themeForm.compactMode" @update:value="onCompactModeChange" />
+          </div>
+        </div>
+      </div>
+
       <!-- Advanced Proxy Settings -->
       <div class="settings-section full-width">
         <div class="section-header">
@@ -375,10 +436,12 @@ import {
   RefreshOutline,
   InformationCircleOutline,
   LogoGithub,
+  ColorPaletteOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
-import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore } from '@/stores'
+import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore, useThemeStore } from '@/stores'
 import type { Locale } from '@/stores/app/LocaleStore'
+import type { ThemeMode } from '@/stores/app/ThemeStore'
 import { systemService } from '@/services/system-service'
 import { eventService } from '@/services/event-service'
 import { supportedLocales } from '@/locales'
@@ -391,6 +454,7 @@ const appStore = useAppStore()
 const kernelStore = useKernelStore()
 const updateStore = useUpdateStore()
 const localeStore = useLocaleStore()
+const themeStore = useThemeStore()
 
 // State
 const loading = ref(false)
@@ -404,6 +468,12 @@ let updateProgressListener: (() => void) | null = null
 const autoStart = ref(false)
 const locale = ref(localeStore.locale)
 const checkingUpdate = ref(false)
+const themeForm = reactive({
+  mode: 'system' as ThemeMode,
+  accentColor: '#6366f1',
+  compactMode: false,
+})
+const accentPresets = ['#6366f1', '#0ea5e9', '#22c55e', '#f59e0b', '#e11d48', '#8b5cf6']
 
 const showPortModal = ref(false)
 const tempProxyPort = ref(12080)
@@ -462,6 +532,18 @@ watch(() => appStore.isDataRestored, (restored) => {
   }
 }, { immediate: true })
 
+const syncThemeForm = () => {
+  themeForm.mode = themeStore.mode as ThemeMode
+  themeForm.accentColor = themeStore.accentColor
+  themeForm.compactMode = themeStore.compactMode
+}
+
+watch(
+  () => [themeStore.mode, themeStore.accentColor, themeStore.compactMode],
+  () => syncThemeForm(),
+  { immediate: true },
+)
+
 const onAutoStartChange = async (value: boolean) => {
   try {
     await appStore.toggleAutoStart(value)
@@ -499,6 +581,23 @@ const onIpVersionChange = async (value: boolean) => {
     console.error('切换IPv6优先失败:', error)
     message.error(t('notification.proxyModeChangeFailed'))
   }
+}
+
+const onThemeModeChange = async (value: ThemeMode) => {
+  await themeStore.setThemeMode(value)
+}
+
+const onAccentChange = async (value: string) => {
+  await themeStore.setAccentColor(value)
+}
+
+const selectAccentPreset = async (color: string) => {
+  themeForm.accentColor = color
+  await themeStore.setAccentColor(color)
+}
+
+const onCompactModeChange = async (value: boolean) => {
+  await themeStore.setCompactMode(value)
 }
 
 const cleanupDownloadListener = () => {
@@ -708,18 +807,18 @@ onUnmounted(() => {
 
 <style scoped>
 .page-container {
-  padding: 24px 32px;
-  max-width: 1200px;
+  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
+  max-width: var(--layout-page-max-width, 1200px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--layout-page-gap, 24px);
 }
 
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 24px;
+  gap: var(--layout-grid-gap, 24px);
 }
 
 .settings-section.full-width {
@@ -749,18 +848,18 @@ onUnmounted(() => {
 .section-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: var(--layout-card-radius, 16px);
+  padding: var(--layout-card-padding, 20px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--layout-row-gap, 16px);
 }
 
 .setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--layout-row-gap, 16px);
 }
 
 .setting-info {
@@ -781,6 +880,57 @@ onUnmounted(() => {
 
 .setting-input {
   width: 140px;
+}
+
+.setting-row.align-start {
+  align-items: flex-start;
+}
+
+.theme-card {
+  gap: 18px;
+}
+
+.theme-mode-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-accent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.preset-swatches {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-swatch {
+  width: 34px;
+  height: 24px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease;
+  position: relative;
+}
+
+.preset-swatch:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
+.swatch-active {
+  position: absolute;
+  inset: 4px;
+  border-radius: 8px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
 }
 
 .alert-box {
@@ -812,12 +962,12 @@ onUnmounted(() => {
 .actions-row {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--layout-inline-gap, 12px);
 }
 
 .sub-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--layout-inline-gap-tight, 8px);
   justify-content: center;
 }
 
@@ -846,7 +996,7 @@ onUnmounted(() => {
 .toggle-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: calc(var(--layout-inline-gap, 12px) - 2px);
   font-size: 13px;
   color: var(--text-secondary);
 }

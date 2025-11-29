@@ -100,6 +100,9 @@ impl DatabaseService {
             CREATE TABLE IF NOT EXISTS theme_config (
                 id INTEGER PRIMARY KEY,
                 is_dark BOOLEAN DEFAULT FALSE,
+                mode TEXT DEFAULT 'system',
+                accent_color TEXT DEFAULT '#6366f1',
+                compact_mode BOOLEAN DEFAULT FALSE,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -107,6 +110,17 @@ impl DatabaseService {
         )
         .execute(pool)
         .await?;
+
+        // 主题配置表兼容字段补充
+        let alter_theme_statements = [
+            "ALTER TABLE theme_config ADD COLUMN mode TEXT DEFAULT 'system'",
+            "ALTER TABLE theme_config ADD COLUMN accent_color TEXT DEFAULT '#6366f1'",
+            "ALTER TABLE theme_config ADD COLUMN compact_mode BOOLEAN DEFAULT FALSE",
+        ];
+
+        for statement in alter_theme_statements {
+            sqlx::query(statement).execute(pool).await.ok();
+        }
 
         // 语言配置表
         sqlx::query(
@@ -269,8 +283,21 @@ impl DatabaseService {
             .await?;
 
         if let Some(row) = row {
+            let stored_mode: String = row.try_get("mode").unwrap_or_else(|_| "system".to_string());
+            let normalized_mode = match stored_mode.as_str() {
+                "light" | "dark" | "system" => stored_mode,
+                _ => "system".to_string(),
+            };
+
+            let accent_color: String = row
+                .try_get("accent_color")
+                .unwrap_or_else(|_| "#6366f1".to_string());
+
             Ok(Some(ThemeConfig {
-                is_dark: row.get("is_dark"),
+                is_dark: row.try_get("is_dark").unwrap_or(true),
+                mode: normalized_mode,
+                accent_color,
+                compact_mode: row.try_get("compact_mode").unwrap_or(false),
             }))
         } else {
             Ok(None)
@@ -281,11 +308,14 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO theme_config 
-            (id, is_dark, updated_at)
-            VALUES (1, ?, ?)
+            (id, is_dark, mode, accent_color, compact_mode, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.is_dark)
+        .bind(&config.mode)
+        .bind(&config.accent_color)
+        .bind(config.compact_mode)
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;

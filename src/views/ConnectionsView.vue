@@ -371,18 +371,18 @@ onUnmounted(() => {
 
 <style scoped>
 .page-container {
-  padding: 24px 32px;
-  max-width: 1400px;
+  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
+  max-width: var(--layout-page-max-width, 1400px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--layout-page-gap, 24px);
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  gap: var(--layout-row-gap, 16px);
 }
 
 .filter-section {
@@ -394,7 +394,7 @@ onUnmounted(() => {
 
 .filter-bar {
   display: flex;
-  gap: 16px;
+  gap: var(--layout-row-gap, 16px);
   flex-wrap: wrap;
 }
 
@@ -411,7 +411,7 @@ onUnmounted(() => {
 .connections-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 16px;
+  gap: var(--layout-row-gap, 16px);
 }
 
 .connection-card {

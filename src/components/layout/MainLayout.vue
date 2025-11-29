@@ -137,7 +137,6 @@ import { useWindowStore } from '@/stores/app/WindowStore'
 import { useUpdateStore } from '@/stores/app/UpdateStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useI18n } from 'vue-i18n'
-import { darkTheme, type GlobalThemeOverrides } from 'naive-ui'
 import {
   HomeOutline,
   SwapHorizontalOutline,
@@ -158,7 +157,6 @@ import { useMessage } from 'naive-ui'
 import mitt from 'mitt'
 import UpdateModal from '@/components/UpdateModal.vue'
 import logo from '@/assets/icon.png'
-import themeOverridesConfig from '@/assets/naive-ui-theme-overrides.json'
 import { useKernelStatus } from '@/composables/useKernelStatus'
 
 defineOptions({
@@ -208,8 +206,8 @@ const updateInfo = ref({
 })
 
 // Theme Configuration
-const theme = computed(() => (themeStore.isDark ? darkTheme : null))
-const themeOverrides = computed<GlobalThemeOverrides>(() => themeOverridesConfig)
+const theme = computed(() => themeStore.naiveTheme)
+const themeOverrides = computed(() => themeStore.themeOverrides)
 
 // Menu Configuration
 const currentMenu = computed(() => {

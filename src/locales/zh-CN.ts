@@ -263,8 +263,16 @@ export default {
       description: '配置语言、网络和其他应用程序选项',
     },
     theme: {
+      title: '外观与主题',
+      mode: '主题模式',
+      modeDesc: '可跟随系统或固定浅色 / 深色',
+      system: '跟随系统',
       light: '浅色',
       dark: '深色',
+      accent: '主题色',
+      accentDesc: '自定义按钮、高亮等主色调',
+      compactMode: '紧凑布局',
+      compactDesc: '收紧控件尺寸与内边距，适合信息密集界面',
     },
     language: {
       title: '语言',

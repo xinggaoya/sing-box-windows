@@ -462,12 +462,12 @@ onMounted(async () => {
 
 <style scoped>
 .page-container {
-  padding: 24px 32px;
-  max-width: 1200px;
+  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
+  max-width: var(--layout-page-max-width, 1200px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: var(--layout-page-gap, 32px);
 }
 
 /* Header */
@@ -549,7 +549,7 @@ onMounted(async () => {
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  gap: var(--layout-grid-gap, 24px);
 }
 
 .grid-section.full-width {
@@ -559,7 +559,7 @@ onMounted(async () => {
 .stats-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: var(--layout-grid-gap, 24px);
 }
 
 /* Sections */

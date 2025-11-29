@@ -300,8 +300,16 @@ export default {
 
     // 主题设置
     theme: {
+      title: '外観とテーマ',
+      mode: 'テーマモード',
+      modeDesc: 'システムに追従するか、ライト/ダークを固定します',
+      system: 'システムに合わせる',
       light: 'ライト',
       dark: 'ダーク',
+      accent: 'アクセントカラー',
+      accentDesc: 'ボタンや強調に使う主色を設定します',
+      compactMode: 'コンパクトレイアウト',
+      compactDesc: '余白を減らし、コントロールを少し小さく表示します',
     },
 
     // 语言设置
