@@ -132,4 +132,7 @@ pub struct Subscription {
     pub is_manual: bool,
     pub manual_content: Option<String>,
     pub use_original_config: bool,
+    pub config_path: Option<String>,
+    pub backup_path: Option<String>,
+    pub auto_update_interval_minutes: Option<u64>,
 }

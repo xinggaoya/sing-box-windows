@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tauri::path::BaseDirectory;
 use tauri::Manager;
 use tracing::{error, info, warn};
@@ -34,16 +34,79 @@ fn runtime_state_from_config(app_config: &AppConfig) -> ProxyRuntimeState {
     }
 }
 
+fn sanitize_file_name(raw: &str) -> String {
+    raw.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect()
+}
+
+fn resolve_target_config_path(
+    file_name: Option<String>,
+    config_path: Option<String>,
+) -> Result<PathBuf, String> {
+    if let Some(path) = config_path {
+        let candidate = PathBuf::from(path);
+        if let Some(parent) = candidate.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("创建配置目录失败: {}", e))?;
+        }
+        return Ok(candidate);
+    }
+
+    let work_dir = get_work_dir_sync();
+    let config_dir = Path::new(&work_dir).join("sing-box/configs");
+    if let Err(e) = std::fs::create_dir_all(&config_dir) {
+        return Err(format!("创建配置目录失败: {}", e));
+    }
+
+    let file = file_name
+        .and_then(|name| Path::new(&name).file_name().map(|n| n.to_string_lossy().to_string()))
+        .unwrap_or_else(|| {
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            format!("config-{}.json", ts)
+        });
+    let safe_file = sanitize_file_name(&file);
+
+    Ok(config_dir.join(safe_file))
+}
+
+fn backup_existing_config(target: &Path) -> Option<PathBuf> {
+    if target.exists() {
+        let backup = target.with_extension("bak");
+        if let Err(e) = std::fs::copy(target, &backup) {
+            warn!("备份配置失败: {}", e);
+            None
+        } else {
+            Some(backup)
+        }
+    } else {
+        None
+    }
+}
+
 // 下载订阅
 #[tauri::command]
 pub async fn download_subscription(
     url: String,
     use_original_config: bool,
+    file_name: Option<String>,
+    config_path: Option<String>,
+    apply_runtime: Option<bool>,
     window: tauri::Window,
     proxy_port: Option<u16>,
     api_port: Option<u16>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let app_handle = window.app_handle();
+    let apply_runtime = apply_runtime.unwrap_or(true);
 
     let mut app_config = load_app_config(&app_handle)
         .await
@@ -56,22 +119,39 @@ pub async fn download_subscription(
         app_config.api_port = port;
     }
 
-    download_and_process_subscription(url, use_original_config, &app_handle, &app_config)
+    let target_path = resolve_target_config_path(file_name, config_path)?;
+    download_and_process_subscription(
+        url,
+        use_original_config,
+        &app_handle,
+        &app_config,
+        &target_path,
+    )
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
 
-    // 按当前数据库配置应用代理（无需前端额外参数）
-    let runtime_state = runtime_state_from_config(&app_config);
-    if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(&runtime_state) {
-        warn!("应用代理配置失败: {}", e);
+    // 按需要应用运行时配置
+    if apply_runtime {
+        if let Err(e) =
+            crate::app::constants::paths::set_active_config_path(Some(&target_path))
+        {
+            warn!("写入激活配置指针失败: {}", e);
+        }
+
+        let runtime_state = runtime_state_from_config(&app_config);
+        if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(&runtime_state)
+        {
+            warn!("应用代理配置失败: {}", e);
+        }
+        crate::app::core::kernel_service::auto_manage_with_saved_config(
+            &app_handle,
+            true,
+            "subscription-download",
+        )
+        .await;
     }
-    crate::app::core::kernel_service::auto_manage_with_saved_config(
-        &app_handle,
-        true,
-        "subscription-download",
-    )
-    .await;
-    Ok(())
+
+    Ok(target_path.to_string_lossy().to_string())
 }
 
 // 手动添加订阅内容
@@ -79,11 +159,15 @@ pub async fn download_subscription(
 pub async fn add_manual_subscription(
     content: String,
     use_original_config: bool,
+    file_name: Option<String>,
+    config_path: Option<String>,
+    apply_runtime: Option<bool>,
     window: tauri::Window,
     proxy_port: Option<u16>,
     api_port: Option<u16>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let app_handle = window.app_handle();
+    let apply_runtime = apply_runtime.unwrap_or(true);
 
     let mut app_config = load_app_config(&app_handle)
         .await
@@ -96,20 +180,38 @@ pub async fn add_manual_subscription(
         app_config.api_port = port;
     }
 
-    process_subscription_content(content, use_original_config, &app_handle, &app_config)
-        .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
+    let target_path = resolve_target_config_path(file_name, config_path)?;
 
-    let runtime_state = runtime_state_from_config(&app_config);
-    if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(&runtime_state) {
-        warn!("应用代理配置失败: {}", e);
-    }
-    crate::app::core::kernel_service::auto_manage_with_saved_config(
+    process_subscription_content(
+        content,
+        use_original_config,
         &app_handle,
-        true,
-        "subscription-manual",
+        &app_config,
+        &target_path,
     )
-    .await;
-    Ok(())
+    .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
+
+    if apply_runtime {
+        if let Err(e) =
+            crate::app::constants::paths::set_active_config_path(Some(&target_path))
+        {
+            warn!("写入激活配置指针失败: {}", e);
+        }
+
+        let runtime_state = runtime_state_from_config(&app_config);
+        if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(&runtime_state)
+        {
+            warn!("应用代理配置失败: {}", e);
+        }
+        crate::app::core::kernel_service::auto_manage_with_saved_config(
+            &app_handle,
+            true,
+            "subscription-manual",
+        )
+        .await;
+    }
+
+    Ok(target_path.to_string_lossy().to_string())
 }
 
 // 获取当前配置文件内容
@@ -129,6 +231,53 @@ pub fn get_current_config() -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+pub fn set_active_config_path(config_path: Option<String>) -> Result<(), String> {
+    match config_path {
+        Some(path) => {
+            let path_buf = PathBuf::from(path);
+            if !path_buf.exists() {
+                return Err("配置文件不存在，无法设为当前使用".to_string());
+            }
+            paths::set_active_config_path(Some(&path_buf))
+                .map_err(|e| format!("写入激活配置失败: {}", e))
+        }
+        None => paths::set_active_config_path(None)
+            .map_err(|e| format!("清除激活配置失败: {}", e)),
+    }
+}
+
+#[tauri::command]
+pub fn delete_subscription_config(config_path: String) -> Result<(), String> {
+    let path = PathBuf::from(config_path);
+    if path.exists() {
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("删除配置文件失败: {}", e))?;
+    }
+
+    let backup = path.with_extension("bak");
+    if backup.exists() {
+        let _ = std::fs::remove_file(&backup);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn rollback_subscription_config(config_path: String) -> Result<String, String> {
+    let path = PathBuf::from(&config_path);
+    let backup = path.with_extension("bak");
+
+    if !backup.exists() {
+        return Err("未找到可用于回滚的备份文件".to_string());
+    }
+
+    std::fs::copy(&backup, &path)
+        .map_err(|e| format!("回滚配置失败: {}", e))?;
+
+    Ok(config_path)
+}
+
 // 切换代理模式（global、rule）
 #[tauri::command]
 pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
@@ -139,8 +288,7 @@ pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
 
     info!("正在切换代理模式为: {}", mode);
 
-    let work_dir = get_work_dir_sync();
-    let path = Path::new(&work_dir).join("sing-box/config.json");
+    let path = paths::get_config_path();
 
     // 检查文件是否存在
     if !path.exists() {
@@ -238,6 +386,7 @@ async fn download_and_process_subscription(
     use_original_config: bool,
     app_handle: &tauri::AppHandle,
     app_config: &AppConfig,
+    target_path: &Path,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir_sync();
@@ -274,7 +423,7 @@ async fn download_and_process_subscription(
     // 如果使用原始配置，直接处理原始内容
     if use_original_config {
         info!("使用原始订阅内容，仅修改必要的端口和地址");
-        process_original_config(&response_text, app_handle, app_config)?;
+        process_original_config(&response_text, app_handle, app_config, target_path)?;
         return Ok(());
     }
 
@@ -357,9 +506,10 @@ async fn download_and_process_subscription(
     );
 
     // 使用模板和提取的节点信息创建新的配置
-    let work_dir = get_work_dir_sync();
-    let dir = Path::new(&work_dir).join("sing-box");
-    // 确保目录存在
+    let dir = target_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from(&work_dir).join("sing-box"));
     if let Err(e) = std::fs::create_dir_all(&dir) {
         error!("{}: {}", messages::ERR_CREATE_DIR_FAILED, e);
     }
@@ -421,12 +571,10 @@ async fn download_and_process_subscription(
 
     apply_app_settings_to_config(&mut config, app_config);
 
-    // 保存配置到文件
-    let config_path = Path::new(&work_dir).join("sing-box/config.json");
-    info!("正在保存配置到: {:?}", config_path);
+    info!("正在保存配置到: {:?}", target_path);
 
     // 确保目录存在
-    if let Some(parent) = config_path.parent() {
+    if let Some(parent) = target_path.parent() {
         if !parent.exists() {
             info!("创建配置目录: {:?}", parent);
             if let Err(e) = std::fs::create_dir_all(parent) {
@@ -437,12 +585,14 @@ async fn download_and_process_subscription(
         }
     }
 
+    let _backup = backup_existing_config(target_path);
+
     // 将配置转换为JSON字符串并写入文件
     let config_str = serde_json::to_string_pretty(&config)?;
-    let mut file = File::create(&config_path)?;
+    let mut file = File::create(target_path)?;
     file.write_all(config_str.as_bytes())?;
 
-    info!("配置已成功保存到: {:?}", config_path);
+    info!("配置已成功保存到: {:?}", target_path);
     info!("订阅已更新并应用到模板，配置已保存");
     Ok(())
 }
@@ -1071,6 +1221,7 @@ fn process_subscription_content(
     use_original_config: bool,
     app_handle: &tauri::AppHandle,
     app_config: &AppConfig,
+    target_path: &Path,
 ) -> Result<(), Box<dyn Error>> {
     // 确保工作目录结构存在
     let work_dir = get_work_dir_sync();
@@ -1090,7 +1241,7 @@ fn process_subscription_content(
     // 如果使用原始配置，直接处理原始内容
     if use_original_config {
         info!("使用原始订阅内容，仅修改必要的端口和地址");
-        process_original_config(&content, app_handle, app_config)?;
+        process_original_config(&content, app_handle, app_config, target_path)?;
         return Ok(());
     }
 
@@ -1177,12 +1328,10 @@ fn process_subscription_content(
         }
     }
 
-    // 保存配置到文件
-    let config_path = Path::new(&work_dir).join("sing-box/config.json");
-    info!("正在保存配置到: {:?}", config_path);
+    info!("正在保存配置到: {:?}", target_path);
 
     // 确保目录存在
-    if let Some(parent) = config_path.parent() {
+    if let Some(parent) = target_path.parent() {
         if !parent.exists() {
             info!("创建配置目录: {:?}", parent);
             if let Err(e) = std::fs::create_dir_all(parent) {
@@ -1192,6 +1341,8 @@ fn process_subscription_content(
             }
         }
     }
+
+    let _backup = backup_existing_config(target_path);
 
     // 将配置转换为JSON字符串
     let config_str = match serde_json::to_string_pretty(&config) {
@@ -1204,14 +1355,14 @@ fn process_subscription_content(
     };
 
     // 写入配置文件
-    match File::create(&config_path) {
+    match File::create(target_path) {
         Ok(mut file) => {
             if let Err(e) = file.write_all(config_str.as_bytes()) {
                 let err_msg = format!("写入配置文件失败: {}", e);
                 error!("{}", err_msg);
                 return Err(err_msg.into());
             }
-            info!("配置已成功保存到: {:?}", config_path);
+            info!("配置已成功保存到: {:?}", target_path);
         }
         Err(e) => {
             let err_msg = format!("创建配置文件失败: {}", e);
@@ -1229,6 +1380,7 @@ fn process_original_config(
     content: &str,
     _app_handle: &tauri::AppHandle,
     app_config: &AppConfig,
+    target_path: &Path,
 ) -> Result<(), Box<dyn Error>> {
     info!("处理原始订阅配置...");
 
@@ -1321,13 +1473,10 @@ fn process_original_config(
         }
     }
 
-    // 保存配置到文件
-    let work_dir = get_work_dir_sync();
-    let config_path = Path::new(&work_dir).join("sing-box/config.json");
-    info!("正在保存配置到: {:?}", config_path);
+    info!("正在保存配置到: {:?}", target_path);
 
     // 确保目录存在
-    if let Some(parent) = config_path.parent() {
+    if let Some(parent) = target_path.parent() {
         if !parent.exists() {
             info!("创建配置目录: {:?}", parent);
             if let Err(e) = std::fs::create_dir_all(parent) {
@@ -1341,8 +1490,10 @@ fn process_original_config(
     // 将配置转换为JSON字符串
     let config_str = serde_json::to_string_pretty(&config)?;
 
+    let _backup = backup_existing_config(target_path);
+
     // 写入配置文件
-    let mut file = File::create(&config_path)?;
+    let mut file = File::create(target_path)?;
     file.write_all(config_str.as_bytes())?;
 
     info!("原始订阅配置（修改端口后）已成功保存");
@@ -1424,8 +1575,7 @@ fn apply_inbounds_settings(
 pub fn get_current_proxy_mode() -> Result<String, String> {
     info!("正在获取当前代理模式");
 
-    let work_dir = get_work_dir_sync();
-    let path = Path::new(&work_dir).join("sing-box/config.json");
+    let path = paths::get_config_path();
 
     // 检查配置文件是否存在
     if !path.exists() {

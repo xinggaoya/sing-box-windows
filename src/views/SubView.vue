@@ -54,6 +54,18 @@
                 >
                   {{ t('sub.inUse') }}
                 </n-tag>
+                <n-tag
+                  v-if="(item.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES) > 0"
+                  size="small"
+                  round
+                  :bordered="false"
+                  type="info"
+                >
+                  <template #icon>
+                    <n-icon size="14"><TimerOutline /></n-icon>
+                  </template>
+                  {{ formatIntervalLabel(item.autoUpdateIntervalMinutes) }}
+                </n-tag>
               </div>
             </div>
             <n-dropdown
@@ -86,7 +98,7 @@
               :type="subStore.activeIndex === index ? 'success' : 'primary'"
               secondary
               :loading="item.isLoading"
-              @click="useSubscription(item.url, index)"
+              @click="useSubscription(index)"
             >
               <template #icon>
                 <n-icon>
@@ -164,6 +176,14 @@
           </div>
           <n-switch v-model:value="formValue.useOriginalConfig" />
         </div>
+
+        <n-form-item :label="t('sub.autoUpdate')" path="autoUpdateIntervalMinutes">
+          <n-select
+            v-model:value="formValue.autoUpdateIntervalMinutes"
+            :options="autoUpdateOptions"
+            size="small"
+          />
+        </n-form-item>
       </n-form>
 
       <template #action>
@@ -205,7 +225,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted, onUnmounted, h } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useSubStore } from '@/stores/subscription/SubStore'
 import { useAppStore } from '@/stores'
@@ -224,6 +244,9 @@ import {
   EllipsisVerticalOutline,
   GlobeOutline,
   TimeOutline,
+  RefreshOutline,
+  ArrowUndoOutline,
+  TimerOutline,
 } from '@vicons/ionicons5'
 import type { FormInst, FormRules, DropdownOption } from 'naive-ui'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -241,7 +264,12 @@ interface Subscription {
   isManual: boolean
   manualContent?: string
   useOriginalConfig: boolean
+  configPath?: string
+  backupPath?: string
+  autoUpdateIntervalMinutes?: number
 }
+
+const DEFAULT_AUTO_UPDATE_MINUTES = 720
 
 const message = useMessage()
 const subStore = useSubStore()
@@ -265,6 +293,7 @@ const formValue = ref<Subscription>({
   isManual: false,
   manualContent: '',
   useOriginalConfig: false,
+  autoUpdateIntervalMinutes: DEFAULT_AUTO_UPDATE_MINUTES,
 })
 
 const subscriptionStats = computed(() => [
@@ -280,6 +309,13 @@ const subscriptionStats = computed(() => [
     icon: CheckmarkCircleOutline,
     type: 'success' as const,
   },
+])
+
+const autoUpdateOptions = computed(() => [
+  { label: t('sub.autoUpdateOff'), value: 0 },
+  { label: t('sub.autoUpdate6h'), value: 360 },
+  { label: t('sub.autoUpdate12h'), value: 720 },
+  { label: t('sub.autoUpdate1d'), value: 1440 },
 ])
 
 const rules: FormRules = {
@@ -302,6 +338,31 @@ const rules: FormRules = {
   ]
 }
 
+const generateConfigFileName = (name: string) => {
+  const safe = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+  return `${safe || 'subscription'}-${Date.now()}.json`
+}
+
+const resolvePersistOptionsFor = (item: Subscription) => {
+  if (item.configPath && item.configPath.length > 0) {
+    return { configPath: item.configPath }
+  }
+  return { fileName: generateConfigFileName(item.name || 'sub') }
+}
+
+const formatIntervalLabel = (minutes?: number) => {
+  const value = minutes ?? DEFAULT_AUTO_UPDATE_MINUTES
+  if (!value) return t('sub.autoUpdateOff')
+  if (value % 1440 === 0) return t('sub.autoUpdate1d')
+  if (value % 720 === 0) return t('sub.autoUpdate12h')
+  if (value % 360 === 0) return t('sub.autoUpdate6h')
+  return `${value} min`
+}
+
 const getDropdownOptions = (index: number): DropdownOption[] => [
   {
     label: t('sub.copyLink'),
@@ -322,6 +383,18 @@ const getDropdownOptions = (index: number): DropdownOption[] => [
     show: subStore.activeIndex === index,
     props: { onClick: editCurrentConfig }
   },
+  {
+    label: t('sub.refreshNow'),
+    key: 'refresh',
+    icon: () => h('span', { class: 'icon' }, [h(RefreshOutline)]),
+    props: { onClick: () => refreshSubscription(index, subStore.activeIndex === index && appStore.isRunning) }
+  },
+  {
+    label: t('sub.rollback'),
+    key: 'rollback',
+    icon: () => h('span', { class: 'icon' }, [h(ArrowUndoOutline)]),
+    props: { onClick: () => rollbackSubscription(index) }
+  },
   { type: 'divider', key: 'd1' },
   {
     label: t('common.delete'),
@@ -340,6 +413,7 @@ const resetForm = () => {
     isManual: false,
     manualContent: '',
     useOriginalConfig: false,
+    autoUpdateIntervalMinutes: DEFAULT_AUTO_UPDATE_MINUTES,
   }
   editIndex.value = null
   activeTab.value = 'url'
@@ -354,52 +428,64 @@ const handleEdit = (index: number, item: Subscription) => {
 
 const handleConfirm = () => {
   formRef.value?.validate(async (errors) => {
-    if (!errors) {
-      try {
-        isLoading.value = true
-        const isManual = activeTab.value === 'manual'
-        
+    if (errors) return
+    try {
+      isLoading.value = true
+      const isManual = activeTab.value === 'manual'
+      const persistOptions = { fileName: generateConfigFileName(formValue.value.name || 'sub') }
+      let savedPath: string | null = null
+
+      if (editIndex.value === null) {
         if (isManual && formValue.value.manualContent) {
-          if (editIndex.value === null) {
-            await subscriptionService.addManualSubscription(
-              formValue.value.manualContent,
-              formValue.value.useOriginalConfig
-            )
-          }
+          savedPath = await subscriptionService.addManualSubscription(
+            formValue.value.manualContent,
+            formValue.value.useOriginalConfig,
+            { ...persistOptions, applyRuntime: false },
+          )
         } else if (!isManual) {
-          if (editIndex.value === null) {
-            await subscriptionService.downloadSubscription(
-              formValue.value.url,
-              formValue.value.useOriginalConfig
-            )
-          }
+          savedPath = await subscriptionService.downloadSubscription(
+            formValue.value.url,
+            formValue.value.useOriginalConfig,
+            { ...persistOptions, applyRuntime: false },
+          )
         }
 
-        if (editIndex.value === null) {
-          subStore.list.push({
-            ...formValue.value,
-            lastUpdate: isManual ? Date.now() : undefined,
-            isManual,
-            manualContent: isManual ? formValue.value.manualContent : undefined
-          })
-          await subStore.setActiveIndex(subStore.list.length - 1)
-          message.success(t('sub.addAndUseSuccess'))
-        } else {
-          subStore.list[editIndex.value] = {
-            ...subStore.list[editIndex.value],
-            ...formValue.value,
-            isManual,
-            manualContent: isManual ? formValue.value.manualContent : undefined
-          }
-          message.success(t('sub.updateSuccess'))
+        const newItem: Subscription = {
+          ...formValue.value,
+          lastUpdate: Date.now(),
+          isManual,
+          manualContent: isManual ? formValue.value.manualContent : undefined,
+          configPath: savedPath || undefined,
+          backupPath: savedPath ? `${savedPath}.bak` : undefined,
         }
-        showAddModal.value = false
-        resetForm()
-      } catch (error) {
-        message.error(t('sub.operationFailed') + error)
-      } finally {
-        isLoading.value = false
+
+        subStore.list.push(newItem)
+        await subStore.setActiveIndex(subStore.list.length - 1)
+
+        if (savedPath) {
+          await subscriptionService.setActiveConfig(savedPath)
+        }
+
+        message.success(t('sub.addAndUseSuccess'))
+        if (appStore.isRunning) {
+          await kernelService.restartKernel()
+        }
+      } else {
+        subStore.list[editIndex.value] = {
+          ...subStore.list[editIndex.value],
+          ...formValue.value,
+          isManual,
+          manualContent: isManual ? formValue.value.manualContent : undefined,
+        }
+        message.success(t('sub.updateSuccess'))
       }
+
+      showAddModal.value = false
+      resetForm()
+    } catch (error) {
+      message.error(t('sub.operationFailed') + error)
+    } finally {
+      isLoading.value = false
     }
   })
 }
@@ -414,24 +500,107 @@ const deleteSubscription = async (index: number) => {
     message.warning(t('sub.cannotDeleteActive'))
     return
   }
-  subStore.list.splice(index, 1)
-  if (subStore.activeIndex !== null && subStore.activeIndex > index) {
-    await subStore.setActiveIndex(subStore.activeIndex - 1)
+  const target = subStore.list[index]
+  try {
+    if (target?.configPath) {
+      await subscriptionService.deleteConfig(target.configPath)
+    }
+    subStore.list.splice(index, 1)
+    if (subStore.activeIndex !== null && subStore.activeIndex > index) {
+      await subStore.setActiveIndex(subStore.activeIndex - 1)
+    }
+    message.success(t('sub.deleteSuccess'))
+  } catch (error) {
+    message.error(t('sub.operationFailed') + error)
   }
-  message.success(t('sub.deleteSuccess'))
 }
 
-const useSubscription = async (url: string, index: number) => {
+const refreshSubscription = async (index: number, applyRuntime = false, silent = false) => {
+  const item = subStore.list[index]
+  if (!item) return
+
+  if (item.isManual && !item.manualContent) {
+    message.error(t('sub.manualContentMissing'))
+    return
+  }
+
+  const persistOptions = {
+    ...resolvePersistOptionsFor(item),
+    applyRuntime,
+  }
+
   try {
     subStore.list[index].isLoading = true
-    const item = subStore.list[index]
-    if (item.isManual && item.manualContent) {
-      await subscriptionService.addManualSubscription(item.manualContent, item.useOriginalConfig)
-    } else {
-      await subscriptionService.downloadSubscription(url, item.useOriginalConfig)
+    const savedPath = item.isManual
+      ? await subscriptionService.addManualSubscription(
+        item.manualContent || '',
+        item.useOriginalConfig,
+        persistOptions,
+      )
+      : await subscriptionService.downloadSubscription(
+        item.url,
+        item.useOriginalConfig,
+        persistOptions,
+      )
+
+    if (savedPath) {
+      subStore.list[index].configPath = savedPath
+      subStore.list[index].backupPath = `${savedPath}.bak`
+      if (applyRuntime) {
+        await subscriptionService.setActiveConfig(savedPath)
+      }
     }
     subStore.list[index].lastUpdate = Date.now()
+
+    if (!silent) {
+      message.success(applyRuntime ? t('sub.refreshAndApplied') : t('sub.refreshSuccess'))
+    }
+
+    if (applyRuntime && appStore.isRunning) {
+      await kernelService.restartKernel()
+    }
+  } catch (error) {
+    message.error(t('sub.refreshFailed') + error)
+  } finally {
+    if (index >= 0 && index < subStore.list.length) {
+      subStore.list[index].isLoading = false
+    }
+  }
+}
+
+const rollbackSubscription = async (index: number) => {
+  const item = subStore.list[index]
+  if (!item?.configPath) {
+    message.error(t('sub.missingConfigFile'))
+    return
+  }
+  try {
+    await subscriptionService.rollbackConfig(item.configPath)
+    message.success(t('sub.rollbackSuccess'))
+    if (subStore.activeIndex === index) {
+      await subscriptionService.setActiveConfig(item.configPath)
+      if (appStore.isRunning) {
+        await kernelService.restartKernel()
+      }
+    }
+  } catch (error) {
+    message.error(t('sub.rollbackFailed') + error)
+  }
+}
+
+const useSubscription = async (index: number) => {
+  const item = subStore.list[index]
+  if (!item) return
+  if (!item.configPath) {
+    await refreshSubscription(index, true)
+    return
+  }
+
+  try {
+    subStore.list[index].isLoading = true
+    await subscriptionService.setActiveConfig(item.configPath)
     await subStore.setActiveIndex(index)
+    subStore.list[index].lastUpdate = Date.now()
     message.success(t('sub.useSuccess'))
     if (appStore.isRunning) {
       await kernelService.restartKernel()
@@ -472,16 +641,30 @@ const editCurrentConfig = async () => {
 const saveCurrentConfig = async () => {
   try {
     isConfigLoading.value = true
-    await subscriptionService.addManualSubscription(currentConfig.value, false)
-    if (subStore.activeIndex !== null) {
-      const activeItem = subStore.list[subStore.activeIndex]
+    const activeItem = subStore.getActiveSubscription()
+    const persistOptions = activeItem?.configPath
+      ? { configPath: activeItem.configPath, applyRuntime: true }
+      : { fileName: generateConfigFileName(activeItem?.name || 'sub'), applyRuntime: true }
+
+    const savedPath = await subscriptionService.addManualSubscription(
+      currentConfig.value,
+      false,
+      persistOptions,
+    )
+
+    if (activeItem) {
       if (activeItem.isManual) {
-        subStore.list[subStore.activeIndex].manualContent = currentConfig.value
-        subStore.list[subStore.activeIndex].lastUpdate = Date.now()
+        activeItem.manualContent = currentConfig.value
       }
+      activeItem.lastUpdate = Date.now()
+      activeItem.configPath = savedPath || activeItem.configPath
+      activeItem.backupPath = savedPath ? `${savedPath}.bak` : activeItem.backupPath
     }
     message.success(t('sub.configSaved'))
     showConfigModal.value = false
+    if (appStore.isRunning) {
+      await kernelService.restartKernel()
+    }
   } catch (error) {
     message.error(t('sub.saveConfigFailed') + error)
   } finally {
@@ -489,8 +672,40 @@ const saveCurrentConfig = async () => {
   }
 }
 
+const AUTO_UPDATE_CHECK_INTERVAL = 30 * 60 * 1000
+let autoUpdateTimer: number | null = null
+
+const runAutoUpdate = async () => {
+  const now = Date.now()
+  for (let i = 0; i < subStore.list.length; i += 1) {
+    const item = subStore.list[i]
+    const interval = item.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES
+    const last = item.lastUpdate ?? 0
+    if (interval > 0 && now - last >= interval * 60 * 1000 && !item.isLoading) {
+      await refreshSubscription(i, subStore.activeIndex === i && appStore.isRunning, true)
+    }
+  }
+}
+
+const startAutoUpdateLoop = () => {
+  stopAutoUpdateLoop()
+  autoUpdateTimer = window.setInterval(runAutoUpdate, AUTO_UPDATE_CHECK_INTERVAL)
+}
+
+const stopAutoUpdateLoop = () => {
+  if (autoUpdateTimer) {
+    window.clearInterval(autoUpdateTimer)
+    autoUpdateTimer = null
+  }
+}
+
 onMounted(() => {
   subStore.resetLoadingState()
+  startAutoUpdateLoop()
+})
+
+onUnmounted(() => {
+  stopAutoUpdateLoop()
 })
 </script>
 

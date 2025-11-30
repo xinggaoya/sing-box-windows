@@ -29,6 +29,5 @@ coverage
 
 *.tsbuildinfo
 /src-tauri/sing-box
-/v2rayN-master
 
 target

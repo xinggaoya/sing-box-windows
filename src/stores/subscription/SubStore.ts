@@ -12,7 +12,12 @@ interface FrontendSubscription {
   isManual: boolean
   manualContent?: string
   useOriginalConfig: boolean
+  configPath?: string
+  backupPath?: string
+  autoUpdateIntervalMinutes?: number
 }
+
+const DEFAULT_AUTO_UPDATE_MINUTES = 720 // 12h
 
 export const useSubStore = defineStore(
   'sub',
@@ -30,6 +35,9 @@ export const useSubStore = defineStore(
         isManual: sub.is_manual,
         manualContent: sub.manual_content || undefined,
         useOriginalConfig: sub.use_original_config,
+        configPath: sub.config_path || undefined,
+        backupPath: sub.backup_path || undefined,
+        autoUpdateIntervalMinutes: sub.auto_update_interval_minutes ?? DEFAULT_AUTO_UPDATE_MINUTES,
       }))
     }
 
@@ -43,6 +51,9 @@ export const useSubStore = defineStore(
         is_manual: sub.isManual,
         manual_content: sub.manualContent || null,
         use_original_config: sub.useOriginalConfig,
+        config_path: sub.configPath || undefined,
+        backup_path: sub.backupPath || undefined,
+        auto_update_interval_minutes: sub.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES,
       }))
     }
 
@@ -101,6 +112,8 @@ export const useSubStore = defineStore(
       isManual: boolean = false,
       manualContent?: string,
       useOriginalConfig: boolean = false,
+      configPath?: string,
+      autoUpdateIntervalMinutes: number = DEFAULT_AUTO_UPDATE_MINUTES,
     ) => {
       list.value.push({
         name,
@@ -109,6 +122,8 @@ export const useSubStore = defineStore(
         isManual,
         manualContent,
         useOriginalConfig,
+        configPath,
+        autoUpdateIntervalMinutes,
       })
 
       // 保存会在 watch 中自动处理

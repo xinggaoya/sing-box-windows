@@ -47,6 +47,7 @@ import {
 
 // 导入组件
 import UpdateNotification from '@/components/UpdateNotification.vue'
+import { subscriptionService } from '@/services/subscription-service'
 
 // 消息消费组件
 const MessageConsumer = defineComponent({
@@ -134,6 +135,10 @@ onMounted(async () => {
 
     // 0.1 初始化订阅数据，确保跨会话持久化生效
     await subStore.initializeStore()
+    const activeSub = subStore.getActiveSubscription()
+    if (activeSub?.configPath) {
+      await subscriptionService.setActiveConfig(activeSub.configPath)
+    }
 
     // 0.2 初始化语言与更新配置，保证刷新后保留用户选择
     await localeStore.initializeStore()

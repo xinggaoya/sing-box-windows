@@ -133,6 +133,9 @@ pub fn run() {
             crate::app::network::subscription_service::download_subscription,
             crate::app::network::subscription_service::add_manual_subscription,
             crate::app::network::subscription_service::get_current_config,
+            crate::app::network::subscription_service::set_active_config_path,
+            crate::app::network::subscription_service::delete_subscription_config,
+            crate::app::network::subscription_service::rollback_subscription_config,
             crate::app::network::subscription_service::toggle_proxy_mode,
             crate::app::network::subscription_service::get_current_proxy_mode,
             // System - System service commands

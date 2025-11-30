@@ -18,31 +18,69 @@ pub mod process {
 /// 文件路径常量
 pub mod paths {
     use crate::utils::app_util::get_work_dir_sync;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
+    use std::fs;
+
+    /// 获取 sing-box 配置目录
+    pub fn get_config_dir() -> PathBuf {
+        let work_dir = get_work_dir_sync();
+        PathBuf::from(&work_dir).join("sing-box")
+    }
+
+    /// 获取当前激活配置指针文件路径
+    pub fn get_active_config_indicator() -> PathBuf {
+        get_config_dir().join("active_config_path")
+    }
 
     /// 获取 Sing-Box 可执行文件路径
     pub fn get_kernel_path() -> PathBuf {
-        let work_dir = get_work_dir_sync();
         let exe_name = if cfg!(target_os = "windows") {
             "sing-box.exe"
         } else {
             "sing-box"
         };
-        PathBuf::from(&work_dir).join("sing-box").join(exe_name)
+        get_config_dir().join(exe_name)
     }
 
     /// 获取 Sing-Box 工作目录
     pub fn get_kernel_work_dir() -> PathBuf {
-        let work_dir = get_work_dir_sync();
-        PathBuf::from(&work_dir).join("sing-box")
+        get_config_dir()
     }
 
     /// 获取配置文件路径
     pub fn get_config_path() -> PathBuf {
-        let work_dir = get_work_dir_sync();
-        PathBuf::from(&work_dir)
-            .join("sing-box")
-            .join("config.json")
+        let config_dir = get_config_dir();
+        let indicator = get_active_config_indicator();
+
+        if let Ok(raw) = fs::read_to_string(&indicator) {
+            let trimmed = raw.trim();
+            if !trimmed.is_empty() {
+                let candidate = PathBuf::from(trimmed);
+                if candidate.exists() {
+                    return candidate;
+                }
+            }
+        }
+
+        config_dir.join("config.json")
+    }
+
+    /// 写入激活配置文件路径指针；None 表示清除指向，回退到默认 config.json
+    pub fn set_active_config_path(path: Option<&Path>) -> std::io::Result<()> {
+        let indicator = get_active_config_indicator();
+        if let Some(parent) = indicator.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        match path {
+            Some(p) => fs::write(indicator, p.to_string_lossy().to_string()),
+            None => {
+                if indicator.exists() {
+                    fs::remove_file(indicator)?;
+                }
+                Ok(())
+            }
+        }
     }
 }
 

@@ -6,4 +6,7 @@ export interface Subscription {
   is_manual: boolean
   manual_content: string | null
   use_original_config: boolean
+  config_path?: string
+  backup_path?: string
+  auto_update_interval_minutes?: number
 }

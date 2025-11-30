@@ -1,11 +1,11 @@
 use crate::entity::config_model;
 use serde::{Deserialize, Serialize};
 
-/// 默认的 TUN IPv4 地址段，保持与 v2rayN 项目一致
+/// 默认的 TUN IPv4 地址段
 pub const DEFAULT_TUN_IPV4: &str = "172.19.0.1/30";
-/// 默认的 TUN IPv6 地址段，保持与 v2rayN 项目一致
+/// 默认的 TUN IPv6 地址段
 pub const DEFAULT_TUN_IPV6: &str = "fdfe:dcba:9876::1/126";
-/// 默认排除的本地网段，来源于 v2rayN TunMode 规则
+/// 默认排除的本地网段
 pub const TUN_ROUTE_EXCLUDES: [&str; 6] = [
     "127.0.0.1/8",
     "10.0.0.0/8",

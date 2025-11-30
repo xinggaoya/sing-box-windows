@@ -30,14 +30,51 @@
           <n-icon><component :is="stat.icon" /></n-icon>
         </template>
       </StatusCard>
+  </div>
+
+  <!-- Content -->
+  <div class="content-section">
+    <div class="filter-bar">
+      <n-input
+        v-model:value="nodeSearch"
+        :placeholder="t('proxy.searchNode')"
+        clearable
+        size="small"
+        round
+        class="filter-input"
+      >
+        <template #prefix>
+          <n-icon><SearchOutline /></n-icon>
+        </template>
+      </n-input>
+      <n-button
+        size="small"
+        tertiary
+        :type="showFavoritesOnly ? 'primary' : 'default'"
+        @click="toggleFavoritesFilter"
+      >
+        <template #icon>
+          <n-icon><component :is="showFavoritesOnly ? Star : StarOutline" /></n-icon>
+        </template>
+        {{ t('proxy.onlyFavorites') }}
+      </n-button>
+      <n-button
+        size="small"
+        secondary
+        :loading="batchTesting"
+        @click="batchTestAllNodes"
+      >
+        <template #icon>
+          <n-icon><SpeedometerOutline /></n-icon>
+        </template>
+        {{ t('proxy.batchTest') }}
+      </n-button>
     </div>
 
-    <!-- Content -->
-    <div class="content-section">
-      <n-spin :show="isLoading">
-        <template #description>
-          <span class="loading-text">{{ t('proxy.loadingInfo') }}</span>
-        </template>
+    <n-spin :show="isLoading">
+      <template #description>
+        <span class="loading-text">{{ t('proxy.loadingInfo') }}</span>
+      </template>
 
         <!-- Empty State -->
         <div v-if="proxyGroups.length === 0 && !isLoading" class="empty-state">
@@ -77,6 +114,17 @@
               </div>
 
               <div class="group-actions">
+                <n-button
+                  @click.stop="autoSelectBest(group)"
+                  size="small"
+                  tertiary
+                  round
+                >
+                  <template #icon>
+                    <n-icon><CheckmarkCircleOutline /></n-icon>
+                  </template>
+                  {{ t('proxy.autoSelect') }}
+                </n-button>
                 <n-button
                   @click.stop="testNodeDelay(group.name)"
                   :loading="testingGroup === group.name"
@@ -122,6 +170,13 @@
                         {{ getNodeStatusText(proxy) }}
                       </div>
                     </div>
+                    <div class="node-actions">
+                      <n-button text size="tiny" @click.stop="toggleFavorite(proxy)">
+                        <n-icon :class="{ favorite: isFavorite(proxy) }">
+                          <component :is="isFavorite(proxy) ? Star : StarOutline" />
+                        </n-icon>
+                      </n-button>
+                    </div>
                   </div>
                 </div>
                 <div class="nodes-footer">
@@ -147,7 +202,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, computed, reactive, onUnmounted } from 'vue'
+import { onMounted, ref, computed, reactive, onUnmounted, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   RefreshOutline,
@@ -156,6 +211,9 @@ import {
   SpeedometerOutline,
   GlobeOutline,
   ChevronDownOutline,
+  SearchOutline,
+  StarOutline,
+  Star,
 } from '@vicons/ionicons5'
 import { proxyService } from '@/services/proxy-service'
 import { listen } from '@tauri-apps/api/event'
@@ -207,6 +265,10 @@ const testResults = reactive<Record<string, number>>({})
 const nodeErrors = reactive<Record<string, string>>({})
 const groupNodeState = reactive<Record<string, { list: string[]; loaded: number }>>({})
 const NODE_BATCH_SIZE = 60
+const nodeSearch = ref('')
+const showFavoritesOnly = ref(false)
+const favoriteNodes = ref<string[]>([])
+const batchTesting = ref(false)
 
 // Listeners
 let unlistenTestProgress: (() => void) | null = null
@@ -249,11 +311,59 @@ const proxyStats = computed(() => {
   ]
 })
 
+watch([nodeSearch, showFavoritesOnly], () => {
+  resetGroupNodeState(proxyGroups.value)
+})
+
 // Methods
+const loadFavorites = () => {
+  try {
+    const saved = localStorage.getItem('sbw_favorite_nodes')
+    if (saved) {
+      favoriteNodes.value = JSON.parse(saved)
+    }
+  } catch {
+    favoriteNodes.value = []
+  }
+}
+
+const persistFavorites = () => {
+  localStorage.setItem('sbw_favorite_nodes', JSON.stringify(favoriteNodes.value))
+}
+
+const toggleFavorite = (node: string) => {
+  const idx = favoriteNodes.value.indexOf(node)
+  if (idx === -1) {
+    favoriteNodes.value.push(node)
+  } else {
+    favoriteNodes.value.splice(idx, 1)
+  }
+  persistFavorites()
+  if (showFavoritesOnly.value) {
+    resetGroupNodeState(proxyGroups.value)
+  }
+}
+
+const isFavorite = (node: string) => favoriteNodes.value.includes(node)
+
+const toggleFavoritesFilter = () => {
+  showFavoritesOnly.value = !showFavoritesOnly.value
+  resetGroupNodeState(proxyGroups.value)
+}
+
+const getFilteredNodesList = (group: ProxyData) => {
+  const search = nodeSearch.value.trim().toLowerCase()
+  return (group.all || []).filter((node) => {
+    const matchSearch = !search || node.toLowerCase().includes(search)
+    const matchFavorite = !showFavoritesOnly.value || favoriteNodes.value.includes(node)
+    return matchSearch && matchFavorite
+  })
+}
+
 const resetGroupNodeState = (groups: ProxyData[]) => {
   groups.forEach(group => {
     groupNodeState[group.name] = {
-      list: group.all || [],
+      list: getFilteredNodesList(group),
       loaded: NODE_BATCH_SIZE
     }
   })
@@ -261,14 +371,15 @@ const resetGroupNodeState = (groups: ProxyData[]) => {
 
 const getVisibleNodes = (group: ProxyData) => {
   const state = groupNodeState[group.name]
-  if (!state) return []
-  return state.list.slice(0, state.loaded)
+  const list = state ? state.list : getFilteredNodesList(group)
+  return list.slice(0, state?.loaded ?? NODE_BATCH_SIZE)
 }
 
 const hasMoreNodes = (group: ProxyData) => {
   const state = groupNodeState[group.name]
-  if (!state) return false
-  return state.loaded < state.list.length
+  const list = state ? state.list : getFilteredNodesList(group)
+  if (!state) return list.length > NODE_BATCH_SIZE
+  return state.loaded < list.length
 }
 
 const loadMoreNodes = (group: ProxyData) => {
@@ -343,6 +454,62 @@ const testNodeDelay = async (group: string) => {
   }
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+const batchTestAllNodes = async () => {
+  if (batchTesting.value) return
+  const nodes = new Set<string>()
+  proxyGroups.value.forEach(group => (group.all || []).forEach(node => nodes.add(node)))
+  if (nodes.size === 0) {
+    message.warning(t('proxy.noProxyGroups'))
+    return
+  }
+  batchTesting.value = true
+  try {
+    const nodeList = Array.from(nodes)
+    const concurrency = Math.min(6, nodeList.length)
+    let pointer = 0
+    const runner = async () => {
+      while (pointer < nodeList.length) {
+        const current = nodeList[pointer]
+        pointer += 1
+        await testSingleNode(current)
+        await sleep(150)
+      }
+    }
+    await Promise.all(Array.from({ length: concurrency }, runner))
+    message.success(t('proxy.batchTestComplete'))
+  } catch (error) {
+    message.error(t('proxy.testErrorMessage'))
+  } finally {
+    batchTesting.value = false
+  }
+}
+
+const autoSelectBest = async (group: ProxyData) => {
+  const nodes = getFilteredNodesList(group)
+  if (!nodes.length) {
+    message.warning(t('proxy.noProxyGroups'))
+    return
+  }
+
+  let bestNode: { node: string | null; delay: number } = { node: null, delay: Number.MAX_SAFE_INTEGER }
+  nodes.forEach(node => {
+    const delay = testResults[node]
+    if (delay && delay > 0 && delay < bestNode.delay) {
+      bestNode = { node, delay }
+    }
+  })
+
+  if (!bestNode.node) {
+    await testNodeDelay(group.name)
+    message.info(t('proxy.testNode'))
+    return
+  }
+
+  await changeProxy(group.name, bestNode.node)
+}
+
 const changeProxy = async (group: string, proxy: string) => {
   try {
     await proxyService.changeProxy(group, proxy)
@@ -394,6 +561,7 @@ const setupEventListeners = async () => {
 }
 
 onMounted(() => {
+  loadFavorites()
   init()
   setupEventListeners()
 })
@@ -426,6 +594,16 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--layout-row-gap, 16px);
+}
+
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.filter-input {
+  max-width: 260px;
 }
 
 .empty-state {
@@ -639,6 +817,15 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--text-tertiary);
   margin-top: 2px;
+}
+
+.node-actions {
+  display: flex;
+  align-items: center;
+}
+
+.node-actions .favorite {
+  color: #f59e0b;
 }
 
 .expand-enter-active,
