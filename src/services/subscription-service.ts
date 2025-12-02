@@ -13,9 +13,9 @@ export const subscriptionService = {
       {
         url,
         useOriginalConfig,
-        file_name: options.fileName,
-        config_path: options.configPath,
-        apply_runtime: options.applyRuntime,
+        fileName: options.fileName,
+        configPath: options.configPath,
+        applyRuntime: options.applyRuntime,
       },
       { withProxyPort: true, withApiPort: true },
     )
@@ -27,9 +27,9 @@ export const subscriptionService = {
       {
         content,
         useOriginalConfig,
-        file_name: options.fileName,
-        config_path: options.configPath,
-        apply_runtime: options.applyRuntime,
+        fileName: options.fileName,
+        configPath: options.configPath,
+        applyRuntime: options.applyRuntime,
       },
       { withProxyPort: true, withApiPort: true },
     )
@@ -38,7 +38,7 @@ export const subscriptionService = {
   setActiveConfig(configPath: string | null) {
     return invokeWithAppContext<void>(
       'set_active_config_path',
-      { config_path: configPath },
+      { configPath },
       undefined,
     )
   },
@@ -46,7 +46,7 @@ export const subscriptionService = {
   deleteConfig(configPath: string) {
     return invokeWithAppContext<void>(
       'delete_subscription_config',
-      { config_path: configPath },
+      { configPath },
       undefined,
     )
   },
@@ -54,7 +54,7 @@ export const subscriptionService = {
   rollbackConfig(configPath: string) {
     return invokeWithAppContext<string>(
       'rollback_subscription_config',
-      { config_path: configPath },
+      { configPath },
       undefined,
     )
   },
