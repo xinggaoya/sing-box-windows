@@ -592,7 +592,7 @@ const useSubscription = async (index: number) => {
   const item = subStore.list[index]
   if (!item) return
   if (!item.configPath) {
-    await refreshSubscription(index, true)
+    message.warning(t('sub.missingConfigFile'))
     return
   }
 

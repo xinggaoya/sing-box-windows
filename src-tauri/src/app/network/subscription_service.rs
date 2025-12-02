@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use tauri::path::BaseDirectory;
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 use tracing::{error, info, warn};
 
 fn runtime_state_from_config(app_config: &AppConfig) -> ProxyRuntimeState {
@@ -108,7 +108,7 @@ pub async fn download_subscription(
     let app_handle = window.app_handle();
     let apply_runtime = apply_runtime.unwrap_or(true);
 
-    let mut app_config = load_app_config(&app_handle)
+    let mut app_config = db_get_app_config(app_handle.clone())
         .await
         .map_err(|e| format!("读取设置失败: {}", e))?;
 
@@ -132,14 +132,17 @@ pub async fn download_subscription(
 
     // 按需要应用运行时配置
     if apply_runtime {
-        if let Err(e) =
-            crate::app::constants::paths::set_active_config_path(Some(&target_path))
+        if let Err(e) = set_active_config_path(app_handle.clone(), Some(target_path.to_string_lossy().to_string())).await
         {
             warn!("写入激活配置指针失败: {}", e);
         }
 
         let runtime_state = runtime_state_from_config(&app_config);
-        if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(&runtime_state)
+        if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(
+            &app_handle,
+            &runtime_state,
+        )
+        .await
         {
             warn!("应用代理配置失败: {}", e);
         }
@@ -169,7 +172,7 @@ pub async fn add_manual_subscription(
     let app_handle = window.app_handle();
     let apply_runtime = apply_runtime.unwrap_or(true);
 
-    let mut app_config = load_app_config(&app_handle)
+    let mut app_config = db_get_app_config(app_handle.clone())
         .await
         .map_err(|e| format!("读取设置失败: {}", e))?;
 
@@ -192,14 +195,17 @@ pub async fn add_manual_subscription(
     .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
 
     if apply_runtime {
-        if let Err(e) =
-            crate::app::constants::paths::set_active_config_path(Some(&target_path))
+        if let Err(e) = set_active_config_path(app_handle.clone(), Some(target_path.to_string_lossy().to_string())).await
         {
             warn!("写入激活配置指针失败: {}", e);
         }
 
         let runtime_state = runtime_state_from_config(&app_config);
-        if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(&runtime_state)
+        if let Err(e) = crate::app::core::proxy_service::apply_proxy_runtime_state(
+            &app_handle,
+            &runtime_state,
+        )
+        .await
         {
             warn!("应用代理配置失败: {}", e);
         }
@@ -216,8 +222,17 @@ pub async fn add_manual_subscription(
 
 // 获取当前配置文件内容
 #[tauri::command]
-pub fn get_current_config() -> Result<String, String> {
-    let config_path = paths::get_config_path();
+pub async fn get_current_config(app_handle: AppHandle) -> Result<String, String> {
+    // 从数据库获取配置路径
+    let app_config = db_get_app_config(app_handle)
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
+    let config_path = if let Some(path_str) = app_config.active_config_path {
+        std::path::PathBuf::from(path_str)
+    } else {
+        paths::get_config_dir().join("config.json")
+    };
 
     // 检查文件是否存在
     if !config_path.exists() {
@@ -231,20 +246,33 @@ pub fn get_current_config() -> Result<String, String> {
     }
 }
 
+use crate::app::storage::enhanced_storage_service::db_save_app_config;
+
 #[tauri::command]
-pub fn set_active_config_path(config_path: Option<String>) -> Result<(), String> {
+pub async fn set_active_config_path(
+    app_handle: AppHandle,
+    config_path: Option<String>,
+) -> Result<(), String> {
+    let mut app_config = db_get_app_config(app_handle.clone())
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
     match config_path {
         Some(path) => {
-            let path_buf = PathBuf::from(path);
+            let path_buf = PathBuf::from(&path);
             if !path_buf.exists() {
                 return Err("配置文件不存在，无法设为当前使用".to_string());
             }
-            paths::set_active_config_path(Some(&path_buf))
-                .map_err(|e| format!("写入激活配置失败: {}", e))
+            app_config.active_config_path = Some(path);
         }
-        None => paths::set_active_config_path(None)
-            .map_err(|e| format!("清除激活配置失败: {}", e)),
+        None => {
+            app_config.active_config_path = None;
+        }
     }
+
+    db_save_app_config(app_config, app_handle)
+        .await
+        .map_err(|e| format!("保存应用配置失败: {}", e))
 }
 
 #[tauri::command]
@@ -280,7 +308,7 @@ pub fn rollback_subscription_config(config_path: String) -> Result<String, Strin
 
 // 切换代理模式（global、rule）
 #[tauri::command]
-pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
+pub async fn toggle_proxy_mode(app_handle: AppHandle, mode: String) -> Result<String, String> {
     // 验证模式参数
     if !["global", "rule"].contains(&mode.as_str()) {
         return Err(format!("无效的代理模式: {}", mode));
@@ -288,7 +316,16 @@ pub fn toggle_proxy_mode(mode: String) -> Result<String, String> {
 
     info!("正在切换代理模式为: {}", mode);
 
-    let path = paths::get_config_path();
+    // 从数据库获取配置路径
+    let app_config = db_get_app_config(app_handle)
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
+    let path = if let Some(path_str) = app_config.active_config_path {
+        std::path::PathBuf::from(path_str)
+    } else {
+        paths::get_config_dir().join("config.json")
+    };
 
     // 检查文件是否存在
     if !path.exists() {
@@ -1575,7 +1612,7 @@ fn apply_inbounds_settings(
 pub fn get_current_proxy_mode() -> Result<String, String> {
     info!("正在获取当前代理模式");
 
-    let path = paths::get_config_path();
+    let path = paths::get_config_dir().join("config.json");
 
     // 检查配置文件是否存在
     if !path.exists() {

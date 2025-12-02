@@ -27,11 +27,6 @@ pub mod paths {
         PathBuf::from(&work_dir).join("sing-box")
     }
 
-    /// 获取当前激活配置指针文件路径
-    pub fn get_active_config_indicator() -> PathBuf {
-        get_config_dir().join("active_config_path")
-    }
-
     /// 获取 Sing-Box 可执行文件路径
     pub fn get_kernel_path() -> PathBuf {
         let exe_name = if cfg!(target_os = "windows") {
@@ -45,42 +40,6 @@ pub mod paths {
     /// 获取 Sing-Box 工作目录
     pub fn get_kernel_work_dir() -> PathBuf {
         get_config_dir()
-    }
-
-    /// 获取配置文件路径
-    pub fn get_config_path() -> PathBuf {
-        let config_dir = get_config_dir();
-        let indicator = get_active_config_indicator();
-
-        if let Ok(raw) = fs::read_to_string(&indicator) {
-            let trimmed = raw.trim();
-            if !trimmed.is_empty() {
-                let candidate = PathBuf::from(trimmed);
-                if candidate.exists() {
-                    return candidate;
-                }
-            }
-        }
-
-        config_dir.join("config.json")
-    }
-
-    /// 写入激活配置文件路径指针；None 表示清除指向，回退到默认 config.json
-    pub fn set_active_config_path(path: Option<&Path>) -> std::io::Result<()> {
-        let indicator = get_active_config_indicator();
-        if let Some(parent) = indicator.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        match path {
-            Some(p) => fs::write(indicator, p.to_string_lossy().to_string()),
-            None => {
-                if indicator.exists() {
-                    fs::remove_file(indicator)?;
-                }
-                Ok(())
-            }
-        }
     }
 }
 

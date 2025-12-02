@@ -62,9 +62,28 @@ fn build_inbounds_for_state(state: &ProxyRuntimeState) -> Vec<config_model::Inbo
     }]
 }
 
-pub fn apply_proxy_runtime_state(state: &ProxyRuntimeState) -> Result<(), String> {
-    config_service::ensure_singbox_config().map_err(|e| format!("准备配置失败: {}", e))?;
-    let config_path = paths::get_config_path();
+use crate::app::storage::enhanced_storage_service::db_get_app_config;
+use tauri::AppHandle;
+
+pub async fn apply_proxy_runtime_state(
+    app_handle: &AppHandle,
+    state: &ProxyRuntimeState,
+) -> Result<(), String> {
+    config_service::ensure_singbox_config(app_handle)
+        .await
+        .map_err(|e| format!("准备配置失败: {}", e))?;
+
+    // 从数据库获取配置路径
+    let app_config = db_get_app_config(app_handle.clone())
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
+    let config_path = if let Some(path_str) = app_config.active_config_path {
+        std::path::PathBuf::from(path_str)
+    } else {
+        paths::get_config_dir().join("config.json")
+    };
+
     let config_path_str = config_path
         .to_str()
         .ok_or_else(|| "配置文件路径包含无效字符".to_string())?;
@@ -107,7 +126,11 @@ pub fn apply_proxy_runtime_state(state: &ProxyRuntimeState) -> Result<(), String
 
 // 修改代理模式为系统代理
 #[tauri::command]
-pub fn set_system_proxy(port: u16, system_proxy_bypass: Option<String>) -> Result<(), String> {
+pub async fn set_system_proxy(
+    app_handle: AppHandle,
+    port: u16,
+    system_proxy_bypass: Option<String>,
+) -> Result<(), String> {
     let runtime_state = ProxyRuntimeState {
         proxy_port: port,
         system_proxy_enabled: true,
@@ -115,12 +138,12 @@ pub fn set_system_proxy(port: u16, system_proxy_bypass: Option<String>) -> Resul
         system_proxy_bypass: system_proxy_bypass.unwrap_or_else(|| DEFAULT_BYPASS_LIST.to_string()),
         tun_options: TunProxyOptions::default(),
     };
-    apply_proxy_runtime_state(&runtime_state)
+    apply_proxy_runtime_state(&app_handle, &runtime_state).await
 }
 
 // 设置手动代理模式（不自动设置系统代理）
 #[tauri::command]
-pub fn set_manual_proxy(port: u16) -> Result<(), String> {
+pub async fn set_manual_proxy(app_handle: AppHandle, port: u16) -> Result<(), String> {
     let runtime_state = ProxyRuntimeState {
         proxy_port: port,
         system_proxy_enabled: false,
@@ -128,12 +151,16 @@ pub fn set_manual_proxy(port: u16) -> Result<(), String> {
         system_proxy_bypass: DEFAULT_BYPASS_LIST.to_string(),
         tun_options: TunProxyOptions::default(),
     };
-    apply_proxy_runtime_state(&runtime_state)
+    apply_proxy_runtime_state(&app_handle, &runtime_state).await
 }
 
 // 修改TUN 模式为代理模式
 #[tauri::command]
-pub fn set_tun_proxy(port: u16, tun_options: Option<TunProxyOptions>) -> Result<(), String> {
+pub async fn set_tun_proxy(
+    app_handle: AppHandle,
+    port: u16,
+    tun_options: Option<TunProxyOptions>,
+) -> Result<(), String> {
     let runtime_state = ProxyRuntimeState {
         proxy_port: port,
         system_proxy_enabled: false,
@@ -141,11 +168,24 @@ pub fn set_tun_proxy(port: u16, tun_options: Option<TunProxyOptions>) -> Result<
         system_proxy_bypass: DEFAULT_BYPASS_LIST.to_string(),
         tun_options: tun_options.unwrap_or_default(),
     };
-    apply_proxy_runtime_state(&runtime_state)
+    apply_proxy_runtime_state(&app_handle, &runtime_state).await
 }
 
-pub fn update_dns_strategy(prefer_ipv6: bool) -> Result<(), String> {
-    let config_path = paths::get_config_path();
+pub async fn update_dns_strategy(
+    app_handle: &AppHandle,
+    prefer_ipv6: bool,
+) -> Result<(), String> {
+    // 从数据库获取配置路径
+    let app_config = db_get_app_config(app_handle.clone())
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
+    let config_path = if let Some(path_str) = app_config.active_config_path {
+        std::path::PathBuf::from(path_str)
+    } else {
+        paths::get_config_dir().join("config.json")
+    };
+
     let content =
         fs::read_to_string(&config_path).map_err(|e| format!("读取配置文件失败: {}", e))?;
     let mut config: Value =
@@ -209,13 +249,13 @@ pub fn update_dns_strategy(prefer_ipv6: bool) -> Result<(), String> {
 
 // 切换 IPV6版本模式
 #[tauri::command]
-pub fn toggle_ip_version(prefer_ipv6: bool) -> Result<(), String> {
+pub async fn toggle_ip_version(app_handle: AppHandle, prefer_ipv6: bool) -> Result<(), String> {
     info!(
         "开始切换IP版本模式: {}",
         if prefer_ipv6 { "IPv6优先" } else { "仅IPv4" }
     );
 
-    update_dns_strategy(prefer_ipv6)?;
+    update_dns_strategy(&app_handle, prefer_ipv6).await?;
 
     info!(
         "✅ IP版本模式已成功切换为: {}",

@@ -200,13 +200,17 @@ pub async fn db_get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     Ok(config)
 }
 
-#[tauri::command]
-pub async fn db_save_app_config(config: AppConfig, app: AppHandle) -> Result<(), String> {
+pub async fn db_save_app_config_internal(config: AppConfig, app: AppHandle) -> Result<(), String> {
     let storage = get_enhanced_storage(&app).await?;
     storage
         .save_app_config(&config)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn db_save_app_config(config: AppConfig, app: AppHandle) -> Result<(), String> {
+    db_save_app_config_internal(config, app.clone()).await?;
 
     // 应用配置更新后，根据最新设置自动管理内核运行状态
     auto_manage_with_saved_config(&app, false, "app-config-updated").await;

@@ -22,11 +22,11 @@ impl ProcessManager {
     }
 
     // 启动进程（带系统环境检查和重试机制）
-    pub async fn start(&self) -> Result<()> {
+    pub async fn start(&self, config_path: &std::path::Path) -> Result<()> {
         info!("🚀 开始启动内核进程...");
 
         // 验证配置文件有效性
-        self.validate_config().await?;
+        self.validate_config(config_path).await?;
 
         // 先检查本地是否有sing-box进程在运行，如果有则先终止
         if let Err(e) = self.kill_existing_processes().await {
@@ -99,7 +99,7 @@ impl ProcessManager {
             info!("🔧 尝试启动内核进程，第 {}/{} 次", attempt, max_attempts);
 
             match self
-                .try_start_kernel_process(&kernel_path, &kernel_work_dir)
+                .try_start_kernel_process(&kernel_path, &kernel_work_dir, config_path)
                 .await
             {
                 Ok(child) => {
@@ -192,6 +192,7 @@ impl ProcessManager {
         &self,
         kernel_path: &std::path::Path,
         kernel_work_dir: &std::path::Path,
+        config_path: &std::path::Path,
     ) -> Result<std::process::Child> {
         let mut cmd = Command::new(kernel_path);
         cmd.args(&[
@@ -200,6 +201,10 @@ impl ProcessManager {
             kernel_work_dir
                 .to_str()
                 .ok_or_else(|| ProcessError::StartFailed("工作目录路径包含无效字符".to_string()))?,
+            "-c",
+            config_path
+                .to_str()
+                .ok_or_else(|| ProcessError::StartFailed("配置文件路径包含无效字符".to_string()))?,
         ]);
 
         // 避免内核 stdout/stderr 继承到 Tauri 控制台，防止开发日志被内核日志淹没
@@ -462,18 +467,17 @@ impl ProcessManager {
     }
 
     // 重启进程
-    pub async fn restart(&self) -> Result<()> {
+    pub async fn restart(&self, config_path: &std::path::Path) -> Result<()> {
         info!("正在重启内核进程");
         self.stop().await?;
         sleep(Duration::from_millis(1000)).await;
-        self.start().await?;
+        self.start(config_path).await?;
         info!("内核进程重启完成");
         Ok(())
     }
 
     // 验证配置文件
-    async fn validate_config(&self) -> Result<()> {
-        let config_path = paths::get_config_path();
+    async fn validate_config(&self, config_path: &std::path::Path) -> Result<()> {
 
         if !config_path.exists() {
             return Err(ProcessError::ConfigError(format!(
@@ -483,7 +487,7 @@ impl ProcessManager {
         }
 
         // 检查配置文件是否可读
-        if let Err(e) = tokio::fs::metadata(&config_path).await {
+        if let Err(e) = tokio::fs::metadata(config_path).await {
             return Err(ProcessError::ConfigError(format!(
                 "无法访问配置文件: {}",
                 e

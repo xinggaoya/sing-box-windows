@@ -26,23 +26,55 @@ fn backup_corrupted_config(path: &Path) {
     }
 }
 
-fn restore_default_config() -> Result<(), String> {
-    let config_path = paths::get_config_path();
-    if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败: {}", e))?;
+use crate::app::storage::enhanced_storage_service::{
+    db_get_app_config, db_save_app_config, db_save_app_config_internal,
+};
+use tauri::AppHandle;
+
+async fn restore_default_config(app_handle: &AppHandle) -> Result<(), String> {
+    // 获取配置目录
+    let config_dir = paths::get_config_dir();
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir).map_err(|e| format!("创建配置目录失败: {}", e))?;
     }
-    fs::write(&config_path, DEFAULT_SINGBOX_CONFIG)
+
+    // 默认配置路径
+    let default_config_path = config_dir.join("config.json");
+
+    // 写入默认配置
+    fs::write(&default_config_path, DEFAULT_SINGBOX_CONFIG)
         .map_err(|e| format!("写入默认配置失败: {}", e))?;
+
+    // 更新数据库中的激活配置路径
+    let mut app_config = db_get_app_config(app_handle.clone())
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
+    app_config.active_config_path = Some(default_config_path.to_string_lossy().to_string());
+
+    db_save_app_config_internal(app_config, app_handle.clone())
+        .await
+        .map_err(|e| format!("保存应用配置失败: {}", e))?;
+
     info!("已恢复默认 sing-box 配置");
     Ok(())
 }
 
-pub fn ensure_singbox_config() -> Result<(), String> {
-    let config_path = paths::get_config_path();
+pub async fn ensure_singbox_config(app_handle: &AppHandle) -> Result<(), String> {
+    // 从数据库获取配置路径
+    let app_config = db_get_app_config(app_handle.clone())
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
+    let config_path = if let Some(path_str) = app_config.active_config_path {
+        std::path::PathBuf::from(path_str)
+    } else {
+        paths::get_config_dir().join("config.json")
+    };
 
     if !config_path.exists() {
         info!("sing-box 配置文件不存在，使用默认模板恢复");
-        return restore_default_config();
+        return restore_default_config(app_handle).await;
     }
 
     match fs::read_to_string(&config_path) {
@@ -52,20 +84,34 @@ pub fn ensure_singbox_config() -> Result<(), String> {
             } else {
                 warn!("检测到 sing-box 配置损坏，正在恢复默认模板");
                 backup_corrupted_config(&config_path);
-                restore_default_config()
+                restore_default_config(app_handle).await
             }
         }
         Err(e) => {
             warn!("读取 sing-box 配置失败: {}，尝试恢复默认模板", e);
             backup_corrupted_config(&config_path);
-            restore_default_config()
+            restore_default_config(app_handle).await
         }
     }
 }
 
 // 更新sing-box配置文件中的端口设置
-fn update_singbox_config_ports(proxy_port: u16, api_port: u16) -> Result<(), Box<dyn Error>> {
-    let config_path = paths::get_config_path();
+// 更新sing-box配置文件中的端口设置
+async fn update_singbox_config_ports(
+    app_handle: &AppHandle,
+    proxy_port: u16,
+    api_port: u16,
+) -> Result<(), Box<dyn Error>> {
+    // 从数据库获取配置路径
+    let app_config = db_get_app_config(app_handle.clone())
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
+    let config_path = if let Some(path_str) = app_config.active_config_path {
+        std::path::PathBuf::from(path_str)
+    } else {
+        paths::get_config_dir().join("config.json")
+    };
 
     // 检查配置文件是否存在
     if !config_path.exists() {
@@ -154,8 +200,13 @@ fn update_singbox_config_ports(proxy_port: u16, api_port: u16) -> Result<(), Box
 }
 
 // 更新sing-box配置文件中的端口设置（供外部调用）
+// 更新sing-box配置文件中的端口设置（供外部调用）
 #[tauri::command]
-pub fn update_singbox_ports(proxy_port: u16, api_port: u16) -> Result<bool, String> {
+pub async fn update_singbox_ports(
+    app_handle: AppHandle,
+    proxy_port: u16,
+    api_port: u16,
+) -> Result<bool, String> {
     // 验证端口范围
     if proxy_port < 1024 || api_port < 1024 {
         return Err("端口号必须在1024-65535之间".to_string());
@@ -167,7 +218,7 @@ pub fn update_singbox_ports(proxy_port: u16, api_port: u16) -> Result<bool, Stri
     }
 
     // 更新sing-box配置文件中的端口设置
-    match update_singbox_config_ports(proxy_port, api_port) {
+    match update_singbox_config_ports(&app_handle, proxy_port, api_port).await {
         Ok(_) => Ok(true),
         Err(e) => Err(format!("更新sing-box配置端口失败: {}", e)),
     }

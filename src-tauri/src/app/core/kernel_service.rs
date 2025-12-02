@@ -85,7 +85,15 @@ async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16) {
                         "websocket_ready": false
                     }));
                     
-                    if let Err(err) = PROCESS_MANAGER.start().await {
+                    // 获取配置路径
+                    let app_config = db_get_app_config(app_handle.clone()).await.unwrap_or_default();
+                    let config_path = if let Some(path_str) = app_config.active_config_path {
+                        std::path::PathBuf::from(path_str)
+                    } else {
+                        paths::get_config_dir().join("config.json")
+                    };
+
+                    if let Err(err) = PROCESS_MANAGER.start(&config_path).await {
                         warn!("守护重启内核失败: {}", err);
                         continue;
                     }
@@ -286,7 +294,10 @@ pub async fn check_kernel_version() -> Result<String, String> {
 
 // 检查配置是否正常
 #[tauri::command]
-pub async fn check_config_validity(config_path: String) -> Result<(), String> {
+pub async fn check_config_validity(
+    app_handle: AppHandle,
+    config_path: String,
+) -> Result<(), String> {
     let kernel_path = paths::get_kernel_path();
 
     if !kernel_path.exists() {
@@ -295,7 +306,19 @@ pub async fn check_config_validity(config_path: String) -> Result<(), String> {
 
     // 确保配置文件路径存在
     let path = if config_path.is_empty() {
-        paths::get_config_path().to_string_lossy().to_string()
+        // 从数据库获取配置路径
+        let app_config = db_get_app_config(app_handle)
+            .await
+            .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
+        if let Some(path_str) = app_config.active_config_path {
+            path_str
+        } else {
+            paths::get_config_dir()
+                .join("config.json")
+                .to_string_lossy()
+                .to_string()
+        }
     } else {
         config_path
     };
@@ -1080,14 +1103,25 @@ pub async fn install_kernel() -> Result<(), String> {
 #[tauri::command]
 pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Result<String, String> {
     let kernel_path = paths::get_kernel_path();
-    let config_path = paths::get_config_path();
 
     if !kernel_path.exists() {
         return Err(messages::ERR_KERNEL_NOT_FOUND.to_string());
     }
 
+    // 从数据库获取配置路径
+    let app_config = db_get_app_config(app_handle.clone())
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+
+    let config_path = if let Some(path_str) = app_config.active_config_path {
+        std::path::PathBuf::from(path_str)
+    } else {
+        // 如果没有激活的配置，使用默认的 config.json
+        paths::get_config_dir().join("config.json")
+    };
+
     if !config_path.exists() {
-        return Err("配置文件不存在".to_string());
+        return Err(format!("配置文件不存在: {:?}", config_path));
     }
 
     // 检查内核是否已经在运行
@@ -1114,7 +1148,7 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
         info!("🚀 尝试启动内核，第 {}/{} 次", attempt, max_attempts);
 
         // 启动内核进程
-        match PROCESS_MANAGER.start().await {
+        match PROCESS_MANAGER.start(&config_path).await {
             Ok(_) => {
                 info!("✅ 内核进程启动成功");
 
@@ -1923,23 +1957,27 @@ async fn start_kernel_with_state(
         "proxy_port": resolved.proxy.proxy_port
     }));
 
-    crate::app::system::config_service::ensure_singbox_config()
+    crate::app::system::config_service::ensure_singbox_config(&app_handle)
+        .await
         .map_err(|e| format!("准备内核配置失败: {}", e))?;
     if let Err(e) = crate::app::system::config_service::update_singbox_ports(
+        app_handle.clone(),
         resolved.proxy.proxy_port,
         resolved.api_port,
-    ) {
+    )
+    .await
+    {
         warn!("更新端口配置失败: {}", e);
     }
 
-    if let Err(e) = apply_proxy_runtime_state(&resolved.proxy) {
+    if let Err(e) = apply_proxy_runtime_state(&app_handle, &resolved.proxy).await {
         return Ok(json!({
             "success": false,
             "message": format!("应用代理配置失败: {}", e)
         }));
     }
 
-    if let Err(e) = update_dns_strategy(resolved.prefer_ipv6) {
+    if let Err(e) = update_dns_strategy(&app_handle, resolved.prefer_ipv6).await {
         warn!("更新DNS策略失败: {}", e);
     }
 
@@ -1956,7 +1994,17 @@ async fn start_kernel_with_state(
         }));
     }
 
-    match PROCESS_MANAGER.start().await {
+    // 获取配置路径
+    let app_config = db_get_app_config(app_handle.clone())
+        .await
+        .map_err(|e| format!("获取应用配置失败: {}", e))?;
+    let config_path = if let Some(path_str) = app_config.active_config_path {
+        std::path::PathBuf::from(path_str)
+    } else {
+        paths::get_config_dir().join("config.json")
+    };
+
+    match PROCESS_MANAGER.start(&config_path).await {
         Ok(_) => {
             info!("✅ 内核进程启动成功");
 
@@ -2070,14 +2118,14 @@ pub async fn apply_proxy_settings(
 
     let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
 
-    if let Err(e) = apply_proxy_runtime_state(&resolved.proxy) {
+    if let Err(e) = apply_proxy_runtime_state(&app_handle, &resolved.proxy).await {
         return Ok(json!({
             "success": false,
             "message": format!("应用代理配置失败: {}", e)
         }));
     }
 
-    if let Err(e) = update_dns_strategy(resolved.prefer_ipv6) {
+    if let Err(e) = update_dns_strategy(&app_handle, resolved.prefer_ipv6).await {
         warn!("更新DNS策略失败: {}", e);
     }
 
@@ -2331,7 +2379,7 @@ pub async fn kernel_check_health(api_port: Option<u16>) -> Result<serde_json::Va
     }
 
     // 检查配置文件
-    let config_path = paths::get_config_path();
+    let config_path = paths::get_config_dir().join("config.json");
     if !config_path.exists() {
         issues.push("配置文件不存在".to_string());
         healthy = false;
@@ -2511,7 +2559,7 @@ fn kernel_binary_exists() -> bool {
 }
 
 fn kernel_config_exists() -> bool {
-    paths::get_config_path().exists()
+    paths::get_config_dir().join("config.json").exists()
 }
 
 async fn auto_manage_kernel_internal(
@@ -2534,13 +2582,13 @@ async fn auto_manage_kernel_internal(
         return Ok(AutoManageResult::missing_config());
     }
 
-    if let Err(err) = check_config_validity(String::new()).await {
+    if let Err(err) = check_config_validity(app_handle.clone(), String::new()).await {
         return Ok(AutoManageResult::invalid_config(err));
     }
 
     let mut _attempted_start = false;
 
-    if let Err(e) = apply_proxy_runtime_state(&resolved_state.proxy) {
+    if let Err(e) = apply_proxy_runtime_state(&app_handle, &resolved_state.proxy).await {
         warn!("自动管理应用代理配置失败: {}", e);
     }
 

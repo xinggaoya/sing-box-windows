@@ -10,7 +10,6 @@ declare module 'vue' {
     LazyComponent: typeof import('./src/components/LazyComponent.vue')['default']
     MainLayout: typeof import('./src/components/layout/MainLayout.vue')['default']
     NButton: typeof import('naive-ui')['NButton']
-    NButtonGroup: typeof import('naive-ui')['NButtonGroup']
     NColorPicker: typeof import('naive-ui')['NColorPicker']
     NConfigProvider: typeof import('naive-ui')['NConfigProvider']
     NDialogProvider: typeof import('naive-ui')['NDialogProvider']
