@@ -18,8 +18,7 @@ pub mod process {
 /// 文件路径常量
 pub mod paths {
     use crate::utils::app_util::get_work_dir_sync;
-    use std::path::{Path, PathBuf};
-    use std::fs;
+    use std::path::PathBuf;
 
     /// 获取 sing-box 配置目录
     pub fn get_config_dir() -> PathBuf {

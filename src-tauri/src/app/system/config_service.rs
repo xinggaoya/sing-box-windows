@@ -27,7 +27,7 @@ fn backup_corrupted_config(path: &Path) {
 }
 
 use crate::app::storage::enhanced_storage_service::{
-    db_get_app_config, db_save_app_config, db_save_app_config_internal,
+    db_get_app_config, db_save_app_config_internal,
 };
 use tauri::AppHandle;
 

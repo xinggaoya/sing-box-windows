@@ -93,6 +93,20 @@ async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16) {
                         paths::get_config_dir().join("config.json")
                     };
 
+                    let kernel_path = paths::get_kernel_path();
+                    if !kernel_path.exists() {
+                        warn!("守护跳过重启：内核文件不存在 {:?}", kernel_path);
+                        KEEP_ALIVE_ENABLED.store(false, Ordering::Relaxed);
+                        GUARDED_API_PORT.store(0, Ordering::Relaxed);
+                        break;
+                    }
+                    if !config_path.exists() {
+                        warn!("守护跳过重启：配置不存在 {:?}", config_path);
+                        KEEP_ALIVE_ENABLED.store(false, Ordering::Relaxed);
+                        GUARDED_API_PORT.store(0, Ordering::Relaxed);
+                        break;
+                    }
+
                     if let Err(err) = PROCESS_MANAGER.start(&config_path).await {
                         warn!("守护重启内核失败: {}", err);
                         continue;
@@ -680,6 +694,14 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
         return Err("下载的文件不存在".to_string());
     }
 
+    // 如内核正在运行，先停止以避免占用导致替换失败
+    let was_running_before_update = is_kernel_running().await.unwrap_or(false);
+    if was_running_before_update {
+        info!("内核更新前检测到正在运行，先尝试停止以便替换");
+        let _ = stop_kernel().await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+    }
+
     let _ = window.emit(
         "kernel-download-progress",
         json!({
@@ -786,7 +808,11 @@ pub async fn download_latest_kernel(app_handle: tauri::AppHandle) -> Result<(), 
         }),
     );
 
-    auto_manage_with_saved_config(&app_handle, true, "kernel-download").await;
+    // 如果更新前内核在运行，尝试自动重新启动
+    if was_running_before_update {
+        info!("内核更新完成，自动重新启动内核");
+        auto_manage_with_saved_config(&app_handle, true, "kernel-update").await;
+    }
 
     Ok(())
 }
@@ -1112,6 +1138,7 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
     let app_config = db_get_app_config(app_handle.clone())
         .await
         .map_err(|e| format!("获取应用配置失败: {}", e))?;
+    let guard_api_port = api_port.unwrap_or(app_config.api_port);
 
     let config_path = if let Some(path_str) = app_config.active_config_path {
         std::path::PathBuf::from(path_str)
@@ -1184,6 +1211,7 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
                                 // 通知内核就绪
                                 KERNEL_READY_NOTIFY.notify_waiters();
 
+                                enable_kernel_guard(app_handle.clone(), guard_api_port).await;
                                 return Ok("内核启动成功".to_string());
                             }
                             Err(e) => {
@@ -1198,6 +1226,7 @@ pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Resul
                     } else {
                         // 没有API端口，但内核已启动
                         KERNEL_READY_NOTIFY.notify_waiters();
+                        enable_kernel_guard(app_handle.clone(), guard_api_port).await;
                         return Ok("内核启动成功（未启动事件中继）".to_string());
                     }
                 } else {
@@ -1942,7 +1971,6 @@ async fn resolve_proxy_runtime_state(
 async fn start_kernel_with_state(
     app_handle: AppHandle,
     resolved: &ResolvedProxyState,
-    keep_alive_enabled: bool,
 ) -> Result<serde_json::Value, String> {
     info!(
         "🚀 启动内核增强版，代理模式: {}, API端口: {}, 代理端口: {}",
@@ -1982,11 +2010,7 @@ async fn start_kernel_with_state(
     }
 
     if is_kernel_running().await.unwrap_or(false) {
-        if keep_alive_enabled {
-            enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
-        } else {
-            disable_kernel_guard().await;
-        }
+        enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
         info!("内核已在运行中");
         return Ok(serde_json::json!({
             "success": true,
@@ -2013,11 +2037,7 @@ async fn start_kernel_with_state(
                 Ok(_) => {
                     info!("✅ 事件中继启动成功");
 
-                    if keep_alive_enabled {
-                        enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
-                    } else {
-                        disable_kernel_guard().await;
-                    }
+                    enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
 
                     let _ = app_handle.emit("kernel-ready", ());
                     let _ = app_handle.emit("kernel-started", json!({
@@ -2041,11 +2061,7 @@ async fn start_kernel_with_state(
                 Err(e) => {
                     warn!("⚠️ 事件中继启动失败: {}, 但内核进程已启动", e);
 
-                    if keep_alive_enabled {
-                        enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
-                    } else {
-                        disable_kernel_guard().await;
-                    }
+                    enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
 
                     let _ = app_handle.emit("kernel-ready", ());
 
@@ -2071,7 +2087,7 @@ async fn start_kernel_with_state(
     }
 }
 
-/// 重构版本的启动命令 - 增强版
+/// 重构版本的启动命令 - 增强版（启动即启用守护）
 #[tauri::command]
 pub async fn kernel_start_enhanced(
     app_handle: AppHandle,
@@ -2094,15 +2110,13 @@ pub async fn kernel_start_enhanced(
         tun_options,
         system_proxy_enabled,
         tun_enabled,
+        // 保留 keep_alive 入参兼容前端，但内部守护默认开启
         keep_alive,
     };
 
-    let resolved = resolve_proxy_runtime_state(&app_handle, overrides.clone()).await?;
-    let keep_alive_enabled = overrides.keep_alive.unwrap_or(resolved.auto_start_kernel);
-
-    start_kernel_with_state(app_handle, &resolved, keep_alive_enabled).await
+    let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
+    start_kernel_with_state(app_handle, &resolved).await
 }
-
 /// 仅应用代理配置，不进行内核重启
 #[tauri::command]
 pub async fn apply_proxy_settings(
@@ -2558,28 +2572,16 @@ fn kernel_binary_exists() -> bool {
     paths::get_kernel_path().exists()
 }
 
-fn kernel_config_exists() -> bool {
-    paths::get_config_dir().join("config.json").exists()
-}
-
 async fn auto_manage_kernel_internal(
     app_handle: AppHandle,
     options: AutoManageOptions,
 ) -> Result<AutoManageResult, String> {
     let resolved_state = resolve_proxy_runtime_state(&app_handle, options.to_overrides()).await?;
-    let keep_alive_enabled = options
-        .keep_alive
-        .unwrap_or(resolved_state.auto_start_kernel);
     let api_port = resolved_state.api_port;
-
+    
     let kernel_installed = kernel_binary_exists();
     if !kernel_installed {
         return Ok(AutoManageResult::missing_kernel());
-    }
-
-    let config_ready = kernel_config_exists();
-    if !config_ready {
-        return Ok(AutoManageResult::missing_config());
     }
 
     if let Err(err) = check_config_validity(app_handle.clone(), String::new()).await {
@@ -2603,8 +2605,7 @@ async fn auto_manage_kernel_internal(
     if !running {
         _attempted_start = true;
         let start_response =
-            start_kernel_with_state(app_handle.clone(), &resolved_state, keep_alive_enabled)
-                .await?;
+            start_kernel_with_state(app_handle.clone(), &resolved_state).await?;
 
         let success = start_response
             .get("success")
@@ -2626,11 +2627,7 @@ async fn auto_manage_kernel_internal(
             Ok(AutoManageResult::error(message, true))
         }
     } else {
-        if keep_alive_enabled {
-            enable_kernel_guard(app_handle.clone(), api_port).await;
-        } else {
-            disable_kernel_guard().await;
-        }
+        enable_kernel_guard(app_handle.clone(), api_port).await;
         Ok(AutoManageResult::running(
             "内核已在运行中".to_string(),
             false,
@@ -2646,15 +2643,6 @@ pub async fn auto_manage_with_saved_config(
 ) {
     match db_get_app_config(app_handle.clone()).await {
         Ok(config) => {
-            if !config.auto_start_kernel && !force_restart {
-                info!(
-                    "自动管理({})跳过：auto_start_kernel 已禁用，确保守护已关闭",
-                    reason
-                );
-                disable_kernel_guard().await;
-                return;
-            }
-
             let mut options = AutoManageOptions::from_app_config(config);
             options.force_restart = force_restart;
 
@@ -2709,3 +2697,4 @@ pub async fn kernel_auto_manage(
     let result = auto_manage_kernel_internal(app_handle, options).await?;
     serde_json::to_value(result).map_err(|e| e.to_string())
 }
+
