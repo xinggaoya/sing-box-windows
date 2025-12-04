@@ -24,8 +24,8 @@ pub mod system {
 }
 
 // Re-exports for backward compatibility
-pub use core::kernel_service;
 pub use core::kernel_auto_manage;
+pub use core::kernel_service;
 pub use core::proxy_service;
 pub use network::subscription_service;
 pub use system::config_service;

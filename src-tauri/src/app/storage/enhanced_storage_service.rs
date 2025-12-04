@@ -185,10 +185,7 @@ pub async fn db_get_app_config(app: AppHandle) -> Result<AppConfig, String> {
         };
 
         if let Err(err) = storage.save_app_config(&config).await {
-            tracing::warn!(
-                "在非管理员模式下写入关闭 TUN 设置失败: {}",
-                err
-            );
+            tracing::warn!("在非管理员模式下写入关闭 TUN 设置失败: {}", err);
         } else {
             tracing::info!(
                 "检测到当前未获得管理员权限，已自动关闭 TUN 模式（原模式: {}）",
@@ -288,7 +285,7 @@ pub async fn db_get_subscriptions(app: AppHandle) -> Result<Vec<Subscription>, S
 pub async fn db_save_subscriptions(
     subscriptions: Vec<Subscription>,
     app: AppHandle,
-    ) -> Result<(), String> {
+) -> Result<(), String> {
     let storage = get_enhanced_storage(&app).await?;
     storage
         .save_subscriptions(&subscriptions)

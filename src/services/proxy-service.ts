@@ -192,6 +192,32 @@ export class ProxyService {
     )
   }
 
+  /**
+   * 测试所有代理组的延迟
+   * 获取所有代理组并为每个组测试延迟
+   */
+  async testAllNodesDelay(server?: string, port?: number) {
+    try {
+      const proxiesData = await this.getProxies()
+      const testPromises: Promise<void>[] = []
+
+      // 遍历所有代理组，测试每个组的延迟
+      for (const groupName of Object.keys(proxiesData.proxies)) {
+        // 跳过非选择器类型的代理组（如 DIRECT 和 REJECT）
+        const group = proxiesData.proxies[groupName]
+        if (group.type === 'Selector' || group.type === 'URLTest') {
+          testPromises.push(this.testGroupDelay(groupName, server, port))
+        }
+      }
+
+      // 并行执行所有延迟测试
+      await Promise.all(testPromises)
+    } catch (error) {
+      console.error('测试所有节点延迟失败:', error)
+      throw error
+    }
+  }
+
   async getRules(port?: number) {
     const args = typeof port === 'number' ? { port } : undefined
     return invokeWithAppContext<unknown>('get_rules', args, {

@@ -2,8 +2,8 @@ use app::storage::EnhancedStorageService;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
-use tracing_subscriber::{fmt, EnvFilter}; // 重新启用数据库存储
 use tokio::sync::OnceCell;
+use tracing_subscriber::{fmt, EnvFilter}; // 重新启用数据库存储
 
 pub mod app;
 pub mod entity;
@@ -65,8 +65,7 @@ pub fn run() {
 
             // 异步初始化数据库服务（单例）
             let app_handle = app.handle().clone();
-            let storage_cell_state =
-                app.state::<Arc<OnceCell<Arc<EnhancedStorageService>>>>();
+            let storage_cell_state = app.state::<Arc<OnceCell<Arc<EnhancedStorageService>>>>();
             let storage_cell = Arc::clone(&*storage_cell_state);
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = storage_cell
@@ -109,21 +108,21 @@ pub fn run() {
             crate::app::storage::enhanced_storage_service::db_get_active_subscription_index,
             crate::app::storage::enhanced_storage_service::db_save_active_subscription_index,
             // Core - Kernel service commands (legacy)
-            crate::app::core::kernel_service::download_latest_kernel,
-            crate::app::core::kernel_service::install_kernel,
-            crate::app::core::kernel_service::get_latest_kernel_version_cmd,
-            crate::app::core::kernel_service::check_kernel_version,
-            crate::app::core::kernel_service::is_kernel_running,
-            crate::app::core::kernel_service::get_system_uptime,
+            crate::app::core::kernel_service::download::download_latest_kernel,
+            crate::app::core::kernel_service::download::install_kernel,
+            crate::app::core::kernel_service::versioning::get_latest_kernel_version_cmd,
+            crate::app::core::kernel_service::versioning::check_kernel_version,
+            crate::app::core::kernel_service::status::is_kernel_running,
+            crate::app::core::kernel_service::status::get_system_uptime,
             // Core - Kernel service commands (enhanced)
-            crate::app::core::kernel_service::kernel_start_enhanced,
-            crate::app::core::kernel_service::kernel_stop_enhanced,
-            crate::app::core::kernel_service::kernel_stop_background,
-            crate::app::core::kernel_service::force_stop_and_exit,
-            crate::app::core::kernel_service::kernel_get_status_enhanced,
-            crate::app::core::kernel_service::kernel_check_health,
+            crate::app::core::kernel_service::runtime::kernel_start_enhanced,
+            crate::app::core::kernel_service::runtime::kernel_stop_enhanced,
+            crate::app::core::kernel_service::runtime::kernel_stop_background,
+            crate::app::core::kernel_service::runtime::force_stop_and_exit,
+            crate::app::core::kernel_service::status::kernel_get_status_enhanced,
+            crate::app::core::kernel_service::status::kernel_check_health,
             crate::app::core::kernel_auto_manage::kernel_auto_manage,
-            crate::app::core::kernel_service::apply_proxy_settings,
+            crate::app::core::kernel_service::runtime::apply_proxy_settings,
             // Network - Subscription service commands
             crate::app::network::subscription_service::download_subscription,
             crate::app::network::subscription_service::add_manual_subscription,

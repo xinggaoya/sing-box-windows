@@ -478,7 +478,6 @@ impl ProcessManager {
 
     // 验证配置文件
     async fn validate_config(&self, config_path: &std::path::Path) -> Result<()> {
-
         if !config_path.exists() {
             return Err(ProcessError::ConfigError(format!(
                 "配置文件不存在: {}",

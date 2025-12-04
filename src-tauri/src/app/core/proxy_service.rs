@@ -171,10 +171,7 @@ pub async fn set_tun_proxy(
     apply_proxy_runtime_state(&app_handle, &runtime_state).await
 }
 
-pub async fn update_dns_strategy(
-    app_handle: &AppHandle,
-    prefer_ipv6: bool,
-) -> Result<(), String> {
+pub async fn update_dns_strategy(app_handle: &AppHandle, prefer_ipv6: bool) -> Result<(), String> {
     // 从数据库获取配置路径
     let app_config = db_get_app_config(app_handle.clone())
         .await

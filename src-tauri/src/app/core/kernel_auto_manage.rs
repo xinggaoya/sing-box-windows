@@ -105,17 +105,6 @@ impl AutoManageResult {
         )
     }
 
-    fn missing_config() -> Self {
-        AutoManageResult::new(
-            "missing_config",
-            "未检测到配置，请先添加订阅或导入配置",
-            true,
-            false,
-            false,
-            None,
-        )
-    }
-
     fn invalid_config(message: String) -> Self {
         AutoManageResult::new(
             "invalid_config",
@@ -139,14 +128,7 @@ impl AutoManageResult {
     }
 
     fn error(message: impl Into<String>, attempted: bool) -> Self {
-        AutoManageResult::new(
-            "error",
-            message.into(),
-            true,
-            true,
-            attempted,
-            None,
-        )
+        AutoManageResult::new("error", message.into(), true, true, attempted, None)
     }
 }
 
@@ -225,10 +207,7 @@ pub async fn auto_manage_with_saved_config(
             }
         }
         Err(err) => {
-            warn!(
-                "加载应用配置失败，跳过自动管理({}): {}",
-                reason, err
-            );
+            warn!("加载应用配置失败，跳过自动管理({}): {}", reason, err);
         }
     }
 }

@@ -128,12 +128,25 @@ fn disable_system_proxy_linux() -> io::Result<()> {
         {
             // 设置代理模式为无代理 (0)
             let _ = std::process::Command::new(kwriteconfig)
-                .args(&["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "ProxyType", "0"])
+                .args(&[
+                    "--file",
+                    "kioslaverc",
+                    "--group",
+                    "Proxy Settings",
+                    "--key",
+                    "ProxyType",
+                    "0",
+                ])
                 .output();
-            
+
             // 通知KDE配置已更改
             let _ = std::process::Command::new("dbus-send")
-                .args(&["--type=signal", "/KIO/Scheduler", "org.kde.KIO.Scheduler.reparseSlaveConfiguration", "string:''"])
+                .args(&[
+                    "--type=signal",
+                    "/KIO/Scheduler",
+                    "org.kde.KIO.Scheduler.reparseSlaveConfiguration",
+                    "string:''",
+                ])
                 .output();
             break;
         }
@@ -270,25 +283,54 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
             .output()
         {
             let proxy_url = format!("http://{}:{}", host, port);
-            
+
             // 设置HTTP代理
             let _ = std::process::Command::new(kwriteconfig)
-                .args(&["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "httpProxy", &proxy_url])
+                .args(&[
+                    "--file",
+                    "kioslaverc",
+                    "--group",
+                    "Proxy Settings",
+                    "--key",
+                    "httpProxy",
+                    &proxy_url,
+                ])
                 .output();
 
             // 设置HTTPS代理
             let _ = std::process::Command::new(kwriteconfig)
-                .args(&["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "httpsProxy", &proxy_url])
+                .args(&[
+                    "--file",
+                    "kioslaverc",
+                    "--group",
+                    "Proxy Settings",
+                    "--key",
+                    "httpsProxy",
+                    &proxy_url,
+                ])
                 .output();
 
             // 设置代理模式为手动 (1)
             let _ = std::process::Command::new(kwriteconfig)
-                .args(&["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "ProxyType", "1"])
+                .args(&[
+                    "--file",
+                    "kioslaverc",
+                    "--group",
+                    "Proxy Settings",
+                    "--key",
+                    "ProxyType",
+                    "1",
+                ])
                 .output();
-            
+
             // 通知KDE配置已更改
             let _ = std::process::Command::new("dbus-send")
-                .args(&["--type=signal", "/KIO/Scheduler", "org.kde.KIO.Scheduler.reparseSlaveConfiguration", "string:''"])
+                .args(&[
+                    "--type=signal",
+                    "/KIO/Scheduler",
+                    "org.kde.KIO.Scheduler.reparseSlaveConfiguration",
+                    "string:''",
+                ])
                 .output();
             break;
         }
