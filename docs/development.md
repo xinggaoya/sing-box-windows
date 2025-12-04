@@ -383,17 +383,18 @@ pnpm tauri dev
 
 - `constants/common.rs` - 通用常量
   - `messages` - 提示消息常量
-  - `log` - 日志相关常量
+ - `log` - 日志相关常量
 
 ### 内核管理 (core/kernel_service.rs)
 
 负责 Sing-Box 内核的下载、启动、停止和版本管理：
 
-- `download_latest_kernel`：下载最新版内核
-- `start_kernel`：启动内核服务
-- `stop_kernel`：停止内核服务
-- `restart_kernel`：重启内核服务
-- `check_kernel_version`：检查内核版本
+- `download_latest_kernel` / `install_kernel`：下载并安装最新版内核
+- `kernel_start_enhanced`：基于当前/传入配置启动内核并开启守护
+- `kernel_stop_enhanced` / `kernel_stop_background`：停止内核（含后台快速停止）
+- `kernel_get_status_enhanced` / `kernel_check_health`：查询状态与健康检查
+- `kernel_auto_manage`：按保存的配置自动管理启动流程
+- `check_kernel_version` / `get_latest_kernel_version_cmd`：检查与获取内核版本
 
 ### 代理服务 (core/proxy_service.rs)
 
@@ -671,16 +672,60 @@ fn example() {
 
 ```rust
 .invoke_handler(tauri::generate_handler![
-    // Core - Kernel service commands (内核服务)
-    crate::app::core::kernel_service::start_kernel,
-    crate::app::core::kernel_service::stop_kernel,
-    crate::app::core::kernel_service::restart_kernel,
+    // Enhanced Storage service commands (数据库)
+    crate::app::storage::enhanced_storage_service::db_get_app_config,
+    crate::app::storage::enhanced_storage_service::db_save_app_config,
+    crate::app::storage::enhanced_storage_service::db_get_theme_config,
+    crate::app::storage::enhanced_storage_service::db_save_theme_config,
+    crate::app::storage::enhanced_storage_service::db_get_locale_config,
+    crate::app::storage::enhanced_storage_service::db_save_locale_config,
+    crate::app::storage::enhanced_storage_service::db_get_window_config,
+    crate::app::storage::enhanced_storage_service::db_save_window_config,
+    crate::app::storage::enhanced_storage_service::db_get_update_config,
+    crate::app::storage::enhanced_storage_service::db_save_update_config,
+    crate::app::storage::enhanced_storage_service::db_get_subscriptions,
+    crate::app::storage::enhanced_storage_service::db_save_subscriptions,
+    crate::app::storage::enhanced_storage_service::db_get_active_subscription_index,
+    crate::app::storage::enhanced_storage_service::db_save_active_subscription_index,
+    // Core - Kernel service commands (legacy)
     crate::app::core::kernel_service::download_latest_kernel,
+    crate::app::core::kernel_service::install_kernel,
+    crate::app::core::kernel_service::get_latest_kernel_version_cmd,
     crate::app::core::kernel_service::check_kernel_version,
-    crate::app::core::kernel_service::start_websocket_relay,
     crate::app::core::kernel_service::is_kernel_running,
-    crate::app::core::kernel_service::check_kernel_status,
-
+    crate::app::core::kernel_service::get_system_uptime,
+    // Core - Kernel service commands (enhanced)
+    crate::app::core::kernel_service::kernel_start_enhanced,
+    crate::app::core::kernel_service::kernel_stop_enhanced,
+    crate::app::core::kernel_service::kernel_stop_background,
+    crate::app::core::kernel_service::force_stop_and_exit,
+    crate::app::core::kernel_service::kernel_get_status_enhanced,
+    crate::app::core::kernel_service::kernel_check_health,
+    crate::app::core::kernel_auto_manage::kernel_auto_manage,
+    crate::app::core::kernel_service::apply_proxy_settings,
+    // Network - Subscription service commands (订阅服务)
+    crate::app::network::subscription_service::download_subscription,
+    crate::app::network::subscription_service::add_manual_subscription,
+    crate::app::network::subscription_service::get_current_config,
+    crate::app::network::subscription_service::set_active_config_path,
+    crate::app::network::subscription_service::delete_subscription_config,
+    crate::app::network::subscription_service::rollback_subscription_config,
+    crate::app::network::subscription_service::toggle_proxy_mode,
+    crate::app::network::subscription_service::get_current_proxy_mode,
+    // System - System service commands (系统服务)
+    crate::app::system::system_service::check_admin,
+    crate::app::system::system_service::restart_as_admin,
+    crate::app::system::system_service::check_network_connectivity,
+    crate::app::system::system_service::wait_for_network_ready,
+    crate::app::system::system_service::open_devtools,
+    // System - Update service commands (更新服务)
+    crate::app::system::update_service::check_update,
+    crate::app::system::update_service::download_update,
+    crate::app::system::update_service::install_update,
+    crate::app::system::update_service::download_and_install_update,
+    crate::app::system::update_service::get_platform_info,
+    // System - Config service commands (配置服务)
+    crate::app::system::config_service::update_singbox_ports,
     // Core - Proxy service commands (代理服务)
     crate::app::core::proxy_service::set_system_proxy,
     crate::app::core::proxy_service::set_manual_proxy,
@@ -691,30 +736,7 @@ fn example() {
     crate::app::core::proxy_service::change_proxy,
     crate::app::core::proxy_service::test_node_delay,
     crate::app::core::proxy_service::test_group_delay,
-    crate::app::core::proxy_service::get_version_info,
     crate::app::core::proxy_service::get_rules,
-
-    // Network - Subscription service commands (订阅服务)
-    crate::app::network::subscription_service::download_subscription,
-    crate::app::network::subscription_service::add_manual_subscription,
-    crate::app::network::subscription_service::get_current_config,
-    crate::app::network::subscription_service::toggle_proxy_mode,
-    crate::app::network::subscription_service::get_current_proxy_mode,
-
-    // System - System service commands (系统服务)
-    crate::app::system::system_service::check_admin,
-    crate::app::system::system_service::restart_as_admin,
-    crate::app::system::system_service::toggle_devtools,
-    crate::app::system::system_service::open_devtools,
-    crate::app::system::system_service::close_devtools,
-    crate::app::system::system_service::is_devtools_open,
-
-    // System - Update service commands (更新服务)
-    crate::app::system::update_service::check_update,
-    crate::app::system::update_service::download_and_install_update,
-
-    // System - Config service commands (配置服务)
-    crate::app::system::config_service::update_singbox_ports,
 ])
 ```
 
@@ -1007,18 +1029,30 @@ A: 使用 Tauri 的 `invoke` API 进行通信：
 import { invoke } from '@tauri-apps/api/tauri'
 
 // 调用后端函数
-const result = await invoke('start_kernel', {
+const result = await invoke('kernel_start_enhanced', {
   api_port: 9090,
-  mixed_port: 7890,
+  proxy_port: 7890,
+  prefer_ipv6: true,
 })
 ```
 
 ```rust
 // 后端命令定义
+use serde_json::json;
+
 #[tauri::command]
-pub async fn start_kernel(api_port: u16, mixed_port: u16) -> Result<String, String> {
+pub async fn kernel_start_enhanced(
+    _app_handle: tauri::AppHandle,
+    api_port: Option<u16>,
+    proxy_port: Option<u16>,
+) -> Result<serde_json::Value, String> {
     // 实现逻辑
-    Ok("启动成功".to_string())
+    Ok(json!({
+        "success": true,
+        "message": "启动成功",
+        "api_port": api_port,
+        "proxy_port": proxy_port
+    }))
 }
 ```
 

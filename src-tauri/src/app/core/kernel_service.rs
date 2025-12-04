@@ -3,15 +3,14 @@ use crate::app::core::event_relay::{
     create_connection_event_relay, create_log_event_relay, create_memory_event_relay,
     create_traffic_event_relay, start_event_relay_with_retry,
 };
+use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::proxy_service::{
     apply_proxy_runtime_state, update_dns_strategy, ProxyRuntimeState,
 };
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
-use crate::app::storage::state_model::AppConfig;
 use crate::process::manager::ProcessManager;
 use crate::utils::http_client;
-use serde::Serialize;
 use serde_json::json;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
@@ -1125,139 +1124,8 @@ pub async fn install_kernel() -> Result<(), String> {
     Ok(())
 }
 
-// 启动内核（带重试机制的完整版本）
-#[tauri::command]
-pub async fn start_kernel(app_handle: AppHandle, api_port: Option<u16>) -> Result<String, String> {
-    let kernel_path = paths::get_kernel_path();
-
-    if !kernel_path.exists() {
-        return Err(messages::ERR_KERNEL_NOT_FOUND.to_string());
-    }
-
-    // 从数据库获取配置路径
-    let app_config = db_get_app_config(app_handle.clone())
-        .await
-        .map_err(|e| format!("获取应用配置失败: {}", e))?;
-    let guard_api_port = api_port.unwrap_or(app_config.api_port);
-
-    let config_path = if let Some(path_str) = app_config.active_config_path {
-        std::path::PathBuf::from(path_str)
-    } else {
-        // 如果没有激活的配置，使用默认的 config.json
-        paths::get_config_dir().join("config.json")
-    };
-
-    if !config_path.exists() {
-        return Err(format!("配置文件不存在: {:?}", config_path));
-    }
-
-    // 检查内核是否已经在运行
-    if is_kernel_running().await.unwrap_or(false) {
-        warn!("内核已在运行中");
-
-        // 如果内核已在运行，检查事件中继是否需要启动
-        if let Some(port) = api_port {
-            info!("内核已运行，检查并启动事件中继...");
-            match start_websocket_relay(app_handle.clone(), Some(port)).await {
-                Ok(_) => info!("✅ 事件中继启动成功"),
-                Err(e) => warn!("⚠️ 事件中继启动失败: {}", e),
-            }
-        }
-
-        return Ok("内核已在运行中".to_string());
-    }
-
-    // 带重试机制的内核启动
-    let max_attempts = 3;
-    let mut last_error = String::new();
-
-    for attempt in 1..=max_attempts {
-        info!("🚀 尝试启动内核，第 {}/{} 次", attempt, max_attempts);
-
-        // 启动内核进程
-        match PROCESS_MANAGER.start(&config_path).await {
-            Ok(_) => {
-                info!("✅ 内核进程启动成功");
-
-                // 等待内核启动并检查状态
-                let mut kernel_ready = false;
-
-                // 多次检查内核是否真正运行起来
-                for check_attempt in 1..=5 {
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-
-                    if is_kernel_running().await.unwrap_or(false) {
-                        info!("✅ 内核确认正在运行（第{}次检查）", check_attempt);
-                        kernel_ready = true;
-                        break;
-                    } else {
-                        warn!("⏳ 内核尚未就绪，第{}次检查", check_attempt);
-                    }
-                }
-
-                if kernel_ready {
-                    // 自动启动事件中继
-                    if let Some(port) = api_port {
-                        info!("🔌 自动启动事件中继服务...");
-                        match start_websocket_relay(app_handle.clone(), Some(port)).await {
-                            Ok(_) => {
-                                info!("✅ 事件中继启动成功");
-
-                                // 发送内核就绪事件到前端
-                                if let Err(e) = app_handle.emit("kernel-ready", true) {
-                                    error!("发送内核就绪事件失败: {}", e);
-                                }
-
-                                // 通知内核就绪
-                                KERNEL_READY_NOTIFY.notify_waiters();
-
-                                enable_kernel_guard(app_handle.clone(), guard_api_port).await;
-                                return Ok("内核启动成功".to_string());
-                            }
-                            Err(e) => {
-                                error!("❌ 事件中继启动失败: {}", e);
-                                last_error = format!("内核启动成功，但事件中继启动失败: {}", e);
-                                // 事件中继失败，尝试停止内核并重试
-                                if let Err(stop_err) = PROCESS_MANAGER.stop().await {
-                                    error!("停止内核失败: {}", stop_err);
-                                }
-                            }
-                        }
-                    } else {
-                        // 没有API端口，但内核已启动
-                        KERNEL_READY_NOTIFY.notify_waiters();
-                        enable_kernel_guard(app_handle.clone(), guard_api_port).await;
-                        return Ok("内核启动成功（未启动事件中继）".to_string());
-                    }
-                } else {
-                    last_error = "内核进程启动后未能稳定运行".to_string();
-                    warn!("❌ 内核进程启动后未能稳定运行");
-                    // 尝试停止可能损坏的进程
-                    if let Err(stop_err) = PROCESS_MANAGER.stop().await {
-                        error!("停止内核失败: {}", stop_err);
-                    }
-                }
-            }
-            Err(e) => {
-                last_error = format!("{}: {}", messages::ERR_PROCESS_START_FAILED, e);
-                error!("❌ 内核启动失败: {}", e);
-            }
-        }
-
-        // 如果不是最后一次尝试，等待后重试
-        if attempt < max_attempts {
-            warn!("⏳ 第{}次启动失败，{}秒后重试...", attempt, 2 * attempt);
-            tokio::time::sleep(Duration::from_secs(2 * attempt as u64)).await;
-        }
-    }
-
-    error!("❌ 内核启动失败，已尝试{}次: {}", max_attempts, last_error);
-    Err(last_error)
-}
-
-// 停止内核
-#[tauri::command]
-pub async fn stop_kernel() -> Result<String, String> {
+// 停止内核（仅内部使用，外部通过增强版接口触发）
+pub(super) async fn stop_kernel() -> Result<String, String> {
     disable_kernel_guard().await;
     // 停止事件中继
     SHOULD_STOP_EVENTS.store(true, Ordering::Relaxed);
@@ -1288,20 +1156,8 @@ pub async fn get_latest_kernel_version_cmd() -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
-// 重启内核
-#[tauri::command]
-pub async fn restart_kernel(
-    app_handle: AppHandle,
-    api_port: Option<u16>,
-) -> Result<String, String> {
-    stop_kernel().await?;
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    start_kernel(app_handle, api_port).await
-}
-
 /// 启动事件中继服务（增强版本，优化开机自启动场景）
-#[tauri::command]
-pub async fn start_websocket_relay(
+async fn start_websocket_relay(
     app_handle: AppHandle,
     api_port: Option<u16>,
 ) -> Result<(), String> {
@@ -1673,49 +1529,6 @@ async fn is_kernel_running_macos() -> Result<bool, String> {
     Ok(false)
 }
 
-// 检查内核完整状态（进程 + API）
-#[tauri::command]
-pub async fn check_kernel_status(api_port: Option<u16>) -> Result<serde_json::Value, String> {
-    // 要求前端必须传递API端口，不使用硬编码默认值
-    let port = api_port.ok_or("API端口参数是必需的，请从前端传递正确的端口配置")?;
-
-    let process_running = is_kernel_running().await.unwrap_or(false);
-
-    let mut status = serde_json::json!({
-        "process_running": process_running,
-        "api_ready": false,
-        "websocket_ready": false
-    });
-
-    if process_running {
-        // 检查API是否可用
-        let client = http_client::get_client();
-        let api_url = format!("http://127.0.0.1:{}/version?token=", port);
-
-        let api_ready = match client
-            .get(&api_url)
-            .timeout(Duration::from_secs(2))
-            .send()
-            .await
-        {
-            Ok(response) if response.status().is_success() => true,
-            _ => false,
-        };
-
-        status["api_ready"] = serde_json::Value::Bool(api_ready);
-
-        // 如果API可用，检查WebSocket
-        if api_ready {
-            let token = crate::app::core::proxy_service::get_api_token();
-            let ws_ready = check_websocket_endpoints_ready(port, &token).await;
-            status["websocket_ready"] = serde_json::Value::Bool(ws_ready);
-        }
-    }
-
-    info!("内核完整状态: {}", status);
-    Ok(status)
-}
-
 /// 清理事件中继任务
 async fn cleanup_event_relay_tasks() {
     // 设置停止标志
@@ -1729,40 +1542,6 @@ async fn cleanup_event_relay_tasks() {
     }
 
     info!("已清理所有事件中继任务");
-}
-
-/// 检查WebSocket端点是否就绪
-async fn check_websocket_endpoints_ready(api_port: u16, token: &str) -> bool {
-    use tokio_tungstenite::connect_async;
-    use url::Url;
-
-    let endpoints = ["traffic", "memory", "logs", "connections"];
-
-    for endpoint in &endpoints {
-        let url_str = format!("ws://127.0.0.1:{}/{}?token={}", api_port, endpoint, token);
-
-        match Url::parse(&url_str) {
-            Ok(url) => {
-                match tokio::time::timeout(Duration::from_secs(3), connect_async(url)).await {
-                    Ok(Ok((ws_stream, _))) => {
-                        // 连接成功，立即关闭
-                        drop(ws_stream);
-                        info!("✅ {} 端点就绪", endpoint);
-                    }
-                    _ => {
-                        warn!("❌ {} 端点未就绪", endpoint);
-                        return false;
-                    }
-                }
-            }
-            Err(_) => {
-                warn!("❌ {} 端点URL解析失败", endpoint);
-                return false;
-            }
-        }
-    }
-
-    true
 }
 
 /// 获取系统运行时间（毫秒）
@@ -1873,24 +1652,23 @@ pub async fn get_system_uptime() -> Result<u64, String> {
 // ========== 新增的重构版本命令 ==========
 
 #[derive(Debug, Clone, Default)]
-struct ProxyOverrides {
-    proxy_mode: Option<String>,
-    api_port: Option<u16>,
-    proxy_port: Option<u16>,
-    prefer_ipv6: Option<bool>,
-    system_proxy_bypass: Option<String>,
-    tun_options: Option<TunProxyOptions>,
-    system_proxy_enabled: Option<bool>,
-    tun_enabled: Option<bool>,
-    keep_alive: Option<bool>,
+pub(super) struct ProxyOverrides {
+    pub(super) proxy_mode: Option<String>,
+    pub(super) api_port: Option<u16>,
+    pub(super) proxy_port: Option<u16>,
+    pub(super) prefer_ipv6: Option<bool>,
+    pub(super) system_proxy_bypass: Option<String>,
+    pub(super) tun_options: Option<TunProxyOptions>,
+    pub(super) system_proxy_enabled: Option<bool>,
+    pub(super) tun_enabled: Option<bool>,
+    pub(super) keep_alive: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
-struct ResolvedProxyState {
-    proxy: ProxyRuntimeState,
-    api_port: u16,
-    prefer_ipv6: bool,
-    auto_start_kernel: bool,
+pub(super) struct ResolvedProxyState {
+    pub(super) proxy: ProxyRuntimeState,
+    pub(super) api_port: u16,
+    pub(super) prefer_ipv6: bool,
 }
 
 impl ResolvedProxyState {
@@ -1899,7 +1677,7 @@ impl ResolvedProxyState {
     }
 }
 
-async fn resolve_proxy_runtime_state(
+pub(super) async fn resolve_proxy_runtime_state(
     app_handle: &AppHandle,
     overrides: ProxyOverrides,
 ) -> Result<ResolvedProxyState, String> {
@@ -1964,11 +1742,10 @@ async fn resolve_proxy_runtime_state(
         proxy: proxy_state,
         api_port: app_config.api_port,
         prefer_ipv6: app_config.prefer_ipv6,
-        auto_start_kernel: app_config.auto_start_kernel,
     })
 }
 
-async fn start_kernel_with_state(
+pub(super) async fn start_kernel_with_state(
     app_handle: AppHandle,
     resolved: &ResolvedProxyState,
 ) -> Result<serde_json::Value, String> {
@@ -2250,15 +2027,7 @@ pub async fn force_stop_and_exit(app_handle: AppHandle) -> Result<serde_json::Va
         SHOULD_STOP_EVENTS.store(true, Ordering::Relaxed);
         cleanup_event_relay_tasks().await;
 
-        // 尝试正常停止，超时则强杀
-        let stop_result = tokio::time::timeout(Duration::from_secs(4), stop_kernel()).await;
-        match stop_result {
-            Ok(Ok(_)) => info!("✅ 内核正常停止"),
-            Ok(Err(e)) => warn!("停止内核失败，尝试强制清理: {}", e),
-            Err(_) => warn!("停止内核超时，尝试强制清理"),
-        }
-
-        // 强制兜底清理内核进程
+        // 强制清理内核进程
         if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
             error!("强制清理内核进程失败: {}", e);
         }
@@ -2429,272 +2198,4 @@ pub async fn kernel_check_health(api_port: Option<u16>) -> Result<serde_json::Va
     }))
 }
 
-#[derive(Debug, Clone)]
-struct AutoManageOptions {
-    proxy_mode: Option<String>,
-    api_port: Option<u16>,
-    proxy_port: Option<u16>,
-    prefer_ipv6: Option<bool>,
-    system_proxy_bypass: Option<String>,
-    tun_options: Option<TunProxyOptions>,
-    system_proxy_enabled: Option<bool>,
-    tun_enabled: Option<bool>,
-    keep_alive: Option<bool>,
-    force_restart: bool,
-}
-
-impl AutoManageOptions {
-    fn from_app_config(config: AppConfig) -> Self {
-        AutoManageOptions {
-            proxy_mode: Some(config.proxy_mode.clone()),
-            api_port: Some(config.api_port),
-            proxy_port: Some(config.proxy_port),
-            prefer_ipv6: Some(config.prefer_ipv6),
-            system_proxy_bypass: Some(config.system_proxy_bypass.clone()),
-            tun_options: Some(TunProxyOptions {
-                ipv4_address: config.tun_ipv4.clone(),
-                ipv6_address: config.tun_ipv6.clone(),
-                mtu: config.tun_mtu,
-                auto_route: config.tun_auto_route,
-                strict_route: config.tun_strict_route,
-                stack: config.tun_stack.clone(),
-                enable_ipv6: config.tun_enable_ipv6,
-                interface_name: None,
-            }),
-            system_proxy_enabled: Some(config.system_proxy_enabled),
-            tun_enabled: Some(config.tun_enabled),
-            keep_alive: Some(config.auto_start_kernel),
-            force_restart: false,
-        }
-    }
-
-    fn to_overrides(&self) -> ProxyOverrides {
-        ProxyOverrides {
-            proxy_mode: self.proxy_mode.clone(),
-            api_port: self.api_port,
-            proxy_port: self.proxy_port,
-            prefer_ipv6: self.prefer_ipv6,
-            system_proxy_bypass: self.system_proxy_bypass.clone(),
-            tun_options: self.tun_options.clone(),
-            system_proxy_enabled: self.system_proxy_enabled,
-            tun_enabled: self.tun_enabled,
-            keep_alive: self.keep_alive,
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct AutoManageResult {
-    state: String,
-    message: String,
-    kernel_installed: bool,
-    config_ready: bool,
-    attempted_start: bool,
-    last_start_message: Option<String>,
-}
-
-impl AutoManageResult {
-    fn new(
-        state: &str,
-        message: impl Into<String>,
-        kernel_installed: bool,
-        config_ready: bool,
-        attempted_start: bool,
-        last_start_message: Option<String>,
-    ) -> Self {
-        AutoManageResult {
-            state: state.to_string(),
-            message: message.into(),
-            kernel_installed,
-            config_ready,
-            attempted_start,
-            last_start_message,
-        }
-    }
-
-    fn missing_kernel() -> Self {
-        AutoManageResult::new(
-            "missing_kernel",
-            "未检测到内核，请先下载内核",
-            false,
-            false,
-            false,
-            None,
-        )
-    }
-
-    fn missing_config() -> Self {
-        AutoManageResult::new(
-            "missing_config",
-            "未检测到配置，请先添加订阅或导入配置",
-            true,
-            false,
-            false,
-            None,
-        )
-    }
-
-    fn invalid_config(message: String) -> Self {
-        AutoManageResult::new(
-            "invalid_config",
-            format!("配置文件校验失败: {}", message),
-            true,
-            false,
-            false,
-            None,
-        )
-    }
-
-    fn running(message: impl Into<String>, attempted: bool, last_message: Option<String>) -> Self {
-        AutoManageResult::new(
-            "running",
-            message.into(),
-            true,
-            true,
-            attempted,
-            last_message,
-        )
-    }
-
-    fn error(message: impl Into<String>, attempted: bool) -> Self {
-        AutoManageResult::new(
-            "error",
-            message.into(),
-            true,
-            true,
-            attempted,
-            None,
-        )
-    }
-}
-
-fn kernel_binary_exists() -> bool {
-    paths::get_kernel_path().exists()
-}
-
-async fn auto_manage_kernel_internal(
-    app_handle: AppHandle,
-    options: AutoManageOptions,
-) -> Result<AutoManageResult, String> {
-    let resolved_state = resolve_proxy_runtime_state(&app_handle, options.to_overrides()).await?;
-    let api_port = resolved_state.api_port;
-    
-    let kernel_installed = kernel_binary_exists();
-    if !kernel_installed {
-        return Ok(AutoManageResult::missing_kernel());
-    }
-
-    if let Err(err) = check_config_validity(app_handle.clone(), String::new()).await {
-        return Ok(AutoManageResult::invalid_config(err));
-    }
-
-    let mut _attempted_start = false;
-
-    if let Err(e) = apply_proxy_runtime_state(&app_handle, &resolved_state.proxy).await {
-        warn!("自动管理应用代理配置失败: {}", e);
-    }
-
-    let mut running = is_kernel_running().await.unwrap_or(false);
-    if options.force_restart && running {
-        info!("自动管理请求触发内核重启");
-        let _ = stop_kernel().await;
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        running = is_kernel_running().await.unwrap_or(false);
-    }
-
-    if !running {
-        _attempted_start = true;
-        let start_response =
-            start_kernel_with_state(app_handle.clone(), &resolved_state).await?;
-
-        let success = start_response
-            .get("success")
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        let message = start_response
-            .get("message")
-            .and_then(|value| value.as_str())
-            .unwrap_or("内核启动状态未知")
-            .to_string();
-
-        if success {
-            Ok(AutoManageResult::running(
-                message.clone(),
-                true,
-                Some(message),
-            ))
-        } else {
-            Ok(AutoManageResult::error(message, true))
-        }
-    } else {
-        enable_kernel_guard(app_handle.clone(), api_port).await;
-        Ok(AutoManageResult::running(
-            "内核已在运行中".to_string(),
-            false,
-            None,
-        ))
-    }
-}
-
-pub async fn auto_manage_with_saved_config(
-    app_handle: &AppHandle,
-    force_restart: bool,
-    reason: &str,
-) {
-    match db_get_app_config(app_handle.clone()).await {
-        Ok(config) => {
-            let mut options = AutoManageOptions::from_app_config(config);
-            options.force_restart = force_restart;
-
-            match auto_manage_kernel_internal(app_handle.clone(), options).await {
-                Ok(result) => {
-                    info!(
-                        "自动管理({})完成，状态: {}, 信息: {}",
-                        reason, result.state, result.message
-                    );
-                }
-                Err(err) => {
-                    warn!("自动管理({})失败: {}", reason, err);
-                }
-            }
-        }
-        Err(err) => {
-            warn!(
-                "加载应用配置失败，跳过自动管理({}): {}",
-                reason, err
-            );
-        }
-    }
-}
-
-#[tauri::command]
-pub async fn kernel_auto_manage(
-    app_handle: AppHandle,
-    proxy_mode: Option<String>,
-    api_port: Option<u16>,
-    proxy_port: Option<u16>,
-    prefer_ipv6: Option<bool>,
-    system_proxy_bypass: Option<String>,
-    tun_options: Option<TunProxyOptions>,
-    keep_alive: Option<bool>,
-    system_proxy_enabled: Option<bool>,
-    tun_enabled: Option<bool>,
-    force_restart: Option<bool>,
-) -> Result<serde_json::Value, String> {
-    let options = AutoManageOptions {
-        proxy_mode,
-        api_port,
-        proxy_port,
-        prefer_ipv6,
-        system_proxy_bypass,
-        tun_options,
-        keep_alive,
-        system_proxy_enabled,
-        tun_enabled,
-        force_restart: force_restart.unwrap_or(false),
-    };
-
-    let result = auto_manage_kernel_internal(app_handle, options).await?;
-    serde_json::to_value(result).map_err(|e| e.to_string())
-}
 

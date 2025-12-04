@@ -1,5 +1,5 @@
 use super::DatabaseService;
-use crate::app::core::kernel_service::auto_manage_with_saved_config;
+use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::storage::error::StorageResult;
 use crate::app::storage::state_model::{
     AppConfig, LocaleConfig, Subscription, ThemeConfig, UpdateConfig, WindowConfig,

@@ -146,7 +146,7 @@ pub async fn download_subscription(
         {
             warn!("应用代理配置失败: {}", e);
         }
-        crate::app::core::kernel_service::auto_manage_with_saved_config(
+        crate::app::core::kernel_auto_manage::auto_manage_with_saved_config(
             &app_handle,
             true,
             "subscription-download",
@@ -209,7 +209,7 @@ pub async fn add_manual_subscription(
         {
             warn!("应用代理配置失败: {}", e);
         }
-        crate::app::core::kernel_service::auto_manage_with_saved_config(
+        crate::app::core::kernel_auto_manage::auto_manage_with_saved_config(
             &app_handle,
             true,
             "subscription-manual",

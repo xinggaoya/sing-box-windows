@@ -288,23 +288,6 @@ fn check_admin_macos() -> bool {
     }
 }
 
-// 切换开发者工具
-#[tauri::command]
-pub fn toggle_devtools(app_handle: tauri::AppHandle) -> Result<(), String> {
-    let main_window = app_handle
-        .get_webview_window("main")
-        .ok_or("无法获取主窗口".to_string())?;
-
-    // 检查devtools是否已经打开
-    if main_window.is_devtools_open() {
-        main_window.close_devtools();
-    } else {
-        main_window.open_devtools();
-    }
-
-    Ok(())
-}
-
 // 打开开发者工具
 #[tauri::command]
 pub fn open_devtools(app_handle: tauri::AppHandle) -> Result<(), String> {
@@ -314,27 +297,6 @@ pub fn open_devtools(app_handle: tauri::AppHandle) -> Result<(), String> {
 
     main_window.open_devtools();
     Ok(())
-}
-
-// 关闭开发者工具
-#[tauri::command]
-pub fn close_devtools(app_handle: tauri::AppHandle) -> Result<(), String> {
-    let main_window = app_handle
-        .get_webview_window("main")
-        .ok_or("无法获取主窗口".to_string())?;
-
-    main_window.close_devtools();
-    Ok(())
-}
-
-// 检查开发者工具是否已打开
-#[tauri::command]
-pub fn is_devtools_open(app_handle: tauri::AppHandle) -> Result<bool, String> {
-    let main_window = app_handle
-        .get_webview_window("main")
-        .ok_or("无法获取主窗口".to_string())?;
-
-    Ok(main_window.is_devtools_open())
 }
 
 const TCP_PROBE_TARGETS: [(&str, u16); 3] = [("1.1.1.1", 443), ("8.8.8.8", 53), ("223.5.5.5", 53)];

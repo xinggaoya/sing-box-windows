@@ -372,20 +372,6 @@ pub async fn test_group_delay<R: Runtime>(
     }
 }
 
-// 获取版本信息
-#[tauri::command]
-pub async fn get_version_info(port: u16) -> Result<Value, String> {
-    let url = format!("http://127.0.0.1:{}/version", port);
-
-    match http_client::get_json::<Value>(&url).await {
-        Ok(data) => Ok(data),
-        Err(e) => {
-            error!("获取版本信息失败: {}", e);
-            Err(format!("获取版本信息失败: {}", e))
-        }
-    }
-}
-
 // 获取规则信息
 #[tauri::command]
 pub async fn get_rules(port: u16) -> Result<Value, String> {

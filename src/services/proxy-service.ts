@@ -147,10 +147,6 @@ export class ProxyService {
     })
   }
 
-  async clearProxy() {
-    return invokeWithAppContext<void>('clear_proxy')
-  }
-
   async toggleIpVersion(preferIpv6: boolean) {
     return invokeWithAppContext<void>('toggle_ip_version', { preferIpv6 })
   }
@@ -194,21 +190,6 @@ export class ProxyService {
       port ? args : { ...args, port: undefined },
       { withApiPort: port ? undefined : 'port' }
     )
-  }
-
-  async testAllNodesDelay(port?: number) {
-    const args = typeof port === 'number' ? { port } : undefined
-    return invokeWithAppContext<void>('test_all_nodes_delay', args, {
-      withApiPort: typeof port === 'number' ? undefined : 'port'
-    })
-  }
-
-  async getDelayData() {
-    return invokeWithAppContext<Record<string, number>>('get_delay_data')
-  }
-
-  async clearDelayData() {
-    return invokeWithAppContext<void>('clear_delay_data')
   }
 
   async getRules(port?: number) {

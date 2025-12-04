@@ -5,10 +5,9 @@ pub mod storage; // 重新启用存储模块
 // Core services
 pub mod core {
     pub mod event_relay;
+    pub mod kernel_auto_manage;
     pub mod kernel_service;
     pub mod proxy_service;
-    pub mod task_manager;
-    pub mod websocket_relay;
     pub mod tun_profile;
 }
 
@@ -26,6 +25,7 @@ pub mod system {
 
 // Re-exports for backward compatibility
 pub use core::kernel_service;
+pub use core::kernel_auto_manage;
 pub use core::proxy_service;
 pub use network::subscription_service;
 pub use system::config_service;

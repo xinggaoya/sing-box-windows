@@ -82,7 +82,7 @@ pub fn run() {
                 tracing::info!("Enhanced storage service initialized successfully");
 
                 // 后端启动后立即尝试自动管理内核（尊重 auto_start_kernel 设置）
-                crate::app::core::kernel_service::auto_manage_with_saved_config(
+                crate::app::core::kernel_auto_manage::auto_manage_with_saved_config(
                     &app_handle,
                     false,
                     "app-start",
@@ -109,16 +109,11 @@ pub fn run() {
             crate::app::storage::enhanced_storage_service::db_get_active_subscription_index,
             crate::app::storage::enhanced_storage_service::db_save_active_subscription_index,
             // Core - Kernel service commands (legacy)
-            crate::app::core::kernel_service::start_kernel,
-            crate::app::core::kernel_service::stop_kernel,
-            crate::app::core::kernel_service::restart_kernel,
             crate::app::core::kernel_service::download_latest_kernel,
             crate::app::core::kernel_service::install_kernel,
             crate::app::core::kernel_service::get_latest_kernel_version_cmd,
             crate::app::core::kernel_service::check_kernel_version,
-            crate::app::core::kernel_service::start_websocket_relay,
             crate::app::core::kernel_service::is_kernel_running,
-            crate::app::core::kernel_service::check_kernel_status,
             crate::app::core::kernel_service::get_system_uptime,
             // Core - Kernel service commands (enhanced)
             crate::app::core::kernel_service::kernel_start_enhanced,
@@ -127,7 +122,7 @@ pub fn run() {
             crate::app::core::kernel_service::force_stop_and_exit,
             crate::app::core::kernel_service::kernel_get_status_enhanced,
             crate::app::core::kernel_service::kernel_check_health,
-            crate::app::core::kernel_service::kernel_auto_manage,
+            crate::app::core::kernel_auto_manage::kernel_auto_manage,
             crate::app::core::kernel_service::apply_proxy_settings,
             // Network - Subscription service commands
             crate::app::network::subscription_service::download_subscription,
@@ -143,10 +138,7 @@ pub fn run() {
             crate::app::system::system_service::restart_as_admin,
             crate::app::system::system_service::check_network_connectivity,
             crate::app::system::system_service::wait_for_network_ready,
-            crate::app::system::system_service::toggle_devtools,
             crate::app::system::system_service::open_devtools,
-            crate::app::system::system_service::close_devtools,
-            crate::app::system::system_service::is_devtools_open,
             // System - Update service commands
             crate::app::system::update_service::check_update,
             crate::app::system::update_service::download_update,
@@ -165,7 +157,6 @@ pub fn run() {
             crate::app::core::proxy_service::change_proxy,
             crate::app::core::proxy_service::test_node_delay,
             crate::app::core::proxy_service::test_group_delay,
-            crate::app::core::proxy_service::get_version_info,
             crate::app::core::proxy_service::get_rules,
         ])
         .run(tauri::generate_context!())

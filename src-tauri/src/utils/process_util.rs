@@ -142,7 +142,5 @@ mod tests {
         let _tasklist = create_tasklist_command();
         let _taskkill = create_taskkill_command();
         let _wmic = create_wmic_command();
-        let _powershell = create_powershell_command();
-        // 只是验证命令可以被创建，不检查内部属性
     }
 }

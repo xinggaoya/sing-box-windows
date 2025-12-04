@@ -42,14 +42,6 @@ export const systemService = {
         return invokeWithAppContext<void>('download_latest_kernel', undefined, { skipDataRestore: true })
     },
 
-    openDirectory(path: string) {
-        return invokeWithAppContext<void>('open_directory', { path })
-    },
-
-    openUrl(url: string) {
-        return invokeWithAppContext<void>('open_url', { url })
-    },
-
     openDevtools() {
         return invokeWithAppContext<void>('open_devtools')
     },

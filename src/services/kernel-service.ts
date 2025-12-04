@@ -393,12 +393,6 @@ class KernelService {
     return invokeWithAppContext<string>('get_api_token')
   }
 
-  async downloadKernel(): Promise<void> {
-    return invokeWithAppContext<void>('download_kernel', undefined, {
-      skipDataRestore: true
-    })
-  }
-
   async installKernel(): Promise<void> {
     return invokeWithAppContext<void>('install_kernel', undefined, {
       skipDataRestore: true
