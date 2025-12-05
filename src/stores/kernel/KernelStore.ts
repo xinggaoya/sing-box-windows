@@ -18,7 +18,9 @@ export const useKernelStore = defineStore('kernel', () => {
   const lastError = ref('')
   const isLoading = ref(false)
   const isKernelInstalled = ref(false)
+
   const latestAvailableVersion = ref('')
+  const availableVersions = ref<string[]>([])
   let statusUnlisten: (() => void) | null = null
   let lastEventTime = 0
 
@@ -68,6 +70,13 @@ export const useKernelStore = defineStore('kernel', () => {
 
     // 3. 移除主动轮询，完全依赖后端事件推送
     // 用户反馈：直接选用推送即可，无需主动定时查询
+
+    // 4. Eager load available versions for better UX (dropdown ready on open)
+    if (availableVersions.value.length === 0) {
+      fetchKernelReleases().catch(err => {
+        console.warn('Failed to eager load kernel versions:', err)
+      })
+    }
   }
 
   const restartKernel = async () => {
@@ -205,6 +214,17 @@ export const useKernelStore = defineStore('kernel', () => {
     }
   }
 
+  const fetchKernelReleases = async () => {
+    try {
+      const versions = await kernelService.getKernelReleases()
+      availableVersions.value = versions.map(v => normalizeKernelVersion(v))
+      return availableVersions.value
+    } catch (error) {
+      lastError.value = error instanceof Error ? error.message : '获取内核版本列表失败'
+      return []
+    }
+  }
+
   const hasKernelUpdate = computed(() => {
     if (!latestAvailableVersion.value) return false
     if (!status.value.version) return true
@@ -255,8 +275,10 @@ export const useKernelStore = defineStore('kernel', () => {
     hasVersionInfo,
     getVersionString,
     fetchLatestKernelVersion,
+    fetchKernelReleases,
     hasKernelUpdate,
     latestAvailableVersion,
+    availableVersions,
   }
 })
 

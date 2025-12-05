@@ -395,6 +395,9 @@ export default {
       downloadFailedMessage: 'Kernel download failed: {error}',
       downloadSuccess: 'Kernel downloaded successfully',
       downloadFailed: 'Kernel download failed',
+      selectVersion: 'Select Version',
+      selectVersionDesc: 'Choose a specific kernel version to download',
+      latest: 'Latest',
     },
     proxyAdvanced: {
       title: 'Advanced Proxy Settings',

@@ -195,9 +195,17 @@ class KernelService {
     }
   }
 
-  /**
-   * 切换代理模式
-   */
+  async getKernelReleases(): Promise<string[]> {
+    try {
+      return await invokeWithAppContext<string[]>('get_kernel_releases_cmd', undefined, {
+        skipDataRestore: true
+      })
+    } catch (error) {
+      console.error('获取内核版本列表失败:', error)
+      return []
+    }
+  }
+
   async switchProxyMode(mode: 'system' | 'tun' | 'manual'): Promise<{ success: boolean; message: string }> {
     try {
       const overrides: Record<string, boolean> = {}

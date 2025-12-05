@@ -26,6 +26,22 @@
             </div>
           </div>
 
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">{{ t('setting.kernel.selectVersion') }}</div>
+              <div class="setting-desc">{{ t('setting.kernel.selectVersionDesc') }}</div>
+            </div>
+            <n-select
+              v-model:value="selectedKernelVersion"
+              :options="kernelVersionOptions"
+              :loading="kernelStore.isLoading"
+              :disabled="downloading"
+              size="small"
+              class="setting-input"
+              placeholder="Latest"
+            />
+          </div>
+
           <div v-if="hasNewVersion || !kernelStore.hasVersionInfo()" class="alert-box warning">
             <n-icon size="18"><WarningOutline /></n-icon>
             <span>
@@ -464,6 +480,7 @@ const downloadMessage = ref('')
 const downloadError = ref('')
 let downloadListener: (() => void) | null = null
 let updateProgressListener: (() => void) | null = null
+const selectedKernelVersion = ref<string | undefined>(undefined)
 
 const autoStart = ref(false)
 const locale = ref(localeStore.locale)
@@ -508,6 +525,13 @@ const tunStackOptions = [
 // Computed
 const kernelLatestVersion = computed(() => kernelStore.latestAvailableVersion || '')
 const hasNewVersion = computed(() => kernelStore.hasKernelUpdate)
+const kernelVersionOptions = computed(() => {
+  const versions = kernelStore.availableVersions || []
+  return [
+    { label: t('setting.kernel.latest'), value: undefined },
+    ...versions.map(v => ({ label: v, value: v }))
+  ]
+})
 const updateStatus = computed(() => updateStore.updateState.status)
 const updateProgress = computed(() => updateStore.updateState.progress || 0)
 const updateMessage = computed(() => updateStore.updateState.message)
@@ -646,7 +670,7 @@ const downloadTheKernel = async () => {
   })
 
   try {
-    await systemService.downloadLatestKernel()
+    await systemService.downloadKernel(selectedKernelVersion.value)
     // 如果后端未推送完成事件，也主动校验一次安装结果
     if (!downloadCompleted) {
       await kernelStore.checkKernelInstallation()
@@ -794,6 +818,9 @@ onMounted(async () => {
   await kernelStore.checkKernelInstallation()
   if (kernelStore.fetchLatestKernelVersion) {
     await kernelStore.fetchLatestKernelVersion()
+  }
+  if (kernelStore.fetchKernelReleases && (!kernelStore.availableVersions || kernelStore.availableVersions.length === 0)) {
+    await kernelStore.fetchKernelReleases()
   }
   await updateStore.initializeStore?.()
   await setupUpdateProgressListener()

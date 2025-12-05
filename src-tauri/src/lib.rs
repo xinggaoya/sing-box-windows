@@ -108,9 +108,11 @@ pub fn run() {
             crate::app::storage::enhanced_storage_service::db_get_active_subscription_index,
             crate::app::storage::enhanced_storage_service::db_save_active_subscription_index,
             // Core - Kernel service commands (legacy)
-            crate::app::core::kernel_service::download::download_latest_kernel,
+            // Core - Kernel service commands (legacy)
+            crate::app::core::kernel_service::download::download_kernel,
             crate::app::core::kernel_service::download::install_kernel,
             crate::app::core::kernel_service::versioning::get_latest_kernel_version_cmd,
+            crate::app::core::kernel_service::versioning::get_kernel_releases_cmd,
             crate::app::core::kernel_service::versioning::check_kernel_version,
             crate::app::core::kernel_service::status::is_kernel_running,
             crate::app::core::kernel_service::status::get_system_uptime,

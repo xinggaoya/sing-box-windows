@@ -38,8 +38,8 @@ export const systemService = {
         return invokeWithAppContext<void>('download_and_install_update', { downloadUrl })
     },
 
-    downloadLatestKernel() {
-        return invokeWithAppContext<void>('download_latest_kernel', undefined, { skipDataRestore: true })
+    downloadKernel(version?: string) {
+        return invokeWithAppContext<void>('download_kernel', { version }, { skipDataRestore: true })
     },
 
     openDevtools() {

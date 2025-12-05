@@ -2,16 +2,17 @@ export default {
   // 通用词汇
   common: {
     appName: 'Sing-Box Windows',
-    ok: 'OK',
     cancel: 'キャンセル',
-    confirm: '確認',
     save: '保存',
+    saveSuccess: '保存成功',
+    saveFailed: '保存失敗',
+    confirm: '確認',
+    add: '追加',
+    edit: '編集',
     delete: '削除',
-    error: 'エラー',
+    import: 'インポート',
+    export: 'エクスポート',
     refresh: '更新',
-    unknown: '不明',
-    search: '検索',
-    minimizedToTray: 'トレイに最小化されました',
   },
 
   // 导航菜单

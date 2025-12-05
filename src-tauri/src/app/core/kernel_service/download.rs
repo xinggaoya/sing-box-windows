@@ -2,6 +2,7 @@ use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::kernel_service::runtime::stop_kernel;
 use crate::app::core::kernel_service::status::is_kernel_running;
 use crate::app::core::kernel_service::versioning::{get_latest_kernel_version, get_system_arch};
+use crate::app::core::kernel_service::PROCESS_MANAGER;
 use serde_json::json;
 use std::path::Path;
 use std::time::Duration;
@@ -10,8 +11,8 @@ use tauri::{AppHandle, Emitter, WebviewWindow};
 use tracing::{info, warn};
 
 #[tauri::command]
-pub async fn download_latest_kernel(app_handle: AppHandle) -> Result<(), String> {
-    info!("开始下载最新内核...");
+pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> Result<(), String> {
+    info!("开始下载内核 (指定版本: {:?})...", version);
 
     let window = app_handle
         .get_webview_window("main")
@@ -40,15 +41,18 @@ pub async fn download_latest_kernel(app_handle: AppHandle) -> Result<(), String>
 
     info!("检测到平台: {}, 架构: {}", platform, arch);
 
-    let version = match get_latest_kernel_version().await {
-        Ok(v) => {
-            info!("获取到最新版本号: {}", v);
-            v
-        }
-        Err(e) => {
-            warn!("获取最新版本失败: {}, 使用默认版本 1.12.10", e);
-            "1.12.10".to_string()
-        }
+    let version = match version {
+        Some(v) => v,
+        None => match get_latest_kernel_version().await {
+            Ok(v) => {
+                info!("获取到最新版本号: {}", v);
+                v
+            }
+            Err(e) => {
+                warn!("获取最新版本失败: {}, 使用默认版本 1.12.10", e);
+                "1.12.10".to_string()
+            }
+        },
     };
 
     let filename = if cfg!(target_os = "windows") {
@@ -104,12 +108,27 @@ pub async fn download_latest_kernel(app_handle: AppHandle) -> Result<(), String>
 
     let work_dir = crate::utils::app_util::get_work_dir_sync();
     let kernel_dir = Path::new(&work_dir).join("sing-box");
+    // 使用专门的临时目录进行下载和解压，避免污染主目录以及混淆旧文件搜索
+    let temp_update_dir = kernel_dir.join("update_temp");
 
-    if let Err(e) = std::fs::create_dir_all(&kernel_dir) {
-        return Err(format!("创建内核目录失败: {}", e));
+    if let Err(e) = std::fs::create_dir_all(&temp_update_dir) {
+        return Err(format!("创建临时更新目录失败: {}", e));
+    }
+    
+    // 清理旧的临时目录内容（如果有）
+    if let Ok(entries) = std::fs::read_dir(&temp_update_dir) {
+        for entry in entries.flatten() {
+           if let Err(e) = if entry.path().is_dir() { 
+               std::fs::remove_dir_all(entry.path()) 
+           } else { 
+               std::fs::remove_file(entry.path()) 
+           } {
+               warn!("清理临时目录失败: {}", e);
+           }
+        }
     }
 
-    let download_path = kernel_dir.join(&filename);
+    let download_path = temp_update_dir.join(&filename);
 
     let _ = window.emit(
         "kernel-download-progress",
@@ -180,21 +199,43 @@ pub async fn download_latest_kernel(app_handle: AppHandle) -> Result<(), String>
                         "message": final_error
                     }),
                 );
-
+                
+                // 失败时清理
+                let _ = std::fs::remove_dir_all(&temp_update_dir);
                 return Err(final_error);
             }
         }
     }
 
     if !download_path.exists() {
+        let _ = std::fs::remove_dir_all(&temp_update_dir);
         return Err("下载的文件不存在".to_string());
     }
 
     let was_running_before_update = is_kernel_running().await.unwrap_or(false);
     if was_running_before_update {
         info!("内核更新前检测到正在运行，先尝试停止以便替换");
-        let _ = stop_kernel().await;
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        
+        // 尝试多次停止内核
+        for i in 0..5 {
+            let _ = stop_kernel().await; // stop_kernel 内部已有 guard disable 和 2s 等待
+            
+            if !is_kernel_running().await.unwrap_or(true) {
+                info!("内核已成功停止");
+                break;
+            }
+            warn!("停止内核尝试 {} 失败，等待重试...", i + 1);
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        
+        // 最后再次确认
+        if is_kernel_running().await.unwrap_or(false) {
+             warn!("几次尝试后内核仍在运行，尝试强制终止进程...");
+             if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+                 warn!("强制终止内核进程失败: {}", e);
+             }
+             tokio::time::sleep(Duration::from_millis(500)).await;
+        }
     }
 
     let _ = window.emit(
@@ -206,7 +247,8 @@ pub async fn download_latest_kernel(app_handle: AppHandle) -> Result<(), String>
         }),
     );
 
-    if let Err(e) = extract_archive(&download_path, &kernel_dir).await {
+    // 解压到临时目录
+    if let Err(e) = extract_archive(&download_path, &temp_update_dir).await {
         let error_msg = format!("解压文件失败: {}", e);
         let _ = window.emit(
             "kernel-download-progress",
@@ -216,9 +258,11 @@ pub async fn download_latest_kernel(app_handle: AppHandle) -> Result<(), String>
                 "message": error_msg
             }),
         );
+        let _ = std::fs::remove_dir_all(&temp_update_dir);
         return Err(error_msg);
     }
 
+    // 删除下载包，只留解压内容
     let _ = std::fs::remove_file(&download_path);
 
     let executable_name = if cfg!(target_os = "windows") {
@@ -227,47 +271,82 @@ pub async fn download_latest_kernel(app_handle: AppHandle) -> Result<(), String>
         "sing-box"
     };
 
-    info!("开始查找可执行文件: {}", executable_name);
+    info!("开始在临时目录中查找新内核: {}", executable_name);
 
-    let found_executable_path = find_executable_file(&kernel_dir, executable_name).await?;
+    // 在临时目录中查找
+    let found_executable_path = match find_executable_file(&temp_update_dir, executable_name).await {
+        Ok(p) => p,
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&temp_update_dir);
+            return Err(e);
+        }
+    };
+    
     let target_executable_path = kernel_dir.join(executable_name);
 
-    if found_executable_path != target_executable_path {
-        info!(
-            "迁移内核文件从 {:?} 到 {:?}",
-            found_executable_path, target_executable_path
-        );
+    info!(
+        "准备迁移新内核文件从 {:?} 到 {:?}",
+        found_executable_path, target_executable_path
+    );
 
-        if target_executable_path.exists() {
-            if let Err(e) = std::fs::remove_file(&target_executable_path) {
-                warn!("删除已存在的目标文件失败: {}, 将继续...", e);
-            }
-        }
-
-        if let Err(_e) = std::fs::rename(&found_executable_path, &target_executable_path) {
-            if let Err(copy_err) = std::fs::copy(&found_executable_path, &target_executable_path) {
-                return Err(format!("复制内核文件失败: {}", copy_err));
-            }
-            if let Err(remove_err) = std::fs::remove_file(&found_executable_path) {
-                warn!("删除原文件失败: {}, 将继续...", remove_err);
-            }
-            info!("成功复制内核文件到正确位置");
+    // 目标如果存在，处理备份/重命名
+    if target_executable_path.exists() {
+        // Windows 下如果文件正在使用，无法直接删除，但通常可以重命名
+        // 尝试将旧文件重命名为 .old
+        let old_executable_path = if cfg!(target_os = "windows") {
+            target_executable_path.with_extension("exe.old")
         } else {
-            info!("成功移动内核文件到正确位置");
+            target_executable_path.with_extension("old")
+        };
+
+        // 如果已经存在 .old 文件，先尝试删除它
+        if old_executable_path.exists() {
+            let _ = std::fs::remove_file(&old_executable_path);
         }
 
-        if let Some(parent_dir) = found_executable_path.parent() {
-            info!("清理版本目录: {:?}", parent_dir);
-
-            if let Err(e) = std::fs::remove_dir_all(parent_dir) {
-                warn!("删除版本目录失败: {}, 将继续...", e);
-            } else {
-                info!("成功删除版本目录: {:?}", parent_dir);
+        if let Err(e) = std::fs::rename(&target_executable_path, &old_executable_path) {
+            warn!("重命名旧文件失败: {}, 尝试直接删除...", e);
+            if let Err(e) = std::fs::remove_file(&target_executable_path) {
+                // 如果实在删不掉，报错返回
+                let _ = std::fs::remove_dir_all(&temp_update_dir);
+                return Err(format!(
+                    "无法删除或重命名旧内核文件 (可能正在使用?): {}. 请尝试手动停止内核或重启应用。", 
+                    e
+                ));
             }
+        } else {
+            info!("旧内核文件已重命名为: {:?}", old_executable_path);
         }
+    }
 
-        if let Err(e) = cleanup_kernel_directory(&kernel_dir, executable_name) {
-            warn!("清理内核目录失败: {}, 将继续...", e);
+    // 移动新文件到目标位置
+    if let Err(e) = std::fs::rename(&found_executable_path, &target_executable_path) {
+        // 如果跨磁盘或者 rename 失败，尝试 copy + delete
+        if let Err(copy_err) = std::fs::copy(&found_executable_path, &target_executable_path) {
+            let _ = std::fs::remove_dir_all(&temp_update_dir);
+            return Err(format!("复制新内核文件失败: {}", copy_err));
+        }
+    }
+    
+    info!("成功部署新内核文件");
+
+    // 清理临时目录
+    if let Err(e) = std::fs::remove_dir_all(&temp_update_dir) {
+        warn!("清理临时更新目录失败: {}, 请手动清理 {:?}", e, temp_update_dir);
+    }
+
+    // 尝试清理残留的旧版本目录 (可选)
+    // 之前下载解压可能留下的垃圾目录 sing-box-1.xx-windows-amd64 等
+    if let Ok(entries) = std::fs::read_dir(&kernel_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            // 如果是目录，且名字看起来像 version 目录，且不是我们刚部署的文件
+            if path.is_dir() && path.file_name().unwrap_or_default() != "logs" && path.file_name().unwrap_or_default() != "update_temp" {
+                 let name = path.file_name().unwrap().to_string_lossy();
+                 if name.starts_with("sing-box-") {
+                     let _ = std::fs::remove_dir_all(&path);
+                 }
+            }
         }
     }
 
@@ -292,6 +371,17 @@ pub async fn download_latest_kernel(app_handle: AppHandle) -> Result<(), String>
     if was_running_before_update {
         info!("内核更新完成，自动重新启动内核");
         auto_manage_with_saved_config(&app_handle, true, "kernel-update").await;
+    }
+
+    // 更新安装版本信息到数据库
+    use crate::app::storage::enhanced_storage_service::{db_save_app_config_internal, db_get_app_config};
+    if let Ok(mut config) = db_get_app_config(app_handle.clone()).await {
+        config.installed_kernel_version = Some(version);
+        if let Err(e) = db_save_app_config_internal(config, app_handle).await {
+            warn!("保存内核版本信息失败: {}", e);
+        } else {
+            info!("已更新数据库中的已安装内核版本信息");
+        }
     }
 
     Ok(())
@@ -519,44 +609,7 @@ fn set_executable_permission(_file_path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn cleanup_kernel_directory(
-    kernel_dir: &Path,
-    executable_name: &str,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("清理内核目录，只保留可执行文件: {}", executable_name);
 
-    if let Ok(entries) = std::fs::read_dir(kernel_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-
-            if path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .map(|name| name == executable_name)
-                .unwrap_or(false)
-            {
-                continue;
-            }
-
-            if path.is_file() {
-                if let Err(e) = std::fs::remove_file(&path) {
-                    warn!("删除文件失败 {:?}: {}", path, e);
-                } else {
-                    info!("删除文件: {:?}", path);
-                }
-            } else if path.is_dir() {
-                if let Err(e) = std::fs::remove_dir_all(&path) {
-                    warn!("删除目录失败 {:?}: {}", path, e);
-                } else {
-                    info!("删除目录: {:?}", path);
-                }
-            }
-        }
-    }
-
-    info!("内核目录清理完成");
-    Ok(())
-}
 
 #[tauri::command]
 pub async fn install_kernel() -> Result<(), String> {

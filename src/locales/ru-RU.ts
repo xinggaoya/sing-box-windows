@@ -2,16 +2,17 @@ export default {
   // 通用词汇
   common: {
     appName: 'Sing-Box Windows',
-    ok: 'ОК',
     cancel: 'Отмена',
-    confirm: 'Подтвердить',
     save: 'Сохранить',
+    saveSuccess: 'Сохранено успешно',
+    saveFailed: 'Ошибка сохранения',
+    confirm: 'Подтвердить',
+    add: 'Добавить',
+    edit: 'Редактировать',
     delete: 'Удалить',
-    error: 'Ошибка',
+    import: 'Импорт',
+    export: 'Экспорт',
     refresh: 'Обновить',
-    unknown: 'Неизвестно',
-    search: 'Поиск',
-    minimizedToTray: 'Свернуто в трей',
   },
 
   // 导航菜单
@@ -88,6 +89,9 @@ export default {
       downloadTotal: 'Общее скачивание',
       memory: 'Использование памяти',
       connectionsLabel: 'соединений',
+      up: 'Загрузка',
+      down: 'Скачивание',
+      total: 'Всего',
     },
 
   
@@ -319,16 +323,16 @@ export default {
 
     // 翋枙扢离
     theme: {
-      title: 'Appearance & Theme',
-      mode: 'Theme Mode',
-      modeDesc: 'Follow system or force light / dark',
-      system: 'System',
-      light: 'Light',
-      dark: 'Dark',
-      accent: 'Accent Color',
-      accentDesc: 'Set the primary accent color for controls',
-      compactMode: 'Compact Layout',
-      compactDesc: 'Tighter paddings and smaller controls for dense UI',
+      title: 'Внешний вид и тема',
+      mode: 'Режим темы',
+      modeDesc: 'Следовать системным настройкам или зафиксировать светлую/темную',
+      system: 'Системная',
+      light: 'Светлая',
+      dark: 'Темная',
+      accent: 'Акцентный цвет',
+      accentDesc: 'Основной акцентный цвет для элементов управления и подсветки',
+      compactMode: 'Компактное расположение',
+      compactDesc: 'Уменьшить отступы и размеры элементов управления для плотного интерфейса',
     },
 
     // 语言设置

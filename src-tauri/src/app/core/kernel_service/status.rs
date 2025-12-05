@@ -260,6 +260,7 @@ pub async fn get_system_uptime() -> Result<u64, String> {
 
 #[tauri::command]
 pub async fn kernel_get_status_enhanced(
+    app_handle: tauri::AppHandle,
     api_port: Option<u16>,
 ) -> Result<serde_json::Value, String> {
     let port = api_port.unwrap_or(12081);
@@ -311,7 +312,7 @@ pub async fn kernel_get_status_enhanced(
         }
     }
 
-    let version = if process_running {
+    let mut version = if process_running {
         let client = http_client::get_client();
         let api_url = format!("http://127.0.0.1:{}/version", port);
         match client
@@ -327,11 +328,15 @@ pub async fn kernel_get_status_enhanced(
             _ => None,
         }
     } else {
-        match crate::app::core::kernel_service::versioning::check_kernel_version().await {
-            Ok(v) => Some(v.trim().to_string()),
-            Err(_) => None,
-        }
+        None
     };
+
+    // 如果运行时并未获取到版本（未运行或API超时），回退到检查安装版本（DB/文件）
+    if version.is_none() {
+        if let Ok(v) = crate::app::core::kernel_service::versioning::check_kernel_version(app_handle).await {
+            version = Some(v.trim().to_string());
+        }
+    }
 
     Ok(serde_json::json!({
         "process_running": process_running,

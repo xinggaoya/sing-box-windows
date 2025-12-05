@@ -23,6 +23,7 @@ pub struct AppConfig {
     pub tun_stack: String,
     pub tun_enable_ipv6: bool,
     pub active_config_path: Option<String>,
+    pub installed_kernel_version: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -46,6 +47,7 @@ impl Default for AppConfig {
             tun_stack: "mixed".to_string(),
             tun_enable_ipv6: true,
             active_config_path: None,
+            installed_kernel_version: None,
         }
     }
 }

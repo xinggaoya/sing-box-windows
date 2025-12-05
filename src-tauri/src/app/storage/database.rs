@@ -68,6 +68,7 @@ impl DatabaseService {
                 tun_stack TEXT DEFAULT 'mixed',
                 tun_enable_ipv6 BOOLEAN DEFAULT TRUE,
                 active_config_path TEXT,
+                installed_kernel_version TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -90,6 +91,7 @@ impl DatabaseService {
             "ALTER TABLE app_config ADD COLUMN system_proxy_enabled BOOLEAN DEFAULT FALSE",
             "ALTER TABLE app_config ADD COLUMN tun_enabled BOOLEAN DEFAULT FALSE",
             "ALTER TABLE app_config ADD COLUMN active_config_path TEXT",
+            "ALTER TABLE app_config ADD COLUMN installed_kernel_version TEXT",
         ];
 
         for statement in alter_statements {
@@ -241,6 +243,7 @@ impl DatabaseService {
                     .try_get("tun_enable_ipv6")
                     .unwrap_or(default_config.tun_enable_ipv6),
                 active_config_path: row.try_get("active_config_path").unwrap_or(None),
+                installed_kernel_version: row.try_get("installed_kernel_version").unwrap_or(None),
             }))
         } else {
             Ok(None)
@@ -251,8 +254,8 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO app_config
-            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, active_config_path, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, active_config_path, installed_kernel_version, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_start_kernel)
@@ -273,6 +276,7 @@ impl DatabaseService {
         .bind(&config.tun_stack)
         .bind(config.tun_enable_ipv6)
         .bind(&config.active_config_path)
+        .bind(&config.installed_kernel_version)
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;

@@ -395,6 +395,9 @@ export default {
       downloadFailedMessage: '内核下载失败: {error}',
       downloadSuccess: '内核下载成功',
       downloadFailed: '内核下载失败',
+      selectVersion: '选择版本',
+      selectVersionDesc: '选择要下载的特定内核版本',
+      latest: '最新版本',
     },
     proxyAdvanced: {
       title: '代理高级设置',
