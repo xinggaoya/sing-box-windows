@@ -89,7 +89,7 @@
         {
             "type": "urltest",
             "tag": "自动选择",
-            "outbounds": [],
+            "outbounds": ["direct"],
             "url": "http://cp.cloudflare.com",
             "interval": "3m",
             "tolerance": 50,
