@@ -7,6 +7,7 @@ use tracing_subscriber::{fmt, EnvFilter}; // 重新启用数据库存储
 
 pub mod app;
 pub mod entity;
+pub mod platform;
 pub mod process;
 pub mod utils;
 

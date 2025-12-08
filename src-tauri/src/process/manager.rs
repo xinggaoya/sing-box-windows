@@ -263,149 +263,28 @@ impl ProcessManager {
     pub async fn kill_existing_processes(&self) -> std::io::Result<()> {
         info!("检查系统中是否有sing-box进程在运行");
 
-        #[cfg(target_os = "windows")]
-        {
-            // 使用异步进程命令
-            let mut cmd = tokio::process::Command::new("tasklist");
-            cmd.args(&["/FI", "IMAGENAME eq sing-box.exe", "/FO", "CSV", "/NH"]);
-
-            #[cfg(target_os = "windows")]
-            cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
-
-            let output = cmd.output().await?;
-
-            let stdout = String::from_utf8_lossy(&output.stdout);
-
-            // 检查输出中是否包含sing-box.exe
-            if stdout.contains("sing-box.exe") {
-                info!("发现已有sing-box.exe进程，正在终止");
-
-                // 使用异步进程命令终止所有sing-box.exe进程
-                let mut cmd = tokio::process::Command::new("taskkill");
-                cmd.args(&["/F", "/IM", "sing-box.exe"]);
-
-                #[cfg(target_os = "windows")]
-                cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
-
-                let kill_output = cmd.output().await?;
-
-                if kill_output.status.success() {
-                    info!("成功终止所有sing-box.exe进程");
+        let kernel_name = crate::platform::get_kernel_executable_name();
+        
+        // 检查是否有进程运行
+        match crate::platform::is_process_running(kernel_name).await {
+            Ok(true) => {
+                info!("发现已有 {} 进程，正在终止", kernel_name);
+                
+                // 终止进程
+                if let Err(e) = crate::platform::kill_processes_by_name(kernel_name).await {
+                    warn!("终止 {} 进程可能失败: {}", kernel_name, e);
                 } else {
-                    let error = String::from_utf8_lossy(&kill_output.stderr);
-                    warn!("终止sing-box.exe进程可能失败: {}", error);
+                    info!("成功终止所有 {} 进程", kernel_name);
                 }
-
-                // 等待一段时间确保进程完全终止
+                
+                // 等待进程完全终止
                 sleep(Duration::from_millis(500)).await;
-            } else {
-                info!("未发现已有sing-box.exe进程");
             }
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            // 获取我们的内核目录，只检测从该目录运行的内核进程
-            let kernel_path = crate::app::constants::paths::get_kernel_path();
-            let kernel_dir = kernel_path
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new("/nonexistent"));
-
-            info!("检查内核进程，内核目录: {:?}", kernel_dir);
-
-            // 更精确的检测：只匹配从我们内核目录运行的 sing-box 进程
-            if let Ok(output) = tokio::process::Command::new("pgrep")
-                .args(&["-f", &format!("sing-box.*{}", kernel_dir.display())])
-                .output()
-                .await
-            {
-                if output.status.success() && !output.stdout.is_empty() {
-                    let pids = String::from_utf8_lossy(&output.stdout);
-                    info!("发现已有的sing-box内核进程，PIDs: {}", pids.trim());
-
-                    // 使用精确匹配终止我们的内核进程
-                    let kill_output = tokio::process::Command::new("pkill")
-                        .args(&["-f", &format!("sing-box.*{}", kernel_dir.display())])
-                        .output()
-                        .await?;
-
-                    if kill_output.status.success() {
-                        info!("成功终止已有的sing-box内核进程");
-                    } else {
-                        let error = String::from_utf8_lossy(&kill_output.stderr);
-                        warn!("终止sing-box内核进程可能失败: {}", error);
-                    }
-
-                    // 等待一段时间确保进程完全终止
-                    sleep(Duration::from_millis(500)).await;
-                } else {
-                    info!("未发现已有的sing-box内核进程");
-                }
-            } else {
-                warn!("无法检查sing-box内核进程状态");
+            Ok(false) => {
+                info!("未发现已有 {} 进程", kernel_name);
             }
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            // 获取我们的内核目录，只检测从该目录运行的内核进程
-            let kernel_path = crate::app::constants::paths::get_kernel_path();
-            let kernel_dir = kernel_path
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new("/nonexistent"));
-
-            info!("检查内核进程，内核目录: {:?}", kernel_dir);
-
-            // 使用ps命令检测sing-box进程
-            if let Ok(output) = tokio::process::Command::new("ps")
-                .args(&["-axo", "pid,command"])
-                .output()
-                .await
-            {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let mut found_pids = Vec::new();
-
-                for line in stdout.lines() {
-                    if line.contains("sing-box") && line.contains(&kernel_dir.display().to_string())
-                    {
-                        if let Some(pid_str) = line.split_whitespace().next() {
-                            if let Ok(pid) = pid_str.parse::<u32>() {
-                                found_pids.push(pid);
-                            }
-                        }
-                    }
-                }
-
-                if !found_pids.is_empty() {
-                    info!("发现已有的sing-box内核进程，PIDs: {:?}", found_pids);
-
-                    // 终止找到的进程
-                    for pid in found_pids {
-                        let kill_output = tokio::process::Command::new("kill")
-                            .args(&["-9", &pid.to_string()])
-                            .output()
-                            .await;
-
-                        match kill_output {
-                            Ok(output) if output.status.success() => {
-                                info!("成功终止sing-box进程，PID: {}", pid);
-                            }
-                            Ok(_) => {
-                                warn!("终止sing-box进程可能失败，PID: {}", pid);
-                            }
-                            Err(e) => {
-                                warn!("无法终止sing-box进程，PID: {}, 错误: {}", pid, e);
-                            }
-                        }
-                    }
-
-                    // 等待一段时间确保进程完全终止
-                    sleep(Duration::from_millis(500)).await;
-                } else {
-                    info!("未发现已有的sing-box内核进程");
-                }
-            } else {
-                warn!("无法检查sing-box内核进程状态");
+            Err(e) => {
+                warn!("无法检查 {} 进程状态: {}", kernel_name, e);
             }
         }
 
@@ -532,54 +411,7 @@ impl ProcessManager {
 
 // 使用PID强制终止进程
 fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
-    #[cfg(windows)]
-    {
-        use std::process::Command;
-
-        let output = Command::new("taskkill")
-            .args(&["/F", "/PID", &pid.to_string()])
-            .creation_flags(crate::app::constants::process::CREATE_NO_WINDOW)
-            .output()?;
-
-        if output.status.success() {
-            info!("成功使用PID {}强制终止进程", pid);
-        } else {
-            let error = String::from_utf8_lossy(&output.stderr);
-            warn!("使用PID {}强制终止进程失败: {}", pid, error);
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        use std::process::Command;
-
-        let output = Command::new("kill")
-            .args(&["-9", &pid.to_string()])
-            .output()?;
-
-        if output.status.success() {
-            info!("成功使用PID {}强制终止进程", pid);
-        } else {
-            let error = String::from_utf8_lossy(&output.stderr);
-            warn!("使用PID {}强制终止进程失败: {}", pid, error);
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        use std::process::Command;
-
-        let output = Command::new("kill")
-            .args(&["-9", &pid.to_string()])
-            .output()?;
-
-        if output.status.success() {
-            info!("成功使用PID {}强制终止进程", pid);
-        } else {
-            let error = String::from_utf8_lossy(&output.stderr);
-            warn!("使用PID {}强制终止进程失败: {}", pid, error);
-        }
-    }
-
-    Ok(())
+    crate::platform::kill_process_by_pid(pid)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
 }
+

@@ -1,261 +1,38 @@
 use crate::app::constants::paths;
 use crate::app::core::kernel_service::PROCESS_MANAGER;
+use crate::platform;
 use crate::utils::http_client;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::info;
 
 #[tauri::command]
 pub async fn is_kernel_running() -> Result<bool, String> {
+    // 首先检查 ProcessManager 中的进程句柄
     if PROCESS_MANAGER.is_running().await {
         return Ok(true);
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        is_kernel_running_windows().await
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        is_kernel_running_linux().await
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        is_kernel_running_macos().await
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-    {
-        Err("当前平台不支持内核状态检查".to_string())
-    }
-}
-
-#[cfg(target_os = "windows")]
-async fn is_kernel_running_windows() -> Result<bool, String> {
-    let kernel_path = crate::app::constants::core::paths::get_kernel_path();
-
-    info!("检查内核进程，可执行文件路径: {:?}", kernel_path);
-
-    let kernel_filename = kernel_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("sing-box.exe");
-    let kernel_lower = kernel_filename.to_ascii_lowercase();
-
-    let mut cmd = tokio::process::Command::new("tasklist");
-    cmd.args(&[
-        "/FI",
-        &format!("IMAGENAME eq {}", kernel_filename),
-        "/FO",
-        "CSV",
-        "/NH",
-    ]);
-
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
-
-    if let Ok(output) = cmd.output().await {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        for line in stdout.lines() {
-            let parts: Vec<&str> = line
-                .split('"')
-                .filter(|s| !s.is_empty() && *s != ",")
-                .collect();
-            if let Some(image_name) = parts.get(0) {
-                if image_name.to_ascii_lowercase() == kernel_lower {
-                    info!("通过tasklist检测到内核进程: {}", image_name);
-                    return Ok(true);
-                }
+    // 使用平台抽象层检测外部启动的内核进程
+    let kernel_name = platform::get_kernel_executable_name();
+    match platform::is_process_running(kernel_name).await {
+        Ok(running) => {
+            if running {
+                info!("通过平台抽象层检测到内核进程");
+            } else {
+                info!("内核运行状态检查: false (未找到相关进程)");
             }
+            Ok(running)
+        }
+        Err(e) => {
+            info!("平台进程检测失败: {}, 返回 false", e);
+            Ok(false)
         }
     }
-
-    let mut cmd = tokio::process::Command::new("powershell");
-    cmd.args(&[
-        "-Command",
-        &format!(
-            "Get-Process | Where-Object {{ $_.Path -like \"{}\" }}",
-            kernel_path.to_string_lossy()
-        ),
-    ]);
-
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
-
-    if let Ok(output) = cmd.output().await {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if !stdout.trim().is_empty() {
-            info!("通过PowerShell检测到内核进程");
-            return Ok(true);
-        }
-    }
-
-    info!("内核运行状态检查: false (未找到相关进程)");
-    Ok(false)
-}
-
-#[cfg(target_os = "linux")]
-async fn is_kernel_running_linux() -> Result<bool, String> {
-    use std::process::Command;
-
-    let kernel_path = crate::app::constants::core::paths::get_kernel_path();
-    let kernel_filename = kernel_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("sing-box");
-
-    if let Ok(output) = Command::new("pidof").arg(kernel_filename).output() {
-        if output.status.success() && !output.stdout.is_empty() {
-            info!("通过pidof检测到内核进程");
-            return Ok(true);
-        }
-    }
-
-    if let Ok(output) = Command::new("pgrep").arg(kernel_filename).output() {
-        if output.status.success() && !output.stdout.is_empty() {
-            info!("通过pgrep检测到内核进程");
-            return Ok(true);
-        }
-    }
-
-    if let Ok(output) = Command::new("ps").args(&["-ef"]).output() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        for line in stdout.lines() {
-            if line.contains(kernel_filename) && line.contains("sing-box") {
-                info!("通过ps检测到内核进程");
-                return Ok(true);
-            }
-        }
-    }
-
-    info!("内核运行状态检查: false (未找到相关进程)");
-    Ok(false)
-}
-
-#[cfg(target_os = "macos")]
-async fn is_kernel_running_macos() -> Result<bool, String> {
-    use std::process::Command;
-
-    let kernel_path = crate::app::constants::core::paths::get_kernel_path();
-    let kernel_filename = kernel_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("sing-box");
-
-    if let Ok(output) = Command::new("pgrep").arg(kernel_filename).output() {
-        if output.status.success() && !output.stdout.is_empty() {
-            info!("通过pgrep检测到内核进程");
-            return Ok(true);
-        }
-    }
-
-    if let Ok(output) = Command::new("ps").args(&["-ef"]).output() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        for line in stdout.lines() {
-            if line.contains(kernel_filename) && line.contains("sing-box") {
-                info!("通过ps检测到内核进程");
-                return Ok(true);
-            }
-        }
-    }
-
-    info!("内核运行状态检查: false (未找到相关进程)");
-    Ok(false)
 }
 
 #[tauri::command]
 pub async fn get_system_uptime() -> Result<u64, String> {
-    #[cfg(windows)]
-    {
-        let mut cmd = tokio::process::Command::new("powershell");
-        cmd.args(&[
-            "-Command",
-            "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime | Select-Object -ExpandProperty TotalMilliseconds"
-        ]);
-
-        #[cfg(target_os = "windows")]
-        cmd.creation_flags(crate::app::constants::process::CREATE_NO_WINDOW);
-
-        match cmd.output().await {
-            Ok(output) => {
-                if output.status.success() {
-                    let uptime_str = String::from_utf8_lossy(&output.stdout);
-                    let uptime_ms: f64 = uptime_str.trim().parse().unwrap_or(0.0);
-                    return Ok(uptime_ms as u64);
-                } else {
-                    warn!("PowerShell获取系统时间失败，使用备用方法");
-                    return Ok(std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_millis() as u64);
-                }
-            }
-            Err(e) => {
-                warn!("无法获取系统运行时间: {}", e);
-                return Ok(0);
-            }
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        match std::fs::read_to_string("/proc/uptime") {
-            Ok(content) => {
-                let uptime_seconds: f64 = content
-                    .split_whitespace()
-                    .next()
-                    .unwrap_or("0")
-                    .parse()
-                    .unwrap_or(0.0);
-                return Ok((uptime_seconds * 1000.0) as u64);
-            }
-            Err(_) => return Ok(0),
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let mut cmd = tokio::process::Command::new("sysctl");
-        cmd.args(&["-n", "kern.boottime"]);
-
-        match cmd.output().await {
-            Ok(output) => {
-                if output.status.success() {
-                    let boottime_str = String::from_utf8_lossy(&output.stdout);
-                    if let Some(sec_part) = boottime_str.split("sec = ").nth(1) {
-                        if let Some(timestamp) = sec_part.split(',').next() {
-                            if let Ok(boot_timestamp) = timestamp.trim().parse::<u64>() {
-                                let current_timestamp = std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_secs();
-
-                                let uptime_seconds =
-                                    current_timestamp.saturating_sub(boot_timestamp);
-                                return Ok(uptime_seconds * 1000);
-                            }
-                        }
-                    }
-                }
-                match tokio::process::Command::new("uptime").output().await {
-                    Ok(uptime_output) if uptime_output.status.success() => {
-                        let uptime_str = String::from_utf8_lossy(&uptime_output.stdout);
-                        info!("uptime输出: {}", uptime_str);
-                        Ok(0)
-                    }
-                    _ => {
-                        warn!("无法获取macOS系统运行时间");
-                        Ok(0)
-                    }
-                }
-            }
-            Err(e) => {
-                warn!("sysctl命令执行失败: {}", e);
-                Ok(0)
-            }
-        }
-    }
+    platform::get_system_uptime_ms().await
 }
 
 #[tauri::command]

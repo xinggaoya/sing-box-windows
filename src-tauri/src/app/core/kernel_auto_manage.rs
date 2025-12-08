@@ -1,7 +1,7 @@
 use crate::app::constants::paths;
 use crate::app::core::kernel_service::{
     check_config_validity, is_kernel_running, resolve_proxy_runtime_state, start_kernel_with_state,
-    stop_kernel, ProxyOverrides,
+    stop_kernel, KernelRuntimeConfig, ProxyOverrides,
 };
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
@@ -13,54 +13,27 @@ use tracing::{info, warn};
 
 #[derive(Debug, Clone)]
 pub struct AutoManageOptions {
-    pub proxy_mode: Option<String>,
-    pub api_port: Option<u16>,
-    pub proxy_port: Option<u16>,
-    pub prefer_ipv6: Option<bool>,
-    pub system_proxy_bypass: Option<String>,
-    pub tun_options: Option<TunProxyOptions>,
-    pub system_proxy_enabled: Option<bool>,
-    pub tun_enabled: Option<bool>,
-    pub keep_alive: Option<bool>,
-    pub force_restart: bool,
+    pub config: KernelRuntimeConfig,
 }
 
 impl AutoManageOptions {
     pub fn from_app_config(config: AppConfig) -> Self {
         AutoManageOptions {
-            proxy_mode: Some(config.proxy_mode.clone()),
-            api_port: Some(config.api_port),
-            proxy_port: Some(config.proxy_port),
-            prefer_ipv6: Some(config.prefer_ipv6),
-            system_proxy_bypass: Some(config.system_proxy_bypass.clone()),
-            tun_options: Some(TunProxyOptions {
-                ipv4_address: config.tun_ipv4.clone(),
-                ipv6_address: config.tun_ipv6.clone(),
-                mtu: config.tun_mtu,
-                auto_route: config.tun_auto_route,
-                strict_route: config.tun_strict_route,
-                stack: config.tun_stack.clone(),
-                enable_ipv6: config.tun_enable_ipv6,
-                interface_name: None,
-            }),
-            system_proxy_enabled: Some(config.system_proxy_enabled),
-            tun_enabled: Some(config.tun_enabled),
-            keep_alive: Some(config.auto_start_kernel),
-            force_restart: false,
+            config: KernelRuntimeConfig::from_app_config(&config),
         }
     }
 
     fn to_overrides(&self) -> ProxyOverrides {
         ProxyOverrides {
-            proxy_mode: self.proxy_mode.clone(),
-            api_port: self.api_port,
-            proxy_port: self.proxy_port,
-            prefer_ipv6: self.prefer_ipv6,
-            system_proxy_bypass: self.system_proxy_bypass.clone(),
-            tun_options: self.tun_options.clone(),
-            system_proxy_enabled: self.system_proxy_enabled,
-            tun_enabled: self.tun_enabled,
-            keep_alive: self.keep_alive,
+            proxy_mode: self.config.proxy_mode.clone(),
+            api_port: self.config.api_port,
+            proxy_port: self.config.proxy_port,
+            prefer_ipv6: self.config.prefer_ipv6,
+            system_proxy_bypass: self.config.system_proxy_bypass.clone(),
+            tun_options: self.config.tun_options.clone(),
+            system_proxy_enabled: self.config.system_proxy_enabled,
+            tun_enabled: self.config.tun_enabled,
+            keep_alive: self.config.keep_alive,
         }
     }
 }
@@ -152,7 +125,7 @@ async fn auto_manage_kernel_internal(
     }
 
     let mut was_running = is_kernel_running().await.unwrap_or(false);
-    if options.force_restart && was_running {
+    if options.config.force_restart && was_running {
         info!("自动管理请求触发内核重启");
         let _ = stop_kernel().await;
         tokio::time::sleep(Duration::from_millis(500)).await;
@@ -171,7 +144,7 @@ async fn auto_manage_kernel_internal(
         .unwrap_or("内核启动状态未知")
         .to_string();
 
-    let attempted_start = !was_running || options.force_restart;
+    let attempted_start = !was_running || options.config.force_restart;
 
     if success {
         Ok(AutoManageResult::running(
@@ -192,7 +165,7 @@ pub async fn auto_manage_with_saved_config(
     match db_get_app_config(app_handle.clone()).await {
         Ok(config) => {
             let mut options = AutoManageOptions::from_app_config(config);
-            options.force_restart = force_restart;
+            options.config.force_restart = force_restart;
 
             match auto_manage_kernel_internal(app_handle.clone(), options).await {
                 Ok(result) => {
@@ -227,16 +200,18 @@ pub async fn kernel_auto_manage(
     force_restart: Option<bool>,
 ) -> Result<serde_json::Value, String> {
     let options = AutoManageOptions {
-        proxy_mode,
-        api_port,
-        proxy_port,
-        prefer_ipv6,
-        system_proxy_bypass,
-        tun_options,
-        keep_alive,
-        system_proxy_enabled,
-        tun_enabled,
-        force_restart: force_restart.unwrap_or(false),
+        config: KernelRuntimeConfig {
+            proxy_mode,
+            api_port,
+            proxy_port,
+            prefer_ipv6,
+            system_proxy_bypass,
+            tun_options,
+            keep_alive,
+            system_proxy_enabled,
+            tun_enabled,
+            force_restart: force_restart.unwrap_or(false),
+        },
     };
 
     let result = auto_manage_kernel_internal(app_handle, options).await?;

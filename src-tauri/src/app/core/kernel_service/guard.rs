@@ -1,12 +1,13 @@
 use crate::app::constants::paths;
 use crate::app::core::kernel_service::event::start_websocket_relay;
 use crate::app::core::kernel_service::status::is_kernel_running;
+use crate::app::core::kernel_service::utils::{
+    emit_kernel_started, emit_kernel_stopped, resolve_config_path_or_default,
+};
 use crate::app::core::kernel_service::PROCESS_MANAGER;
-use crate::app::storage::enhanced_storage_service::db_get_app_config;
-use serde_json::json;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tracing::{info, warn};
@@ -44,31 +45,9 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16) {
                 _ => {
                     info!("守护检测到内核停止，尝试自动重启...");
 
-                    let _ = app_handle.emit(
-                        "kernel-stopped",
-                        json!({
-                            "process_running": false,
-                            "api_ready": false,
-                            "websocket_ready": false
-                        }),
-                    );
-                    let _ = app_handle.emit(
-                        "kernel-status-changed",
-                        json!({
-                            "process_running": false,
-                            "api_ready": false,
-                            "websocket_ready": false
-                        }),
-                    );
+                    emit_kernel_stopped(&app_handle);
 
-                    let app_config = db_get_app_config(app_handle.clone())
-                        .await
-                        .unwrap_or_default();
-                    let config_path = if let Some(path_str) = app_config.active_config_path {
-                        std::path::PathBuf::from(path_str)
-                    } else {
-                        paths::get_config_dir().join("config.json")
-                    };
+                    let config_path = resolve_config_path_or_default(&app_handle).await;
 
                     let kernel_path = paths::get_kernel_path();
                     if !kernel_path.exists() {
@@ -98,23 +77,8 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16) {
                         }
                     }
 
-                    let _ = app_handle.emit(
-                        "kernel-started",
-                        json!({
-                            "process_running": true,
-                            "api_ready": true,
-                            "auto_restarted": true
-                        }),
-                    );
-                    let _ = app_handle.emit(
-                        "kernel-status-changed",
-                        json!({
-                            "process_running": true,
-                            "api_ready": true,
-                            "websocket_ready": true
-                        }),
-                    );
-                    let _ = app_handle.emit("kernel-ready", ());
+                    // Guard restart uses port 0 since we don't have full state
+                    emit_kernel_started(&app_handle, "auto", port_value, 0, true);
                 }
             }
         }

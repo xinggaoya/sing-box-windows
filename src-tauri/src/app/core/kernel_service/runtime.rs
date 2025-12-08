@@ -1,9 +1,13 @@
-use crate::app::constants::{common::messages, paths};
+use crate::app::constants::common::messages;
 use crate::app::core::kernel_service::event::{
     cleanup_event_relay_tasks, start_websocket_relay, SHOULD_STOP_EVENTS,
 };
 use crate::app::core::kernel_service::guard::{disable_kernel_guard, enable_kernel_guard};
 use crate::app::core::kernel_service::status::is_kernel_running;
+use crate::app::core::kernel_service::utils::{
+    emit_kernel_error, emit_kernel_started, emit_kernel_starting, emit_kernel_stopped,
+    resolve_config_path,
+};
 use crate::app::core::kernel_service::PROCESS_MANAGER;
 use crate::app::core::proxy_service::{
     apply_proxy_runtime_state, update_dns_strategy, ProxyRuntimeState,
@@ -126,13 +130,11 @@ pub async fn start_kernel_with_state(
         resolved.proxy.proxy_port
     );
 
-    let _ = app_handle.emit(
-        "kernel-starting",
-        json!({
-            "proxy_mode": resolved.derived_mode(),
-            "api_port": resolved.api_port,
-            "proxy_port": resolved.proxy.proxy_port
-        }),
+    emit_kernel_starting(
+        &app_handle,
+        &resolved.derived_mode(),
+        resolved.api_port,
+        resolved.proxy.proxy_port,
     );
 
     crate::app::system::config_service::ensure_singbox_config(&app_handle)
@@ -168,14 +170,7 @@ pub async fn start_kernel_with_state(
         }));
     }
 
-    let app_config = db_get_app_config(app_handle.clone())
-        .await
-        .map_err(|e| format!("获取应用配置失败: {}", e))?;
-    let config_path = if let Some(path_str) = app_config.active_config_path {
-        std::path::PathBuf::from(path_str)
-    } else {
-        paths::get_config_dir().join("config.json")
-    };
+    let config_path = resolve_config_path(&app_handle).await?;
 
     match PROCESS_MANAGER.start(&config_path).await {
         Ok(_) => {
@@ -188,24 +183,12 @@ pub async fn start_kernel_with_state(
 
                     enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
 
-                    let _ = app_handle.emit("kernel-ready", ());
-                    let _ = app_handle.emit(
-                        "kernel-started",
-                        json!({
-                            "proxy_mode": resolved.derived_mode(),
-                            "api_port": resolved.api_port,
-                            "proxy_port": resolved.proxy.proxy_port,
-                            "process_running": true,
-                            "api_ready": true
-                        }),
-                    );
-                    let _ = app_handle.emit(
-                        "kernel-status-changed",
-                        json!({
-                            "process_running": true,
-                            "api_ready": true,
-                            "websocket_ready": true
-                        }),
+                    emit_kernel_started(
+                        &app_handle,
+                        &resolved.derived_mode(),
+                        resolved.api_port,
+                        resolved.proxy.proxy_port,
+                        false,
                     );
 
                     Ok(serde_json::json!({
@@ -230,12 +213,7 @@ pub async fn start_kernel_with_state(
         Err(e) => {
             error!("? 内核启动失败: {}", e);
 
-            let _ = app_handle.emit(
-                "kernel-error",
-                json!({
-                    "error": format!("启动失败: {}", e)
-                }),
-            );
+            emit_kernel_error(&app_handle, &format!("启动失败: {}", e));
 
             Ok(serde_json::json!({
                 "success": false,
@@ -315,23 +293,7 @@ pub async fn kernel_stop_enhanced(app_handle: AppHandle) -> Result<serde_json::V
 
     match stop_kernel().await {
         Ok(_) => {
-            let _ = app_handle.emit(
-                "kernel-stopped",
-                json!({
-                    "process_running": false,
-                    "api_ready": false,
-                    "websocket_ready": false
-                }),
-            );
-
-            let _ = app_handle.emit(
-                "kernel-status-changed",
-                json!({
-                    "process_running": false,
-                    "api_ready": false,
-                    "websocket_ready": false
-                }),
-            );
+            emit_kernel_stopped(&app_handle);
 
             Ok(serde_json::json!({
                 "success": true,
@@ -339,12 +301,7 @@ pub async fn kernel_stop_enhanced(app_handle: AppHandle) -> Result<serde_json::V
             }))
         }
         Err(e) => {
-            let _ = app_handle.emit(
-                "kernel-error",
-                json!({
-                    "error": format!("停止失败: {}", e)
-                }),
-            );
+            emit_kernel_error(&app_handle, &format!("停止失败: {}", e));
 
             Ok(serde_json::json!({
                 "success": false,
@@ -365,12 +322,7 @@ pub async fn kernel_stop_background(app_handle: AppHandle) -> Result<serde_json:
             Ok(Ok(_)) => info!("? 后台停止内核完成"),
             Ok(Err(e)) => {
                 error!("? 后台停止内核失败: {}", e);
-                let _ = handle.emit(
-                    "kernel-error",
-                    json!({
-                        "error": format!("停止失败: {}", e)
-                    }),
-                );
+                emit_kernel_error(&handle, &format!("停止失败: {}", e));
             }
             Err(_) => {
                 warn!("? 停止内核超时，尝试强制清理");
@@ -380,22 +332,7 @@ pub async fn kernel_stop_background(app_handle: AppHandle) -> Result<serde_json:
             }
         }
 
-        let _ = handle.emit(
-            "kernel-stopped",
-            json!({
-                "process_running": false,
-                "api_ready": false,
-                "websocket_ready": false
-            }),
-        );
-        let _ = handle.emit(
-            "kernel-status-changed",
-            json!({
-                "process_running": false,
-                "api_ready": false,
-                "websocket_ready": false
-            }),
-        );
+        emit_kernel_stopped(&handle);
     });
 
     Ok(json!({
@@ -417,22 +354,7 @@ pub async fn force_stop_and_exit(app_handle: AppHandle) -> Result<serde_json::Va
             error!("强制清理内核进程失败: {}", e);
         }
 
-        let _ = handle.emit(
-            "kernel-stopped",
-            json!({
-                "process_running": false,
-                "api_ready": false,
-                "websocket_ready": false
-            }),
-        );
-        let _ = handle.emit(
-            "kernel-status-changed",
-            json!({
-                "process_running": false,
-                "api_ready": false,
-                "websocket_ready": false
-            }),
-        );
+        emit_kernel_stopped(&handle);
 
         handle.exit(0);
     });

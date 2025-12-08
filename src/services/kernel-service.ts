@@ -282,18 +282,22 @@ class KernelService {
     }
   }
 
+  /**
+   * @deprecated 此方法未实现，仅为接口保留。
+   * 如需使用，请先实现后端 `get_kernel_config` 命令。
+   */
   async getKernelConfig(): Promise<KernelConfig> {
-    // 暂时保留空实现，如果需要从后端获取完整配置再实现
+    console.warn('⚠️ getKernelConfig() 未实现，返回默认值')
     return {
       proxy_mode: 'manual',
-      api_port: 9090,
-      proxy_port: 7890,
+      api_port: 12081,
+      proxy_port: 12080,
       prefer_ipv6: false,
       auto_start: false,
       system_proxy_bypass: '',
       tun: {
-        ipv4_address: '',
-        ipv6_address: '',
+        ipv4_address: '172.19.0.1/30',
+        ipv6_address: 'fdfe:dcba:9876::1/126',
         mtu: 1500,
         auto_route: true,
         strict_route: true,
@@ -303,17 +307,13 @@ class KernelService {
     }
   }
 
-  async updateKernelConfig(config: Partial<KernelConfig>): Promise<{ success: boolean; message: string }> {
-    try {
-      console.log('🔧 更新内核配置:', config)
-      return { success: true, message: '配置更新成功' }
-    } catch (error) {
-      console.error('更新内核配置失败:', error)
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : '更新内核配置失败'
-      }
-    }
+  /**
+   * @deprecated 此方法未实现，仅为接口保留。
+   * 如需使用，请先实现后端 `update_kernel_config` 命令。
+   */
+  async updateKernelConfig(_config: Partial<KernelConfig>): Promise<{ success: boolean; message: string }> {
+    console.warn('⚠️ updateKernelConfig() 未实现')
+    return { success: false, message: '此功能尚未实现' }
   }
 
   async checkKernelHealth(): Promise<{ healthy: boolean; issues: string[] }> {
