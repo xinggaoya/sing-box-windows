@@ -308,8 +308,45 @@ pub async fn db_save_active_subscription_index(
     app: AppHandle,
 ) -> Result<(), String> {
     let storage = get_enhanced_storage(&app).await?;
+    
+    // Save the subscription index
     storage
         .save_active_subscription_index(index)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    
+    // Sync active_config_path with the selected subscription's config_path
+    let mut app_config = storage.get_app_config().await.map_err(|e| e.to_string())?;
+    
+    if let Some(idx) = index {
+        // Load subscriptions and get the config_path for the selected index
+        let subscriptions = storage.get_subscriptions().await.map_err(|e| e.to_string())?;
+        
+        if let Some(subscription) = subscriptions.get(idx as usize) {
+            app_config.active_config_path = subscription.config_path.clone();
+            tracing::info!(
+                "已同步激活配置路径: {:?} (订阅索引: {})",
+                app_config.active_config_path,
+                idx
+            );
+        } else {
+            tracing::warn!(
+                "订阅索引 {} 超出范围 (总数: {})，清除激活配置路径",
+                idx,
+                subscriptions.len()
+            );
+            app_config.active_config_path = None;
+        }
+    } else {
+        // No subscription selected, clear the active config path
+        app_config.active_config_path = None;
+        tracing::info!("已清除激活配置路径 (无激活订阅)");
+    }
+    
+    storage
+        .save_app_config(&app_config)
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    Ok(())
 }
