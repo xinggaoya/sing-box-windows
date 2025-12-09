@@ -1,6 +1,6 @@
 import { nextTick, ref, watch, type Ref } from 'vue'
 import { DatabaseService } from '@/services/database-service'
-import type { AppConfig } from '@/types/database'
+import type { AppConfig } from '@/types/generated/AppConfig'
 
 export interface PersistenceState {
   systemProxyEnabled: Ref<boolean>
@@ -19,6 +19,8 @@ export interface PersistenceState {
   tunStrictRoute: Ref<boolean>
   tunStack: Ref<string>
   tunEnableIpv6: Ref<boolean>
+  activeConfigPath: Ref<string | null>
+  installedKernelVersion: Ref<string | null>
 }
 
 export function createAppPersistence(state: PersistenceState) {
@@ -76,6 +78,9 @@ export function createAppPersistence(state: PersistenceState) {
   const loadFromBackend = async () => {
     try {
       const appConfig = await DatabaseService.getAppConfig()
+
+      state.activeConfigPath.value = appConfig.active_config_path || null
+      state.installedKernelVersion.value = appConfig.installed_kernel_version || null
 
       // 加载新的独立开关字段（如果数据库有的话）
       // 如果数据库没有，则从旧的proxy_mode派生
@@ -142,6 +147,8 @@ export function createAppPersistence(state: PersistenceState) {
         tun_strict_route: state.tunStrictRoute.value,
         tun_stack: state.tunStack.value,
         tun_enable_ipv6: state.tunEnableIpv6.value,
+        active_config_path: state.activeConfigPath.value,
+        installed_kernel_version: state.installedKernelVersion.value,
       }
       await DatabaseService.saveAppConfig(config)
       console.log('✅ 应用配置已保存到数据库')
@@ -181,6 +188,7 @@ export function createAppPersistence(state: PersistenceState) {
       state.tunStrictRoute,
       state.tunStack,
       state.tunEnableIpv6,
+      state.activeConfigPath,
     ],
     scheduleSave,
     { deep: true }

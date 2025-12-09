@@ -75,6 +75,8 @@ export const useAppStore = defineStore(
     const tunStrictRoute = ref(true)
     const tunStack = ref<'system' | 'gvisor' | 'mixed'>('mixed')
     const tunEnableIpv6 = ref(false)
+    const activeConfigPath = ref<string | null>(null)
+    const installedKernelVersion = ref<string | null>(null)
 
     const {
       isDataRestored,
@@ -103,6 +105,8 @@ export const useAppStore = defineStore(
       tunStrictRoute,
       tunStack,
       tunEnableIpv6,
+      activeConfigPath,
+      installedKernelVersion,
     })
 
     // 同步开机自启设置与系统状态
@@ -383,6 +387,13 @@ export const useAppStore = defineStore(
       // 保存会在 watch 中自动处理
     }
 
+    // 设置激活的配置文件路径
+    const setActiveConfigPath = async (path: string | null) => {
+      activeConfigPath.value = path
+      // 变化会自动触发 stopAutoSave 中的 watcher 保存到后端
+      await waitForSaveCompletion()
+    }
+
     return {
       isRunning,
       wsConnected,
@@ -405,6 +416,8 @@ export const useAppStore = defineStore(
       tunStrictRoute,
       tunStack,
       tunEnableIpv6,
+      activeConfigPath,
+      installedKernelVersion,
       setRunningState,
       setConnectingState,
       toggleAutoStart,
@@ -432,6 +445,7 @@ export const useAppStore = defineStore(
       syncAutoStartWithSystem,
       loadFromBackend,
       saveToBackend,
+      setActiveConfigPath,
     }
   },
   // 移除 persist 配置，现在使用后端存储

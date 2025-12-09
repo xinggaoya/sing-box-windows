@@ -464,6 +464,7 @@ const handleConfirm = () => {
 
         if (savedPath) {
           await subscriptionService.setActiveConfig(savedPath)
+          await appStore.setActiveConfigPath(savedPath)
         }
 
         message.success(t('sub.addAndUseSuccess'))
@@ -548,6 +549,7 @@ const refreshSubscription = async (index: number, applyRuntime = false, silent =
       subStore.list[index].backupPath = `${savedPath}.bak`
       if (applyRuntime) {
         await subscriptionService.setActiveConfig(savedPath)
+        await appStore.setActiveConfigPath(savedPath)
       }
     }
     subStore.list[index].lastUpdate = Date.now()
@@ -579,6 +581,7 @@ const rollbackSubscription = async (index: number) => {
     message.success(t('sub.rollbackSuccess'))
     if (subStore.activeIndex === index) {
       await subscriptionService.setActiveConfig(item.configPath)
+      await appStore.setActiveConfigPath(item.configPath)
       if (appStore.isRunning) {
         await kernelService.restartKernel()
       }
@@ -599,6 +602,7 @@ const useSubscription = async (index: number) => {
   try {
     subStore.list[index].isLoading = true
     await subscriptionService.setActiveConfig(item.configPath)
+    await appStore.setActiveConfigPath(item.configPath)
     await subStore.setActiveIndex(index)
     subStore.list[index].lastUpdate = Date.now()
     message.success(t('sub.useSuccess'))

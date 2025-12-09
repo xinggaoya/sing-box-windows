@@ -16,4 +16,6 @@ export interface AppConfig {
   tun_ipv6: string
   tun_stack: string
   tun_enable_ipv6: boolean
+  active_config_path: string | null
+  installed_kernel_version: string | null
 }
