@@ -525,7 +525,7 @@ const setupEventListeners = async () => {
     // 处理进度事件
   })
 
-  unlistenTestResult = await listen('group-delay-result', (event) => {
+  unlistenTestResult = await listen('proxy-group-delay-result', (event) => {
     const data = event.payload as TestGroupResult
     if (data) {
       Object.entries(data).forEach(([proxy, delay]) => {
