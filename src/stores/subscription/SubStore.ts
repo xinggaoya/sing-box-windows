@@ -2,6 +2,7 @@ import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { DatabaseService } from '@/services/database-service'
 import type { Subscription } from '@/types/database'
+import mitt from '@/utils/mitt'
 
 // 为了前端兼容性，创建一个适配器接口
 interface FrontendSubscription {
@@ -231,6 +232,11 @@ export const useSubStore = defineStore(
         await new Promise(resolve => setTimeout(resolve, 100))
         isInitializing = false
         hasInitialized = true
+
+        // 监听后端自动刷新事件，重新拉取列表/激活状态
+        mitt.on('subscription-updated', async () => {
+          await loadFromBackend()
+        })
       })()
 
       return initializePromise

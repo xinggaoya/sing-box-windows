@@ -41,6 +41,10 @@ export default {
 
   // 首页
   home: {
+  kernelHealthy: "Kernel healthy",
+  kernelUnhealthy: "Kernel has issues",
+  kernelCheckedAt: "Last checked",
+  noIssues: "No issues",
     // 基础操作
     start: 'Запуск',
     stop: 'Остановка',

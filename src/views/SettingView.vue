@@ -458,6 +458,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore, useThemeStore } from '@/stores'
 import type { Locale } from '@/stores/app/LocaleStore'
 import type { ThemeMode } from '@/stores/app/ThemeStore'
+import { APP_EVENTS } from '@/constants/events'
 import { systemService } from '@/services/system-service'
 import { eventService } from '@/services/event-service'
 import { supportedLocales } from '@/locales'
@@ -642,7 +643,7 @@ const downloadTheKernel = async () => {
 
   // 监听后端推送的下载进度，实时刷新 UI
   cleanupDownloadListener()
-  downloadListener = await eventService.on('kernel-download-progress', (payload) => {
+  downloadListener = await eventService.on(APP_EVENTS.kernelDownloadProgress, (payload) => {
     const data = payload as KernelDownloadPayload
     if (typeof data.progress === 'number') {
       downloadProgress.value = Math.min(100, Math.max(0, data.progress))
@@ -777,7 +778,7 @@ const savePortSettings = async () => {
 // 监听更新下载进度，保持设置页状态与后端事件同步
 const setupUpdateProgressListener = async () => {
   try {
-    updateProgressListener = await eventService.on('update-progress', (payload) => {
+    updateProgressListener = await eventService.on(APP_EVENTS.updateProgress, (payload) => {
       const data = payload as { status?: string; progress?: number; message?: string }
       const progress = typeof data.progress === 'number' ? data.progress : updateProgress.value
       const status = data.status || updateStatus.value

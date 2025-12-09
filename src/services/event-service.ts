@@ -1,4 +1,5 @@
 import { listen } from '@tauri-apps/api/event'
+import { APP_EVENTS, type AppEventName, type AppEventPayloads } from '@/constants/events'
 
 /**
  * 简化的事件服务类 - 替换原有的WebSocket管理
@@ -27,62 +28,67 @@ export class EventService {
   /**
    * 监听流量数据事件
    */
-  public async onTrafficData(callback: (data: unknown) => void) {
-    const unlisten = await listen('traffic-data', (event) => {
-      callback(event.payload)
+  public async onTrafficData(callback: (data: AppEventPayloads[typeof APP_EVENTS.trafficData]) => void) {
+    const unlisten = await listen(APP_EVENTS.trafficData, (event) => {
+      callback(event.payload as AppEventPayloads[typeof APP_EVENTS.trafficData])
     })
-    this.eventListeners.set('traffic-data', unlisten)
+    this.eventListeners.set(APP_EVENTS.trafficData, unlisten)
   }
 
   /**
    * 监听内存数据事件
    */
-  public async onMemoryData(callback: (data: unknown) => void) {
-    const unlisten = await listen('memory-data', (event) => {
-      callback(event.payload)
+  public async onMemoryData(callback: (data: AppEventPayloads[typeof APP_EVENTS.memoryData]) => void) {
+    const unlisten = await listen(APP_EVENTS.memoryData, (event) => {
+      callback(event.payload as AppEventPayloads[typeof APP_EVENTS.memoryData])
     })
-    this.eventListeners.set('memory-data', unlisten)
+    this.eventListeners.set(APP_EVENTS.memoryData, unlisten)
   }
 
   /**
    * 监听日志数据事件
    */
-  public async onLogData(callback: (data: unknown) => void) {
-    const unlisten = await listen('log-data', (event) => {
-      callback(event.payload)
+  public async onLogData(callback: (data: AppEventPayloads[typeof APP_EVENTS.logData]) => void) {
+    const unlisten = await listen(APP_EVENTS.logData, (event) => {
+      callback(event.payload as AppEventPayloads[typeof APP_EVENTS.logData])
     })
-    this.eventListeners.set('log-data', unlisten)
+    this.eventListeners.set(APP_EVENTS.logData, unlisten)
   }
 
   /**
    * 监听连接数据事件
    */
-  public async onConnectionsData(callback: (data: unknown) => void) {
-    const unlisten = await listen('connections-data', (event) => {
-      callback(event.payload)
+  public async onConnectionsData(callback: (data: AppEventPayloads[typeof APP_EVENTS.connectionsData]) => void) {
+    const unlisten = await listen(APP_EVENTS.connectionsData, (event) => {
+      callback(event.payload as AppEventPayloads[typeof APP_EVENTS.connectionsData])
     })
-    this.eventListeners.set('connections-data', unlisten)
+    this.eventListeners.set(APP_EVENTS.connectionsData, unlisten)
   }
 
   /**
    * 监听内核就绪事件
    */
   public async onKernelReady(callback: () => void) {
-    const unlisten = await listen('kernel-ready', () => {
+    const unlisten = await listen(APP_EVENTS.kernelReady, () => {
       callback()
     })
-    this.eventListeners.set('kernel-ready', unlisten)
+    this.eventListeners.set(APP_EVENTS.kernelReady, unlisten)
   }
 
   /**
    * 通用事件监听方法
    */
+  public async on<K extends AppEventName>(
+    eventName: K,
+    callback: (data: AppEventPayloads[K]) => void
+  ): Promise<() => void>
+  public async on(eventName: string, callback: (data: unknown) => void): Promise<() => void>
   public async on(eventName: string, callback: (data: unknown) => void): Promise<() => void> {
     const unlisten = await listen(eventName, (event) => {
-      callback(event.payload)
+      callback(event.payload as never)
     })
     this.eventListeners.set(eventName, unlisten)
-    
+
     // 返回取消监听的函数
     return () => {
       this.removeEventListener(eventName)
@@ -92,7 +98,7 @@ export class EventService {
   /**
    * 移除特定事件监听器
    */
-  public removeEventListener(eventName: string) {
+  public removeEventListener(eventName: AppEventName | string) {
     const unlisten = this.eventListeners.get(eventName)
     if (unlisten) {
       try {

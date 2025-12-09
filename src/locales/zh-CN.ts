@@ -34,6 +34,10 @@ export default {
     disconnected: '已断开',
   },
   home: {
+  kernelHealthy: "内核健康",
+  kernelUnhealthy: "内核存在异常",
+  kernelCheckedAt: "上次检查",
+  noIssues: "暂无问题",
     start: '启动',
     stop: '停止',
     restart: '重启',

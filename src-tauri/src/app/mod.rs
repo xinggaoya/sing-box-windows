@@ -18,6 +18,7 @@ pub mod network {
 
 // System services
 pub mod system {
+    pub mod background_tasks;
     pub mod config_service;
     pub mod system_service;
     pub mod update_service;
@@ -29,6 +30,7 @@ pub use core::kernel_service;
 pub use core::proxy_service;
 pub use network::subscription_service;
 pub use system::config_service;
+pub use system::background_tasks;
 pub use system::system_service;
 pub use system::update_service;
 

@@ -1,12 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { APP_EVENTS } from '@/constants/events'
+import type { TrafficDataPayload } from '@/types/events'
 import { eventService } from '@/services/event-service'
-
-// 声明traffic-data事件的类型
-interface TrafficData {
-  up: number
-  down: number
-}
 
 // 连接状态接口
 interface ConnectionState {
@@ -40,7 +36,7 @@ export const useTrafficStore = defineStore(
     let memoryCleanupTimer: number | null = null
 
     // 更新流量统计数据
-    const updateTrafficStats = (data: TrafficData) => {
+    const updateTrafficStats = (data: TrafficDataPayload) => {
       if (data && 'up' in data && 'down' in data) {
         try {
           // 确保数据是数字类型
@@ -80,7 +76,7 @@ export const useTrafficStore = defineStore(
         // 监听流量数据事件
         await eventService.onTrafficData((data) => {
           if (data && typeof data === 'object' && 'up' in data && 'down' in data) {
-            updateTrafficStats(data as unknown as TrafficData)
+            updateTrafficStats(data as TrafficDataPayload)
           }
         })
 
@@ -101,7 +97,7 @@ export const useTrafficStore = defineStore(
       if (!eventListenersSetup) return
 
       try {
-        eventService.removeEventListener('traffic-data')
+        eventService.removeEventListener(APP_EVENTS.trafficData)
       } catch (error) {
         console.error('清理流量监听器时出错:', error)
       } finally {

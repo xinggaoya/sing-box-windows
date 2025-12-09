@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { APP_EVENTS } from '@/constants/events'
 import { eventService } from '@/services/event-service'
+import type { LogEventPayload } from '@/types/events'
 
 // 定义消息类型
 export type MessageType = 'success' | 'info' | 'error' | 'warning'
@@ -73,11 +75,11 @@ export const useLogStore = defineStore(
           data !== null &&
           'type' in data &&
           'payload' in data &&
-          typeof data.type === 'string' &&
-          typeof data.payload === 'string'
+          typeof (data as LogEventPayload).type === 'string' &&
+          typeof (data as LogEventPayload).payload === 'string'
         ) {
-          // 添加日志
-          addLog(data.type, data.payload)
+          const entry = data as LogEventPayload
+          addLog(entry.type, entry.payload)
         } else {
           console.warn('无效的日志数据格式:', data)
         }
@@ -179,7 +181,7 @@ export const useLogStore = defineStore(
 
       if (eventListenersSetup) {
         try {
-          eventService.removeEventListener('log-data')
+          eventService.removeEventListener(APP_EVENTS.logData)
         } catch (error) {
           console.error('清理日志监听器时出错:', error)
         } finally {

@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { APP_EVENTS } from '@/constants/events'
 import { kernelService, type KernelStatus } from '@/services/kernel-service'
 import { useAppStore, type ProxyMode } from '../app/AppStore'
+import { eventService } from '@/services/event-service'
 
 const DEFAULT_STATUS: KernelStatus = {
   process_running: false,
@@ -18,10 +20,16 @@ export const useKernelStore = defineStore('kernel', () => {
   const lastError = ref('')
   const isLoading = ref(false)
   const isKernelInstalled = ref(false)
+  const healthStatus = ref<{ healthy: boolean; issues: string[]; lastChecked?: number }>({
+    healthy: true,
+    issues: [],
+    lastChecked: undefined,
+  })
 
   const latestAvailableVersion = ref('')
   const availableVersions = ref<string[]>([])
   let statusUnlisten: (() => void) | null = null
+  let healthUnlisten: (() => void) | null = null
   let lastEventTime = 0
 
   const applyStatus = (next: KernelStatus) => {
@@ -62,6 +70,15 @@ export const useKernelStore = defineStore('kernel', () => {
       statusUnlisten = await kernelService.onKernelStatusChange((nextStatus) => {
         lastEventTime = Date.now()
         applyStatus(nextStatus)
+      })
+    }
+    if (!healthUnlisten) {
+      healthUnlisten = await eventService.on(APP_EVENTS.kernelHealth, (payload) => {
+        healthStatus.value = {
+          healthy: !!payload.healthy,
+          issues: payload.issues || [],
+          lastChecked: Date.now(),
+        }
       })
     }
 
@@ -262,6 +279,7 @@ export const useKernelStore = defineStore('kernel', () => {
     isStarting,
     isStopping,
     uptime,
+    healthStatus,
     initializeStore,
     refreshStatus,
     restartKernel,

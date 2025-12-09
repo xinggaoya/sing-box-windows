@@ -88,6 +88,14 @@ pub fn run() {
                     "app-start",
                 )
                 .await;
+
+                // 启动后台任务（自动更新检查、健康巡检等）
+                crate::app::system::background_tasks::start_background_tasks(&app_handle).await;
+                // 启动订阅自动刷新
+                crate::app::network::subscription_service::auto_update::start_subscription_auto_update(
+                    &app_handle,
+                )
+                .await;
             });
 
             Ok(())

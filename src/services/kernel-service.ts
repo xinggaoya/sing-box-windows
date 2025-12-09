@@ -2,6 +2,7 @@
  * 内核管理服务
  * 职责：提供内核控制、状态查询、配置管理等功能
  */
+import { APP_EVENTS } from '@/constants/events'
 import { eventService } from './event-service'
 import { invokeWithAppContext, withAppStore } from './invoke-client'
 
@@ -411,29 +412,29 @@ class KernelService {
    * 监听内核状态变化
    */
   async onKernelStatusChange(callback: (status: KernelStatus) => void): Promise<() => void> {
-    return eventService.on('kernel-status-changed', (data: unknown) => {
+    return eventService.on(APP_EVENTS.kernelStatusChanged, (data) => {
       callback(data as KernelStatus)
     })
   }
 
   async onKernelReady(callback: () => void): Promise<() => void> {
-    return eventService.on('kernel-ready', callback)
+    return eventService.on(APP_EVENTS.kernelReady, callback)
   }
 
   async onKernelError(callback: (error: any) => void): Promise<() => void> {
-    return eventService.on('kernel-error', callback)
+    return eventService.on(APP_EVENTS.kernelError, callback)
   }
 
   async onKernelStarting(callback: (data: any) => void): Promise<() => void> {
-    return eventService.on('kernel-starting', callback)
+    return eventService.on(APP_EVENTS.kernelStarting, callback)
   }
 
   async onKernelStarted(callback: (data: any) => void): Promise<() => void> {
-    return eventService.on('kernel-started', callback)
+    return eventService.on(APP_EVENTS.kernelStarted, callback)
   }
 
   async onKernelStopped(callback: (data: any) => void): Promise<() => void> {
-    return eventService.on('kernel-stopped', callback)
+    return eventService.on(APP_EVENTS.kernelStopped, callback)
   }
 
   async updateSingboxPorts(proxyPort: number, apiPort: number): Promise<void> {

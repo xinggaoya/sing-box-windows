@@ -34,6 +34,10 @@ export default {
     disconnected: 'Disconnected',
   },
   home: {
+  kernelHealthy: "Kernel healthy",
+  kernelUnhealthy: "Kernel has issues",
+  kernelCheckedAt: "Last checked",
+  noIssues: "No issues",
     start: 'Start',
     stop: 'Stop',
     restart: 'Restart',

@@ -145,6 +145,18 @@ export const useUpdateStore = defineStore(
       }
     }
 
+
+    // 后台事件驱动的更新信息同步
+    const applyUpdateInfo = (info: UpdateInfo) => {
+      hasUpdate.value = info.has_update
+      latestVersion.value = info.latest_version
+      downloadUrl.value = info.download_url
+      releaseNotes.value = info.release_notes || ''
+      releaseDate.value = info.release_date || ''
+      fileSize.value = info.file_size || 0
+      isPrerelease.value = info.is_prerelease || false
+    }
+
     // 检查更新
     const checkUpdate = async (silent: boolean = false): Promise<UpdateInfo | null> => {
       // 如果用户跳过了这个版本且是静默检查，则不进行检查
@@ -340,6 +352,7 @@ export const useUpdateStore = defineStore(
       // 方法
       fetchAppVersion,
       checkUpdate,
+      applyUpdateInfo,
       downloadAndInstallUpdate,
       skipCurrentVersion,
       resetUpdateState,

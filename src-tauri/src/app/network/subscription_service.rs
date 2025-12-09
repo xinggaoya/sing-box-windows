@@ -1,6 +1,7 @@
 pub mod helpers;
 mod mode;
 mod parser;
+pub mod auto_update;
 
 use crate::app::constants::{messages, paths};
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;

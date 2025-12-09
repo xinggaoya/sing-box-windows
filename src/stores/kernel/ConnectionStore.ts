@@ -1,43 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { APP_EVENTS } from '@/constants/events'
 import { eventService } from '@/services/event-service'
+import type { ConnectionItem, ConnectionsDataPayload } from '@/types/events'
 
 // 定义连接状态接口
 interface ConnectionState {
   connected: boolean
   connecting: boolean
   error: Error | null
-}
-
-// 定义连接数据接口
-interface ConnectionMetadata {
-  destinationIP: string
-  destinationPort: string
-  dnsMode: string
-  host: string
-  network: string
-  processPath: string
-  sourceIP: string
-  sourcePort: string
-  type: string
-}
-
-interface Connection {
-  chains: string[]
-  download: number
-  id: string
-  metadata: ConnectionMetadata
-  rule: string
-  rulePayload: string
-  start: string
-  upload: number
-}
-
-interface ConnectionsData {
-  connections: Connection[]
-  downloadTotal: number
-  uploadTotal: number
-  memory: number
 }
 
 export const useConnectionStore = defineStore(
@@ -62,7 +33,7 @@ export const useConnectionStore = defineStore(
     })
 
     // 连接信息
-    const connections = ref<Connection[]>([])
+    const connections = ref<ConnectionItem[]>([])
     const connectionsTotal = ref({
       upload: 0,
       download: 0,
@@ -130,9 +101,8 @@ export const useConnectionStore = defineStore(
       try {
         // 监听连接数据事件
         await eventService.onConnectionsData((data) => {
-          // 类型检查
-          if (data && typeof data === 'object' && 'connections' in data) {
-            updateConnections(data as unknown as ConnectionsData)
+          if (data && Array.isArray(data.connections)) {
+            updateConnections(data)
             connectionsState.value.connected = true
             connectionsState.value.error = null
           }
@@ -140,9 +110,8 @@ export const useConnectionStore = defineStore(
 
         // 监听内存数据事件
         await eventService.onMemoryData((data) => {
-          // 类型检查
-          if (data && typeof data === 'object' && 'inuse' in data && 'oslimit' in data) {
-            updateMemory(data as unknown as { inuse: number; oslimit: number })
+          if (data && typeof data.inuse === 'number' && typeof data.oslimit === 'number') {
+            updateMemory(data)
             memoryState.value.connected = true
             memoryState.value.error = null
           }
@@ -164,8 +133,8 @@ export const useConnectionStore = defineStore(
       if (!eventListenersSetup) return
 
       try {
-        eventService.removeEventListener('connections-data')
-        eventService.removeEventListener('memory-data')
+        eventService.removeEventListener(APP_EVENTS.connectionsData)
+        eventService.removeEventListener(APP_EVENTS.memoryData)
       } catch (error) {
         console.error('清理连接监听器时出错:', error)
       } finally {
@@ -256,7 +225,7 @@ export const useConnectionStore = defineStore(
     }
 
     // 更新连接数据（优化版本）
-    const updateConnections = (data: ConnectionsData) => {
+    const updateConnections = (data: ConnectionsDataPayload) => {
       try {
         if (data?.connections && Array.isArray(data.connections)) {
           // 限制连接数量以防止内存溢出
