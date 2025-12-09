@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-sing-box-windows is a modern cross-platform proxy client for Windows and Linux built with Tauri 2.0 + Vue 3, providing complete proxy management, routing rules, subscription management, and system service functionality.
+sing-box-windows is a modern cross-platform proxy client for Windows, Linux, and macOS built with Tauri 2.0 + Vue 3, providing complete proxy management, routing rules, subscription management, and system service functionality.
 
 ### Tech Stack
 
@@ -32,16 +32,16 @@ pnpm tauri dev
 pnpm tauri build
 
 # Build MSI installer (Windows)
-pnpm tauri build -- --target x86_64-pc-windows-msi
+pnpm tauri build:windows
 
 # Build DEB package (Linux)
-pnpm tauri build -- --target x86_64-unknown-linux-gnu
+pnpm tauri build:linux:deb
 
 # Build AppImage (Linux)
-pnpm tauri build -- --target x86_64-unknown-linux-gnu
+pnpm tauri build:linux:appimage
 
-# Build with target check skip
-pnpm tauri build -- --target x86_64-pc-windows-msi --no-target-check
+# Build DMG (macOS)
+pnpm tauri build:macos:dmg
 
 # Build all targets
 pnpm tauri build:all
@@ -62,19 +62,18 @@ pnpm type-check
 cd src-tauri && cargo fmt
 ```
 
-### Testing
-```bash
-# Frontend unit tests
-pnpm test
-
-# Rust unit tests
-cd src-tauri && cargo test
-
-# Rust documentation tests
-cd src-tauri && cargo test --doc
-```
-
 ## Core Architecture
+
+### Architectural Patterns
+
+1. **Event-Driven State Management**: The application uses Tauri's event system for real-time updates between frontend and backend, with stores listening to events rather than polling.
+
+2. **Hybrid Storage Architecture**:
+   - **Tauri Store**: Simple settings and preferences
+   - **SQLite Database**: Structured data via `EnhancedStorageService`
+   - **Auto-debounced persistence**: 300ms debounce with `waitForSaveCompletion()`
+
+3. **Service Layer Pattern**: All backend interactions go through a service layer with clear separation of concerns.
 
 ### Frontend Architecture
 
@@ -119,12 +118,15 @@ src-tauri/src/
 - **Standard Pinia**: Uses the official Pinia library for state management.
 - **Debounced Persistence**: Auto-debounce save state to Tauri Store and SQLite.
 - **Component-based Lifecycle**: Lifecycle events (like starting/stopping listeners) are managed by the Vue components that use the stores, not by the stores themselves.
+- **Initialization Phases**: Stores implement `startInitialization()` → load data → `finishInitialization()` patterns.
+- **Data Restore Pattern**: Use `waitForDataRestore()` to prevent race conditions during startup.
 
 ### 2. Frontend-Backend Communication
 - **Tauri Commands**: All frontend calls go through Tauri commands
 - **Unified Error Handling**: Backend returns Result<T, String> format consistently
 - **Type Safety**: Uses typescript-bindings to ensure type safety
-- **WebSocket Communication**: Real-time updates via WebSocket for kernel status and traffic
+- **Event-Driven Updates**: Real-time updates via Tauri events for kernel status and traffic
+- **Invoke Client**: `invoke-client.ts` provides automatic port injection and context-aware argument merging
 
 ### 3. Modular Design
 - **Components grouped by functionality**: Each functional module has independent component directories
@@ -150,15 +152,17 @@ src-tauri/src/
 7. Update routing configuration (if needed)
 8. Register new Tauri commands in `lib.rs`
 
-### Component Naming Conventions
-- **Page components**: Use PascalCase, e.g., `ProxyPage.vue`
-- **Functional components**: Use PascalCase, e.g., `ProxyConfig.vue`
-- **Utility components**: Use PascalCase, e.g., `LoadingSpinner.vue`
+### Store Development Patterns
+- **Initialization**: Always implement proper initialization with data restore waiting
+- **Cleanup**: Implement `cleanupStore()` methods for resource cleanup
+- **Event Handling**: Use event-driven updates with anti-stale mechanisms
+- **Persistence**: Use the persistence composable for automatic save/load
 
-### State Management Conventions
-- **Store naming**: Feature name + Store, e.g., `proxyStore`
-- **Action naming**: Verb + noun, e.g., `updateConfig`
-- **State naming**: Use camelCase, avoid abbreviations
+### Backend Development Patterns
+- **Service Organization**: Group services by domain (core, network, system, storage)
+- **Error Handling**: Return Result<T, String> for all commands
+- **State Management**: Use application-wide state for persistent data
+- **Async Operations**: Use tokio for all async operations
 
 ## Key Files and Their Purposes
 
@@ -166,14 +170,14 @@ src-tauri/src/
 - `src-tauri/tauri.conf.json`: Tauri application configuration
 - `src-tauri/Cargo.toml`: Rust dependency configuration
 - `package.json`: Node.js dependency configuration
-- `vite.config.ts`: Vite build configuration with auto-imports
+- `vite.config.ts`: Vite build configuration with auto-imports and chunk optimization
 
 ### Core Files
 - `src/stores/index.ts`: Store management system entry point
-- `src/services/websocket-service.ts`: WebSocket communication service
+- `src/services/invoke-client.ts`: Unified Tauri command invoker with port injection
 - `src-tauri/src/lib.rs`: Tauri entry file and command registration
-- `src-tauri/src/app/`: Backend service layer implementation
 - `src-tauri/src/app/storage/enhanced_storage_service.rs`: SQLite-based storage service
+- `src-tauri/src/app/core/kernel_service/mod.rs`: Core kernel management
 
 ## Storage System
 
@@ -183,6 +187,13 @@ The application uses a hybrid storage approach:
 - **Storage Locations**:
   - Windows: `%APPDATA%\sing-box-windows\`
   - Linux: `~/.local/share/sing-box-windows/`
+  - macOS: `~/Library/Application Support/sing-box-windows/`
+
+### Enhanced Storage Service
+- Single initialization with `OnceCell` pattern
+- Type-safe operations through SQLx
+- Automatic schema migrations
+- Backend-frontend synchronization
 
 ## Development Guidelines
 
@@ -190,6 +201,7 @@ The application uses a hybrid storage approach:
 - Pay special attention to memory leaks for long-running applications.
 - Ensure resources like event listeners and timers are properly cleaned up in Vue component `onUnmounted` hooks.
 - Monitor WebSocket connections and ensure proper cleanup in the services that manage them.
+- Implement `cleanupStore()` methods for all stores with resources.
 
 ### Error Handling
 - All async operations require proper error handling
@@ -199,11 +211,12 @@ The application uses a hybrid storage approach:
 ### Performance
 - Use virtual scrolling or pagination for large data operations
 - Implement lazy loading for non-critical components
+- Use the composable patterns for reusable logic
 
 ### Cross-Platform Compatibility
-- Maintain compatibility with both Windows and Linux platforms
+- Maintain compatibility with Windows, Linux, and macOS platforms
 - Use platform-specific dependencies only when necessary
-- Test builds on both target platforms before releases
+- Test builds on all target platforms before releases
 
 ## Debugging
 
@@ -218,6 +231,12 @@ The application uses a hybrid storage approach:
 - Complex logic can use VS Code debugger (requires launch.json configuration)
 - Log levels controlled via RUST_LOG environment variable
 
+### Logging Configuration
+Set log level via environment variable:
+```bash
+RUST_LOG=debug pnpm tauri dev
+```
+
 ## Platform-Specific Notes
 
 ### Windows
@@ -229,6 +248,11 @@ The application uses a hybrid storage approach:
 - Requires libwebkit2gtk-4.1-0, libssl3, libgtk-3-0 dependencies
 - DEB and AppImage packages supported
 - System proxy integration via environment variables
+
+### macOS
+- Requires Xcode Command Line Tools for compilation
+- DMG and App bundles supported
+- System proxy integration via network settings
 
 ## Testing and Quality Assurance
 
