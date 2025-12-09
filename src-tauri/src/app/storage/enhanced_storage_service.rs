@@ -8,6 +8,33 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tokio::sync::OnceCell;
 
+/// 将全局设置同步到指定的配置文件
+fn sync_settings_to_config_file(
+    config_path: &std::path::Path,
+    app_config: &AppConfig,
+) -> Result<(), String> {
+    use crate::app::network::subscription_service::helpers::apply_app_settings_to_config;
+    
+    // 读取现有配置
+    let content = std::fs::read_to_string(config_path)
+        .map_err(|e| format!("读取配置文件失败: {}", e))?;
+    
+    // 解析 JSON
+    let mut config: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("解析配置文件失败: {}", e))?;
+    
+    // 应用全局设置
+    apply_app_settings_to_config(&mut config, app_config);
+    
+    // 写回文件
+    let updated = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("序列化配置失败: {}", e))?;
+    std::fs::write(config_path, updated)
+        .map_err(|e| format!("写入配置文件失败: {}", e))?;
+    
+    Ok(())
+}
+
 /// 获取数据库服务的辅助函数（单例初始化）
 async fn get_enhanced_storage(app: &AppHandle) -> Result<Arc<EnhancedStorageService>, String> {
     let cell_state = app.state::<Arc<OnceCell<Arc<EnhancedStorageService>>>>();
@@ -347,6 +374,21 @@ pub async fn db_save_active_subscription_index(
         .save_app_config(&app_config)
         .await
         .map_err(|e| e.to_string())?;
+    
+    // 将全局设置同步到新激活的配置文件
+    if let Some(ref config_path_str) = app_config.active_config_path {
+        let config_path = std::path::PathBuf::from(config_path_str);
+        if config_path.exists() {
+            match sync_settings_to_config_file(&config_path, &app_config) {
+                Ok(_) => {
+                    tracing::info!("已将全局设置同步到配置文件: {:?}", config_path);
+                }
+                Err(e) => {
+                    tracing::warn!("同步设置到配置文件失败: {}", e);
+                }
+            }
+        }
+    }
     
     Ok(())
 }
