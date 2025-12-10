@@ -162,7 +162,7 @@ pub async fn start_kernel_with_state(
     }
 
     if is_kernel_running().await.unwrap_or(false) {
-        enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
+        enable_kernel_guard(app_handle.clone(), resolved.api_port, resolved.proxy.tun_enabled).await;
         info!("内核已在运行中");
         return Ok(serde_json::json!({
             "success": true,
@@ -172,7 +172,7 @@ pub async fn start_kernel_with_state(
 
     let config_path = resolve_config_path(&app_handle).await?;
 
-    match PROCESS_MANAGER.start(&config_path).await {
+    match PROCESS_MANAGER.start(&config_path, resolved.proxy.tun_enabled).await {
         Ok(_) => {
             info!("? 内核进程启动成功");
 
@@ -181,7 +181,7 @@ pub async fn start_kernel_with_state(
                 Ok(_) => {
                     info!("? 事件中继启动成功");
 
-                    enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
+                    enable_kernel_guard(app_handle.clone(), resolved.api_port, resolved.proxy.tun_enabled).await;
 
                     emit_kernel_started(
                         &app_handle,
@@ -199,7 +199,7 @@ pub async fn start_kernel_with_state(
                 Err(e) => {
                     warn!("?? 事件中继启动失败: {}, 但内核进程已启动", e);
 
-                    enable_kernel_guard(app_handle.clone(), resolved.api_port).await;
+                    enable_kernel_guard(app_handle.clone(), resolved.api_port, resolved.proxy.tun_enabled).await;
 
                     let _ = app_handle.emit("kernel-ready", ());
 

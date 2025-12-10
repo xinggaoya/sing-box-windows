@@ -124,31 +124,82 @@ fn restart_as_admin_linux(app_handle: tauri::AppHandle) -> Result<(), String> {
         return Err(format!("找不到程序可执行文件: {}", current_exe.display()));
     }
 
-    // 使用pkexec或gksu进行权限提升
-    let sudo_commands = vec!["pkexec", "gksu", "kdesudo"];
+    let exe_str = current_exe.to_string_lossy().to_string();
+
+    // 优先使用 pkexec (Polkit)，这在大多数现代 Linux 发行版上都可用
+    // 顺序：pkexec > gksu > kdesudo
+    let sudo_commands = ["pkexec", "gksu", "kdesudo"];
 
     for sudo_cmd in sudo_commands {
         if which::which(sudo_cmd).is_ok() {
-            let result = std::process::Command::new(sudo_cmd)
-                .arg(&current_exe)
-                .spawn();
+            // 构建命令，传递必要的显示环境变量（对于 Wayland/X11 兼容性）
+            let mut cmd = std::process::Command::new(sudo_cmd);
+            cmd.arg(&exe_str);
 
-            match result {
+            // 传递显示相关环境变量，确保 GUI 应用能正常显示
+            if let Ok(display) = std::env::var("DISPLAY") {
+                cmd.env("DISPLAY", display);
+            }
+            if let Ok(wayland_display) = std::env::var("WAYLAND_DISPLAY") {
+                cmd.env("WAYLAND_DISPLAY", wayland_display);
+            }
+            if let Ok(xdg_runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
+                cmd.env("XDG_RUNTIME_DIR", xdg_runtime_dir);
+            }
+
+            match cmd.spawn() {
                 Ok(_) => {
                     // 启动成功，退出当前进程
                     app_handle.exit(0);
                     return Ok(());
                 }
                 Err(e) => {
-                    eprintln!("尝试使用 {} 提权失败: {}", sudo_cmd, e);
+                    tracing::warn!("尝试使用 {} 提权失败: {}", sudo_cmd, e);
                     continue;
                 }
             }
         }
     }
 
-    Err("未找到可用的权限提升工具 (pkexec, gksu, kdesudo)".to_string())
+    // 最后尝试：使用终端运行 sudo
+    if let Some(terminal) = find_terminal_emulator() {
+        let sudo_cmd = format!("sudo '{}'", exe_str.replace("'", "'\\''"));
+        let result = std::process::Command::new(&terminal)
+            .arg("-e")
+            .arg(&sudo_cmd)
+            .spawn();
+
+        if result.is_ok() {
+            app_handle.exit(0);
+            return Ok(());
+        }
+    }
+
+    Err("未找到可用的权限提升工具 (pkexec, gksu, kdesudo) 或终端模拟器".to_string())
 }
+
+/// 查找可用的终端模拟器
+#[cfg(target_os = "linux")]
+fn find_terminal_emulator() -> Option<String> {
+    let terminals = [
+        "gnome-terminal",
+        "konsole",
+        "xfce4-terminal",
+        "mate-terminal",
+        "tilix",
+        "terminator",
+        "alacritty",
+        "kitty",
+        "xterm",
+    ];
+    for term in terminals {
+        if which::which(term).is_ok() {
+            return Some(term.to_string());
+        }
+    }
+    None
+}
+
 
 #[cfg(target_os = "macos")]
 fn restart_as_admin_macos(app_handle: tauri::AppHandle) -> Result<(), String> {
@@ -166,31 +217,47 @@ fn restart_as_admin_macos(app_handle: tauri::AppHandle) -> Result<(), String> {
         return Err(format!("找不到程序可执行文件: {}", current_exe.display()));
     }
 
-    // 使用osascript进行权限提升
     let exe_path = current_exe.to_string_lossy();
+    // 转义路径中的单引号，避免 AppleScript 语法错误
+    let escaped_path = exe_path.replace("'", "'\\''");
 
+    // 使用 osascript 通过 shell 以管理员权限运行应用
+    // 注意：使用 open -n 来启动新实例，--args --elevated 可用于传递标志
     let apple_script = format!(
-        "do shell script \"{}\" with administrator privileges",
-        exe_path
+        r#"do shell script "open -n -a '{}' --args --elevated" with administrator privileges"#,
+        escaped_path
     );
+
+    tracing::info!("尝试使用 osascript 提权启动应用");
 
     let result = std::process::Command::new("osascript")
         .arg("-e")
-        .arg(apple_script)
+        .arg(&apple_script)
         .spawn();
 
     match result {
         Ok(_) => {
+            // 延迟一下确保新进程启动
+            std::thread::sleep(std::time::Duration::from_millis(500));
             // 启动成功，退出当前进程
             app_handle.exit(0);
             Ok(())
         }
         Err(e) => {
-            // 尝试备用方法 - 使用open命令
-            let result = std::process::Command::new("open")
-                .arg("-a")
-                .arg("Terminal")
-                .arg(&current_exe)
+            tracing::warn!("osascript 提权失败: {}，尝试备用方法", e);
+
+            // 备用方法：使用 Terminal 运行 sudo 命令
+            let terminal_script = format!(
+                r#"tell application "Terminal"
+                    activate
+                    do script "sudo '{}'"
+                end tell"#,
+                escaped_path
+            );
+
+            let result = std::process::Command::new("osascript")
+                .arg("-e")
+                .arg(&terminal_script)
                 .spawn();
 
             match result {
@@ -208,6 +275,7 @@ fn restart_as_admin_macos(app_handle: tauri::AppHandle) -> Result<(), String> {
         }
     }
 }
+
 
 // 检查是否有管理员权限 - 跨平台实现
 #[tauri::command]
@@ -249,43 +317,17 @@ fn check_admin_windows() -> bool {
 
 #[cfg(target_os = "linux")]
 fn check_admin_linux() -> bool {
-    // 检查当前用户是否为root
-    match std::env::var("USER") {
-        Ok(user) => user == "root",
-        Err(_) => {
-            // 备用方法：检查是否为root用户
-            nix::unistd::getuid().is_root()
-        }
-    }
+    // 直接使用 getuid() 检查是否为 root 用户
+    // 这是最可靠的方式，不依赖可被伪造的环境变量
+    nix::unistd::getuid().is_root()
 }
 
 #[cfg(target_os = "macos")]
 fn check_admin_macos() -> bool {
-    // 检查当前用户是否为管理员
-    match std::env::var("USER") {
-        Ok(user) => {
-            // macOS上通常管理员用户不是root，但可以通过id命令检查
-            if let Ok(output) = std::process::Command::new("id").arg("-u").output() {
-                if let Ok(uid_str) = String::from_utf8(output.stdout) {
-                    if let Ok(uid) = uid_str.trim().parse::<u32>() {
-                        // UID 0 为root，其他需要进一步检查
-                        if uid == 0 {
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            // 检查用户是否在admin组中
-            if let Ok(output) = std::process::Command::new("groups").arg(&user).output() {
-                let groups_str = String::from_utf8_lossy(&output.stdout);
-                groups_str.contains("admin") || groups_str.contains("wheel")
-            } else {
-                false
-            }
-        }
-        Err(_) => false,
-    }
+    // TUN 需要 root 权限运行，检查当前进程的 effective UID
+    // 注意：在 admin 组中不代表当前进程有 root 权限
+    // 我们需要检查的是进程是否以 root 身份运行
+    nix::unistd::geteuid().is_root()
 }
 
 // 打开开发者工具

@@ -14,14 +14,16 @@ use tracing::{info, warn};
 
 static KEEP_ALIVE_ENABLED: AtomicBool = AtomicBool::new(false);
 static GUARDED_API_PORT: AtomicU16 = AtomicU16::new(0);
+static GUARDED_TUN_ENABLED: AtomicBool = AtomicBool::new(false);
 
 lazy_static::lazy_static! {
     pub(super) static ref KERNEL_GUARD_HANDLE: Mutex<Option<JoinHandle<()>>> =
         Mutex::new(None);
 }
 
-pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16) {
+pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tun_enabled: bool) {
     GUARDED_API_PORT.store(api_port, Ordering::Relaxed);
+    GUARDED_TUN_ENABLED.store(tun_enabled, Ordering::Relaxed);
     if KEEP_ALIVE_ENABLED.swap(true, Ordering::Relaxed) {
         return;
     }
@@ -63,7 +65,8 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16) {
                         break;
                     }
 
-                    if let Err(err) = PROCESS_MANAGER.start(&config_path).await {
+                    let tun_enabled = GUARDED_TUN_ENABLED.load(Ordering::Relaxed);
+                    if let Err(err) = PROCESS_MANAGER.start(&config_path, tun_enabled).await {
                         warn!("守护重启内核失败: {}", err);
                         continue;
                     }
@@ -95,6 +98,7 @@ pub(super) async fn disable_kernel_guard() {
     }
 
     GUARDED_API_PORT.store(0, Ordering::Relaxed);
+    GUARDED_TUN_ENABLED.store(false, Ordering::Relaxed);
     let mut handle_slot = KERNEL_GUARD_HANDLE.lock().await;
     if let Some(handle) = handle_slot.take() {
         handle.abort();

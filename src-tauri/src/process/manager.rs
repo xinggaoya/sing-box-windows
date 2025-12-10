@@ -22,8 +22,9 @@ impl ProcessManager {
     }
 
     // 启动进程（带系统环境检查和重试机制）
-    pub async fn start(&self, config_path: &std::path::Path) -> Result<()> {
-        info!("🚀 开始启动内核进程...");
+    // tun_enabled: 是否启用 TUN 模式，在 Linux/macOS 上需要特殊权限提升
+    pub async fn start(&self, config_path: &std::path::Path, tun_enabled: bool) -> Result<()> {
+        info!("🚀 开始启动内核进程... TUN模式: {}", tun_enabled);
 
         // 验证配置文件有效性
         self.validate_config(config_path).await?;
@@ -99,7 +100,7 @@ impl ProcessManager {
             info!("🔧 尝试启动内核进程，第 {}/{} 次", attempt, max_attempts);
 
             match self
-                .try_start_kernel_process(&kernel_path, &kernel_work_dir, config_path)
+                .try_start_kernel_process(&kernel_path, &kernel_work_dir, config_path, tun_enabled)
                 .await
             {
                 Ok(child) => {
@@ -188,37 +189,170 @@ impl ProcessManager {
     }
 
     // 尝试启动内核进程
+    // tun_enabled 参数用于在 Linux/macOS 上启用 TUN 时进行权限提升
     async fn try_start_kernel_process(
         &self,
         kernel_path: &std::path::Path,
         kernel_work_dir: &std::path::Path,
         config_path: &std::path::Path,
+        tun_enabled: bool,
     ) -> Result<std::process::Child> {
-        let mut cmd = Command::new(kernel_path);
-        cmd.args(&[
-            "run",
-            "-D",
-            kernel_work_dir
-                .to_str()
-                .ok_or_else(|| ProcessError::StartFailed("工作目录路径包含无效字符".to_string()))?,
-            "-c",
-            config_path
-                .to_str()
-                .ok_or_else(|| ProcessError::StartFailed("配置文件路径包含无效字符".to_string()))?,
-        ]);
+        let kernel_str = kernel_path
+            .to_str()
+            .ok_or_else(|| ProcessError::StartFailed("内核路径包含无效字符".to_string()))?;
+        let work_dir_str = kernel_work_dir
+            .to_str()
+            .ok_or_else(|| ProcessError::StartFailed("工作目录路径包含无效字符".to_string()))?;
+        let config_str = config_path
+            .to_str()
+            .ok_or_else(|| ProcessError::StartFailed("配置文件路径包含无效字符".to_string()))?;
 
-        // 避免内核 stdout/stderr 继承到 Tauri 控制台，防止开发日志被内核日志淹没
-        cmd.stdout(Stdio::null()).stderr(Stdio::null());
-
+        // Windows: 直接启动（假设应用已以管理员权限运行）
         #[cfg(target_os = "windows")]
-        cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
+        {
+            let _ = (tun_enabled, kernel_str); // Windows 不使用这些参数，由应用整体权限控制
+            let mut cmd = Command::new(kernel_path);
+            cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
+            cmd.stdout(Stdio::null()).stderr(Stdio::null());
+            cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
-        let child = cmd
-            .spawn()
-            .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
+            let child = cmd
+                .spawn()
+                .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
+            return Ok(child);
+        }
+
+        // Linux: TUN 模式使用 pkexec 提权
+        #[cfg(target_os = "linux")]
+        {
+            if tun_enabled {
+                info!("🔐 TUN 模式启用，使用 pkexec 提升内核权限");
+                return self.start_kernel_with_pkexec(kernel_str, work_dir_str, config_str);
+            } else {
+                let mut cmd = Command::new(kernel_path);
+                cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
+                cmd.stdout(Stdio::null()).stderr(Stdio::null());
+
+                let child = cmd
+                    .spawn()
+                    .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
+                return Ok(child);
+            }
+        }
+
+        // macOS: TUN 模式使用 osascript 提权
+        #[cfg(target_os = "macos")]
+        {
+            if tun_enabled {
+                info!("🔐 TUN 模式启用，使用 osascript 提升内核权限");
+                return self.start_kernel_with_osascript(kernel_str, work_dir_str, config_str);
+            } else {
+                let mut cmd = Command::new(kernel_path);
+                cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
+                cmd.stdout(Stdio::null()).stderr(Stdio::null());
+
+                let child = cmd
+                    .spawn()
+                    .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
+                return Ok(child);
+            }
+        }
+
+        // 其他平台回退
+        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+        {
+            let _ = tun_enabled;
+            let mut cmd = Command::new(kernel_path);
+            cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
+            cmd.stdout(Stdio::null()).stderr(Stdio::null());
+
+            let child = cmd
+                .spawn()
+                .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
+            Ok(child)
+        }
+    }
+
+    /// Linux: 使用 pkexec 以 root 权限启动内核
+    #[cfg(target_os = "linux")]
+    fn start_kernel_with_pkexec(
+        &self,
+        kernel_path: &str,
+        work_dir: &str,
+        config_path: &str,
+    ) -> Result<std::process::Child> {
+        // 检查 pkexec 是否可用
+        if which::which("pkexec").is_err() {
+            return Err(ProcessError::StartFailed(
+                "TUN 模式需要 pkexec（polkit），请安装 polkit 包或以 root 用户运行".to_string(),
+            ));
+        }
+
+        info!("使用 pkexec 启动内核: {}", kernel_path);
+
+        let mut cmd = Command::new("pkexec");
+        cmd.arg(kernel_path)
+            .args(&["run", "-D", work_dir, "-c", config_path])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+
+        // 传递显示环境变量，确保 pkexec 对话框能正常显示
+        if let Ok(display) = std::env::var("DISPLAY") {
+            cmd.env("DISPLAY", display);
+        }
+        if let Ok(xauthority) = std::env::var("XAUTHORITY") {
+            cmd.env("XAUTHORITY", xauthority);
+        }
+
+        let child = cmd.spawn().map_err(|e| {
+            ProcessError::StartFailed(format!("pkexec 启动内核失败: {}。请确保已安装 polkit。", e))
+        })?;
 
         Ok(child)
     }
+
+    /// macOS: 使用 osascript 弹出密码对话框并以 root 权限启动内核
+    #[cfg(target_os = "macos")]
+    fn start_kernel_with_osascript(
+        &self,
+        kernel_path: &str,
+        work_dir: &str,
+        config_path: &str,
+    ) -> Result<std::process::Child> {
+        // 转义路径中的特殊字符
+        let escape_for_shell = |s: &str| s.replace("'", "'\\''");
+        
+        let kernel_escaped = escape_for_shell(kernel_path);
+        let work_dir_escaped = escape_for_shell(work_dir);
+        let config_escaped = escape_for_shell(config_path);
+
+        // 构建要以 root 权限执行的命令
+        let shell_cmd = format!(
+            "'{}' run -D '{}' -c '{}'",
+            kernel_escaped, work_dir_escaped, config_escaped
+        );
+
+        info!("使用 osascript 启动内核: {}", kernel_path);
+
+        // 使用 osascript 执行需要管理员权限的 shell 命令
+        let apple_script = format!(
+            r#"do shell script "{}" with administrator privileges"#,
+            shell_cmd.replace("\"", "\\\"")
+        );
+
+        let mut cmd = Command::new("osascript");
+        cmd.args(&["-e", &apple_script]);
+
+        let child = cmd.spawn().map_err(|e| {
+            ProcessError::StartFailed(format!(
+                "osascript 启动内核失败: {}。请在弹出的对话框中输入密码。",
+                e
+            ))
+        })?;
+
+        Ok(child)
+    }
+
 
     // 验证启动是否成功
     async fn verify_startup(&self) -> bool {
@@ -346,11 +480,11 @@ impl ProcessManager {
     }
 
     // 重启进程
-    pub async fn restart(&self, config_path: &std::path::Path) -> Result<()> {
-        info!("正在重启内核进程");
+    pub async fn restart(&self, config_path: &std::path::Path, tun_enabled: bool) -> Result<()> {
+        info!("正在重启内核进程，TUN模式: {}", tun_enabled);
         self.stop().await?;
         sleep(Duration::from_millis(1000)).await;
-        self.start(config_path).await?;
+        self.start(config_path, tun_enabled).await?;
         info!("内核进程重启完成");
         Ok(())
     }
