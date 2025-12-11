@@ -147,14 +147,10 @@ export function useAppBootstrap(deps: AppBootstrapDeps) {
         console.error('注册 update-available 事件失败:', error)
       })
 
-    // 内核健康事件 -> 先简单打印或后续接入 UI
+    // 内核健康事件 - 仅记录日志，不向用户弹窗（在 Linux 上检测不准确）
     eventService
       .on(APP_EVENTS.kernelHealth, (payload) => {
         console.log('收到内核健康状态:', payload)
-        if (!payload.healthy) {
-          const issues = payload.issues?.join('; ') || '未知问题'
-          appStore.showWarningMessage?.(`内核健康检查发现问题: ${issues}`)
-        }
       })
       .then((unlisten) => cleanupFns.push(unlisten))
       .catch((error) => {

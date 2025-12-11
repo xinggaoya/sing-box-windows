@@ -48,28 +48,6 @@
       </div>
     </div>
 
-    <n-alert
-      v-if="healthStatus"
-      :type="healthStatus.healthy ? 'success' : 'warning'"
-      class="health-alert"
-      closable
-    >
-      <template #icon>
-        <n-icon>
-          <ShieldCheckmarkOutline v-if="healthStatus.healthy" />
-          <WarningOutline v-else />
-        </n-icon>
-      </template>
-      <div class="health-title">
-        {{ healthStatus.healthy ? t('home.kernelHealthy') : t('home.kernelUnhealthy') }}
-      </div>
-      <div v-if="!healthStatus.healthy" class="health-issues">
-        {{ healthIssuesText }}
-      </div>
-      <div v-if="healthStatus.lastChecked" class="health-time">
-        {{ t('home.kernelCheckedAt') }} {{ formatTime(healthStatus.lastChecked) }}
-      </div>
-    </n-alert>
 
     <!-- Main Grid -->
     <div class="dashboard-grid">
@@ -193,8 +171,7 @@ import {
   GlobeOutline,
   FlashOutline,
   RadioOutline,
-  SettingsOutline,
-  WarningOutline
+  SettingsOutline
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -220,18 +197,6 @@ const kernelStore = useKernelStore()
 const trafficStore = useTrafficStore()
 const connectionStore = useConnectionStore()
 const themeStore = useThemeStore()
-const healthStatus = computed(() => kernelStore.healthStatus)
-const healthIssuesText = computed(
-  () => (healthStatus.value?.issues || []).join('；') || t('home.noIssues'),
-)
-const formatTime = (ts?: number) => {
-  if (!ts) return ''
-  try {
-    return new Date(ts).toLocaleString()
-  } catch {
-    return ''
-  }
-}
 
 // Kernel status (shared with layout)
 const { statusClass, statusState, isRunning: kernelRunning, isLoading: kernelLoading } =
@@ -721,19 +686,5 @@ onMounted(async () => {
   padding: 16px;
 }
 
-.health-alert {
-  margin-top: 12px;
-}
-
-.health-issues {
-  margin-top: 4px;
-  color: var(--n-text-color);
-}
-
-.health-time {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--n-text-color-disabled);
-}
 
 </style>
