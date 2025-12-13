@@ -9,7 +9,6 @@ declare module 'vue' {
   export interface GlobalComponents {
     LazyComponent: typeof import('./src/components/LazyComponent.vue')['default']
     MainLayout: typeof import('./src/components/layout/MainLayout.vue')['default']
-    NAlert: typeof import('naive-ui')['NAlert']
     NButton: typeof import('naive-ui')['NButton']
     NButtonGroup: typeof import('naive-ui')['NButtonGroup']
     NColorPicker: typeof import('naive-ui')['NColorPicker']

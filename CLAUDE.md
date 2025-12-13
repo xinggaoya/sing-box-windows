@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 开发指导原则
+
+- 请你全程使用中文进行交流
+- 代码过程中在必要的地方要写一些注释
+- 如果涉及到编写页面，请你以现代化、简约、美观的风格设计
+- 你可以使用任何工具、以及MCP在开发时最好使用MCP熟悉最新文档
+
 ## Project Overview
 
 sing-box-windows is a modern cross-platform proxy client for Windows, Linux, and macOS built with Tauri 2.0 + Vue 3, providing complete proxy management, routing rules, subscription management, and system service functionality.
@@ -60,6 +67,12 @@ pnpm type-check
 
 # Rust code formatting (requires manual installation of rustfmt)
 cd src-tauri && cargo fmt
+
+# Rust clippy linter
+cd src-tauri && cargo clippy
+
+# Run all quality checks
+pnpm lint && pnpm type-check && cd src-tauri && cargo clippy
 ```
 
 ## Core Architecture
@@ -139,6 +152,8 @@ src-tauri/src/
 - **Lazy Loading**: LazyComponent.vue implements on-demand component loading
 - **Memory Management**: Built-in memory leak detection and WebSocket connection cleanup
 - **Auto Imports**: Uses unplugin-auto-import and unplugin-vue-components
+- **Code Splitting**: Vite configuration separates vendor libraries (Naive UI, Tauri) into chunks
+- **Port Injection**: invoke-client.ts automatically injects API and proxy ports into commands
 
 ## Development Workflow
 
@@ -234,8 +249,32 @@ The application uses a hybrid storage approach:
 ### Logging Configuration
 Set log level via environment variable:
 ```bash
+# Enable debug logging for all modules
 RUST_LOG=debug pnpm tauri dev
+
+# Enable debug logging only for this app
+RUST_LOG=sing_box_windows=debug pnpm tauri dev
+
+# Enable info logging for Tauri and debug for this app
+RUST_LOG=tauri=info,sing_box_windows=debug pnpm tauri dev
 ```
+
+## 常见问题解决
+
+### 开发环境问题
+1. **Windows 编译错误**: 确保安装了 Visual Studio Build Tools 或 Visual Studio Community with C++ support
+2. **Linux 依赖问题**: 安装必要的系统依赖 `sudo apt-get install libwebkit2gtk-4.1-0 libssl3 libgtk-3-0`
+3. **macOS 编译**: 需要安装 Xcode Command Line Tools `xcode-select --install`
+
+### 性能调试
+- 使用 Vue DevTools 检查组件性能（开发环境）
+- 使用 Chrome DevTools Memory 面板检查内存泄漏
+- 监控 WebSocket 连接是否正确清理
+
+### 构建优化
+- 生产构建会自动排除 Vue DevTools
+- Vite 配置已优化 chunk 分割，减少初始加载体积
+- 使用 `pnpm tauri build -- --help` 查看所有构建选项
 
 ## Platform-Specific Notes
 
@@ -265,5 +304,30 @@ RUST_LOG=debug pnpm tauri dev
 ### Before Committing
 1. Run `pnpm lint` to fix code style issues
 2. Run `pnpm type-check` to verify TypeScript types
-3. Test functionality on target platforms
-4. Verify memory usage for long-running operations
+3. Run `cd src-tauri && cargo clippy` for Rust linting
+4. Test functionality on target platforms
+5. Verify memory usage for long-running operations
+
+## 特别说明
+
+### 单实例应用
+该应用配置为单实例模式，使用 `tauri_plugin_single_instance` 插件。当用户尝试运行第二个实例时，会将已运行的实例窗口带到前台。
+
+### 无边框窗口
+应用使用无边框窗口设计 (`decorations: false`)，提供了自定义的窗口控制组件。
+
+### WebSocket 实时通信
+前后端使用 WebSocket 进行实时数据传输，特别用于：
+- 内核状态更新
+- 流量统计数据
+- 连接状态变化
+
+### 延迟启动支持
+macOS 支持延迟启动参数 `--hide`，允许应用在后台启动而不显示窗口。
+
+### 国际化支持
+应用支持多语言：
+- English (en-US)
+- 简体中文 (zh-CN)
+- 日本語 (ja-JP)
+- Русский (ru-RU)
