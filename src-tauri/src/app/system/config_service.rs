@@ -31,32 +31,52 @@ use crate::app::storage::enhanced_storage_service::{
 };
 use tauri::AppHandle;
 
-async fn restore_default_config(app_handle: &AppHandle) -> Result<(), String> {
-    // 获取配置目录
-    let config_dir = paths::get_config_dir();
-    if !config_dir.exists() {
-        fs::create_dir_all(&config_dir).map_err(|e| format!("创建配置目录失败: {}", e))?;
+fn write_default_config(path: &Path) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败: {}", e))?;
+        }
     }
 
-    // 默认配置路径
-    let default_config_path = config_dir.join("config.json");
+    fs::write(path, DEFAULT_SINGBOX_CONFIG).map_err(|e| format!("写入默认配置失败: {}", e))?;
+    Ok(())
+}
 
-    // 写入默认配置
-    fs::write(&default_config_path, DEFAULT_SINGBOX_CONFIG)
-        .map_err(|e| format!("写入默认配置失败: {}", e))?;
+/// 尝试从同路径的 `.bak` 备份恢复配置（订阅配置写入时会维护该备份）。
+/// 返回 `Ok(true)` 表示已成功恢复并可继续使用该配置文件。
+fn try_restore_from_bak(path: &Path) -> Result<bool, String> {
+    let backup = path.with_extension("bak");
+    if !backup.exists() {
+        return Ok(false);
+    }
 
-    // 更新数据库中的激活配置路径
+    let content =
+        fs::read_to_string(&backup).map_err(|e| format!("读取备份配置失败: {}", e))?;
+    if serde_json::from_str::<Value>(&content).is_err() {
+        warn!("发现备份配置也不是有效 JSON，跳过恢复: {:?}", backup);
+        return Ok(false);
+    }
+
+    fs::copy(&backup, path).map_err(|e| format!("从备份恢复配置失败: {}", e))?;
+    info!("已从备份恢复配置: {:?} -> {:?}", backup, path);
+    Ok(true)
+}
+
+async fn persist_active_config_path_if_missing(
+    app_handle: &AppHandle,
+    path: &Path,
+) -> Result<(), String> {
     let mut app_config = db_get_app_config(app_handle.clone())
         .await
         .map_err(|e| format!("获取应用配置失败: {}", e))?;
 
-    app_config.active_config_path = Some(default_config_path.to_string_lossy().to_string());
+    if app_config.active_config_path.is_none() {
+        app_config.active_config_path = Some(path.to_string_lossy().to_string());
+        db_save_app_config_internal(app_config, app_handle.clone())
+            .await
+            .map_err(|e| format!("保存应用配置失败: {}", e))?;
+    }
 
-    db_save_app_config_internal(app_config, app_handle.clone())
-        .await
-        .map_err(|e| format!("保存应用配置失败: {}", e))?;
-
-    info!("已恢复默认 sing-box 配置");
     Ok(())
 }
 
@@ -66,15 +86,27 @@ pub async fn ensure_singbox_config(app_handle: &AppHandle) -> Result<(), String>
         .await
         .map_err(|e| format!("获取应用配置失败: {}", e))?;
 
-    let config_path = if let Some(path_str) = app_config.active_config_path {
-        std::path::PathBuf::from(path_str)
-    } else {
-        paths::get_config_dir().join("config.json")
-    };
+    let active_config_path = app_config.active_config_path.clone();
+    let config_path = active_config_path
+        .as_deref()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| paths::get_config_dir().join("config.json"));
 
     if !config_path.exists() {
-        info!("sing-box 配置文件不存在，使用默认模板恢复");
-        return restore_default_config(app_handle).await;
+        info!("sing-box 配置文件不存在，尝试从备份恢复: {:?}", config_path);
+        if try_restore_from_bak(&config_path)? {
+            return Ok(());
+        }
+
+        // 关键修复：
+        // 以前这里会直接把 active_config_path 重置为默认 `config.json`，导致“订阅选择”被悄悄改变，
+        // 从而出现“内核运行配置与前端选中订阅不一致”的现象。
+        // 现在优先在原路径恢复/写入默认模板，不主动切换 active_config_path（除非原本就没有设置）。
+        info!("未找到可用备份，写入默认模板到: {:?}", config_path);
+        write_default_config(&config_path)?;
+        persist_active_config_path_if_missing(app_handle, &config_path).await?;
+        info!("已恢复 sing-box 配置（保持 active_config_path 不变）");
+        return Ok(());
     }
 
     match fs::read_to_string(&config_path) {
@@ -84,13 +116,31 @@ pub async fn ensure_singbox_config(app_handle: &AppHandle) -> Result<(), String>
             } else {
                 warn!("检测到 sing-box 配置损坏，正在恢复默认模板");
                 backup_corrupted_config(&config_path);
-                restore_default_config(app_handle).await
+
+                // 优先从 `.bak` 恢复（订阅配置文件通常会有可回滚的备份）
+                if try_restore_from_bak(&config_path)? {
+                    return Ok(());
+                }
+
+                warn!("未找到可用备份，写入默认模板到: {:?}", config_path);
+                write_default_config(&config_path)?;
+                persist_active_config_path_if_missing(app_handle, &config_path).await?;
+                info!("已恢复 sing-box 配置（保持 active_config_path 不变）");
+                Ok(())
             }
         }
         Err(e) => {
             warn!("读取 sing-box 配置失败: {}，尝试恢复默认模板", e);
             backup_corrupted_config(&config_path);
-            restore_default_config(app_handle).await
+            if try_restore_from_bak(&config_path)? {
+                return Ok(());
+            }
+
+            warn!("未找到可用备份，写入默认模板到: {:?}", config_path);
+            write_default_config(&config_path)?;
+            persist_active_config_path_if_missing(app_handle, &config_path).await?;
+            info!("已恢复 sing-box 配置（保持 active_config_path 不变）");
+            Ok(())
         }
     }
 }

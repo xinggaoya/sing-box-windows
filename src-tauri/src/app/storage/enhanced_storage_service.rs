@@ -341,43 +341,26 @@ pub async fn db_save_active_subscription_index(
         .save_active_subscription_index(index)
         .await
         .map_err(|e| e.to_string())?;
-    
-    // Sync active_config_path with the selected subscription's config_path
-    let mut app_config = storage.get_app_config().await.map_err(|e| e.to_string())?;
-    
-    if let Some(idx) = index {
-        // Load subscriptions and get the config_path for the selected index
+
+    // 重要说明：
+    // - active_config_path 是内核启动时读取的“真实生效配置路径”（来源：AppConfig）。
+    // - active_subscription_index 仅用于前端高亮/记忆选择位置，使用“索引”在列表变动时很容易漂移。
+    // 因此这里不再尝试用索引反向覆盖 active_config_path，避免出现“前端索引写入导致内核配置跳到别的订阅”的问题。
+    //
+    // 但为了保持原有能力：当用户切换订阅时，把全局设置（端口/TUN/系统代理等）同步到该订阅配置文件。
+    let app_config = storage.get_app_config().await.map_err(|e| e.to_string())?;
+
+    let target_config_path = if let Some(idx) = index {
         let subscriptions = storage.get_subscriptions().await.map_err(|e| e.to_string())?;
-        
-        if let Some(subscription) = subscriptions.get(idx as usize) {
-            app_config.active_config_path = subscription.config_path.clone();
-            tracing::info!(
-                "已同步激活配置路径: {:?} (订阅索引: {})",
-                app_config.active_config_path,
-                idx
-            );
-        } else {
-            tracing::warn!(
-                "订阅索引 {} 超出范围 (总数: {})，清除激活配置路径",
-                idx,
-                subscriptions.len()
-            );
-            app_config.active_config_path = None;
-        }
+        subscriptions
+            .get(idx as usize)
+            .and_then(|subscription| subscription.config_path.clone())
+            .map(std::path::PathBuf::from)
     } else {
-        // No subscription selected, clear the active config path
-        app_config.active_config_path = None;
-        tracing::info!("已清除激活配置路径 (无激活订阅)");
-    }
-    
-    storage
-        .save_app_config(&app_config)
-        .await
-        .map_err(|e| e.to_string())?;
-    
-    // 将全局设置同步到新激活的配置文件
-    if let Some(ref config_path_str) = app_config.active_config_path {
-        let config_path = std::path::PathBuf::from(config_path_str);
+        None
+    };
+
+    if let Some(config_path) = target_config_path {
         if config_path.exists() {
             match sync_settings_to_config_file(&config_path, &app_config) {
                 Ok(_) => {
@@ -387,6 +370,11 @@ pub async fn db_save_active_subscription_index(
                     tracing::warn!("同步设置到配置文件失败: {}", e);
                 }
             }
+        } else {
+            tracing::warn!(
+                "订阅索引写入时发现配置文件不存在，跳过同步: {:?}",
+                config_path
+            );
         }
     }
     

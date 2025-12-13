@@ -65,12 +65,21 @@ async fn run_once(app: &AppHandle) -> Result<(), String> {
             }
         };
 
+        // 关键修复：
+        // 以前这里固定传 apply_runtime = true，会导致“依次刷新每个订阅时不断覆盖 active_config_path”，
+        // 最终内核会使用最后一个被刷新的订阅配置（订阅数量 >= 2 时尤为明显）。
+        // 现在仅当当前订阅就是用户正在使用的订阅时，才允许应用到运行时（写入 active_config_path + 触发自动拉起/重启）。
+        let should_apply_runtime = match (&app_config.active_config_path, &sub.config_path) {
+            (Some(active), Some(sub_path)) => active == sub_path,
+            _ => false,
+        };
+
         match download_subscription(
             sub.url.clone(),
             sub.use_original_config,
             Some(format!("{}.json", sub.name)),
             sub.config_path.clone(),
-            Some(true),
+            Some(should_apply_runtime),
             window,
             Some(app_config.proxy_port),
             Some(app_config.api_port),

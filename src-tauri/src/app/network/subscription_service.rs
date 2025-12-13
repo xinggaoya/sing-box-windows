@@ -165,7 +165,13 @@ pub async fn set_active_config_path(
         .await
         .map_err(|e| format!("获取应用配置失败: {}", e))?;
 
+    // 记录 active_config_path 的变更，便于排查“过一段时间配置指针被改写”的问题
+    let previous = app_config.active_config_path.clone();
     app_config.active_config_path = config_path;
+    info!(
+        "设置 active_config_path: {:?} -> {:?}",
+        previous, app_config.active_config_path
+    );
 
     db_save_app_config(app_config, app_handle)
         .await
