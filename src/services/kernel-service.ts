@@ -283,54 +283,6 @@ class KernelService {
     }
   }
 
-  /**
-   * @deprecated 此方法未实现，仅为接口保留。
-   * 如需使用，请先实现后端 `get_kernel_config` 命令。
-   */
-  async getKernelConfig(): Promise<KernelConfig> {
-    console.warn('⚠️ getKernelConfig() 未实现，返回默认值')
-    return {
-      proxy_mode: 'manual',
-      api_port: 12081,
-      proxy_port: 12080,
-      prefer_ipv6: false,
-      auto_start: false,
-      system_proxy_bypass: '',
-      tun: {
-        ipv4_address: '172.19.0.1/30',
-        ipv6_address: 'fdfe:dcba:9876::1/126',
-        mtu: 1500,
-        auto_route: true,
-        strict_route: true,
-        stack: 'mixed',
-        enable_ipv6: true,
-      },
-    }
-  }
-
-  /**
-   * @deprecated 此方法未实现，仅为接口保留。
-   * 如需使用，请先实现后端 `update_kernel_config` 命令。
-   */
-  async updateKernelConfig(_config: Partial<KernelConfig>): Promise<{ success: boolean; message: string }> {
-    console.warn('⚠️ updateKernelConfig() 未实现')
-    return { success: false, message: '此功能尚未实现' }
-  }
-
-  async checkKernelHealth(): Promise<{ healthy: boolean; issues: string[] }> {
-    try {
-      return await invokeWithAppContext<{ healthy: boolean; issues: string[] }>('kernel_check_health', undefined, {
-        withApiPort: true
-      })
-    } catch (error) {
-      console.error('检查内核健康状态失败:', error)
-      return {
-        healthy: false,
-        issues: [error instanceof Error ? error.message : '健康检查失败']
-      }
-    }
-  }
-
   autoManageKernel(options: KernelStartOptions & { forceRestart?: boolean } = {}): Promise<KernelAutoManageResult> {
     return withAppStore(async store => {
       await store.waitForDataRestore()

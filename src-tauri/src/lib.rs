@@ -31,6 +31,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build()) // 重新启用 store 插件
         .plugin(tauri_plugin_websocket::init())
+        .plugin(tauri_plugin_os::init()) // 添加 OS 信息插件
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec!["--hide"]),
@@ -157,6 +158,7 @@ pub fn run() {
             crate::app::system::update_service::download_update,
             crate::app::system::update_service::download_and_install_update,
             crate::app::system::update_service::get_platform_info,
+            crate::app::system::update_service::get_detailed_platform_info,
             // System - Config service commands
             crate::app::system::config_service::update_singbox_ports,
             // Core - Proxy service commands

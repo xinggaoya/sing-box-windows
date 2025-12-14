@@ -397,6 +397,10 @@
               <span class="value">{{ kernelStore.hasVersionInfo() ? formatVersion(kernelStore.getVersionString()) : t('setting.notInstalled') }}</span>
             </div>
             <div class="about-item">
+              <span class="label">平台</span>
+              <span class="value">{{ platformInfo?.display_name || '加载中...' }}</span>
+            </div>
+            <div class="about-item">
               <span class="label">{{ t('setting.about.license') }}</span>
               <span class="value">MIT License</span>
             </div>
@@ -482,6 +486,7 @@ const downloadError = ref('')
 let downloadListener: (() => void) | null = null
 let updateProgressListener: (() => void) | null = null
 const selectedKernelVersion = ref<string | undefined>(undefined)
+const platformInfo = ref<{ os: string; arch: string; display_name: string } | null>(null)
 
 const autoStart = ref(false)
 const locale = ref(localeStore.locale)
@@ -816,6 +821,14 @@ onMounted(async () => {
     },
     { immediate: false },
   )
+
+  // 获取平台信息
+  try {
+    platformInfo.value = await systemService.getDetailedPlatformInfo()
+  } catch (error) {
+    console.error('获取平台信息失败:', error)
+  }
+
   await kernelStore.checkKernelInstallation()
   if (kernelStore.fetchLatestKernelVersion) {
     await kernelStore.fetchLatestKernelVersion()

@@ -5,66 +5,135 @@ use semver::Version;
 use serde_json::json;
 use std::path::Path;
 use tauri::{Emitter, Manager};
+use std::env;
 
-// 获取当前平台标识符
+// 获取当前平台标识符 - 使用 Rust 标准库，更准确
 fn get_platform_identifier() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "windows"
-    } else if cfg!(target_os = "linux") {
-        "linux"
-    } else if cfg!(target_os = "macos") {
-        "macos"
-    } else {
-        "unknown"
-    }
+    env::consts::OS
+}
+
+// 获取当前架构
+fn get_current_arch() -> &'static str {
+    env::consts::ARCH
 }
 
 // 检查文件是否匹配当前平台
 fn is_platform_compatible(filename: &str) -> bool {
     let platform = get_platform_identifier();
+    let arch = get_current_arch();
 
-    match platform {
+    // 只支持桌面平台
+    let extension_match = match platform {
         "windows" => filename.ends_with(".msi") || filename.ends_with(".exe"),
         "linux" => filename.ends_with(".AppImage") || filename.ends_with(".deb"),
         "macos" => filename.ends_with(".dmg") || filename.ends_with(".app.tar.gz"),
         _ => false,
+    };
+
+    if !extension_match {
+        return false;
+    }
+
+    // 检查架构兼容性
+    check_arch_compatibility(filename, arch)
+}
+
+// 检查架构兼容性（仅桌面平台）
+fn check_arch_compatibility(filename: &str, current_arch: &str) -> bool {
+    let filename_lower = filename.to_lowercase();
+
+    match current_arch {
+        "x86_64" => {
+            // x64 架构优先选择 x64 包，也接受通用包
+            filename_lower.contains("x64") ||
+            filename_lower.contains("x86_64") ||
+            filename_lower.contains("amd64") ||
+            !filename_lower.contains("arm") // 没有架构标识时默认兼容
+        }
+        "aarch64" => {
+            // ARM64 Mac 优先选择 ARM64 或 Universal 包
+            filename_lower.contains("arm64") ||
+            filename_lower.contains("aarch64") ||
+            filename_lower.contains("universal")
+        }
+        "arm" | "armv7" => {
+            // ARM32
+            filename_lower.contains("arm32") ||
+            filename_lower.contains("armv7") ||
+            (filename_lower.contains("arm") && !filename_lower.contains("64"))
+        }
+        "x86" => {
+            // 32位 x86
+            filename_lower.contains("i386") ||
+            filename_lower.contains("386") ||
+            (filename_lower.contains("x86") && !filename_lower.contains("64"))
+        }
+        _ => true, // 其他架构保守处理
     }
 }
+
 
 // 获取平台优先级分数（用于选择最合适的安装包）
 fn get_platform_priority(filename: &str) -> i32 {
     let platform = get_platform_identifier();
+    let arch = get_current_arch();
+    let filename_lower = filename.to_lowercase();
 
-    match platform {
+    // 基础优先级（桌面平台）
+    let base_priority = match platform {
         "windows" => {
-            if filename.ends_with(".exe") {
-                2
-            } else if filename.ends_with(".msi") {
-                1
-            } else {
-                0
-            }
+            if filename.ends_with(".exe") { 20 }
+            else if filename.ends_with(".msi") { 10 }
+            else { 0 }
         }
         "linux" => {
-            if filename.ends_with(".deb") {
-                2
-            } else if filename.ends_with(".AppImage") {
-                1
+            if filename.ends_with(".deb") { 20 }
+            else if filename.ends_with(".AppImage") { 10 }
+            else { 0 }
+        }
+        "macos" => {
+            if filename.ends_with(".dmg") { 20 }
+            else if filename.ends_with(".app.tar.gz") { 10 }
+            else { 0 }
+        }
+        _ => 0,
+    };
+
+    if base_priority == 0 {
+        return 0;
+    }
+
+    // 架构匹配加分
+    let arch_bonus = match arch {
+        "x86_64" => {
+            if filename_lower.contains("x64") || filename_lower.contains("x86_64") || filename_lower.contains("amd64") {
+                5
             } else {
                 0
             }
         }
-        "macos" => {
-            if filename.ends_with(".dmg") {
-                2
-            } else if filename.ends_with(".app.tar.gz") {
-                1
+        "aarch64" => {
+            if filename_lower.contains("arm64") || filename_lower.contains("aarch64") {
+                5
+            } else if filename_lower.contains("universal") {
+                4  // macOS Universal 包
             } else {
                 0
             }
         }
         _ => 0,
-    }
+    };
+
+    // 特殊标识加分
+    let special_bonus = if filename_lower.contains("portable") {
+        2
+    } else if filename_lower.contains("installer") || filename_lower.contains("latest") {
+        1
+    } else {
+        0
+    };
+
+    base_priority + arch_bonus + special_bonus
 }
 
 // 更新信息结构体
@@ -251,10 +320,52 @@ pub async fn download_update(app_handle: tauri::AppHandle) -> Result<(), String>
 }
 
 
-// 获取当前平台信息
+// 获取当前平台信息（简化版，兼容旧接口）
 #[tauri::command]
 pub async fn get_platform_info() -> Result<String, String> {
     Ok(get_platform_identifier().to_string())
+}
+
+// 获取详细的平台信息（包括操作系统和架构）
+#[tauri::command]
+pub async fn get_detailed_platform_info() -> Result<PlatformDetailedInfo, String> {
+    Ok(PlatformDetailedInfo::current())
+}
+
+// 详细平台信息结构体
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PlatformDetailedInfo {
+    pub os: String,           // 操作系统：windows, linux, macos
+    pub arch: String,         // 架构：x86_64, aarch64, etc.
+    pub display_name: String, // 显示名称：Windows x64, macOS ARM64 等
+}
+
+impl PlatformDetailedInfo {
+    pub fn current() -> Self {
+        let os = env::consts::OS.to_string();
+        let arch = env::consts::ARCH.to_string();
+
+        // 生成友好的显示名称
+        let display_name = match (os.as_str(), arch.as_str()) {
+            ("windows", "x86_64") => "Windows x64".to_string(),
+            ("windows", "x86") => "Windows x86".to_string(),
+            ("windows", "aarch64") => "Windows ARM64".to_string(),
+            ("linux", "x86_64") => "Linux x64".to_string(),
+            ("linux", "x86") => "Linux x86".to_string(),
+            ("linux", "aarch64") => "Linux ARM64".to_string(),
+            ("linux", "arm") => "Linux ARM".to_string(),
+            ("macos", "x86_64") => "macOS Intel".to_string(),
+            ("macos", "aarch64") => "macOS Apple Silicon".to_string(),
+            ("macos", "arm") => "macOS ARM".to_string(),
+            _ => format!("{} ({})", os, arch),
+        };
+
+        Self {
+            os,
+            arch,
+            display_name,
+        }
+    }
 }
 
 // 下载并安装更新

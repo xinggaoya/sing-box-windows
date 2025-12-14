@@ -17,6 +17,10 @@ export const systemService = {
         return invokeWithAppContext<string>('get_platform_info', undefined, { skipDataRestore: true })
     },
 
+    getDetailedPlatformInfo() {
+        return invokeWithAppContext<{ os: string; arch: string; display_name: string }>('get_detailed_platform_info', undefined, { skipDataRestore: true })
+    },
+
     checkUpdate(currentVersion?: string, includePrerelease?: boolean) {
         const version = currentVersion || '1.8.2'
         const includePre = includePrerelease || false

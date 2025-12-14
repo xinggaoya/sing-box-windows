@@ -9,8 +9,9 @@ declare module 'vue' {
   export interface GlobalComponents {
     LazyComponent: typeof import('./src/components/LazyComponent.vue')['default']
     MainLayout: typeof import('./src/components/layout/MainLayout.vue')['default']
+    NAlert: typeof import('naive-ui')['NAlert']
     NButton: typeof import('naive-ui')['NButton']
-    NButtonGroup: typeof import('naive-ui')['NButtonGroup']
+    NCard: typeof import('naive-ui')['NCard']
     NColorPicker: typeof import('naive-ui')['NColorPicker']
     NConfigProvider: typeof import('naive-ui')['NConfigProvider']
     NDialogProvider: typeof import('naive-ui')['NDialogProvider']
@@ -46,6 +47,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     StatusCard: typeof import('./src/components/common/StatusCard.vue')['default']
+    SudoPasswordModal: typeof import('./src/components/system/SudoPasswordModal.vue')['default']
     TrafficChart: typeof import('./src/components/layout/TrafficChart.vue')['default']
     UpdateModal: typeof import('./src/components/UpdateModal.vue')['default']
     UpdateNotification: typeof import('./src/components/UpdateNotification.vue')['default']
