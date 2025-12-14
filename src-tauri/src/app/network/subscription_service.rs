@@ -6,21 +6,21 @@ pub mod auto_update;
 use crate::app::constants::{messages, paths};
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::proxy_service::apply_proxy_runtime_state;
+use crate::app::singbox::config_generator;
+use crate::app::singbox::settings_patch::apply_app_settings_to_config;
 use crate::app::storage::enhanced_storage_service::{db_get_app_config, db_save_app_config};
 use crate::app::storage::state_model::AppConfig;
 use crate::utils::http_client;
 use base64;
 use helpers::{
-    apply_app_settings_to_config, backup_existing_config, resolve_target_config_path,
-    runtime_state_from_config,
+    backup_existing_config, resolve_target_config_path, runtime_state_from_config,
 };
-use parser::{extract_nodes_from_subscription, update_selector_outbounds};
+use parser::extract_nodes_from_subscription;
 use serde_json::{json, Value};
 use std::error::Error;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Manager};
 use tracing::{error, info, warn};
 
@@ -221,7 +221,7 @@ pub fn get_current_proxy_mode() -> Result<String, String> {
 async fn download_and_process_subscription(
     url: String,
     use_original_config: bool,
-    app_handle: &AppHandle,
+    _app_handle: &AppHandle,
     app_config: &AppConfig,
     target_path: &Path,
 ) -> Result<(), Box<dyn Error>> {
@@ -235,15 +235,6 @@ async fn download_and_process_subscription(
             error!("{}", err_msg);
             return Err(err_msg.into());
         }
-    }
-
-    let template_path = app_handle
-        .path()
-        .resolve("src/config/template.json", BaseDirectory::Resource)?;
-    if !template_path.exists() {
-        let err_msg = format!("找不到模板文件: {:?}", template_path);
-        error!("{}", err_msg);
-        return Err(err_msg.into());
     }
 
     info!("开始下载订阅: {}", url);
@@ -326,51 +317,9 @@ async fn download_and_process_subscription(
         error!("{}: {}", messages::ERR_CREATE_DIR_FAILED, e);
     }
 
-    let mut template_file = File::open(&template_path)?;
-    let mut template_content = String::new();
-    template_file.read_to_string(&mut template_content)?;
-
-    let mut config: Value = serde_json::from_str(&template_content)?;
-
-    if let Some(config_obj) = config.as_object_mut() {
-        if let Some(outbounds) = config_obj.get_mut("outbounds") {
-            if let Some(outbounds_array) = outbounds.as_array_mut() {
-                if let Some(auto_select) = outbounds_array
-                    .iter_mut()
-                    .find(|o| o.get("tag").and_then(|t| t.as_str()) == Some("自动选择"))
-                {
-                    if let Some(outbound_tags) = auto_select.get_mut("outbounds") {
-                        let node_tags: Vec<Value> = extracted_nodes
-                            .iter()
-                            .map(|node| json!(node.get("tag").unwrap().as_str().unwrap()))
-                            .collect();
-                        *outbound_tags = json!(node_tags);
-                    }
-                }
-
-                if let Some(proxy_select) = outbounds_array
-                    .iter_mut()
-                    .find(|o| o.get("tag").and_then(|t| t.as_str()) == Some("手动切换"))
-                {
-                    if let Some(outbound_tags) = proxy_select.get_mut("outbounds") {
-                        let mut tags = vec![json!("自动选择")];
-                        for node in &extracted_nodes {
-                            tags.push(json!(node.get("tag").unwrap().as_str().unwrap()));
-                        }
-                        *outbound_tags = json!(tags);
-                    }
-                }
-
-                update_selector_outbounds(outbounds_array, &extracted_nodes);
-
-                for node in extracted_nodes {
-                    outbounds_array.push(node);
-                }
-            }
-        }
-    }
-
-    apply_app_settings_to_config(&mut config, app_config);
+    // 不再读取/替换模板文件：直接根据 AppConfig 生成一份通用配置骨架，然后注入订阅节点。
+    let config = config_generator::generate_config_with_nodes(app_config, &extracted_nodes)
+        .map_err(|e| format!("生成配置失败: {}", e))?;
 
     info!("正在保存配置到: {:?}", target_path);
 
@@ -399,7 +348,7 @@ async fn download_and_process_subscription(
 fn process_subscription_content(
     content: String,
     use_original_config: bool,
-    app_handle: &AppHandle,
+    _app_handle: &AppHandle,
     app_config: &AppConfig,
     target_path: &Path,
 ) -> Result<(), Box<dyn Error>> {
@@ -426,66 +375,9 @@ fn process_subscription_content(
         return Err("无法从配置内容提取节点，请检查格式".into());
     }
 
-    let work_dir = crate::utils::app_util::get_work_dir_sync();
-    let sing_box_dir = Path::new(&work_dir).join("sing-box");
-    if !sing_box_dir.exists() {
-        if let Err(e) = std::fs::create_dir_all(&sing_box_dir) {
-            return Err(format!("创建Sing-Box目录失败: {}", e).into());
-        }
-    }
-
-    let template_path = app_handle
-        .path()
-        .resolve("src/config/template.json", BaseDirectory::Resource)?;
-    if !template_path.exists() {
-        return Err(format!("找不到模板文件: {:?}", template_path).into());
-    }
-
-    let mut template_file = File::open(&template_path)?;
-    let mut template_content = String::new();
-    template_file.read_to_string(&mut template_content)?;
-
-    let mut config: Value = serde_json::from_str(&template_content)?;
-
-    if let Some(config_obj) = config.as_object_mut() {
-        if let Some(outbounds) = config_obj.get_mut("outbounds") {
-            if let Some(outbounds_array) = outbounds.as_array_mut() {
-                if let Some(auto_select) = outbounds_array
-                    .iter_mut()
-                    .find(|o| o.get("tag").and_then(|t| t.as_str()) == Some("自动选择"))
-                {
-                    if let Some(outbound_tags) = auto_select.get_mut("outbounds") {
-                        let node_tags: Vec<Value> = extracted_nodes
-                            .iter()
-                            .map(|node| json!(node.get("tag").unwrap().as_str().unwrap()))
-                            .collect();
-                        *outbound_tags = json!(node_tags);
-                    }
-                }
-
-                if let Some(proxy_select) = outbounds_array
-                    .iter_mut()
-                    .find(|o| o.get("tag").and_then(|t| t.as_str()) == Some("手动切换"))
-                {
-                    if let Some(outbound_tags) = proxy_select.get_mut("outbounds") {
-                        let mut tags = vec![json!("自动选择")];
-                        for node in &extracted_nodes {
-                            tags.push(json!(node.get("tag").unwrap().as_str().unwrap()));
-                        }
-                        *outbound_tags = json!(tags);
-                    }
-                }
-
-                update_selector_outbounds(outbounds_array, &extracted_nodes);
-
-                for node in extracted_nodes {
-                    outbounds_array.push(node);
-                }
-            }
-        }
-    }
-
-    apply_app_settings_to_config(&mut config, app_config);
+    // 手动输入的订阅内容（URI/节点列表等）同样走“生成骨架 + 注入节点”的路径。
+    let config = config_generator::generate_config_with_nodes(app_config, &extracted_nodes)
+        .map_err(|e| format!("生成配置失败: {}", e))?;
 
     info!("正在保存手动配置到: {:?}", target_path);
 

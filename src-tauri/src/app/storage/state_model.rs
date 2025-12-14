@@ -24,6 +24,23 @@ pub struct AppConfig {
     pub tun_enable_ipv6: bool,
     pub active_config_path: Option<String>,
     pub installed_kernel_version: Option<String>,
+
+    // --- sing-box 配置生成（订阅模板）高级选项 ---
+    // 说明：这些字段仅影响“本程序生成的订阅配置”，不会强行覆盖用户导入的原始订阅配置结构。
+    pub singbox_dns_proxy: String,
+    pub singbox_dns_cn: String,
+    pub singbox_dns_resolver: String,
+    pub singbox_urltest_url: String,
+    /// 非国内流量默认走的出站：manual/auto
+    pub singbox_default_proxy_outbound: String,
+    /// 是否启用广告拦截（基于 geosite-category-ads-all）
+    pub singbox_block_ads: bool,
+    /// 规则集/Clash UI 下载走的出站：manual/direct
+    pub singbox_download_detour: String,
+    /// 是否启用 DNS 劫持（hijack-dns）
+    pub singbox_dns_hijack: bool,
+    /// 是否启用 Telegram/YouTube/Netflix/OpenAI 分流组
+    pub singbox_enable_app_groups: bool,
 }
 
 impl Default for AppConfig {
@@ -49,6 +66,18 @@ impl Default for AppConfig {
             tun_enable_ipv6: false,
             active_config_path: None,
             installed_kernel_version: None,
+
+            // sing-box 配置生成高级选项默认值：
+            // - 适配国内网络：国内域名直连，其他走代理；DNS 使用 CN/Proxy 双路分流
+            singbox_dns_proxy: "https://1.1.1.1/dns-query".to_string(),
+            singbox_dns_cn: "h3://dns.alidns.com/dns-query".to_string(),
+            singbox_dns_resolver: "114.114.114.114".to_string(),
+            singbox_urltest_url: "http://cp.cloudflare.com/generate_204".to_string(),
+            singbox_default_proxy_outbound: "manual".to_string(),
+            singbox_block_ads: true,
+            singbox_download_detour: "manual".to_string(),
+            singbox_dns_hijack: true,
+            singbox_enable_app_groups: true,
         }
     }
 }

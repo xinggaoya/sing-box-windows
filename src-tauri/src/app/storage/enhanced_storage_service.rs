@@ -13,8 +13,8 @@ fn sync_settings_to_config_file(
     config_path: &std::path::Path,
     app_config: &AppConfig,
 ) -> Result<(), String> {
-    use crate::app::network::subscription_service::helpers::apply_app_settings_to_config;
-    
+    use crate::app::singbox::settings_patch::apply_app_settings_to_config;
+     
     // 读取现有配置
     let content = std::fs::read_to_string(config_path)
         .map_err(|e| format!("读取配置文件失败: {}", e))?;
@@ -237,6 +237,18 @@ pub async fn db_save_app_config_internal(config: AppConfig, app: AppHandle) -> R
 #[tauri::command]
 pub async fn db_save_app_config(config: AppConfig, app: AppHandle) -> Result<(), String> {
     db_save_app_config_internal(config, app.clone()).await?;
+
+    // 保存设置后，尽量把变更同步到“当前生效配置文件”，避免用户需要重新下载订阅/重启应用才能生效。
+    // 同步逻辑采用“局部 patch”策略：如果配置文件不是本程序生成的结构，会尽量只修改端口/TUN/DNS 策略等通用字段。
+    let effective_config = db_get_app_config(app.clone()).await?;
+    if let Some(path) = effective_config.active_config_path.clone() {
+        let config_path = std::path::PathBuf::from(path);
+        if config_path.exists() {
+            if let Err(e) = sync_settings_to_config_file(&config_path, &effective_config) {
+                tracing::warn!("保存设置后同步到配置文件失败: {}", e);
+            }
+        }
+    }
 
     // 应用配置更新后，根据最新设置自动管理内核运行状态
     auto_manage_with_saved_config(&app, false, "app-config-updated").await;

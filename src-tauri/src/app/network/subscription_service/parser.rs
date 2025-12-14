@@ -430,33 +430,5 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
     }
 }
 
-pub fn update_selector_outbounds(outbounds_array: &mut Vec<Value>, nodes: &Vec<Value>) {
-    // 注意：不包含 "手动切换" 和 "自动选择"，因为它们已经在主函数中被正确处理
-    // "手动切换" 需要包含 "自动选择" + 节点tags
-    // "自动选择" 只需要包含节点tags
-    // 这里只处理其他 selector 类型的出站
-    let selector_tags = vec![
-        "TikTok节点",
-        "OpenAI节点",
-        "Netflix节点",
-        "Spotify节点",
-        "YouTube节点",
-        "Disney节点",
-    ];
-
-    let node_tags: Vec<Value> = nodes
-        .iter()
-        .filter_map(|node| node.get("tag").cloned())
-        .collect();
-
-    for tag in selector_tags {
-        if let Some(selector) = outbounds_array
-            .iter_mut()
-            .find(|o| o.get("tag").and_then(|t| t.as_str()) == Some(tag))
-        {
-            if let Some(selector_obj) = selector.as_object_mut() {
-                selector_obj.insert("outbounds".to_string(), json!(node_tags));
-            }
-        }
-    }
-}
+// `selector` 分组的更新逻辑已迁移至 `app::singbox::config_generator`：
+// - 订阅模块只负责“提取节点”，不再耦合模板替换与特定分组名字。

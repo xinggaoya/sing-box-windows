@@ -1,8 +1,7 @@
 use crate::app::core::proxy_service::ProxyRuntimeState;
-use crate::app::core::tun_profile::{TunProxyOptions, TUN_ROUTE_EXCLUDES};
+use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::state_model::AppConfig;
 use crate::utils::app_util::get_work_dir_sync;
-use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
 use tracing::warn;
 
@@ -84,68 +83,5 @@ pub fn backup_existing_config(target: &Path) -> Option<PathBuf> {
         }
     } else {
         None
-    }
-}
-
-pub fn apply_inbounds_settings(config_obj: &mut Map<String, Value>, app_config: &AppConfig) {
-    let mut tun_addresses = vec![app_config.tun_ipv4.clone()];
-    if app_config.tun_enable_ipv6 {
-        tun_addresses.push(app_config.tun_ipv6.clone());
-    }
-
-    let mut inbounds = Vec::new();
-    inbounds.push(json!({
-        "type": "mixed",
-        "tag": "mixed-in",
-        "listen": "127.0.0.1",
-        "listen_port": app_config.proxy_port,
-        "sniff": true,
-        "set_system_proxy": app_config.system_proxy_enabled
-    }));
-
-    if app_config.tun_enabled {
-        inbounds.push(json!({
-            "type": "tun",
-            "tag": "tun-in",
-            "address": tun_addresses,
-            "auto_route": app_config.tun_auto_route,
-            "strict_route": app_config.tun_strict_route,
-            "stack": app_config.tun_stack,
-            "mtu": app_config.tun_mtu,
-            "sniff": true,
-            "sniff_override_destination": true,
-            "route_exclude_address": TUN_ROUTE_EXCLUDES
-        }));
-    }
-
-    config_obj.insert("inbounds".to_string(), json!(inbounds));
-}
-
-pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) {
-    if let Some(config_obj) = config.as_object_mut() {
-        apply_inbounds_settings(config_obj, app_config);
-
-        let experimental = config_obj
-            .entry("experimental".to_string())
-            .or_insert(json!({}));
-        if let Some(exp_obj) = experimental.as_object_mut() {
-            let clash_api = exp_obj.entry("clash_api".to_string()).or_insert(json!({}));
-            if let Some(clash_api_obj) = clash_api.as_object_mut() {
-                clash_api_obj.insert(
-                    "external_controller".to_string(),
-                    json!(format!("127.0.0.1:{}", app_config.api_port)),
-                );
-            }
-        }
-
-        let dns = config_obj.entry("dns".to_string()).or_insert(json!({}));
-        if let Some(dns_obj) = dns.as_object_mut() {
-            let strategy = if app_config.prefer_ipv6 {
-                "prefer_ipv6"
-            } else {
-                "ipv4_only"
-            };
-            dns_obj.insert("strategy".to_string(), json!(strategy));
-        }
     }
 }

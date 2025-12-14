@@ -1,12 +1,12 @@
 use crate::app::constants::paths;
+use crate::app::singbox::config_generator;
+use crate::app::storage::state_model::AppConfig;
 use serde_json::json;
 use serde_json::Value;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
 use tracing::{error, info, warn};
-
-const DEFAULT_SINGBOX_CONFIG: &str = include_str!("../../config/template.json");
 
 fn backup_corrupted_config(path: &Path) {
     if !path.exists() {
@@ -26,19 +26,21 @@ fn backup_corrupted_config(path: &Path) {
     }
 }
 
-use crate::app::storage::enhanced_storage_service::{
-    db_get_app_config, db_save_app_config_internal,
-};
+use crate::app::storage::enhanced_storage_service::{db_get_app_config, db_save_app_config_internal};
 use tauri::AppHandle;
 
-fn write_default_config(path: &Path) -> Result<(), String> {
+fn write_default_config(path: &Path, app_config: &AppConfig) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         if !parent.exists() {
             fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败: {}", e))?;
         }
     }
 
-    fs::write(path, DEFAULT_SINGBOX_CONFIG).map_err(|e| format!("写入默认配置失败: {}", e))?;
+    // 不再依赖打包资源中的 template.json：这里直接生成一份通用配置骨架。
+    let config = config_generator::generate_base_config(app_config);
+    let content =
+        serde_json::to_string_pretty(&config).map_err(|e| format!("序列化默认配置失败: {}", e))?;
+    fs::write(path, content).map_err(|e| format!("写入默认配置失败: {}", e))?;
     Ok(())
 }
 
@@ -103,7 +105,7 @@ pub async fn ensure_singbox_config(app_handle: &AppHandle) -> Result<(), String>
         // 从而出现“内核运行配置与前端选中订阅不一致”的现象。
         // 现在优先在原路径恢复/写入默认模板，不主动切换 active_config_path（除非原本就没有设置）。
         info!("未找到可用备份，写入默认模板到: {:?}", config_path);
-        write_default_config(&config_path)?;
+        write_default_config(&config_path, &app_config)?;
         persist_active_config_path_if_missing(app_handle, &config_path).await?;
         info!("已恢复 sing-box 配置（保持 active_config_path 不变）");
         return Ok(());
@@ -123,7 +125,7 @@ pub async fn ensure_singbox_config(app_handle: &AppHandle) -> Result<(), String>
                 }
 
                 warn!("未找到可用备份，写入默认模板到: {:?}", config_path);
-                write_default_config(&config_path)?;
+                write_default_config(&config_path, &app_config)?;
                 persist_active_config_path_if_missing(app_handle, &config_path).await?;
                 info!("已恢复 sing-box 配置（保持 active_config_path 不变）");
                 Ok(())
@@ -137,7 +139,7 @@ pub async fn ensure_singbox_config(app_handle: &AppHandle) -> Result<(), String>
             }
 
             warn!("未找到可用备份，写入默认模板到: {:?}", config_path);
-            write_default_config(&config_path)?;
+            write_default_config(&config_path, &app_config)?;
             persist_active_config_path_if_missing(app_handle, &config_path).await?;
             info!("已恢复 sing-box 配置（保持 active_config_path 不变）");
             Ok(())

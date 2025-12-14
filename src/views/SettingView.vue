@@ -272,6 +272,91 @@
         </div>
       </div>
 
+      <!-- sing-box 订阅配置生成（高级） -->
+      <div class="settings-section full-width">
+        <div class="section-header">
+          <n-icon size="20"><OptionsOutline /></n-icon>
+          <h3>{{ t('setting.singboxProfile.title') }}</h3>
+        </div>
+        <div class="section-card">
+          <n-form label-placement="top" class="advanced-form">
+            <n-grid :cols="24" :x-gap="24" :y-gap="16">
+              <n-grid-item :span="24">
+                <div class="subsection-title">{{ t('setting.singboxProfile.routingTitle') }}</div>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.singboxProfile.defaultOutbound')">
+                  <n-select v-model:value="singboxProfileForm.defaultProxyOutbound" :options="defaultOutboundOptions" />
+                </n-form-item>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.singboxProfile.downloadDetour')">
+                  <n-select v-model:value="singboxProfileForm.downloadDetour" :options="downloadDetourOptions" />
+                </n-form-item>
+              </n-grid-item>
+
+              <n-grid-item :span="24">
+                <div class="toggles-row">
+                  <div class="toggle-item">
+                    <span>{{ t('setting.singboxProfile.blockAds') }}</span>
+                    <n-switch v-model:value="singboxProfileForm.blockAds" />
+                  </div>
+                  <div class="toggle-item">
+                    <span>{{ t('setting.singboxProfile.dnsHijack') }}</span>
+                    <n-switch v-model:value="singboxProfileForm.dnsHijack" />
+                  </div>
+                  <div class="toggle-item">
+                    <span>{{ t('setting.singboxProfile.enableAppGroups') }}</span>
+                    <n-switch v-model:value="singboxProfileForm.enableAppGroups" />
+                  </div>
+                </div>
+              </n-grid-item>
+
+              <n-grid-item :span="24">
+                <div class="subsection-title">{{ t('setting.singboxProfile.dnsTitle') }}</div>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.singboxProfile.dnsProxy')">
+                  <n-input v-model:value="singboxProfileForm.dnsProxy" placeholder="https://1.1.1.1/dns-query" />
+                </n-form-item>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.singboxProfile.dnsCn')">
+                  <n-input v-model:value="singboxProfileForm.dnsCn" placeholder="h3://dns.alidns.com/dns-query" />
+                </n-form-item>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.singboxProfile.dnsResolver')">
+                  <n-input v-model:value="singboxProfileForm.dnsResolver" placeholder="114.114.114.114" />
+                </n-form-item>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.singboxProfile.urltestUrl')">
+                  <n-input v-model:value="singboxProfileForm.urltestUrl" placeholder="http://cp.cloudflare.com/generate_204" />
+                </n-form-item>
+              </n-grid-item>
+
+              <n-grid-item :span="24">
+                <n-button
+                  type="primary"
+                  block
+                  :loading="savingSingboxProfile"
+                  @click="saveSingboxProfileSettings"
+                >
+                  {{ t('setting.singboxProfile.save') }}
+                </n-button>
+              </n-grid-item>
+            </n-grid>
+          </n-form>
+        </div>
+      </div>
+
       <!-- Update Settings -->
       <div class="settings-section">
         <div class="section-header">
@@ -513,6 +598,19 @@ const proxyAdvancedForm = reactive({
   tunStrictRoute: true
 })
 
+const savingSingboxProfile = ref(false)
+const singboxProfileForm = reactive({
+  defaultProxyOutbound: 'manual' as 'manual' | 'auto',
+  downloadDetour: 'manual' as 'manual' | 'direct',
+  blockAds: true,
+  dnsHijack: true,
+  enableAppGroups: true,
+  dnsProxy: '',
+  dnsCn: '',
+  dnsResolver: '',
+  urltestUrl: '',
+})
+
 // Options
 const languageOptions: { label: string; value: Locale }[] = [
   { label: t('setting.language.auto'), value: 'auto' },
@@ -526,6 +624,16 @@ const tunStackOptions = [
   { label: 'System', value: 'system' },
   { label: 'gVisor', value: 'gvisor' },
   { label: 'Mixed', value: 'mixed' }
+]
+
+const defaultOutboundOptions = [
+  { label: t('setting.singboxProfile.outboundManual'), value: 'manual' },
+  { label: t('setting.singboxProfile.outboundAuto'), value: 'auto' },
+]
+
+const downloadDetourOptions = [
+  { label: t('setting.singboxProfile.detourManual'), value: 'manual' },
+  { label: t('setting.singboxProfile.detourDirect'), value: 'direct' },
 ]
 
 // Computed
@@ -559,8 +667,42 @@ watch(() => appStore.isDataRestored, (restored) => {
     proxyAdvancedForm.tunEnableIpv6 = appStore.tunEnableIpv6
     proxyAdvancedForm.tunAutoRoute = appStore.tunAutoRoute
     proxyAdvancedForm.tunStrictRoute = appStore.tunStrictRoute
+
+    singboxProfileForm.defaultProxyOutbound = appStore.singboxDefaultProxyOutbound as 'manual' | 'auto'
+    singboxProfileForm.downloadDetour = appStore.singboxDownloadDetour as 'manual' | 'direct'
+    singboxProfileForm.blockAds = appStore.singboxBlockAds
+    singboxProfileForm.dnsHijack = appStore.singboxDnsHijack
+    singboxProfileForm.enableAppGroups = appStore.singboxEnableAppGroups
+    singboxProfileForm.dnsProxy = appStore.singboxDnsProxy
+    singboxProfileForm.dnsCn = appStore.singboxDnsCn
+    singboxProfileForm.dnsResolver = appStore.singboxDnsResolver
+    singboxProfileForm.urltestUrl = appStore.singboxUrltestUrl
   }
 }, { immediate: true })
+
+const saveSingboxProfileSettings = async () => {
+  try {
+    savingSingboxProfile.value = true
+
+    appStore.singboxDefaultProxyOutbound = singboxProfileForm.defaultProxyOutbound
+    appStore.singboxDownloadDetour = singboxProfileForm.downloadDetour
+    appStore.singboxBlockAds = singboxProfileForm.blockAds
+    appStore.singboxDnsHijack = singboxProfileForm.dnsHijack
+    appStore.singboxEnableAppGroups = singboxProfileForm.enableAppGroups
+    appStore.singboxDnsProxy = singboxProfileForm.dnsProxy.trim() || appStore.singboxDnsProxy
+    appStore.singboxDnsCn = singboxProfileForm.dnsCn.trim() || appStore.singboxDnsCn
+    appStore.singboxDnsResolver = singboxProfileForm.dnsResolver.trim() || appStore.singboxDnsResolver
+    appStore.singboxUrltestUrl = singboxProfileForm.urltestUrl.trim() || appStore.singboxUrltestUrl
+
+    await appStore.saveToBackend()
+    message.success(t('common.saveSuccess'))
+  } catch (error) {
+    console.error('保存 sing-box 配置生成高级选项失败:', error)
+    message.error(t('common.saveFailed'))
+  } finally {
+    savingSingboxProfile.value = false
+  }
+}
 
 const syncThemeForm = () => {
   themeForm.mode = themeStore.mode as ThemeMode

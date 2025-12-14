@@ -69,6 +69,15 @@ impl DatabaseService {
                 tun_enable_ipv6 BOOLEAN DEFAULT FALSE,
                 active_config_path TEXT,
                 installed_kernel_version TEXT,
+                singbox_dns_proxy TEXT DEFAULT 'https://1.1.1.1/dns-query',
+                singbox_dns_cn TEXT DEFAULT 'h3://dns.alidns.com/dns-query',
+                singbox_dns_resolver TEXT DEFAULT '114.114.114.114',
+                singbox_urltest_url TEXT DEFAULT 'http://cp.cloudflare.com/generate_204',
+                singbox_default_proxy_outbound TEXT DEFAULT 'manual',
+                singbox_block_ads BOOLEAN DEFAULT TRUE,
+                singbox_download_detour TEXT DEFAULT 'manual',
+                singbox_dns_hijack BOOLEAN DEFAULT TRUE,
+                singbox_enable_app_groups BOOLEAN DEFAULT TRUE,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -92,6 +101,15 @@ impl DatabaseService {
             "ALTER TABLE app_config ADD COLUMN tun_enabled BOOLEAN DEFAULT FALSE",
             "ALTER TABLE app_config ADD COLUMN active_config_path TEXT",
             "ALTER TABLE app_config ADD COLUMN installed_kernel_version TEXT",
+            "ALTER TABLE app_config ADD COLUMN singbox_dns_proxy TEXT DEFAULT 'https://1.1.1.1/dns-query'",
+            "ALTER TABLE app_config ADD COLUMN singbox_dns_cn TEXT DEFAULT 'h3://dns.alidns.com/dns-query'",
+            "ALTER TABLE app_config ADD COLUMN singbox_dns_resolver TEXT DEFAULT '114.114.114.114'",
+            "ALTER TABLE app_config ADD COLUMN singbox_urltest_url TEXT DEFAULT 'http://cp.cloudflare.com/generate_204'",
+            "ALTER TABLE app_config ADD COLUMN singbox_default_proxy_outbound TEXT DEFAULT 'manual'",
+            "ALTER TABLE app_config ADD COLUMN singbox_block_ads BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN singbox_download_detour TEXT DEFAULT 'manual'",
+            "ALTER TABLE app_config ADD COLUMN singbox_dns_hijack BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN singbox_enable_app_groups BOOLEAN DEFAULT TRUE",
         ];
 
         for statement in alter_statements {
@@ -244,6 +262,33 @@ impl DatabaseService {
                     .unwrap_or(default_config.tun_enable_ipv6),
                 active_config_path: row.try_get("active_config_path").unwrap_or(None),
                 installed_kernel_version: row.try_get("installed_kernel_version").unwrap_or(None),
+                singbox_dns_proxy: row
+                    .try_get("singbox_dns_proxy")
+                    .unwrap_or_else(|_| default_config.singbox_dns_proxy.clone()),
+                singbox_dns_cn: row
+                    .try_get("singbox_dns_cn")
+                    .unwrap_or_else(|_| default_config.singbox_dns_cn.clone()),
+                singbox_dns_resolver: row
+                    .try_get("singbox_dns_resolver")
+                    .unwrap_or_else(|_| default_config.singbox_dns_resolver.clone()),
+                singbox_urltest_url: row
+                    .try_get("singbox_urltest_url")
+                    .unwrap_or_else(|_| default_config.singbox_urltest_url.clone()),
+                singbox_default_proxy_outbound: row
+                    .try_get("singbox_default_proxy_outbound")
+                    .unwrap_or_else(|_| default_config.singbox_default_proxy_outbound.clone()),
+                singbox_block_ads: row
+                    .try_get("singbox_block_ads")
+                    .unwrap_or(default_config.singbox_block_ads),
+                singbox_download_detour: row
+                    .try_get("singbox_download_detour")
+                    .unwrap_or_else(|_| default_config.singbox_download_detour.clone()),
+                singbox_dns_hijack: row
+                    .try_get("singbox_dns_hijack")
+                    .unwrap_or(default_config.singbox_dns_hijack),
+                singbox_enable_app_groups: row
+                    .try_get("singbox_enable_app_groups")
+                    .unwrap_or(default_config.singbox_enable_app_groups),
             }))
         } else {
             Ok(None)
@@ -254,8 +299,8 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO app_config
-            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, active_config_path, installed_kernel_version, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, active_config_path, installed_kernel_version, singbox_dns_proxy, singbox_dns_cn, singbox_dns_resolver, singbox_urltest_url, singbox_default_proxy_outbound, singbox_block_ads, singbox_download_detour, singbox_dns_hijack, singbox_enable_app_groups, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_start_kernel)
@@ -277,6 +322,15 @@ impl DatabaseService {
         .bind(config.tun_enable_ipv6)
         .bind(&config.active_config_path)
         .bind(&config.installed_kernel_version)
+        .bind(&config.singbox_dns_proxy)
+        .bind(&config.singbox_dns_cn)
+        .bind(&config.singbox_dns_resolver)
+        .bind(&config.singbox_urltest_url)
+        .bind(&config.singbox_default_proxy_outbound)
+        .bind(config.singbox_block_ads)
+        .bind(&config.singbox_download_detour)
+        .bind(config.singbox_dns_hijack)
+        .bind(config.singbox_enable_app_groups)
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;

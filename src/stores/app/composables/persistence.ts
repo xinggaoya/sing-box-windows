@@ -21,6 +21,15 @@ export interface PersistenceState {
   tunEnableIpv6: Ref<boolean>
   activeConfigPath: Ref<string | null>
   installedKernelVersion: Ref<string | null>
+  singboxDnsProxy: Ref<string>
+  singboxDnsCn: Ref<string>
+  singboxDnsResolver: Ref<string>
+  singboxUrltestUrl: Ref<string>
+  singboxDefaultProxyOutbound: Ref<string>
+  singboxBlockAds: Ref<boolean>
+  singboxDownloadDetour: Ref<string>
+  singboxDnsHijack: Ref<boolean>
+  singboxEnableAppGroups: Ref<boolean>
 }
 
 export function createAppPersistence(state: PersistenceState) {
@@ -112,6 +121,17 @@ export function createAppPersistence(state: PersistenceState) {
       state.tunStrictRoute.value = appConfig.tun_strict_route
       state.tunStack.value = appConfig.tun_stack
       state.tunEnableIpv6.value = appConfig.tun_enable_ipv6
+
+      // sing-box 配置生成高级选项（旧版本数据库可能没有这些字段）
+      state.singboxDnsProxy.value = appConfig.singbox_dns_proxy || state.singboxDnsProxy.value
+      state.singboxDnsCn.value = appConfig.singbox_dns_cn || state.singboxDnsCn.value
+      state.singboxDnsResolver.value = appConfig.singbox_dns_resolver || state.singboxDnsResolver.value
+      state.singboxUrltestUrl.value = appConfig.singbox_urltest_url || state.singboxUrltestUrl.value
+      state.singboxDefaultProxyOutbound.value = appConfig.singbox_default_proxy_outbound || state.singboxDefaultProxyOutbound.value
+      state.singboxBlockAds.value = appConfig.singbox_block_ads ?? state.singboxBlockAds.value
+      state.singboxDownloadDetour.value = appConfig.singbox_download_detour || state.singboxDownloadDetour.value
+      state.singboxDnsHijack.value = appConfig.singbox_dns_hijack ?? state.singboxDnsHijack.value
+      state.singboxEnableAppGroups.value = appConfig.singbox_enable_app_groups ?? state.singboxEnableAppGroups.value
     } catch (error) {
       console.error('从数据库加载应用配置失败:', error)
     } finally {
@@ -149,6 +169,15 @@ export function createAppPersistence(state: PersistenceState) {
         tun_enable_ipv6: state.tunEnableIpv6.value,
         active_config_path: state.activeConfigPath.value,
         installed_kernel_version: state.installedKernelVersion.value,
+        singbox_dns_proxy: state.singboxDnsProxy.value,
+        singbox_dns_cn: state.singboxDnsCn.value,
+        singbox_dns_resolver: state.singboxDnsResolver.value,
+        singbox_urltest_url: state.singboxUrltestUrl.value,
+        singbox_default_proxy_outbound: state.singboxDefaultProxyOutbound.value,
+        singbox_block_ads: state.singboxBlockAds.value,
+        singbox_download_detour: state.singboxDownloadDetour.value,
+        singbox_dns_hijack: state.singboxDnsHijack.value,
+        singbox_enable_app_groups: state.singboxEnableAppGroups.value,
       }
       await DatabaseService.saveAppConfig(config)
       console.log('✅ 应用配置已保存到数据库')
@@ -189,6 +218,15 @@ export function createAppPersistence(state: PersistenceState) {
       state.tunStack,
       state.tunEnableIpv6,
       state.activeConfigPath,
+      state.singboxDnsProxy,
+      state.singboxDnsCn,
+      state.singboxDnsResolver,
+      state.singboxUrltestUrl,
+      state.singboxDefaultProxyOutbound,
+      state.singboxBlockAds,
+      state.singboxDownloadDetour,
+      state.singboxDnsHijack,
+      state.singboxEnableAppGroups,
     ],
     scheduleSave,
     { deep: true }

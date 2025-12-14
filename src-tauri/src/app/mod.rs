@@ -2,6 +2,9 @@
 pub mod constants;
 pub mod storage; // 重新启用存储模块
 
+// sing-box 配置生成与设置同步
+pub mod singbox;
+
 // Core services
 pub mod core {
     pub mod event_relay;

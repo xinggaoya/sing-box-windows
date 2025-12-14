@@ -14,6 +14,10 @@ const DEFAULT_SYSTEM_PROXY_BYPASS =
 const DEFAULT_TUN_IPV4 = '172.19.0.1/30'
 const DEFAULT_TUN_IPV6 = 'fdfe:dcba:9876::1/126'
 const DEFAULT_TUN_MTU = 1500
+const DEFAULT_SINGBOX_DNS_PROXY = 'https://1.1.1.1/dns-query'
+const DEFAULT_SINGBOX_DNS_CN = 'h3://dns.alidns.com/dns-query'
+const DEFAULT_SINGBOX_DNS_RESOLVER = '114.114.114.114'
+const DEFAULT_SINGBOX_URLTEST_URL = 'http://cp.cloudflare.com/generate_204'
 
 export const useAppStore = defineStore(
   'app',
@@ -78,6 +82,17 @@ export const useAppStore = defineStore(
     const activeConfigPath = ref<string | null>(null)
     const installedKernelVersion = ref<string | null>(null)
 
+    // sing-box 配置生成（订阅模板）高级选项
+    const singboxDnsProxy = ref(DEFAULT_SINGBOX_DNS_PROXY)
+    const singboxDnsCn = ref(DEFAULT_SINGBOX_DNS_CN)
+    const singboxDnsResolver = ref(DEFAULT_SINGBOX_DNS_RESOLVER)
+    const singboxUrltestUrl = ref(DEFAULT_SINGBOX_URLTEST_URL)
+    const singboxDefaultProxyOutbound = ref<'manual' | 'auto'>('manual')
+    const singboxBlockAds = ref(true)
+    const singboxDownloadDetour = ref<'manual' | 'direct'>('manual')
+    const singboxDnsHijack = ref(true)
+    const singboxEnableAppGroups = ref(true)
+
     const {
       isDataRestored,
       startInitialization,
@@ -107,6 +122,15 @@ export const useAppStore = defineStore(
       tunEnableIpv6,
       activeConfigPath,
       installedKernelVersion,
+      singboxDnsProxy,
+      singboxDnsCn,
+      singboxDnsResolver,
+      singboxUrltestUrl,
+      singboxDefaultProxyOutbound,
+      singboxBlockAds,
+      singboxDownloadDetour,
+      singboxDnsHijack,
+      singboxEnableAppGroups,
     })
 
     // 同步开机自启设置与系统状态
@@ -418,6 +442,15 @@ export const useAppStore = defineStore(
       tunEnableIpv6,
       activeConfigPath,
       installedKernelVersion,
+      singboxDnsProxy,
+      singboxDnsCn,
+      singboxDnsResolver,
+      singboxUrltestUrl,
+      singboxDefaultProxyOutbound,
+      singboxBlockAds,
+      singboxDownloadDetour,
+      singboxDnsHijack,
+      singboxEnableAppGroups,
       setRunningState,
       setConnectingState,
       toggleAutoStart,

@@ -487,6 +487,25 @@ export default {
         invalidStack: '有効なスタックモードを選択してください',
       },
     },
+    singboxProfile: {
+      title: 'サブスク設定生成（高度）',
+      routingTitle: 'ルーティング＆ダウンロード',
+      dnsTitle: 'DNS',
+      defaultOutbound: '非中国向けデフォルト出力',
+      outboundManual: '手動切替（推奨）',
+      outboundAuto: '自動選択（URLTest）',
+      downloadDetour: 'ルールセット/UI ダウンロード経路',
+      detourManual: '手動切替',
+      detourDirect: '直結',
+      blockAds: '広告ブロック（geosite-category-ads-all）',
+      dnsHijack: 'DNS ハイジャック（hijack-dns）',
+      enableAppGroups: 'アプリ分流グループを有効化（TG/YouTube/Netflix/OpenAI）',
+      dnsProxy: 'プロキシ DNS（非中国）',
+      dnsCn: '中国 DNS',
+      dnsResolver: 'リゾルバ DNS（DoH の名前解決用）',
+      urltestUrl: 'URLTest URL',
+      save: '保存',
+    },
 
     // 开发者工具
     developer: {

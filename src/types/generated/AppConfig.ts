@@ -18,4 +18,13 @@ export interface AppConfig {
   tun_enable_ipv6: boolean
   active_config_path: string | null
   installed_kernel_version: string | null
+  singbox_dns_proxy: string
+  singbox_dns_cn: string
+  singbox_dns_resolver: string
+  singbox_urltest_url: string
+  singbox_default_proxy_outbound: string
+  singbox_block_ads: boolean
+  singbox_download_detour: string
+  singbox_dns_hijack: boolean
+  singbox_enable_app_groups: boolean
 }
