@@ -119,7 +119,6 @@ pub fn run() {
             // Core - Kernel service commands (legacy)
             // Core - Kernel service commands (legacy)
             crate::app::core::kernel_service::download::download_kernel,
-            crate::app::core::kernel_service::download::install_kernel,
             crate::app::core::kernel_service::versioning::get_latest_kernel_version_cmd,
             crate::app::core::kernel_service::versioning::get_kernel_releases_cmd,
             crate::app::core::kernel_service::versioning::check_kernel_version,
@@ -156,7 +155,6 @@ pub fn run() {
             // System - Update service commands
             crate::app::system::update_service::check_update,
             crate::app::system::update_service::download_update,
-            crate::app::system::update_service::install_update,
             crate::app::system::update_service::download_and_install_update,
             crate::app::system::update_service::get_platform_info,
             // System - Config service commands

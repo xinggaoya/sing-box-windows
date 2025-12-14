@@ -250,12 +250,6 @@ pub async fn download_update(app_handle: tauri::AppHandle) -> Result<(), String>
     Ok(())
 }
 
-// 安装更新
-#[tauri::command]
-pub async fn install_update(_download_path: String) -> Result<(), String> {
-    // 简单的实现，返回成功
-    Ok(())
-}
 
 // 获取当前平台信息
 #[tauri::command]

@@ -610,9 +610,3 @@ fn set_executable_permission(_file_path: &Path) -> Result<(), std::io::Error> {
 }
 
 
-
-#[tauri::command]
-pub async fn install_kernel() -> Result<(), String> {
-    info!("内核安装完成");
-    Ok(())
-}

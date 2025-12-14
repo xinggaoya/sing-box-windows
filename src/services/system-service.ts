@@ -30,10 +30,6 @@ export const systemService = {
         return invokeWithAppContext<void>('download_update')
     },
 
-    installUpdate(downloadPath: string) {
-        return invokeWithAppContext<void>('install_update', { downloadPath })
-    },
-
     downloadAndInstallUpdate(downloadUrl?: string) {
         return invokeWithAppContext<void>('download_and_install_update', { downloadUrl })
     },

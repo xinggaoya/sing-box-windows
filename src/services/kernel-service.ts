@@ -398,16 +398,8 @@ class KernelService {
     }
   }
 
-  async getApiToken(): Promise<string> {
-    return invokeWithAppContext<string>('get_api_token')
-  }
-
-  async installKernel(): Promise<void> {
-    return invokeWithAppContext<void>('install_kernel', undefined, {
-      skipDataRestore: true
-    })
-  }
-
+  
+  
   /**
    * 监听内核状态变化
    */
