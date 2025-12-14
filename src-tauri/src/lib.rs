@@ -149,6 +149,10 @@ pub fn run() {
             crate::app::system::system_service::check_network_connectivity,
             crate::app::system::system_service::wait_for_network_ready,
             crate::app::system::system_service::open_devtools,
+            // System - Sudo service commands (Linux/macOS TUN 提权)
+            crate::app::system::sudo_service::sudo_password_status,
+            crate::app::system::sudo_service::sudo_set_password,
+            crate::app::system::sudo_service::sudo_clear_password,
             // System - Update service commands
             crate::app::system::update_service::check_update,
             crate::app::system::update_service::download_update,

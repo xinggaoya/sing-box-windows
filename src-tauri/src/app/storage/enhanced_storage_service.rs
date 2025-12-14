@@ -201,7 +201,9 @@ pub async fn db_get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     let storage = get_enhanced_storage(&app).await?;
     let mut config = storage.get_app_config().await.map_err(|e| e.to_string())?;
 
-    // 非管理员启动时自动关闭 TUN，避免因缺少权限导致内核无法拉起
+    // Windows：非管理员启动时自动关闭 TUN，避免因缺少权限导致内核无法拉起
+    // Linux/macOS：内核可通过 sudo 提权启动（应用本身无需 root），因此不在这里强制关闭。
+    #[cfg(target_os = "windows")]
     if config.tun_enabled && !crate::app::system::system_service::check_admin() {
         let previous_mode = config.proxy_mode.clone();
         config.tun_enabled = false;

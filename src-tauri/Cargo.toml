@@ -60,6 +60,7 @@ tauri-plugin-websocket = "2"
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29", features = ["user"] }
 which = "7.0"
+keyring = "3.6.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # macOS特定依赖

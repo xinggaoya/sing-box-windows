@@ -100,6 +100,19 @@ export default {
       description: '切换到 TUN 模式需要以管理员权限重启应用，是否立即以管理员身份重启？',
       confirm: '以管理员身份重启',
     },
+    sudoPassword: {
+      title: '需要系统密码',
+      description:
+        '首次启用 TUN 需要使用 sudo 提权启动内核。密码将安全保存在系统钥匙串/密钥环中，仅用于本机提权，不会上传。',
+      placeholder: '请输入系统密码',
+      save: '保存并继续',
+      saved: '系统密码已保存',
+      required: '需要设置系统密码才能启用 TUN',
+      invalid: '系统密码错误，请重新输入',
+      empty: '请输入系统密码',
+      failed: '保存失败',
+      unsupported: '当前平台暂不支持该操作',
+    },
   },
   proxy: {
     title: '代理设置',

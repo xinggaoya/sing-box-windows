@@ -7,6 +7,7 @@ export * from './app/ThemeStore'
 export * from './app/LocaleStore'
 export * from './app/WindowStore'
 export * from './app/UpdateStore'
+export * from './app/SudoStore'
 
 // 导出内核相关Store
 export * from './kernel/KernelStore'

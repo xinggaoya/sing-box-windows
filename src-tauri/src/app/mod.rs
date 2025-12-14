@@ -20,6 +20,7 @@ pub mod network {
 pub mod system {
     pub mod background_tasks;
     pub mod config_service;
+    pub mod sudo_service;
     pub mod system_service;
     pub mod update_service;
 }

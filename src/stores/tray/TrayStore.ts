@@ -15,6 +15,8 @@ import i18n from '@/locales'
 import type { ProxyMode } from '@/types'
 import { useRouter } from 'vue-router'
 import { systemService } from '@/services/system-service'
+import { sudoService } from '@/services/sudo-service'
+import { useSudoStore } from '@/stores'
 
 // 自定义菜单项类型定义
 export interface TrayMenuOptions {
@@ -144,31 +146,105 @@ export const useTrayStore = defineStore('tray', () => {
 
     // TUN模式特殊处理
     if (targetMode === 'tun') {
-      const isAdmin = await systemService.checkAdmin()
-      if (!isAdmin) {
-        try {
-          // 保存TUN启用状态
-          await appStore.toggleTun(true)
-          await appStore.saveToBackend()
+      const platform = await systemService.getPlatformInfo().catch(() => 'unknown')
 
-          if (appStore.isRunning) {
-            await kernelStore.stopKernel({ force: true })
+      // Windows：仍沿用“以管理员身份重启应用”的策略
+      if (platform === 'windows') {
+        const isAdmin = await systemService.checkAdmin()
+        if (!isAdmin) {
+          try {
+            // 保存TUN启用状态
+            await appStore.toggleTun(true)
+            await appStore.saveToBackend()
+
+            if (appStore.isRunning) {
+              await kernelStore.stopKernel({ force: true })
+            }
+            await systemService.restartAsAdmin()
+            return
+          } catch (error) {
+            console.error('以管理员身份重启以启用TUN失败:', error)
+            await appStore.toggleTun(false)
+            await refreshTrayMenu()
+            return
           }
-          await systemService.restartAsAdmin()
-          return
-        } catch (error) {
-          console.error('以管理员身份重启以启用TUN失败:', error)
-          await appStore.toggleTun(false)
-          await refreshTrayMenu()
+        } else {
+          // 已是管理员，直接启用TUN
+          try {
+            await appStore.toggleTun(true)
+            await appStore.toggleSystemProxy(false) // 互斥：关闭系统代理
+
+            const applied = await kernelStore.applyProxySettings()
+            if (!applied) throw new Error(kernelStore.lastError || '应用代理配置失败')
+
+            const success = await kernelStore.restartKernel()
+            if (!success) {
+              throw new Error(kernelStore.lastError || '内核重启失败')
+            }
+          } catch (error) {
+            console.error('启用TUN模式失败:', error)
+            await appStore.toggleTun(false)
+            await refreshTrayMenu()
+          }
           return
         }
-      } else {
-        // 已是管理员，直接启用TUN
-        try {
-          await appStore.toggleTun(true)
-          await appStore.toggleSystemProxy(false) // 互斥：关闭系统代理
+      }
 
-          const success = await kernelStore.restartKernel()
+      // Linux/macOS：首次启用弹窗输入系统密码（保存到 keyring），后续 sudo 自动提权启动内核
+      if (platform === 'linux' || platform === 'macos') {
+        const parseSudoCode = (raw: unknown) => {
+          const msg = raw instanceof Error ? raw.message : String(raw || '')
+          if (msg.includes('SUDO_PASSWORD_REQUIRED')) return 'required'
+          if (msg.includes('SUDO_PASSWORD_INVALID')) return 'invalid'
+          return null
+        }
+
+        try {
+          const status = await sudoService.getStatus()
+          if (!status.supported) {
+            appStore.showErrorMessage?.(i18n.global.t('home.sudoPassword.unsupported'))
+            await refreshTrayMenu()
+            return
+          }
+
+          // 如果还没保存过密码，先拉起窗口让用户输入
+          if (!status.has_saved) {
+            await windowStore.showWindow()
+            await router.push('/').catch(() => {})
+            const ok = await useSudoStore().requestPassword()
+            if (!ok) {
+              await refreshTrayMenu()
+              return
+            }
+          }
+
+          await appStore.toggleTun(true)
+          await appStore.toggleSystemProxy(false)
+
+          const applied = await kernelStore.applyProxySettings()
+          if (!applied) throw new Error(kernelStore.lastError || '应用代理配置失败')
+
+          let success = await kernelStore.restartKernel()
+          if (!success) {
+            const code = parseSudoCode(kernelStore.lastError)
+            if (code === 'required' || code === 'invalid') {
+              appStore.showWarningMessage?.(
+                code === 'invalid'
+                  ? i18n.global.t('home.sudoPassword.invalid')
+                  : i18n.global.t('home.sudoPassword.required')
+              )
+
+              await windowStore.showWindow()
+              await router.push('/').catch(() => {})
+              const ok = await useSudoStore().requestPassword()
+              if (ok) {
+                const appliedRetry = await kernelStore.applyProxySettings()
+                if (!appliedRetry) throw new Error(kernelStore.lastError || '应用代理配置失败')
+                success = await kernelStore.restartKernel()
+              }
+            }
+          }
+
           if (!success) {
             throw new Error(kernelStore.lastError || '内核重启失败')
           }
@@ -179,6 +255,10 @@ export const useTrayStore = defineStore('tray', () => {
         }
         return
       }
+
+      appStore.showErrorMessage?.(i18n.global.t('home.sudoPassword.unsupported'))
+      await refreshTrayMenu()
+      return
     }
 
     // 其他模式（System/Manual）

@@ -13,6 +13,9 @@
               <router-view />
             </div>
 
+            <!-- Linux/macOS：sudo 密码输入弹窗（全局，可从托盘/自动启动流程唤起） -->
+            <SudoPasswordModal />
+
             <!-- 更新通知组件 -->
             <UpdateNotification />
           </n-message-provider>
@@ -44,7 +47,13 @@ import {
 } from '@/stores'
 
 import UpdateNotification from '@/components/UpdateNotification.vue'
+import SudoPasswordModal from '@/components/system/SudoPasswordModal.vue'
 import { useAppBootstrap } from '@/boot/useAppBootstrap'
+import { eventService } from '@/services/event-service'
+import { APP_EVENTS } from '@/constants/events'
+import { systemService } from '@/services/system-service'
+import { useSudoStore } from '@/stores'
+import { kernelService } from '@/services/kernel-service'
 
 const MessageConsumer = defineComponent({
   name: 'MessageConsumer',
@@ -60,7 +69,7 @@ const MessageConsumer = defineComponent({
 })
 
 const router = useRouter()
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 
 const themeStore = useThemeStore()
 const appStore = useAppStore()
@@ -76,6 +85,23 @@ const configProviderTheme = computed(() => themeStore.naiveTheme)
 const themeOverrides = computed(() => themeStore.themeOverrides)
 
 const cleanupFunctions: (() => void)[] = []
+let sudoPromptRunning = false
+
+const extractKernelErrorMessage = (raw: unknown) => {
+  if (typeof raw === 'string') return raw
+  if (raw && typeof raw === 'object' && 'error' in raw) {
+    const err = (raw as { error?: unknown }).error
+    return typeof err === 'string' ? err : String(err ?? '')
+  }
+  return String(raw ?? '')
+}
+
+const parseSudoCode = (raw: unknown) => {
+  const msg = extractKernelErrorMessage(raw)
+  if (msg.includes('SUDO_PASSWORD_REQUIRED')) return 'required'
+  if (msg.includes('SUDO_PASSWORD_INVALID')) return 'invalid'
+  return null
+}
 
 const handleBeforeUnload = () => {
   cleanup()
@@ -108,6 +134,37 @@ onMounted(async () => {
 
     await initialize()
     cleanupFunctions.push(() => cleanupBootstrap())
+
+    // 监听后端 kernel-error：在 Linux/macOS 且启用了 TUN 时，如果提示需要 sudo 密码，则弹窗引导用户设置。
+    const sudoStore = useSudoStore()
+    const unlistenKernelError = await eventService.on(APP_EVENTS.kernelError, async (payload: unknown) => {
+      if (sudoPromptRunning) return
+      const code = parseSudoCode(payload)
+      if (!code) return
+
+      // 仅在 TUN 开启时处理（避免手动模式下误触发）
+      if (!appStore.tunEnabled) return
+
+      try {
+        sudoPromptRunning = true
+        const platform = await systemService.getPlatformInfo().catch(() => 'unknown')
+        if (platform !== 'linux' && platform !== 'macos') return
+
+        // 提示原因：密码缺失/失效
+        appStore.showWarningMessage?.(
+          code === 'invalid' ? t('home.sudoPassword.invalid') : t('home.sudoPassword.required')
+        )
+
+        const ok = await sudoStore.requestPassword()
+        if (!ok) return
+
+        // 用户保存后，重新触发一次自动管理（尊重用户当前配置）
+        await kernelService.autoManageKernel({ forceRestart: true })
+      } finally {
+        sudoPromptRunning = false
+      }
+    })
+    cleanupFunctions.push(unlistenKernelError)
   } catch (error) {
     console.error('应用初始化失败:', error)
   }

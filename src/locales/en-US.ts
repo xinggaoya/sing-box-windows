@@ -100,6 +100,19 @@ export default {
       description: 'TUN mode needs the app to restart with administrator privileges. Restart as admin now?',
       confirm: 'Restart as admin',
     },
+    sudoPassword: {
+      title: 'System password required',
+      description:
+        'Enabling TUN for the first time requires sudo privileges to start the kernel. The password will be stored securely in your system keychain/keyring and will never be uploaded.',
+      placeholder: 'Enter your system password',
+      save: 'Save & continue',
+      saved: 'System password saved',
+      required: 'A system password is required to enable TUN',
+      invalid: 'Incorrect system password, please try again',
+      empty: 'Please enter your system password',
+      failed: 'Failed to save password',
+      unsupported: 'This operation is not supported on the current platform',
+    },
   },
   proxy: {
     title: 'Proxy Settings',

@@ -320,7 +320,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
     }
 
     // 移动新文件到目标位置
-    if let Err(e) = std::fs::rename(&found_executable_path, &target_executable_path) {
+    if let Err(_e) = std::fs::rename(&found_executable_path, &target_executable_path) {
         // 如果跨磁盘或者 rename 失败，尝试 copy + delete
         if let Err(copy_err) = std::fs::copy(&found_executable_path, &target_executable_path) {
             let _ = std::fs::remove_dir_all(&temp_update_dir);

@@ -222,12 +222,17 @@ impl ProcessManager {
             return Ok(child);
         }
 
-        // Linux: TUN 模式使用 pkexec 提权
+        // Linux: TUN 模式使用 sudo + 系统密钥环提权（由前端首次收集系统密码）
         #[cfg(target_os = "linux")]
         {
             if tun_enabled {
-                info!("🔐 TUN 模式启用，使用 pkexec 提升内核权限");
-                return self.start_kernel_with_pkexec(kernel_str, work_dir_str, config_str);
+                info!("🔐 TUN 模式启用，使用 sudo 提升内核权限");
+                return crate::app::system::sudo_service::spawn_kernel_with_saved_password(
+                    kernel_str,
+                    work_dir_str,
+                    config_str,
+                )
+                .map_err(ProcessError::StartFailed);
             } else {
                 let mut cmd = Command::new(kernel_path);
                 cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
@@ -240,12 +245,17 @@ impl ProcessManager {
             }
         }
 
-        // macOS: TUN 模式使用 osascript 提权
+        // macOS: TUN 模式使用 sudo + 系统钥匙串提权（由前端首次收集系统密码）
         #[cfg(target_os = "macos")]
         {
             if tun_enabled {
-                info!("🔐 TUN 模式启用，使用 osascript 提升内核权限");
-                return self.start_kernel_with_osascript(kernel_str, work_dir_str, config_str);
+                info!("🔐 TUN 模式启用，使用 sudo 提升内核权限");
+                return crate::app::system::sudo_service::spawn_kernel_with_saved_password(
+                    kernel_str,
+                    work_dir_str,
+                    config_str,
+                )
+                .map_err(ProcessError::StartFailed);
             } else {
                 let mut cmd = Command::new(kernel_path);
                 cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
@@ -273,87 +283,8 @@ impl ProcessManager {
         }
     }
 
-    /// Linux: 使用 pkexec 以 root 权限启动内核
-    #[cfg(target_os = "linux")]
-    fn start_kernel_with_pkexec(
-        &self,
-        kernel_path: &str,
-        work_dir: &str,
-        config_path: &str,
-    ) -> Result<std::process::Child> {
-        // 检查 pkexec 是否可用
-        if which::which("pkexec").is_err() {
-            return Err(ProcessError::StartFailed(
-                "TUN 模式需要 pkexec（polkit），请安装 polkit 包或以 root 用户运行".to_string(),
-            ));
-        }
-
-        info!("使用 pkexec 启动内核: {}", kernel_path);
-
-        let mut cmd = Command::new("pkexec");
-        cmd.arg(kernel_path)
-            .args(&["run", "-D", work_dir, "-c", config_path])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-
-        // 传递显示环境变量，确保 pkexec 对话框能正常显示
-        if let Ok(display) = std::env::var("DISPLAY") {
-            cmd.env("DISPLAY", display);
-        }
-        if let Ok(xauthority) = std::env::var("XAUTHORITY") {
-            cmd.env("XAUTHORITY", xauthority);
-        }
-
-        let child = cmd.spawn().map_err(|e| {
-            ProcessError::StartFailed(format!("pkexec 启动内核失败: {}。请确保已安装 polkit。", e))
-        })?;
-
-        Ok(child)
-    }
-
-    /// macOS: 使用 osascript 弹出密码对话框并以 root 权限启动内核
-    #[cfg(target_os = "macos")]
-    fn start_kernel_with_osascript(
-        &self,
-        kernel_path: &str,
-        work_dir: &str,
-        config_path: &str,
-    ) -> Result<std::process::Child> {
-        // 转义路径中的特殊字符
-        let escape_for_shell = |s: &str| s.replace("'", "'\\''");
-        
-        let kernel_escaped = escape_for_shell(kernel_path);
-        let work_dir_escaped = escape_for_shell(work_dir);
-        let config_escaped = escape_for_shell(config_path);
-
-        // 构建要以 root 权限执行的命令
-        let shell_cmd = format!(
-            "'{}' run -D '{}' -c '{}'",
-            kernel_escaped, work_dir_escaped, config_escaped
-        );
-
-        info!("使用 osascript 启动内核: {}", kernel_path);
-
-        // 使用 osascript 执行需要管理员权限的 shell 命令
-        let apple_script = format!(
-            r#"do shell script "{}" with administrator privileges"#,
-            shell_cmd.replace("\"", "\\\"")
-        );
-
-        let mut cmd = Command::new("osascript");
-        cmd.args(&["-e", &apple_script]);
-
-        let child = cmd.spawn().map_err(|e| {
-            ProcessError::StartFailed(format!(
-                "osascript 启动内核失败: {}。请在弹出的对话框中输入密码。",
-                e
-            ))
-        })?;
-
-        Ok(child)
-    }
-
-
+    // 说明：旧版 Linux(pkexec)/macOS(osascript) 提权方案已替换为 sudo + 密钥环保存密码，
+    // 以满足“首次弹窗输入密码、后续自动提权”的产品需求。
     // 验证启动是否成功
     async fn verify_startup(&self) -> bool {
         info!("🔍 验证内核启动状态...");
@@ -548,4 +479,3 @@ fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
     crate::platform::kill_process_by_pid(pid)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
 }
-

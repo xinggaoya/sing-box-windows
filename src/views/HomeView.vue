@@ -29,7 +29,7 @@
           {{ t('home.restart') }}
         </n-tooltip>
 
-        <n-tooltip v-if="!isAdmin" trigger="hover">
+        <n-tooltip v-if="isWindowsPlatform && !isAdmin" trigger="hover">
           <template #trigger>
             <n-button
               class="action-button"
@@ -155,6 +155,7 @@
         </div>
       </div>
     </div>
+
   </div>
 </template>
 
@@ -182,6 +183,7 @@ import { kernelService } from '@/services/kernel-service'
 import StatusCard from '@/components/common/StatusCard.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
+import { useSudoStore } from '@/stores'
 
 defineOptions({
   name: 'HomeView',
@@ -197,13 +199,18 @@ const kernelStore = useKernelStore()
 const trafficStore = useTrafficStore()
 const connectionStore = useConnectionStore()
 const themeStore = useThemeStore()
+const sudoStore = useSudoStore()
 
 // Kernel status (shared with layout)
 const { statusClass, statusState, isRunning: kernelRunning, isLoading: kernelLoading } =
   useKernelStatus(kernelStore)
 const isAdmin = ref(false)
+const platform = ref<'windows' | 'linux' | 'macos' | 'unknown'>('unknown')
 const currentNodeProxyMode = ref('rule')
 const modeSwitchPending = ref(false)
+
+const isWindowsPlatform = computed(() => platform.value === 'windows')
+const isUnixPlatform = computed(() => platform.value === 'linux' || platform.value === 'macos')
 
 const formatBytes = (bytes: number) => {
   if (!bytes) return '0 B'
@@ -308,7 +315,14 @@ const confirmTunSwitch = () => {
   })
 }
 
-const enableTunWithKernelRestart = async () => {
+const parseSudoCode = (raw: unknown) => {
+  const msg = raw instanceof Error ? raw.message : String(raw || '')
+  if (msg.includes('SUDO_PASSWORD_REQUIRED')) return 'required'
+  if (msg.includes('SUDO_PASSWORD_INVALID')) return 'invalid'
+  return null
+}
+
+const enableTunWithKernelRestart = async (options?: { allowSudoRetry?: boolean }) => {
   try {
     modeSwitchPending.value = true
     await appStore.toggleTun(true)
@@ -327,6 +341,22 @@ const enableTunWithKernelRestart = async () => {
     }
 
     await appStore.toggleTun(false)
+
+    // Linux/macOS：sudo 密码缺失/失效时，提示用户重新设置，并允许一次自动重试
+    if (isUnixPlatform.value) {
+      const code = parseSudoCode(kernelStore.lastError)
+      if (code === 'required' || code === 'invalid') {
+        message.error(code === 'invalid' ? t('home.sudoPassword.invalid') : t('home.sudoPassword.required'))
+
+        const allowRetry = options?.allowSudoRetry ?? true
+        const ok = await sudoStore.requestPassword()
+        if (ok && allowRetry) {
+          return enableTunWithKernelRestart({ allowSudoRetry: false })
+        }
+        return false
+      }
+    }
+
     message.error(t('home.restartFailed'))
     return false
   } catch (error) {
@@ -342,13 +372,30 @@ const toggleTunProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
   
   if (value) {
-    // 启用TUN模式前先刷新管理员状态，有权限时不弹窗直接处理
-    await checkAdmin()
+    if (isWindowsPlatform.value) {
+      // Windows：启用TUN模式前先刷新管理员状态，有权限时不弹窗直接处理
+      await checkAdmin()
 
-    if (isAdmin.value) {
+      if (isAdmin.value) {
+        await enableTunWithKernelRestart()
+      } else {
+        await confirmTunSwitch()
+      }
+    } else if (isUnixPlatform.value) {
+      // Linux/macOS：首次启用 TUN 弹窗收集系统密码，后续自动 sudo 提权启动内核
+      const { sudoService } = await import('@/services/sudo-service')
+      const status = await sudoService.getStatus()
+      if (!status.supported) {
+        message.error(t('home.sudoPassword.unsupported'))
+        return
+      }
+      if (!status.has_saved) {
+        const ok = await sudoStore.requestPassword()
+        if (!ok) return
+      }
       await enableTunWithKernelRestart()
     } else {
-      await confirmTunSwitch()
+      message.error(t('home.sudoPassword.unsupported'))
     }
   } else {
     // 禁用TUN模式 - 需要重启内核
@@ -456,6 +503,13 @@ const checkAdmin = async () => {
 }
 
 onMounted(async () => {
+  try {
+    const { systemService } = await import('@/services/system-service')
+    const raw = await systemService.getPlatformInfo()
+    platform.value = raw === 'windows' || raw === 'linux' || raw === 'macos' ? raw : 'unknown'
+  } catch (error) {
+    platform.value = 'unknown'
+  }
   checkAdmin()
   await kernelStore.initializeStore()
 })
@@ -685,6 +739,5 @@ onMounted(async () => {
   overflow: hidden;
   padding: 16px;
 }
-
 
 </style>
