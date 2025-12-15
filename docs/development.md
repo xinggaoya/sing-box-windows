@@ -21,10 +21,14 @@ Sing-Box Windows 是一个基于 [Sing-Box](https://github.com/SagerNet/sing-box
 
 - 现代化用户界面，支持亮暗主题
 - 多种代理模式（系统代理/TUN模式）
-- 多种订阅格式支持
+- 多种订阅格式支持（sing-box、Clash/Mihomo、URI）
 - 实时流量监控与统计
 - 丰富的日志系统
 - 规则分流功能
+- 高级路由配置（DNS劫持、应用分流）
+- 单实例模式应用
+- 无边框窗口设计
+- 跨平台 sudo 支持（Linux/macOS）
 
 ## 技术栈
 
@@ -47,6 +51,8 @@ Sing-Box Windows 是一个基于 [Sing-Box](https://github.com/SagerNet/sing-box
 - **serde & serde_json**：序列化和反序列化
 - **reqwest**：HTTP 客户端，支持TLS
 - **tracing & tracing-subscriber**：结构化日志记录
+- **sqlx**：异步 SQL 工具包，支持 SQLite
+- **tauri-plugin-single-instance**：单实例模式插件
 - **tauri-plugin-store**：持久化存储插件
 - **tauri-plugin-websocket**：WebSocket 支持
 
@@ -161,13 +167,27 @@ sing-box-windows/
 │   │   │   │   ├── task_manager.rs    # 任务管理器
 │   │   │   │   └── mod.rs             # 核心模块入口
 │   │   │   ├── network/        # 网络服务模块
-│   │   │   │   ├── subscription_service.rs # 订阅服务
+│   │   │   │   ├── subscription_service.rs # 订阅服务主模块
+│   │   │   │   ├── subscription_service/
+│   │   │   │   │   ├── mod.rs           # 订阅模块入口
+│   │   │   │   │   ├── parser.rs        # 订阅解析器
+│   │   │   │   │   ├── auto_update.rs   # 自动更新服务
+│   │   │   │   │   └── config_generator.rs # 配置生成器
 │   │   │   │   └── mod.rs              # 网络模块入口
+│   │   │   ├── storage/        # 存储服务模块
+│   │   │   │   ├── enhanced_storage_service.rs # 增强存储服务
+│   │   │   │   ├── database.rs      # 数据库服务
+│   │   │   │   └── state_model.rs   # 数据模型
 │   │   │   ├── system/         # 系统服务模块
 │   │   │   │   ├── system_service.rs   # 系统功能(权限/服务)
+│   │   │   │   ├── sudo_service.rs     # sudo 密码管理
+│   │   │   │   ├── background_tasks.rs # 后台任务系统
 │   │   │   │   ├── update_service.rs   # 更新服务
 │   │   │   │   ├── config_service.rs   # 配置服务
 │   │   │   │   └── mod.rs              # 系统模块入口
+│   │   │   ├── singbox/        # Sing-Box 专用模块
+│   │   │   │   ├── config_generator.rs # 配置生成器
+│   │   │   │   └── mod.rs             # 模块入口
 │   │   │   └── mod.rs          # 应用模块入口
 │   │   ├── entity/    # 数据实体模型
 │   │   │   ├── config_model.rs # 配置数据模型
@@ -208,10 +228,90 @@ sing-box-windows/
 
 这种模块化的结构有以下优点：
 
-1. **功能划分清晰**：按功能将代码划分为核心、网络、系统等模块
+1. **功能划分清晰**：按功能将代码划分为核心、网络、系统、存储等模块
 2. **易于维护**：相关功能集中在一起，便于定位和修改
 3. **降低耦合度**：每个模块都有明确的职责和边界
 4. **方便扩展**：添加新功能时可以在相应模块中扩展，不影响其他模块
+
+## 最新架构特性
+
+### 1. 混合存储架构
+
+应用采用混合存储方案，结合了 SQLite 数据库和配置文件：
+
+- **SQLite 数据库**：使用 `enhanced_storage_service` 管理所有应用配置
+- **自动同步机制**：配置变更时自动同步到 sing-box 运行时配置文件
+- **单例模式**：数据库服务使用 `OnceCell` 确保全局唯一实例
+- **数据表结构**：
+  - `app_config`：存储完整的 sing-box 配置（包含高级选项）
+  - `theme_config`：主题相关配置
+  - `locale_config`：语言设置
+  - `window_config`：窗口状态和位置
+  - `update_config`：自动更新配置
+
+### 2. 单实例模式
+
+使用 `tauri_plugin_single_instance` 插件实现：
+
+- 防止多个实例同时运行
+- 启动第二个实例时自动激活现有窗口
+- 支持 `--hide` 参数实现后台启动
+- 适合系统托盘模式运行
+
+### 3. 无边框窗口设计
+
+现代化的无边框窗口实现：
+
+- 自定义窗口控制组件
+- 窗口状态持久化（位置、大小、最大化状态）
+- 最小窗口尺寸限制（1024x700）
+- 居中显示和自动布局
+
+### 4. 跨平台 sudo 支持
+
+Linux 和 macOS 平台的 TUN 模式提权：
+
+- 密码安全存储在系统密钥环（keyring）
+- 避免重复输入 sudo 密码
+- 密码验证机制
+- 支持密码管理和清除
+
+### 5. 高级配置功能
+
+通过 UI 界面提供的 sing-box 高级选项：
+
+- **DNS 配置**：
+  - DNS 代理服务器
+  - 国内 DNS 服务器（如 119.29.29.29）
+  - DNS 劫持开关
+  - 假 DNS 过滤
+
+- **路由控制**：
+  - 自动路由发现
+  - 严格路由模式
+  - MTU 自动检测和设置
+  - IPv6 支持控制
+
+- **应用分流组**：
+  - Telegram 专用代理
+  - YouTube 专用代理
+  - Netflix 专用代理
+  - OpenAI 专用代理
+
+- **高级选项**：
+  - 广告拦截
+  - 下载分流控制
+  - TCP 快速打开
+  - UDP 会话复用
+
+### 6. 后台任务系统
+
+自动化后台服务：
+
+- **自动更新检查**：每 4 小时检查一次应用更新
+- **内核健康监控**：每 10 分钟检查 sing-box 运行状态
+- **订阅自动更新**：根据用户配置的间隔自动刷新订阅
+- **异步执行**：使用 tokio 异步运行时，不阻塞主线程
 
 ## 开发环境搭建
 
@@ -407,30 +507,72 @@ pnpm tauri dev
 - `change_proxy`：切换使用的代理节点
 - `test_node_delay`：测试节点延迟
 
-### 订阅服务 (network/subscription_service.rs)
+### 订阅服务 (network/subscription_service/)
 
-处理代理订阅的添加、更新和管理：
+处理代理订阅的添加、更新和管理，支持多种订阅格式：
 
+#### 主要功能
 - `download_subscription`：下载订阅内容
 - `add_manual_subscription`：手动添加订阅
 - `get_current_config`：获取当前配置
+- `parse_subscription_content`：解析订阅内容（支持 Base64、JSON、YAML）
+- `extract_nodes`：从订阅中提取代理节点
+- `auto_update_subscription`：自动更新订阅服务
 
-### 系统服务 (system/system_service.rs)
+#### 支持的订阅格式
+1. **Sing-Box 原生格式**：JSON 配置文件
+2. **Clash/Mihomo 格式**：YAML 配置文件
+3. **URI 格式**：直接解析代理协议链接（vmess://、vless://、trojan:// 等）
+4. **Base64 编码**：自动解码处理
+
+#### 订阅解析器 (parser.rs)
+- 智能识别订阅格式
+- 多协议节点解析支持
+- 节点信息标准化处理
+- 错误处理和日志记录
+
+#### 配置生成器 (config_generator.rs)
+- 根据用户配置生成 sing-box 配置文件
+- 支持高级路由规则
+- DNS 配置生成
+- 出站组和规则集优化
+
+### 系统服务 (system/system/)
 
 处理与操作系统相关的功能：
 
+#### 系统功能 (system_service.rs)
 - `check_admin`：检查管理员权限
 - `restart_as_admin`：以管理员身份重启
-- `install_service`：安装系统服务
-- `uninstall_service`：卸载系统服务
-- `check_service_status`：检查服务状态
+- `check_network_connectivity`：检查网络连接
+- `wait_for_network_ready`：等待网络就绪
+- `open_devtools`：打开开发者工具
+
+#### Sudo 服务 (sudo_service.rs)
+Linux/macOS 平台的 sudo 密码管理：
+- `set_sudo_password`：设置 sudo 密码
+- `verify_sudo_password`：验证 sudo 密码
+- `has_saved_password`：检查是否已保存密码
+- `clear_saved_password`：清除保存的密码
+- 使用系统密钥环安全存储密码
+
+#### 后台任务 (background_tasks.rs)
+自动化后台服务管理：
+- `start_background_tasks`：启动后台任务
+- `stop_background_tasks`：停止后台任务
+- 定时更新检查（4小时间隔）
+- 内核健康监控（10分钟间隔）
+- 订阅自动更新（可配置间隔）
 
 ### 更新服务 (system/update_service.rs)
 
 处理应用程序的更新：
 
 - `check_update`：检查更新
+- `download_update`：下载更新包
+- `install_update`：安装更新
 - `download_and_install_update`：下载并安装更新
+- `get_platform_info`：获取平台信息用于更新匹配
 
 ## 前端开发指南
 
@@ -712,12 +854,23 @@ fn example() {
     crate::app::network::subscription_service::rollback_subscription_config,
     crate::app::network::subscription_service::toggle_proxy_mode,
     crate::app::network::subscription_service::get_current_proxy_mode,
+    crate::app::network::subscription_service::parser::parse_subscription_content,
+    crate::app::network::subscription_service::parser::extract_nodes_from_subscription,
+    crate::app::network::subscription_service::auto_update::auto_update_subscription,
     // System - System service commands (系统服务)
     crate::app::system::system_service::check_admin,
     crate::app::system::system_service::restart_as_admin,
     crate::app::system::system_service::check_network_connectivity,
     crate::app::system::system_service::wait_for_network_ready,
     crate::app::system::system_service::open_devtools,
+    // System - Sudo service commands (sudo 管理)
+    crate::app::system::sudo_service::set_sudo_password,
+    crate::app::system::sudo_service::verify_sudo_password,
+    crate::app::system::sudo_service::has_saved_password,
+    crate::app::system::sudo_service::clear_saved_password,
+    // System - Background tasks commands (后台任务)
+    crate::app::system::background_tasks::start_background_tasks,
+    crate::app::system::background_tasks::stop_background_tasks,
     // System - Update service commands (更新服务)
     crate::app::system::update_service::check_update,
     crate::app::system::update_service::download_update,
@@ -742,41 +895,65 @@ fn example() {
 
 #### 命令分类说明
 
-1. **内核服务命令** (Kernel Service)：
+1. **增强存储服务命令** (Enhanced Storage Service)：
+
+   - 应用配置的持久化存储和管理
+   - 主题、语言、窗口等配置的保存和恢复
+   - 订阅数据的数据库管理
+   - 配置自动同步机制
+
+2. **内核服务命令** (Kernel Service)：
 
    - 内核的生命周期管理（启动、停止、重启）
    - 内核版本检查和下载
    - WebSocket 中继服务管理
-   - 内核运行状态检查
-
-2. **代理服务命令** (Proxy Service)：
-
-   - 代理模式设置（系统代理、手动代理、TUN模式）
-   - 代理节点管理和切换
-   - 节点延迟测试
-   - 代理规则获取
+   - 内核运行状态检查和健康监控
+   - 代理设置应用
 
 3. **订阅服务命令** (Subscription Service)：
 
-   - 订阅下载和解析
+   - 订阅下载和解析（支持多种格式）
    - 手动添加订阅
-   - 配置管理
+   - 订阅内容解析和节点提取
+   - 订阅自动更新服务
+   - 配置管理和路径同步
    - 代理模式切换
 
 4. **系统服务命令** (System Service)：
 
    - 管理员权限检查和提升
+   - 网络连接状态检查
    - 开发者工具控制
    - 系统级功能操作
 
-5. **更新服务命令** (Update Service)：
+5. **Sudo 服务命令** (Sudo Service)：
+
+   - sudo 密码设置和验证
+   - 密码状态查询
+   - 密码安全存储和清除
+
+6. **后台任务命令** (Background Tasks)：
+
+   - 后台任务启动和停止
+   - 定时任务管理（更新检查、健康监控）
+
+7. **更新服务命令** (Update Service)：
 
    - 应用更新检查
-   - 自动下载和安装更新
+   - 更新包下载和安装
+   - 平台信息获取
 
-6. **配置服务命令** (Config Service)：
+8. **配置服务命令** (Config Service)：
    - Sing-box 端口配置更新
    - 配置文件管理
+
+9. **代理服务命令** (Proxy Service)：
+
+   - 代理模式设置（系统代理、手动代理、TUN模式）
+   - 代理节点管理和切换
+   - 节点延迟测试
+   - 代理规则获取
+   - IP 版本切换
 
 ### 模块组织
 

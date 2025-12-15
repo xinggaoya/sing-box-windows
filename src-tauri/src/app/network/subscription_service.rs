@@ -15,7 +15,7 @@ use base64;
 use helpers::{
     backup_existing_config, resolve_target_config_path, runtime_state_from_config,
 };
-use parser::extract_nodes_from_subscription;
+use parser::{extract_nodes_from_subscription, parse_to_value};
 use serde_json::{json, Value};
 use std::error::Error;
 use std::fs::File;
@@ -114,6 +114,7 @@ pub async fn add_manual_subscription(
         &app_config,
         &target_path,
     )
+    .await
     .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
 
     if apply_runtime {
@@ -252,6 +253,14 @@ async fn download_and_process_subscription(
     }
 
     let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
+    if extracted_nodes.is_empty() {
+        if let Ok(provider_nodes) = try_load_proxy_providers(&response_text).await {
+            if !provider_nodes.is_empty() {
+                info!("从 proxy-providers 提取到 {} 个节点", provider_nodes.len());
+                extracted_nodes = provider_nodes;
+            }
+        }
+    }
     info!("从原始内容提取到 {} 个节点", extracted_nodes.len());
 
     if extracted_nodes.is_empty() {
@@ -261,6 +270,14 @@ async fn download_and_process_subscription(
             if let Ok(decoded_text) = String::from_utf8(decoded.clone()) {
                 info!("base64标准解码成功，重新从解码内容提取节点...");
                 extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
+                if extracted_nodes.is_empty() {
+                    if let Ok(provider_nodes) = try_load_proxy_providers(&decoded_text).await {
+                        if !provider_nodes.is_empty() {
+                            info!("从 proxy-providers 提取到 {} 个节点", provider_nodes.len());
+                            extracted_nodes = provider_nodes;
+                        }
+                    }
+                }
                 info!(
                     "从标准base64解码内容提取到 {} 个节点",
                     extracted_nodes.len()
@@ -270,6 +287,14 @@ async fn download_and_process_subscription(
             if let Ok(decoded_text) = String::from_utf8(decoded.clone()) {
                 info!("URL安全base64解码成功，重新从解码内容提取节点...");
                 extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
+                if extracted_nodes.is_empty() {
+                    if let Ok(provider_nodes) = try_load_proxy_providers(&decoded_text).await {
+                        if !provider_nodes.is_empty() {
+                            info!("从 proxy-providers 提取到 {} 个节点", provider_nodes.len());
+                            extracted_nodes = provider_nodes;
+                        }
+                    }
+                }
                 info!(
                     "从URL安全base64解码内容提取到 {} 个节点",
                     extracted_nodes.len()
@@ -345,7 +370,7 @@ async fn download_and_process_subscription(
     Ok(())
 }
 
-fn process_subscription_content(
+async fn process_subscription_content(
     content: String,
     use_original_config: bool,
     _app_handle: &AppHandle,
@@ -362,10 +387,27 @@ fn process_subscription_content(
     info!("从手动内容提取到 {} 个节点", extracted_nodes.len());
 
     if extracted_nodes.is_empty() {
+        if let Ok(provider_nodes) = try_load_proxy_providers(&content).await {
+            if !provider_nodes.is_empty() {
+                info!("从 proxy-providers 提取到 {} 个节点", provider_nodes.len());
+                extracted_nodes = provider_nodes;
+            }
+        }
+    }
+
+    if extracted_nodes.is_empty() {
         if let Ok(decoded) = base64::decode(&content.trim()) {
             if let Ok(decoded_text) = String::from_utf8(decoded.clone()) {
                 info!("手动内容 base64 解码成功，重新提取节点");
                 extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
+                if extracted_nodes.is_empty() {
+                    if let Ok(provider_nodes) = try_load_proxy_providers(&decoded_text).await {
+                        if !provider_nodes.is_empty() {
+                            info!("从 proxy-providers 提取到 {} 个节点", provider_nodes.len());
+                            extracted_nodes = provider_nodes;
+                        }
+                    }
+                }
                 info!("从解码内容提取到 {} 个节点", extracted_nodes.len());
             }
         }
@@ -474,4 +516,45 @@ fn process_original_config(
 
     info!("原始订阅配置（修改端口后）已成功保存");
     Ok(())
+}
+
+/// 尝试解析并拉取 proxy-providers 中的节点列表（Clash/Mihomo 配置常见写法）。
+async fn try_load_proxy_providers(raw: &str) -> Result<Vec<Value>, String> {
+    let (content_json, _) = match parse_to_value(raw) {
+        Ok(v) => v,
+        Err(_) => return Ok(Vec::new()),
+    };
+
+    let providers = match content_json
+        .get("proxy-providers")
+        .or_else(|| content_json.get("proxy_providers"))
+        .and_then(|v| v.as_object())
+    {
+        Some(p) => p,
+        None => return Ok(Vec::new()),
+    };
+
+    let mut collected = Vec::new();
+    for (name, provider) in providers {
+        let url = match provider.get("url").and_then(|v| v.as_str()) {
+            Some(u) if !u.is_empty() => u.trim(),
+            _ => continue,
+        };
+
+        info!("拉取 proxy-provider: {} => {}", name, url);
+        match http_client::get_text(url).await {
+            Ok(body) => match extract_nodes_from_subscription(&body) {
+                Ok(mut nodes) => {
+                    if !nodes.is_empty() {
+                        info!("proxy-provider {} 获取到 {} 个节点", name, nodes.len());
+                        collected.append(&mut nodes);
+                    }
+                }
+                Err(e) => warn!("解析 proxy-provider {} 失败: {}", name, e),
+            },
+            Err(e) => warn!("下载 proxy-provider {} 失败: {}", name, e),
+        }
+    }
+
+    Ok(collected)
 }
