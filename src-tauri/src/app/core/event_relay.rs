@@ -6,7 +6,6 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tracing::{error, info, warn};
-use url::Url;
 
 /// 直接的事件发送器，不再使用WebSocket中继
 /// 后端直接连接到sing-box API，然后将数据作为Tauri事件发送到前端
@@ -44,7 +43,7 @@ impl<R: Send + Sync + 'static + Serialize> EventDirectRelay<R> {
 
     /// 启动直接事件中继
     pub async fn start(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let url = Url::parse(&self.endpoint)?;
+        let url = self.endpoint.as_str();
         let (ws_stream, _) = connect_async(url).await?;
         let (mut _write, mut read) = ws_stream.split();
 

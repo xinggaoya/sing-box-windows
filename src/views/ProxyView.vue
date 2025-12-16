@@ -17,21 +17,7 @@
       </template>
     </PageHeader>
 
-    <!-- Stats Grid -->
-    <div class="stats-grid">
-      <StatusCard
-        v-for="stat in proxyStats"
-        :key="stat.label"
-        :label="stat.label"
-        :value="stat.value"
-        :type="stat.type"
-      >
-        <template #icon>
-          <n-icon><component :is="stat.icon" /></n-icon>
-        </template>
-      </StatusCard>
-  </div>
-
+  
   <!-- Content -->
   <div class="content-section">
     <div class="filter-bar">
@@ -166,8 +152,21 @@
                     
                     <div class="node-details">
                       <div class="node-name" :title="proxy">{{ proxy }}</div>
-                      <div class="node-meta" @click.stop="testSingleNode(proxy)">
-                        {{ getNodeStatusText(proxy) }}
+                      <div class="node-meta">
+                        <span class="status-text" @click.stop="testSingleNode(proxy)">
+                          {{ getNodeStatusText(proxy) }}
+                        </span>
+                        <n-button
+                          text
+                          size="tiny"
+                          :loading="testingNodes[proxy]"
+                          @click.stop="testSingleNode(proxy)"
+                        >
+                          <template #icon>
+                            <n-icon size="14"><SpeedometerOutline /></n-icon>
+                          </template>
+                          {{ t('proxy.testNode') }}
+                        </n-button>
                       </div>
                     </div>
                     <div class="node-actions">
@@ -362,9 +361,12 @@ const getFilteredNodesList = (group: ProxyData) => {
 
 const resetGroupNodeState = (groups: ProxyData[]) => {
   groups.forEach(group => {
+    const prev = groupNodeState[group.name]
+    const list = getFilteredNodesList(group)
+    const loaded = prev ? Math.min(prev.loaded, list.length) : Math.min(NODE_BATCH_SIZE, list.length)
     groupNodeState[group.name] = {
-      list: getFilteredNodesList(group),
-      loaded: NODE_BATCH_SIZE
+      list,
+      loaded
     }
   })
 }
@@ -406,7 +408,9 @@ const getNodeStatusText = (proxy: string) => {
   return t('proxy.clickToTest')
 }
 
-const init = async () => {
+const init = async (options: { preserveExpanded?: boolean } = {}) => {
+  const { preserveExpanded = true } = options
+  const previousExpanded = preserveExpanded ? new Set(expandedGroups.value) : new Set<string>()
   isLoading.value = true
   try {
     const data = await proxyService.getProxies()
@@ -419,7 +423,9 @@ const init = async () => {
       }
     })
     proxyGroups.value = groups
-    expandedGroups.value = []
+    expandedGroups.value = preserveExpanded
+      ? groups.map(item => item.name).filter(name => previousExpanded.has(name))
+      : []
     resetGroupNodeState(groups)
     if (groups.length > 0) {
       message.success(t('proxy.loadSuccess'))
@@ -511,10 +517,20 @@ const autoSelectBest = async (group: ProxyData) => {
 }
 
 const changeProxy = async (group: string, proxy: string) => {
+  if (testingNodes[proxy]) {
+    message.info(t('proxy.testing'))
+    return
+  }
   try {
     await proxyService.changeProxy(group, proxy)
+    const targetGroup = proxyGroups.value.find(item => item.name === group)
+    if (targetGroup) {
+      targetGroup.now = proxy
+    }
+    if (rawProxies.value[group]) {
+      rawProxies.value[group].now = proxy
+    }
     message.success(t('proxy.switchSuccess', { group, proxy }))
-    await init()
   } catch (error) {
     message.error(t('proxy.switchErrorMessage'))
   }
@@ -576,19 +592,14 @@ onUnmounted(() => {
 
 <style scoped>
 .page-container {
-  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
+  padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
   max-width: var(--layout-page-max-width, 1400px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--layout-page-gap, 24px);
+  gap: var(--layout-page-gap, 16px);
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--layout-row-gap, 16px);
-}
 
 .content-section {
   display: flex;
@@ -817,6 +828,9 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--text-tertiary);
   margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .node-actions {

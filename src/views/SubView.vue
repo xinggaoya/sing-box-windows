@@ -11,21 +11,7 @@
       </template>
     </PageHeader>
 
-    <!-- Stats -->
-    <div class="stats-grid">
-      <StatusCard
-        v-for="stat in subscriptionStats"
-        :key="stat.label"
-        :label="stat.label"
-        :value="stat.value"
-        :type="stat.type"
-      >
-        <template #icon>
-          <n-icon><component :is="stat.icon" /></n-icon>
-        </template>
-      </StatusCard>
-    </div>
-
+    
     <!-- Subscription List -->
     <div class="subscription-section">
       <div v-if="subStore.list.length > 0" class="subscription-grid">
@@ -723,11 +709,6 @@ onUnmounted(() => {
   gap: var(--layout-page-gap, 24px);
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--layout-row-gap, 16px);
-}
 
 .subscription-grid {
   display: grid;

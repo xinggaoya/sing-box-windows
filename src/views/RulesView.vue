@@ -17,21 +17,7 @@
       </template>
     </PageHeader>
 
-    <!-- Stats -->
-    <div class="stats-grid">
-      <StatusCard
-        v-for="stat in ruleStats"
-        :key="stat.label"
-        :label="stat.label"
-        :value="stat.value"
-        :type="stat.type"
-      >
-        <template #icon>
-          <n-icon><component :is="stat.icon" /></n-icon>
-        </template>
-      </StatusCard>
-    </div>
-
+    
     <!-- Filters -->
     <div class="filter-section">
       <div class="filter-bar">
@@ -280,19 +266,14 @@ onMounted(() => {
 
 <style scoped>
 .page-container {
-  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
+  padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
   max-width: var(--layout-page-max-width, 1400px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--layout-page-gap, 24px);
+  gap: var(--layout-page-gap, 16px);
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--layout-row-gap, 16px);
-}
 
 .filter-section {
   background: var(--panel-bg);

@@ -11,7 +11,7 @@ use crate::app::singbox::settings_patch::apply_app_settings_to_config;
 use crate::app::storage::enhanced_storage_service::{db_get_app_config, db_save_app_config};
 use crate::app::storage::state_model::AppConfig;
 use crate::utils::http_client;
-use base64;
+use base64::{Engine as _, engine::general_purpose};
 use helpers::{
     backup_existing_config, resolve_target_config_path, runtime_state_from_config,
 };
@@ -257,7 +257,7 @@ async fn download_and_process_subscription(
     if extracted_nodes.is_empty() {
         info!("未从原始内容提取到节点，尝试base64解码...");
 
-        if let Ok(decoded) = base64::decode(&response_text.trim()) {
+        if let Ok(decoded) = general_purpose::STANDARD.decode(&response_text.trim()) {
             if let Ok(decoded_text) = String::from_utf8(decoded.clone()) {
                 info!("base64标准解码成功，重新从解码内容提取节点...");
                 extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
@@ -266,8 +266,8 @@ async fn download_and_process_subscription(
                     extracted_nodes.len()
                 );
             }
-        } else if let Ok(decoded) = base64::decode_config(&response_text.trim(), base64::URL_SAFE) {
-            if let Ok(decoded_text) = String::from_utf8(decoded.clone()) {
+        } else if let Ok(decoded) = general_purpose::URL_SAFE.decode(&response_text.trim()) {
+            if let Ok(decoded_text) = String::from_utf8(decoded) {
                 info!("URL安全base64解码成功，重新从解码内容提取节点...");
                 extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
                 info!(
@@ -288,7 +288,7 @@ async fn download_and_process_subscription(
             .replace("trojan://", "")
             .replace("vless://", "");
 
-        if let Ok(decoded) = base64::decode(&stripped_text) {
+        if let Ok(decoded) = general_purpose::STANDARD.decode(&stripped_text) {
             if let Ok(decoded_text) = String::from_utf8(decoded) {
                 extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
                 info!(
@@ -362,8 +362,8 @@ fn process_subscription_content(
     info!("从手动内容提取到 {} 个节点", extracted_nodes.len());
 
     if extracted_nodes.is_empty() {
-        if let Ok(decoded) = base64::decode(&content.trim()) {
-            if let Ok(decoded_text) = String::from_utf8(decoded.clone()) {
+        if let Ok(decoded) = general_purpose::STANDARD.decode(&content.trim()) {
+            if let Ok(decoded_text) = String::from_utf8(decoded) {
                 info!("手动内容 base64 解码成功，重新提取节点");
                 extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
                 info!("从解码内容提取到 {} 个节点", extracted_nodes.len());

@@ -69,9 +69,12 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             "tag": TAG_AUTO,
             "outbounds": [TAG_DIRECT],
             "url": app_config.singbox_urltest_url,
+            // 保障切换节点时主动中断旧连接，避免连接数长期堆积
+            "interrupt_exist_connections": true,
+            // 缩短空闲回收时间，配合上面的中断行为防止连接滞留
+            "idle_timeout": "10m",
             "interval": "3m",
-            "tolerance": 50,
-            "interrupt_exist_connections": false
+            "tolerance": 50
         }),
         json!({
             "type": "selector",
@@ -392,10 +395,11 @@ fn ensure_urltest_and_selector(outbounds: &mut Vec<Value>, node_tags: &[String])
             "type": "urltest",
             "tag": TAG_AUTO,
             "outbounds": [],
+            "interrupt_exist_connections": true,
+            "idle_timeout": "10m",
             "url": "http://cp.cloudflare.com/generate_204",
             "interval": "3m",
-            "tolerance": 50,
-            "interrupt_exist_connections": false
+            "tolerance": 50
         })
     })?;
 

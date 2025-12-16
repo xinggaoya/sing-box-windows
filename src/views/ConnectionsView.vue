@@ -17,21 +17,7 @@
       </template>
     </PageHeader>
 
-    <!-- Stats -->
-    <div class="stats-grid">
-      <StatusCard
-        v-for="stat in connectionStats"
-        :key="stat.label"
-        :label="stat.label"
-        :value="stat.value"
-        :type="stat.type"
-      >
-        <template #icon>
-          <n-icon><component :is="stat.icon" /></n-icon>
-        </template>
-      </StatusCard>
-    </div>
-
+  
     <!-- Filters -->
     <div class="filter-section">
       <div class="filter-bar">
@@ -379,11 +365,6 @@ onUnmounted(() => {
   gap: var(--layout-page-gap, 24px);
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--layout-row-gap, 16px);
-}
 
 .filter-section {
   background: var(--panel-bg);

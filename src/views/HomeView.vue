@@ -517,12 +517,12 @@ onMounted(async () => {
 
 <style scoped>
 .page-container {
-  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
+  padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
   max-width: var(--layout-page-max-width, 1200px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--layout-page-gap, 32px);
+  gap: var(--layout-page-gap, 20px);
 }
 
 /* Header */

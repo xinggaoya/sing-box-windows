@@ -3,11 +3,24 @@
     <PageHeader :title="t('log.title')" :subtitle="t('log.subtitle')">
       <template #actions>
         <div class="header-controls">
+          <!-- 简化的统计信息 -->
+          <div class="mini-stats">
+            <n-tag type="info" size="small">
+              {{ totalLogs }} {{ t('log.records') }}
+            </n-tag>
+            <n-tag v-if="logTypeCounts.error" type="error" size="small">
+              {{ t('log.types.error') }}: {{ logTypeCounts.error }}
+            </n-tag>
+            <n-tag v-if="logTypeCounts.warning" type="warning" size="small">
+              {{ t('log.types.warning') }}: {{ logTypeCounts.warning }}
+            </n-tag>
+          </div>
+
           <n-switch v-model:value="autoScroll" size="medium">
             <template #checked>{{ t('log.autoScroll') }}</template>
             <template #unchecked>{{ t('log.manualScroll') }}</template>
           </n-switch>
-          
+
           <n-button-group>
             <n-button
               @click="clearLogs"
@@ -45,21 +58,6 @@
       </template>
     </PageHeader>
 
-    <!-- Stats -->
-    <div class="stats-grid">
-      <StatusCard
-        v-for="stat in logStats"
-        :key="stat.label"
-        :label="stat.label"
-        :value="stat.value"
-        :type="stat.type"
-      >
-        <template #icon>
-          <n-icon><component :is="stat.icon" /></n-icon>
-        </template>
-      </StatusCard>
-    </div>
-
     <!-- Filters -->
     <div class="filter-section">
       <div class="filter-bar">
@@ -87,7 +85,32 @@
 
     <!-- Logs List -->
     <div class="logs-section">
-      <div class="logs-container" ref="logListRef">
+      <div class="logs-container" ref="logListRef" @scroll="handleScroll">
+        <!-- 快速定位按钮 -->
+        <div v-if="displayedLogs.length > 0" class="scroll-controls">
+          <n-button-group size="small" vertical>
+            <n-button
+              @click="scrollToTop"
+              :disabled="!isScrolled"
+              circle
+              type="tertiary"
+            >
+              <template #icon>
+                <n-icon><ChevronUpOutline /></n-icon>
+              </template>
+            </n-button>
+            <n-button
+              @click="scrollToBottom"
+              :disabled="isAtBottom"
+              circle
+              type="tertiary"
+            >
+              <template #icon>
+                <n-icon><ChevronDownOutline /></n-icon>
+              </template>
+            </n-button>
+          </n-button-group>
+        </div>
         <div v-if="displayedLogs.length > 0" class="logs-list">
           <div
             v-for="log in displayedLogs"
@@ -145,6 +168,8 @@ import {
   WarningOutline,
   AlertCircleOutline,
   CheckmarkCircleOutline,
+  ChevronUpOutline,
+  ChevronDownOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -199,8 +224,10 @@ const message = useMessage()
 
 const searchQuery = ref('')
 const filterType = ref<string | null>(null)
-const autoScroll = ref(true)
+const autoScroll = ref(false)
 const logListRef = ref<HTMLElement | null>(null)
+const isScrolled = ref(false)
+const isAtBottom = ref(true)
 
 // Computed
 const logs = computed(() => logStore.logs)
@@ -320,13 +347,42 @@ const exportLogs = () => {
   message.success(t('log.exportedSuccess'))
 }
 
+// 滚动控制方法
+const scrollToTop = () => {
+  if (logListRef.value) {
+    logListRef.value.scrollTop = 0
+  }
+}
+
+const scrollToBottom = () => {
+  if (logListRef.value) {
+    logListRef.value.scrollTop = logListRef.value.scrollHeight
+  }
+}
+
+// 监听滚动事件
+const handleScroll = () => {
+  if (logListRef.value) {
+    const { scrollTop, scrollHeight, clientHeight } = logListRef.value
+    isScrolled.value = scrollTop > 0
+    isAtBottom.value = scrollTop + clientHeight >= scrollHeight - 10
+  }
+}
+
 watch(
   () => displayedLogs.value.length,
-  async () => {
+  async (newLength, oldLength) => {
     if (autoScroll.value) {
       await nextTick()
       if (logListRef.value) {
+        // 自动滚动到底部（最旧的日志）
         logListRef.value.scrollTop = logListRef.value.scrollHeight
+      }
+    } else if (!oldLength && newLength > 0) {
+      // 首次加载日志时，滚动到顶部（最新的日志）
+      await nextTick()
+      if (logListRef.value) {
+        logListRef.value.scrollTop = 0
       }
     }
   }
@@ -335,39 +391,39 @@ watch(
 
 <style scoped>
 .page-container {
-  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
+  padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
   max-width: var(--layout-page-max-width, 1400px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--layout-page-gap, 24px);
+  gap: var(--layout-page-gap, 16px);
   height: calc(100vh - 40px); /* Adjust for window controls */
 }
 
 .header-controls {
   display: flex;
   align-items: center;
-  gap: var(--layout-row-gap, 16px);
+  gap: var(--layout-row-gap, 12px);
+  flex-wrap: wrap;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--layout-row-gap, 16px);
-  flex-shrink: 0;
+.mini-stats {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .filter-section {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 16px;
-  padding: 16px;
+  padding: 12px 16px;
   flex-shrink: 0;
 }
 
 .filter-bar {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -395,8 +451,17 @@ watch(
 .logs-container {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 12px 16px;
   scroll-behavior: smooth;
+  height: 100%;
+  position: relative;
+}
+
+.scroll-controls {
+  position: fixed;
+  bottom: 24px;
+  right: 32px;
+  z-index: 100;
 }
 
 .logs-list {
@@ -407,12 +472,12 @@ watch(
 
 .log-entry {
   display: flex;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.4;
   transition: background 0.1s ease;
 }
 
@@ -423,22 +488,22 @@ watch(
 .log-meta {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
-  width: 140px;
+  width: 120px;
 }
 
 .log-time {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .log-type-badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 1px 5px;
+  border-radius: 3px;
 }
 
 .log-entry.info .log-type-badge {

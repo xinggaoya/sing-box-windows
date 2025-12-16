@@ -91,6 +91,10 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
         for outbound in outbounds.iter_mut() {
             if outbound.get("tag").and_then(|t| t.as_str()) == Some(TAG_AUTO) {
                 if let Some(obj) = outbound.as_object_mut() {
+                    // 强制启用切换时中断旧连接，避免长时间后台运行连接数膨胀
+                    obj.insert("interrupt_exist_connections".to_string(), json!(true));
+                    // 缩短空闲回收时间，防止长尾连接占满列表
+                    obj.insert("idle_timeout".to_string(), json!("10m"));
                     obj.insert("url".to_string(), json!(app_config.singbox_urltest_url));
                 }
             }
