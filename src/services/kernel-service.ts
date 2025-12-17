@@ -83,7 +83,7 @@ class KernelService {
       await store.waitForDataRestore()
 
       // 仅传递必要的参数覆盖，其他由后端从数据库读取
-      const args: Record<string, any> = {}
+      const args: Record<string, unknown> = {}
 
       if (options.config?.proxy_mode) {
         args.proxy_mode = options.config.proxy_mode
@@ -124,7 +124,7 @@ class KernelService {
   /**
    * 停止内核
    */
-  async stopKernel(options: KernelStopOptions = {}): Promise<{ success: boolean; message: string }> {
+  async stopKernel(_options: KernelStopOptions = {}): Promise<{ success: boolean; message: string }> {
     // 如果是强制停止，可能需要调用不同的后端API，或者传递参数
     // 目前后端 kernel_stop_enhanced 似乎不接受参数，但我们保留 options 接口以备将来扩展
     return invokeWithAppContext<{ success: boolean; message: string }>(
@@ -169,7 +169,7 @@ class KernelService {
       return await invokeWithAppContext<boolean>('is_kernel_running', undefined, {
         skipDataRestore: true
       })
-    } catch (error) {
+    } catch {
       return false
     }
   }
@@ -288,7 +288,7 @@ class KernelService {
       await store.waitForDataRestore()
 
       // 仅传递覆盖参数
-      const args: Record<string, any> = {}
+      const args: Record<string, unknown> = {}
 
       if (options.forceRestart !== undefined) {
         args.force_restart = options.forceRestart
@@ -365,19 +365,19 @@ class KernelService {
     return eventService.on(APP_EVENTS.kernelReady, callback)
   }
 
-  async onKernelError(callback: (error: any) => void): Promise<() => void> {
+  async onKernelError(callback: (error: unknown) => void): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelError, callback)
   }
 
-  async onKernelStarting(callback: (data: any) => void): Promise<() => void> {
+  async onKernelStarting(callback: (data: unknown) => void): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelStarting, callback)
   }
 
-  async onKernelStarted(callback: (data: any) => void): Promise<() => void> {
+  async onKernelStarted(callback: (data: unknown) => void): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelStarted, callback)
   }
 
-  async onKernelStopped(callback: (data: any) => void): Promise<() => void> {
+  async onKernelStopped(callback: (data: unknown) => void): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelStopped, callback)
   }
 

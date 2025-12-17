@@ -9,7 +9,7 @@ import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 // import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode: _mode }) => ({
   plugins: [
     vue(),
     AutoImport({

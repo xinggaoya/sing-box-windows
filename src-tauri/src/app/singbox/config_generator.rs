@@ -79,7 +79,8 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         json!({
             "type": "selector",
             "tag": TAG_MANUAL,
-            "outbounds": [TAG_AUTO, TAG_DIRECT]
+            // 手动切换分组只暴露“自动选择 + 订阅节点”，不暴露 direct，避免 UI 优选/自动选择误选到直连。
+            "outbounds": [TAG_AUTO]
         }),
     ];
 
@@ -89,22 +90,22 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             json!({
                 "type": "selector",
                 "tag": TAG_TELEGRAM,
-                "outbounds": [TAG_MANUAL, TAG_AUTO, TAG_DIRECT]
+                "outbounds": [TAG_MANUAL, TAG_AUTO]
             }),
             json!({
                 "type": "selector",
                 "tag": TAG_YOUTUBE,
-                "outbounds": [TAG_MANUAL, TAG_AUTO, TAG_DIRECT]
+                "outbounds": [TAG_MANUAL, TAG_AUTO]
             }),
             json!({
                 "type": "selector",
                 "tag": TAG_NETFLIX,
-                "outbounds": [TAG_MANUAL, TAG_AUTO, TAG_DIRECT]
+                "outbounds": [TAG_MANUAL, TAG_AUTO]
             }),
             json!({
                 "type": "selector",
                 "tag": TAG_OPENAI,
-                "outbounds": [TAG_MANUAL, TAG_AUTO, TAG_DIRECT]
+                "outbounds": [TAG_MANUAL, TAG_AUTO]
             }),
         ]);
     }
@@ -402,7 +403,7 @@ pub fn inject_nodes(config: &mut Value, app_config: &AppConfig, nodes: &[Value])
     }
 
     // 1) 更新 TAG_AUTO(urltest) 只包含节点（避免把 direct 当作最快导致全直连）。
-    // 2) 更新 TAG_MANUAL(selector) 包含自动选择 + 每个节点 + direct（便于用户手动回退直连）。
+    // 2) 更新 TAG_MANUAL(selector) 包含自动选择 + 每个节点（不包含 direct，避免 UI 误选直连）。
     ensure_urltest_and_selector(outbounds, &group_node_tags)?;
 
     // 追加节点出站
@@ -481,13 +482,12 @@ fn ensure_urltest_and_selector(outbounds: &mut Vec<Value>, node_tags: &[String])
         auto.insert("outbounds".to_string(), Value::Array(auto_list));
     }
 
-    // 手动切换候选列表：自动选择 + 每个节点 + direct
-    let mut manual_list = Vec::<Value>::with_capacity(2 + node_tags.len());
+    // 手动切换候选列表：自动选择 + 每个节点
+    let mut manual_list = Vec::<Value>::with_capacity(1 + node_tags.len());
     manual_list.push(Value::String(TAG_AUTO.to_string()));
     for tag in node_tags {
         manual_list.push(Value::String(tag.clone()));
     }
-    manual_list.push(Value::String(TAG_DIRECT.to_string()));
     {
         let manual = outbounds
             .get_mut(manual_idx)

@@ -47,7 +47,7 @@ export interface RulesData {
 // 保留此文件仅为向后兼容，建议新代码使用Tauri事件或Pinia
 
 // 创建 mitt 实例（向后兼容）
-const emitter = mitt<any>()
+const emitter = mitt<Record<string, unknown>>()
 
 export default emitter
 export { mitt } // 重新导出mitt，如果某些地方还需要使用

@@ -112,7 +112,7 @@
                   {{ t('proxy.autoSelect') }}
                 </n-button>
                 <n-button
-                  @click.stop="testNodeDelay(group.name)"
+                  @click.stop="testGroupNodes(group)"
                   :loading="testingGroup === group.name"
                   size="small"
                   secondary
@@ -201,12 +201,11 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, computed, reactive, onUnmounted, watch } from 'vue'
+import { onMounted, ref, reactive, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   RefreshOutline,
   CheckmarkCircleOutline,
-  SwapHorizontalOutline,
   SpeedometerOutline,
   GlobeOutline,
   ChevronDownOutline,
@@ -215,11 +214,8 @@ import {
   Star,
 } from '@vicons/ionicons5'
 import { proxyService } from '@/services/proxy-service'
-import { listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
-import { useAppStore } from '@/stores'
 import PageHeader from '@/components/common/PageHeader.vue'
-import StatusCard from '@/components/common/StatusCard.vue'
 
 // Interfaces
 interface ProxyHistory {
@@ -236,15 +232,6 @@ interface ProxyData {
   udp: boolean
 }
 
-interface TestGroupResult {
-  [proxyName: string]: number
-}
-
-interface TestNodeResult {
-  proxy: string
-  delay: number
-}
-
 defineOptions({
   name: 'ProxyView'
 })
@@ -252,7 +239,6 @@ defineOptions({
 const message = useMessage()
 const isLoading = ref(false)
 const { t } = useI18n()
-const appStore = useAppStore()
 
 // Data
 const rawProxies = ref<Record<string, ProxyData>>({})
@@ -268,47 +254,6 @@ const nodeSearch = ref('')
 const showFavoritesOnly = ref(false)
 const favoriteNodes = ref<string[]>([])
 const batchTesting = ref(false)
-
-// Listeners
-let unlistenTestProgress: (() => void) | null = null
-let unlistenTestResult: (() => void) | null = null
-let unlistenTestComplete: (() => void) | null = null
-let unlistenNodeResult: (() => void) | null = null
-
-// Computed
-const proxyStats = computed(() => {
-  const groups = proxyGroups.value
-  const totalNodes = groups.reduce((sum, group) => sum + (group.all?.length ?? 0), 0)
-  const expanded = expandedGroups.value.length
-  const testingCount = Object.values(testingNodes).filter(Boolean).length
-
-  return [
-    {
-      label: t('proxy.dashboard.groupTotal'),
-      value: groups.length,
-      icon: SwapHorizontalOutline,
-      type: 'primary' as const,
-    },
-    {
-      label: t('proxy.dashboard.nodeTotal'),
-      value: totalNodes,
-      icon: GlobeOutline,
-      type: 'success' as const,
-    },
-    {
-      label: t('proxy.dashboard.expanded'),
-      value: expanded,
-      icon: ChevronDownOutline,
-      type: 'warning' as const,
-    },
-    {
-      label: t('proxy.dashboard.testing'),
-      value: testingCount,
-      icon: SpeedometerOutline,
-      type: 'default' as const,
-    },
-  ]
-})
 
 watch([nodeSearch, showFavoritesOnly], () => {
   resetGroupNodeState(proxyGroups.value)
@@ -437,53 +382,99 @@ const init = async (options: { preserveExpanded?: boolean } = {}) => {
   }
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+const normalizeDelayError = (raw?: string | null) => {
+  if (!raw) return t('proxy.testFailed')
+  const text = raw.toLowerCase()
+
+  // 列表里尽量只展示简短状态，详细原因交给 toast 或日志。
+  if (text.includes('timeout') || text.includes('timed out')) return t('proxy.timeout')
+  if (text.includes('delay=0')) return t('proxy.testFailed')
+  if (text.includes('http')) return t('proxy.testFailed')
+
+  return t('proxy.testFailed')
+}
+
+// 统一的“多节点测速”执行器：单测/组测/批测全部复用，避免逻辑分叉导致体验不一致。
+const runDelayTests = async (
+  nodes: string[],
+  options: { concurrency?: number; gapMs?: number } = {},
+) => {
+  const list = Array.from(new Set(nodes)).filter(Boolean)
+  if (!list.length) return
+
+  const concurrency = Math.min(options.concurrency ?? 6, list.length)
+  const gapMs = options.gapMs ?? 120
+  let pointer = 0
+
+  const runner = async () => {
+    while (pointer < list.length) {
+      const current = list[pointer]
+      pointer += 1
+      await testSingleNode(current)
+      if (gapMs > 0) await sleep(gapMs)
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, runner))
+}
+
 const testSingleNode = async (proxy: string) => {
   if (testingNodes[proxy]) return
   testingNodes[proxy] = true
+
+  // 说明：旧实现依赖事件回传（listen + emit），在组测速场景下会出现“部分节点无结果也无错误”。
+  // 现在改为直接等待 invoke 返回结果，确保每个节点都有明确的 ok/error。
   try {
     delete nodeErrors[proxy]
-    await proxyService.testNodeDelay(proxy)
+    const result = await proxyService.testNodeDelay(proxy)
+    if (result.ok && result.delay > 0) {
+      testResults[proxy] = result.delay
+      delete nodeErrors[proxy]
+    } else {
+      nodeErrors[proxy] = normalizeDelayError(result.error)
+    }
   } catch (error) {
+    nodeErrors[proxy] = t('proxy.testFailed')
+  } finally {
     testingNodes[proxy] = false
-    nodeErrors[proxy] = t('proxy.timeout')
   }
 }
 
-const testNodeDelay = async (group: string) => {
-  if (testingGroup.value === group) return
-  testingGroup.value = group
+const testGroupNodes = async (group: ProxyData) => {
+  if (testingGroup.value === group.name || batchTesting.value) return
+
+  const nodes = getFilteredNodesList(group)
+  if (!nodes.length) {
+    message.warning(t('proxy.noProxyGroups'))
+    return
+  }
+
+  testingGroup.value = group.name
   try {
-    await proxyService.testGroupDelay(group)
+    await runDelayTests(nodes, { concurrency: 6, gapMs: 120 })
+    message.success(t('proxy.groupTestComplete'))
   } catch (error) {
-    message.error(`${t('proxy.testErrorMessage')}: ${group}`)
+    message.error(`${t('proxy.testErrorMessage')}: ${group.name}`)
+  } finally {
     testingGroup.value = ''
   }
 }
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
 const batchTestAllNodes = async () => {
-  if (batchTesting.value) return
+  if (batchTesting.value || testingGroup.value) return
+
   const nodes = new Set<string>()
   proxyGroups.value.forEach(group => (group.all || []).forEach(node => nodes.add(node)))
   if (nodes.size === 0) {
     message.warning(t('proxy.noProxyGroups'))
     return
   }
+
   batchTesting.value = true
   try {
-    const nodeList = Array.from(nodes)
-    const concurrency = Math.min(6, nodeList.length)
-    let pointer = 0
-    const runner = async () => {
-      while (pointer < nodeList.length) {
-        const current = nodeList[pointer]
-        pointer += 1
-        await testSingleNode(current)
-        await sleep(150)
-      }
-    }
-    await Promise.all(Array.from({ length: concurrency }, runner))
+    await runDelayTests(Array.from(nodes), { concurrency: 6, gapMs: 120 })
     message.success(t('proxy.batchTestComplete'))
   } catch (error) {
     message.error(t('proxy.testErrorMessage'))
@@ -501,6 +492,8 @@ const autoSelectBest = async (group: ProxyData) => {
 
   let bestNode: { node: string | null; delay: number } = { node: null, delay: Number.MAX_SAFE_INTEGER }
   nodes.forEach(node => {
+    // 兜底：即便用户导入了非本程序生成的配置，也避免“自动选优”选到 direct 导致全直连。
+    if (node === 'direct') return
     const delay = testResults[node]
     if (delay && delay > 0 && delay < bestNode.delay) {
       bestNode = { node, delay }
@@ -508,7 +501,7 @@ const autoSelectBest = async (group: ProxyData) => {
   })
 
   if (!bestNode.node) {
-    await testNodeDelay(group.name)
+    await testGroupNodes(group)
     message.info(t('proxy.testNode'))
     return
   }
@@ -535,6 +528,9 @@ const changeProxy = async (group: string, proxy: string) => {
     message.error(t('proxy.switchErrorMessage'))
   }
 }
+
+/* 旧的基于事件回传的测速实现已废弃（组测速可能丢结果导致 UI 无提示）。
+ * 当前页面统一使用 invoke 返回结果的方式，确保每个节点都有明确的 ok/error。
 
 const setupEventListeners = async () => {
   unlistenTestProgress = await listen('test-delay-progress', (event) => {
@@ -575,18 +571,11 @@ const setupEventListeners = async () => {
     }
   })
 }
+*/
 
 onMounted(() => {
   loadFavorites()
   init()
-  setupEventListeners()
-})
-
-onUnmounted(() => {
-  if (unlistenTestProgress) unlistenTestProgress()
-  if (unlistenTestResult) unlistenTestResult()
-  if (unlistenTestComplete) unlistenTestComplete()
-  if (unlistenNodeResult) unlistenNodeResult()
 })
 </script>
 

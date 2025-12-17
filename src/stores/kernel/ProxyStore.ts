@@ -8,7 +8,7 @@ export const useProxyStore = defineStore('proxy', () => {
   const appStore = useAppStore()
   const loading = ref(false)
   const proxies = ref<ProxiesData['proxies']>({})
-  const delayData = ref<Record<string, number>>({})
+  const _delayData = ref<Record<string, number>>({})
 
   // Legacy state for compatibility
   const selectedNodeIndex = ref<number | null>(null)
@@ -93,7 +93,7 @@ export const useProxyStore = defineStore('proxy', () => {
   // Compatibility aliases
   const getProxyNodes = fetchProxies
 
-  const changeProxyNode = async (index: number) => {
+  const changeProxyNode = async (_index: number) => {
     console.warn('changeProxyNode is deprecated')
     return false
   }

@@ -31,16 +31,19 @@ const handleGoToSettings = () => {
 }
 
 // 监听更新可用事件
-const handleUpdateAvailable = (updateInfo: {
-  is_prerelease?: boolean
-}) => {
+const handleUpdateAvailable = (updateInfo: unknown) => {
+  const payload = (updateInfo && typeof updateInfo === 'object')
+    ? (updateInfo as Record<string, unknown>)
+    : null
+  const isPrerelease = payload ? Boolean(payload.is_prerelease) : false
+
   // 如果已经有通知显示，先销毁它
   if (activeNotification) {
     activeNotification.destroy()
   }
 
   // 创建新的通知
-  const notificationTitle = updateInfo.is_prerelease
+  const notificationTitle = isPrerelease
     ? t('notification.prereleaseAvailable')
     : t('notification.updateAvailable')
 

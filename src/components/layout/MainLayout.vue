@@ -253,18 +253,20 @@ const onSelect = (key: string) => {
 }
 
 // Update Handling
-const handleShowUpdateModal = (data: any) => {
-  if (data && typeof data === 'object') {
-    updateInfo.value = {
-      latestVersion: data.latestVersion || '',
-      currentVersion: data.currentVersion || updateStore.appVersion,
-      downloadUrl: data.downloadUrl || '',
-      releaseNotes: data.releaseNotes || '',
-      releaseDate: data.releaseDate || '',
-      fileSize: data.fileSize || 0,
-    }
-    showUpdateModal.value = true
+const handleShowUpdateModal = (data: unknown) => {
+  if (!data || typeof data !== 'object') return
+
+  const payload = data as Record<string, unknown>
+  updateInfo.value = {
+    latestVersion: typeof payload.latestVersion === 'string' ? payload.latestVersion : '',
+    currentVersion:
+      typeof payload.currentVersion === 'string' ? payload.currentVersion : updateStore.appVersion,
+    downloadUrl: typeof payload.downloadUrl === 'string' ? payload.downloadUrl : '',
+    releaseNotes: typeof payload.releaseNotes === 'string' ? payload.releaseNotes : '',
+    releaseDate: typeof payload.releaseDate === 'string' ? payload.releaseDate : '',
+    fileSize: typeof payload.fileSize === 'number' ? payload.fileSize : 0,
   }
+  showUpdateModal.value = true
 }
 
 const handleUpdate = async () => {

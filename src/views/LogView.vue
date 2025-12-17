@@ -156,7 +156,7 @@
 
 <script setup lang="ts">
 import { useLogStore } from '@/stores/kernel/LogStore'
-import { ref, computed, watch, nextTick, defineComponent, h } from 'vue'
+import { ref, computed, watch, nextTick, defineComponent, h, type Component } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   TrashOutline,
@@ -174,6 +174,7 @@ import {
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusCard from '@/components/common/StatusCard.vue'
+import type { StatusCardType } from '@/types'
 
 defineOptions({
   name: 'LogView'
@@ -263,7 +264,7 @@ const logTypeCounts = computed(() => {
 })
 
 const logStats = computed(() => {
-  const typeMap = [
+  const typeMap: Array<{ type: string; icon: Component; accent: StatusCardType }> = [
     { type: 'info', icon: InformationCircleOutline, accent: 'primary' },
     { type: 'warning', icon: WarningOutline, accent: 'warning' },
     { type: 'error', icon: AlertCircleOutline, accent: 'error' },
@@ -274,7 +275,7 @@ const logStats = computed(() => {
     label: getLogTypeLabel(config.type),
     value: logTypeCounts.value[config.type] || 0,
     icon: config.icon,
-    type: config.accent as any,
+    type: config.accent,
   }))
 
   stats.push({

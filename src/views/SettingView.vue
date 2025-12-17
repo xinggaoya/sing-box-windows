@@ -733,7 +733,7 @@ const handleChangeLanguage = async (value: string) => {
 
   // 选择 auto 时明确切回自动模式，避免保留旧值
   const nextLocale = value === 'auto' ? 'auto' : value
-  await localeStore.setLocale(nextLocale as any)
+  await localeStore.setLocale(nextLocale as Locale)
   locale.value = localeStore.currentLocale
 }
 

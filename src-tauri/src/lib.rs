@@ -171,6 +171,7 @@ pub fn run() {
             crate::app::core::proxy_service::change_proxy,
             crate::app::core::proxy_service::test_node_delay,
             crate::app::core::proxy_service::test_group_delay,
+            crate::app::core::proxy_service::test_nodes_delay,
             crate::app::core::proxy_service::get_rules,
         ])
         .run(tauri::generate_context!())

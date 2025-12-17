@@ -10,14 +10,14 @@ export type ProxyMode = 'system' | 'tun' | 'manual'
 export type StatusCardType = 'default' | 'primary' | 'success' | 'warning' | 'error'
 
 // WebSocket消息类型
-export interface WebSocketMessage<T = any> {
+export interface WebSocketMessage<T = unknown> {
   type: string
   data: T
   timestamp?: number
 }
 
 // 通用响应类型
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   error?: string

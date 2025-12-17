@@ -127,8 +127,14 @@ import {
   ServerOutline,
   AlertCircleOutline
 } from '@vicons/ionicons5'
-import { listen } from '@tauri-apps/api/event'
+import { listen, type Event } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
+
+interface UpdateProgressPayload {
+  status: 'checking' | 'downloading' | 'completed' | 'error' | 'installing'
+  progress: number
+  message: string
+}
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -198,7 +204,7 @@ const handleUpdateShow = (value: boolean) => {
 
 const setupProgressListener = async () => {
   try {
-    unlisten = await listen('update-progress', (event: any) => {
+    unlisten = await listen<UpdateProgressPayload>('update-progress', (event: Event<UpdateProgressPayload>) => {
       const { status, progress, message: msg } = event.payload
       updateProgress.value = progress
       progressMessage.value = status === 'installing' ? t('setting.update.installStarted') : msg

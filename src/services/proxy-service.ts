@@ -18,6 +18,22 @@ export interface ProxyData {
   udp: boolean
 }
 
+// 延迟测试（测速）结果
+export interface ProxyDelayTestResult {
+  proxy: string
+  delay: number
+  ok: boolean
+  error?: string | null
+  successSamples: number
+}
+
+export interface DelayTestOptions {
+  timeoutMs?: number
+  url?: string
+  concurrency?: number
+  samples?: number
+}
+
 export interface ProxiesData {
   proxies: Record<string, ProxyData>
 }
@@ -176,17 +192,26 @@ export class ProxyService {
 
   async testNodeDelay(proxy: string, server?: string, port?: number) {
     const args = { proxy, server, port }
-    return invokeWithAppContext<void>(
+    return invokeWithAppContext<ProxyDelayTestResult>(
       'test_node_delay',
       port ? args : { ...args, port: undefined },
       { withApiPort: port ? undefined : 'port' }
     )
   }
 
-  async testGroupDelay(group: string, server?: string, port?: number) {
-    const args = { group, server, port }
-    return invokeWithAppContext<void>(
+  async testGroupDelay(group: string, server?: string, port?: number, options?: DelayTestOptions) {
+    const args = { group, server, port, options }
+    return invokeWithAppContext<ProxyDelayTestResult[]>(
       'test_group_delay',
+      port ? args : { ...args, port: undefined },
+      { withApiPort: port ? undefined : 'port' }
+    )
+  }
+
+  async testNodesDelay(proxies: string[], options?: DelayTestOptions, port?: number) {
+    const args = { proxies, options, port }
+    return invokeWithAppContext<ProxyDelayTestResult[]>(
+      'test_nodes_delay',
       port ? args : { ...args, port: undefined },
       { withApiPort: port ? undefined : 'port' }
     )
@@ -199,7 +224,7 @@ export class ProxyService {
   async testAllNodesDelay(server?: string, port?: number) {
     try {
       const proxiesData = await this.getProxies()
-      const testPromises: Promise<void>[] = []
+      const testPromises: Promise<ProxyDelayTestResult[]>[] = []
 
       // 遍历所有代理组，测试每个组的延迟
       for (const groupName of Object.keys(proxiesData.proxies)) {
