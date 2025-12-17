@@ -114,7 +114,10 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     match tag {
                         t if t == DNS_PROXY => {
                             obj.insert("address".to_string(), json!(app_config.singbox_dns_proxy));
-                            // 让 DNS_PROXY 的请求走“默认代理出站”，更符合用户预期（手动/自动）
+                            // DNS_PROXY 默认走代理（防污染/更接近 Clash 的体验）。
+                            // 循环依赖问题由 config_generator 在“注入节点”时给节点补 `domain_resolver=dns_resolver` 来解决：
+                            // - 节点域名用 dns_resolver（直连）解析
+                            // - DNS_PROXY 的 DoH/DoH3 请求可以走代理出站
                             obj.insert("detour".to_string(), json!(default_outbound));
                         }
                         t if t == DNS_CN => {

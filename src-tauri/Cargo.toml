@@ -28,6 +28,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "local
 base64 = "0.22"
 sha2 = "0.10"
 semver = "1.0"
+serde_yaml = "0.9"
 
 # Tauri 2.0 最新版本
 tauri = { version = "2.2", features = ["tray-icon", "unstable", "devtools"] }

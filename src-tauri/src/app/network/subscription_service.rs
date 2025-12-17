@@ -24,6 +24,28 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 use tracing::{error, info, warn};
 
+/// 尝试把订阅内容当作 Base64 解码成 UTF-8 文本。
+///
+/// 说明：不少机场会把 Clash YAML / URI 列表做一次 Base64 封装，且可能包含换行。
+fn try_decode_base64_to_text(raw: &str) -> Option<String> {
+    let mut s: String = raw.split_whitespace().collect();
+    if s.is_empty() {
+        return None;
+    }
+
+    // 补齐 padding，兼容省略 '=' 的情况
+    let rem = s.len() % 4;
+    if rem != 0 {
+        s.push_str(&"=".repeat(4 - rem));
+    }
+
+    let bytes = general_purpose::STANDARD
+        .decode(&s)
+        .or_else(|_| general_purpose::URL_SAFE.decode(&s))
+        .ok()?;
+    String::from_utf8(bytes).ok()
+}
+
 #[tauri::command]
 pub async fn download_subscription(
     url: String,
@@ -257,24 +279,10 @@ async fn download_and_process_subscription(
     if extracted_nodes.is_empty() {
         info!("未从原始内容提取到节点，尝试base64解码...");
 
-        if let Ok(decoded) = general_purpose::STANDARD.decode(&response_text.trim()) {
-            if let Ok(decoded_text) = String::from_utf8(decoded.clone()) {
-                info!("base64标准解码成功，重新从解码内容提取节点...");
-                extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
-                info!(
-                    "从标准base64解码内容提取到 {} 个节点",
-                    extracted_nodes.len()
-                );
-            }
-        } else if let Ok(decoded) = general_purpose::URL_SAFE.decode(&response_text.trim()) {
-            if let Ok(decoded_text) = String::from_utf8(decoded) {
-                info!("URL安全base64解码成功，重新从解码内容提取节点...");
-                extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
-                info!(
-                    "从URL安全base64解码内容提取到 {} 个节点",
-                    extracted_nodes.len()
-                );
-            }
+        if let Some(decoded_text) = try_decode_base64_to_text(&response_text) {
+            info!("base64 解码成功，重新从解码内容提取节点...");
+            extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
+            info!("从 base64 解码内容提取到 {} 个节点", extracted_nodes.len());
         }
     }
 
@@ -301,7 +309,10 @@ async fn download_and_process_subscription(
 
     if extracted_nodes.is_empty() {
         error!("无法从订阅内容提取节点信息，已尝试所有解码方式");
-        return Err("无法从订阅内容提取节点信息，请检查订阅链接或内容格式".into());
+        return Err(
+            "无法从订阅内容提取节点信息（支持 sing-box JSON / Clash YAML / URI 列表，且可 base64 封装），请检查订阅链接或内容格式"
+                .into(),
+        );
     }
 
     info!(
@@ -362,12 +373,10 @@ fn process_subscription_content(
     info!("从手动内容提取到 {} 个节点", extracted_nodes.len());
 
     if extracted_nodes.is_empty() {
-        if let Ok(decoded) = general_purpose::STANDARD.decode(&content.trim()) {
-            if let Ok(decoded_text) = String::from_utf8(decoded) {
-                info!("手动内容 base64 解码成功，重新提取节点");
-                extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
-                info!("从解码内容提取到 {} 个节点", extracted_nodes.len());
-            }
+        if let Some(decoded_text) = try_decode_base64_to_text(&content) {
+            info!("手动内容 base64 解码成功，重新提取节点");
+            extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
+            info!("从解码内容提取到 {} 个节点", extracted_nodes.len());
         }
     }
 
@@ -474,4 +483,20 @@ fn process_original_config(
 
     info!("原始订阅配置（修改端口后）已成功保存");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{try_decode_base64_to_text, extract_nodes_from_subscription};
+    use base64::{engine::general_purpose, Engine as _};
+
+    #[test]
+    fn base64_uri_list_should_extract_nodes_after_decode() {
+        let uri_list = "trojan://password@example.com:443#test\nvless://uuid@example.com:443?security=tls&sni=example.com#vless\n";
+        let b64 = general_purpose::STANDARD.encode(uri_list.as_bytes());
+
+        let decoded = try_decode_base64_to_text(&b64).expect("decode should work");
+        let nodes = extract_nodes_from_subscription(&decoded).expect("extract should work");
+        assert_eq!(nodes.len(), 2);
+    }
 }

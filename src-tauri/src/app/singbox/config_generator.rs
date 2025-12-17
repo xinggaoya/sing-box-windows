@@ -277,6 +277,9 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
                     "address": app_config.singbox_dns_proxy,
                     "address_resolver": DNS_RESOLVER,
                     "strategy": dns_strategy,
+                    // DNS_PROXY 默认走代理（更符合“防污染/可解析被墙域名”的预期），
+                    // 但为了避免形成“DNS 走代理 -> 代理节点域名又需要 DNS”的循环依赖，
+                    // 我们会在注入节点时为每个节点设置 `domain_resolver=dns_resolver`（直连解析节点域名）。
                     "detour": default_outbound
                 },
                 {
@@ -319,11 +322,11 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
 /// 基于骨架配置注入节点，并更新“自动选择/手动切换”等组的候选列表。
 pub fn generate_config_with_nodes(app_config: &AppConfig, nodes: &[Value]) -> Result<Value, String> {
     let mut config = generate_base_config(app_config);
-    inject_nodes(&mut config, nodes)?;
+    inject_nodes(&mut config, app_config, nodes)?;
     Ok(config)
 }
 
-pub fn inject_nodes(config: &mut Value, nodes: &[Value]) -> Result<(), String> {
+pub fn inject_nodes(config: &mut Value, app_config: &AppConfig, nodes: &[Value]) -> Result<(), String> {
     let outbounds = ensure_outbounds_array(config)?;
 
     // 预先收集已有 tag，避免节点 tag 与内置出站/分组冲突。
@@ -335,7 +338,16 @@ pub fn inject_nodes(config: &mut Value, nodes: &[Value]) -> Result<(), String> {
     }
 
     let mut normalized_nodes = Vec::<Value>::with_capacity(nodes.len());
-    let mut node_tags = Vec::<String>::with_capacity(nodes.len());
+    // 用于注入到“自动选择/手动切换”等分组的节点列表。
+    // 注意：订阅里可能会夹带“提示节点/占位节点”（如 server=0.0.0.0），放进 urltest 会导致启动时默认选中无效节点，表现为全部无法联网。
+    let mut group_node_tags = Vec::<String>::with_capacity(nodes.len());
+
+    let resolver_strategy = if app_config.prefer_ipv6 {
+        "prefer_ipv6"
+    } else {
+        // 节点域名解析默认走 IPv4，能显著降低“有 AAAA 但本机 IPv6 不可用”导致的连接失败。
+        "ipv4_only"
+    };
 
     for (idx, node) in nodes.iter().cloned().enumerate() {
         let mut node_obj = node
@@ -361,13 +373,37 @@ pub fn inject_nodes(config: &mut Value, nodes: &[Value]) -> Result<(), String> {
         existing_tags.insert(tag.clone());
         node_obj.insert("tag".to_string(), Value::String(tag.clone()));
 
-        node_tags.push(tag);
+        // 为“节点 server 是域名”的出站补上 domain_resolver，避免出现 DNS 循环依赖：
+        // - DNS_PROXY 的 DoH/DoH3 可以走代理出站（防污染/可解析被墙域名）
+        // - 代理节点本身的域名用 dns_resolver（直连）解析
+        // 这样即便 DNS_PROXY 需要走代理，也不会反过来依赖 DNS_PROXY 来解析节点域名。
+        if let Some(server) = node_obj.get("server").and_then(|v| v.as_str()) {
+            let server = server.trim();
+            if !server.is_empty()
+                && server != "0.0.0.0"
+                && server.parse::<std::net::IpAddr>().is_err()
+                && !node_obj.contains_key("domain_resolver")
+            {
+                node_obj.insert(
+                    "domain_resolver".to_string(),
+                    json!({
+                        "server": DNS_RESOLVER,
+                        "strategy": resolver_strategy
+                    }),
+                );
+            }
+        }
+
+        // 只把“看起来可用”的节点加入分组候选，避免 urltest 初始选择到无效节点（如 server=0.0.0.0）。
+        if should_include_node_in_groups(&node_obj) {
+            group_node_tags.push(tag.clone());
+        }
         normalized_nodes.push(Value::Object(node_obj));
     }
 
     // 1) 更新 TAG_AUTO(urltest) 只包含节点（避免把 direct 当作最快导致全直连）。
     // 2) 更新 TAG_MANUAL(selector) 包含自动选择 + 每个节点 + direct（便于用户手动回退直连）。
-    ensure_urltest_and_selector(outbounds, &node_tags)?;
+    ensure_urltest_and_selector(outbounds, &group_node_tags)?;
 
     // 追加节点出站
     for node in normalized_nodes {
@@ -375,6 +411,26 @@ pub fn inject_nodes(config: &mut Value, nodes: &[Value]) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn should_include_node_in_groups(node_obj: &serde_json::Map<String, Value>) -> bool {
+    // 订阅里经常会夹带提示节点：server=0.0.0.0 或空字符串。
+    // 这些节点在 Clash 内核里通常不会被默认选中，但放进 sing-box 的 urltest 初始候选会导致“启动即断网”。
+    let server = node_obj
+        .get("server")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+
+    if server.is_empty() {
+        return false;
+    }
+    // 明确屏蔽不可路由地址
+    if server == "0.0.0.0" {
+        return false;
+    }
+
+    true
 }
 
 fn ensure_outbounds_array(config: &mut Value) -> Result<&mut Vec<Value>, String> {
