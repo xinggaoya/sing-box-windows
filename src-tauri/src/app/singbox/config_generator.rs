@@ -1,51 +1,20 @@
 use crate::app::singbox::settings_patch::apply_app_settings_to_config;
 use crate::app::storage::state_model::AppConfig;
+use super::common::{
+    dns_strategy, node_domain_resolver_strategy, normalize_default_outbound, normalize_download_detour,
+    DNS_BLOCK, DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOIP_CN, RS_GEOIP_PRIVATE,
+    RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_NETFLIX,
+    RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
+};
+use super::config_schema::{
+    CacheFileConfig, ClashApiConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, LogConfig,
+    RemoteRuleSetConfig, RouteConfig, SingBoxConfig,
+};
 use serde_json::{json, Value};
-
-// 代理组/出站标签（这些标签会暴露在 Clash API 里，尽量保持稳定，避免前端/用户习惯被破坏）。
-pub const TAG_AUTO: &str = "自动选择";
-pub const TAG_MANUAL: &str = "手动切换";
-pub const TAG_DIRECT: &str = "direct";
-pub const TAG_BLOCK: &str = "block";
-
-// 业务分流组（可选，但对大多数用户比较实用）
-pub const TAG_TELEGRAM: &str = "Telegram";
-pub const TAG_YOUTUBE: &str = "YouTube";
-pub const TAG_NETFLIX: &str = "Netflix";
-pub const TAG_OPENAI: &str = "OpenAI";
-
-// DNS server tags
-const DNS_PROXY: &str = "dns_proxy";
-const DNS_CN: &str = "dns_cn";
-const DNS_RESOLVER: &str = "dns_resolver";
-const DNS_BLOCK: &str = "dns_block";
-
-// Rule-set tags (官方 SagerNet 规则集)
-const RS_GEOSITE_CN: &str = "geosite-cn";
-const RS_GEOSITE_GEOLOCATION_NOT_CN: &str = "geosite-geolocation-!cn";
-const RS_GEOSITE_PRIVATE: &str = "geosite-private";
-const RS_GEOSITE_ADS: &str = "geosite-category-ads-all";
-const RS_GEOSITE_TELEGRAM: &str = "geosite-telegram";
-const RS_GEOSITE_YOUTUBE: &str = "geosite-youtube";
-const RS_GEOSITE_NETFLIX: &str = "geosite-netflix";
-const RS_GEOSITE_OPENAI: &str = "geosite-openai";
-const RS_GEOIP_CN: &str = "geoip-cn";
-const RS_GEOIP_PRIVATE: &str = "geoip-private";
-
-fn normalize_default_outbound(app_config: &AppConfig) -> &'static str {
-    match app_config.singbox_default_proxy_outbound.as_str() {
-        "auto" => TAG_AUTO,
-        _ => TAG_MANUAL,
-    }
-}
-
-fn normalize_download_detour(app_config: &AppConfig) -> &'static str {
-    match app_config.singbox_download_detour.as_str() {
-        "direct" => TAG_DIRECT,
-        // 订阅规则集/Clash UI 下载默认走“手动切换”，便于用户用可用节点下载（适配国内网络）
-        _ => TAG_MANUAL,
-    }
-}
+// 兼容旧引用：这些 tag 之前是 `config_generator` 的 `pub const`，保留同名导出以降低未来重构的破坏性。
+pub use super::common::{
+    TAG_AUTO, TAG_BLOCK, TAG_DIRECT, TAG_MANUAL, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
+};
 
 /// 生成一份“通用且更适合国内环境”的 sing-box 配置骨架（不依赖模板文件）。
 ///
@@ -54,11 +23,7 @@ fn normalize_download_detour(app_config: &AppConfig) -> &'static str {
 /// - DNS：国内用国内 DNS，非国内用 DoH（尽量避免污染）。
 /// - 兼容：保留 Clash API（前端节点选择/延迟测试依赖）。
 pub fn generate_base_config(app_config: &AppConfig) -> Value {
-    let dns_strategy = if app_config.prefer_ipv6 {
-        "prefer_ipv6"
-    } else {
-        "ipv4_only"
-    };
+    let dns_strategy = dns_strategy(app_config);
 
     let default_outbound = normalize_default_outbound(app_config);
     let download_detour = normalize_download_detour(app_config);
@@ -128,97 +93,77 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
 
     let mut rule_sets: Vec<Value> = Vec::new();
     if app_config.singbox_block_ads {
-        rule_sets.push(json!({
-            "tag": RS_GEOSITE_ADS,
-            "type": "remote",
-            "format": "binary",
-            "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
-            "download_detour": download_detour,
-            "update_interval": "1d"
-        }));
+        rule_sets.push(remote_rule_set_value(
+            RS_GEOSITE_ADS,
+            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+            download_detour,
+            "1d",
+        ));
     }
 
     rule_sets.extend([
-        json!({
-            "tag": RS_GEOSITE_CN,
-            "type": "remote",
-            "format": "binary",
-            "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
-            "download_detour": download_detour,
-            "update_interval": "1d"
-        }),
-        json!({
-            "tag": RS_GEOSITE_GEOLOCATION_NOT_CN,
-            "type": "remote",
-            "format": "binary",
-            "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs",
-            "download_detour": download_detour,
-            "update_interval": "1d"
-        }),
+        remote_rule_set_value(
+            RS_GEOSITE_CN,
+            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+            download_detour,
+            "1d",
+        ),
+        remote_rule_set_value(
+            RS_GEOSITE_GEOLOCATION_NOT_CN,
+            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs",
+            download_detour,
+            "1d",
+        ),
     ]);
 
     if app_config.singbox_enable_app_groups {
         rule_sets.extend([
-            json!({
-                "tag": RS_GEOSITE_TELEGRAM,
-                "type": "remote",
-                "format": "binary",
-                "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs",
-                "download_detour": download_detour,
-                "update_interval": "7d"
-            }),
-            json!({
-                "tag": RS_GEOSITE_YOUTUBE,
-                "type": "remote",
-                "format": "binary",
-                "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-youtube.srs",
-                "download_detour": download_detour,
-                "update_interval": "7d"
-            }),
-            json!({
-                "tag": RS_GEOSITE_NETFLIX,
-                "type": "remote",
-                "format": "binary",
-                "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs",
-                "download_detour": download_detour,
-                "update_interval": "7d"
-            }),
-            json!({
-                "tag": RS_GEOSITE_OPENAI,
-                "type": "remote",
-                "format": "binary",
-                "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
-                "download_detour": download_detour,
-                "update_interval": "7d"
-            }),
+            remote_rule_set_value(
+                RS_GEOSITE_TELEGRAM,
+                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs",
+                download_detour,
+                "7d",
+            ),
+            remote_rule_set_value(
+                RS_GEOSITE_YOUTUBE,
+                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-youtube.srs",
+                download_detour,
+                "7d",
+            ),
+            remote_rule_set_value(
+                RS_GEOSITE_NETFLIX,
+                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs",
+                download_detour,
+                "7d",
+            ),
+            remote_rule_set_value(
+                RS_GEOSITE_OPENAI,
+                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
+                download_detour,
+                "7d",
+            ),
         ]);
     }
 
     rule_sets.extend([
-        json!({
-            "tag": RS_GEOSITE_PRIVATE,
-            "type": "remote",
-            "format": "binary",
-            "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-private.srs",
-            "download_detour": TAG_DIRECT,
-            "update_interval": "7d"
-        }),
-        json!({
-            "tag": RS_GEOIP_PRIVATE,
-            "type": "remote",
-            "format": "binary",
-            "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-private.srs",
-            "download_detour": TAG_DIRECT,
-            "update_interval": "7d"
-        }),
-        json!({
-            "tag": RS_GEOIP_CN,
-            "type": "remote",
-            "format": "binary",
-            "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
-            "download_detour": download_detour,
-            "update_interval": "1d"
-        }),
+        remote_rule_set_value(
+            RS_GEOSITE_PRIVATE,
+            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-private.srs",
+            TAG_DIRECT,
+            "7d",
+        ),
+        remote_rule_set_value(
+            RS_GEOIP_PRIVATE,
+            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-private.srs",
+            TAG_DIRECT,
+            "7d",
+        ),
+        remote_rule_set_value(
+            RS_GEOIP_CN,
+            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+            download_detour,
+            "1d",
+        ),
     ]);
 
     let mut route_rules: Vec<Value> = vec![
@@ -254,70 +199,94 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     ]);
 
     // 注意：这里的 outbounds 只是骨架，订阅节点注入后会补齐 TAG_AUTO/TAG_MANUAL 的候选列表。
-    let mut config = json!({
-        "log": {
-            "disabled": false,
-            "level": "info",
-            "timestamp": true
+    //
+    // 这里用结构体序列化生成 JSON，减少“字符串 key + json! 拼装”的维护成本：
+    // - 字段改名/移动时更容易被编译器发现
+    // - 减少复制粘贴造成的漏字段/错字段
+    let base = SingBoxConfig {
+        log: LogConfig {
+            disabled: false,
+            level: "info".to_string(),
+            timestamp: true,
         },
-        "experimental": {
-            "cache_file": { "enabled": true },
-            "clash_api": {
-                "external_controller": format!("127.0.0.1:{}", app_config.api_port),
-                "external_ui": "metacubexd",
+        experimental: ExperimentalConfig {
+            cache_file: CacheFileConfig { enabled: true },
+            clash_api: ClashApiConfig {
+                external_controller: format!("127.0.0.1:{}", app_config.api_port),
+                external_ui: "metacubexd".to_string(),
                 // 让 sing-box 自动下载 UI（国内网络可能被墙，下载走代理可提高成功率）
-                "external_ui_download_url": "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
-                "external_ui_download_detour": download_detour,
-                "default_mode": "rule"
-            }
+                external_ui_download_url:
+                    "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
+                        .to_string(),
+                external_ui_download_detour: download_detour.to_string(),
+                default_mode: "rule".to_string(),
+            },
         },
-        "dns": {
-            "servers": [
-                {
-                    "tag": DNS_PROXY,
-                    "address": app_config.singbox_dns_proxy,
-                    "address_resolver": DNS_RESOLVER,
-                    "strategy": dns_strategy,
+        dns: DnsConfig {
+            servers: vec![
+                DnsServerConfig {
+                    tag: DNS_PROXY.to_string(),
+                    address: app_config.singbox_dns_proxy.clone(),
+                    address_resolver: Some(DNS_RESOLVER.to_string()),
+                    strategy: Some(dns_strategy.to_string()),
                     // DNS_PROXY 默认走代理（更符合“防污染/可解析被墙域名”的预期），
                     // 但为了避免形成“DNS 走代理 -> 代理节点域名又需要 DNS”的循环依赖，
                     // 我们会在注入节点时为每个节点设置 `domain_resolver=dns_resolver`（直连解析节点域名）。
-                    "detour": default_outbound
+                    detour: Some(default_outbound.to_string()),
                 },
-                {
-                    "tag": DNS_CN,
-                    "address": app_config.singbox_dns_cn,
-                    "address_resolver": DNS_RESOLVER,
-                    "strategy": dns_strategy,
-                    "detour": TAG_DIRECT
+                DnsServerConfig {
+                    tag: DNS_CN.to_string(),
+                    address: app_config.singbox_dns_cn.clone(),
+                    address_resolver: Some(DNS_RESOLVER.to_string()),
+                    strategy: Some(dns_strategy.to_string()),
+                    detour: Some(TAG_DIRECT.to_string()),
                 },
-                {
-                    "tag": DNS_RESOLVER,
-                    "address": app_config.singbox_dns_resolver,
-                    "strategy": dns_strategy,
-                    "detour": TAG_DIRECT
+                DnsServerConfig {
+                    tag: DNS_RESOLVER.to_string(),
+                    address: app_config.singbox_dns_resolver.clone(),
+                    address_resolver: None,
+                    strategy: Some(dns_strategy.to_string()),
+                    detour: Some(TAG_DIRECT.to_string()),
                 },
-                {
-                    "tag": DNS_BLOCK,
-                    "address": "rcode://success"
-                }
+                DnsServerConfig {
+                    tag: DNS_BLOCK.to_string(),
+                    address: "rcode://success".to_string(),
+                    address_resolver: None,
+                    strategy: None,
+                    detour: None,
+                },
             ],
-            "rules": dns_rules,
-            "independent_cache": true,
-            "final": DNS_PROXY
+            rules: dns_rules,
+            independent_cache: true,
+            final_server: DNS_PROXY.to_string(),
         },
-        "inbounds": [],
-        "outbounds": outbounds,
-        "route": {
-            "rule_set": rule_sets,
-            "rules": route_rules,
-            "final": default_outbound,
-            "auto_detect_interface": true
-        }
-    });
+        inbounds: Vec::new(),
+        outbounds,
+        route: RouteConfig {
+            rule_set: rule_sets,
+            rules: route_rules,
+            final_outbound: default_outbound.to_string(),
+            auto_detect_interface: true,
+        },
+    };
+
+    let mut config = serde_json::to_value(base).expect("SingBoxConfig 序列化失败");
 
     // 统一由 settings_patch 负责把端口/TUN/IPv6 偏好写入配置，确保行为一致。
     apply_app_settings_to_config(&mut config, app_config);
     config
+}
+
+fn remote_rule_set_value(tag: &str, url: &str, download_detour: &str, update_interval: &str) -> Value {
+    let rs = RemoteRuleSetConfig {
+        tag: tag.to_string(),
+        kind: "remote".to_string(),
+        format: "binary".to_string(),
+        url: url.to_string(),
+        download_detour: download_detour.to_string(),
+        update_interval: update_interval.to_string(),
+    };
+    serde_json::to_value(rs).expect("RemoteRuleSetConfig 序列化失败")
 }
 
 /// 基于骨架配置注入节点，并更新“自动选择/手动切换”等组的候选列表。
@@ -343,12 +312,7 @@ pub fn inject_nodes(config: &mut Value, app_config: &AppConfig, nodes: &[Value])
     // 注意：订阅里可能会夹带“提示节点/占位节点”（如 server=0.0.0.0），放进 urltest 会导致启动时默认选中无效节点，表现为全部无法联网。
     let mut group_node_tags = Vec::<String>::with_capacity(nodes.len());
 
-    let resolver_strategy = if app_config.prefer_ipv6 {
-        "prefer_ipv6"
-    } else {
-        // 节点域名解析默认走 IPv4，能显著降低“有 AAAA 但本机 IPv6 不可用”导致的连接失败。
-        "ipv4_only"
-    };
+    let resolver_strategy = node_domain_resolver_strategy(app_config);
 
     for (idx, node) in nodes.iter().cloned().enumerate() {
         let mut node_obj = node
@@ -365,11 +329,29 @@ pub fn inject_nodes(config: &mut Value, app_config: &AppConfig, nodes: &[Value])
         if raw_tag.is_empty() {
             return Err(format!("节点缺少 tag: index={}", idx));
         }
+        if node_obj.get("type").and_then(|v| v.as_str()).unwrap_or("").trim().is_empty() {
+            return Err(format!("节点缺少 type: tag={}, index={}", raw_tag, idx));
+        }
 
         // 若 tag 冲突，则自动改名，避免覆盖内置分组/出站。
         let mut tag = raw_tag.clone();
         if existing_tags.contains(&tag) {
-            tag = format!("节点-{}-{}", raw_tag, idx);
+            // 先用 index 尝试一次，避免同名节点时生成可读且相对稳定的 tag。
+            let candidate = format!("节点-{}-{}", raw_tag, idx);
+            if !existing_tags.contains(&candidate) {
+                tag = candidate;
+            } else {
+                // 极端情况下仍可能冲突（例如订阅自带同名 + 已存在相同格式 tag），这里兜底确保唯一性。
+                let mut counter = 1usize;
+                loop {
+                    let candidate = format!("节点-{}-{}", raw_tag, counter);
+                    if !existing_tags.contains(&candidate) {
+                        tag = candidate;
+                        break;
+                    }
+                    counter = counter.saturating_add(1);
+                }
+            }
         }
         existing_tags.insert(tag.clone());
         node_obj.insert("tag".to_string(), Value::String(tag.clone()));

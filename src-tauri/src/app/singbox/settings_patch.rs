@@ -1,27 +1,12 @@
 use crate::app::core::tun_profile::TUN_ROUTE_EXCLUDES;
 use crate::app::storage::state_model::AppConfig;
+use super::common::{
+    dns_strategy, normalize_default_outbound, normalize_download_detour, DNS_BLOCK, DNS_CN, DNS_PROXY,
+    DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_NETFLIX,
+    RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE, TAG_AUTO,
+    TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
+};
 use serde_json::{json, Map, Value};
-
-const TAG_AUTO: &str = "自动选择";
-const TAG_MANUAL: &str = "手动切换";
-const TAG_DIRECT: &str = "direct";
-
-const DNS_PROXY: &str = "dns_proxy";
-const DNS_CN: &str = "dns_cn";
-const DNS_RESOLVER: &str = "dns_resolver";
-const DNS_BLOCK: &str = "dns_block";
-
-const RS_GEOSITE_ADS: &str = "geosite-category-ads-all";
-const RS_GEOSITE_GEOLOCATION_NOT_CN: &str = "geosite-geolocation-!cn";
-const RS_GEOSITE_TELEGRAM: &str = "geosite-telegram";
-const RS_GEOSITE_YOUTUBE: &str = "geosite-youtube";
-const RS_GEOSITE_NETFLIX: &str = "geosite-netflix";
-const RS_GEOSITE_OPENAI: &str = "geosite-openai";
-
-const TAG_TELEGRAM: &str = "Telegram";
-const TAG_YOUTUBE: &str = "YouTube";
-const TAG_NETFLIX: &str = "Netflix";
-const TAG_OPENAI: &str = "OpenAI";
 
 /// 将应用设置（端口 / System Proxy / TUN / IPv6 偏好等）同步到 sing-box 配置。
 ///
@@ -58,27 +43,8 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
         // dns.strategy 用于切换“仅 IPv4 / IPv6 优先”等行为。
         let dns = config_obj.entry("dns".to_string()).or_insert(json!({}));
         if let Some(dns_obj) = dns.as_object_mut() {
-            let strategy = if app_config.prefer_ipv6 {
-                "prefer_ipv6"
-            } else {
-                "ipv4_only"
-            };
-            dns_obj.insert("strategy".to_string(), json!(strategy));
+            dns_obj.insert("strategy".to_string(), json!(dns_strategy(app_config)));
         }
-    }
-}
-
-fn normalize_default_outbound(app_config: &AppConfig) -> &'static str {
-    match app_config.singbox_default_proxy_outbound.as_str() {
-        "auto" => TAG_AUTO,
-        _ => TAG_MANUAL,
-    }
-}
-
-fn normalize_download_detour(app_config: &AppConfig) -> &'static str {
-    match app_config.singbox_download_detour.as_str() {
-        "direct" => TAG_DIRECT,
-        _ => TAG_MANUAL,
     }
 }
 
