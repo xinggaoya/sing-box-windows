@@ -172,7 +172,10 @@ pub async fn start_kernel_with_state(
 
     let config_path = resolve_config_path(&app_handle).await?;
 
-    match PROCESS_MANAGER.start(&config_path, resolved.proxy.tun_enabled).await {
+    match PROCESS_MANAGER
+        .start(&app_handle, &config_path, resolved.proxy.tun_enabled)
+        .await
+    {
         Ok(_) => {
             info!("? 内核进程启动成功");
 

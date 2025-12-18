@@ -103,7 +103,7 @@ export default {
     sudoPassword: {
       title: '需要系统密码',
       description:
-        '首次启用 TUN 需要使用 sudo 提权启动内核。密码将安全保存在系统钥匙串/密钥环中，仅用于本机提权，不会上传。',
+        '首次启用 TUN 需要使用 sudo 提权启动内核。密码会加密保存在本地数据库，仅用于本机提权，不会上传。',
       placeholder: '请输入系统密码',
       save: '保存并继续',
       saved: '系统密码已保存',

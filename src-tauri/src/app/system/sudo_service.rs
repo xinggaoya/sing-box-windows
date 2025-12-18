@@ -1,4 +1,5 @@
 use serde::Serialize;
+use tauri::{AppHandle, Manager};
 
 /// 统一给前端/调用方识别的错误码前缀（避免依赖具体文案）。
 /// 约定：Rust 端返回 `SUDO_PASSWORD_REQUIRED` / `SUDO_PASSWORD_INVALID` 等，
@@ -15,14 +16,14 @@ pub struct SudoPasswordStatus {
 
 /// 查询当前平台是否支持“保存并复用 sudo 密码”能力，以及是否已保存。
 #[tauri::command]
-pub fn sudo_password_status() -> Result<SudoPasswordStatus, String> {
+pub async fn sudo_password_status(app: AppHandle) -> Result<SudoPasswordStatus, String> {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        let has_saved = has_saved_password()?;
-        Ok(SudoPasswordStatus {
+        let has_saved = has_saved_password(&app).await?;
+        return Ok(SudoPasswordStatus {
             supported: true,
             has_saved,
-        })
+        });
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -34,15 +35,15 @@ pub fn sudo_password_status() -> Result<SudoPasswordStatus, String> {
     }
 }
 
-/// 设置/更新 sudo 密码：会先校验密码是否正确，正确才写入系统密钥环。
+/// 设置/更新 sudo 密码：会先校验密码是否正确，正确才加密写入数据库。
 #[tauri::command]
-pub fn sudo_set_password(_password: String) -> Result<(), String> {
+pub async fn sudo_set_password(password: String, app: AppHandle) -> Result<(), String> {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         // 必要的安全措施：不保存无效密码，避免后续启动卡死/失败。
-        validate_sudo_password(&_password)?;
-        set_saved_password(&_password)?;
-        Ok(())
+        validate_sudo_password(&password)?;
+        save_password(&app, &password).await?;
+        return Ok(());
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -53,11 +54,11 @@ pub fn sudo_set_password(_password: String) -> Result<(), String> {
 
 /// 清除已保存的 sudo 密码（例如用户修改了系统密码后需要重新设置）。
 #[tauri::command]
-pub fn sudo_clear_password() -> Result<(), String> {
+pub async fn sudo_clear_password(app: AppHandle) -> Result<(), String> {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        delete_saved_password()?;
-        Ok(())
+        delete_saved_password(&app).await?;
+        return Ok(());
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -67,86 +68,133 @@ pub fn sudo_clear_password() -> Result<(), String> {
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn keyring_entry() -> Result<keyring::Entry, String> {
-    // service 名尽量稳定，避免不同版本之间互相覆盖/找不到
-    const SERVICE: &str = "sing-box-windows.sudo";
-    // user 作为 keyring 的 “账户名”，用当前登录用户更直观
-    let user = std::env::var("USER")
-        .or_else(|_| std::env::var("USERNAME"))
-        .unwrap_or_else(|_| "default".to_string());
+use {
+    base64::engine::general_purpose::STANDARD as BASE64_ENGINE,
+    base64::Engine,
+    aes_gcm::{
+        aead::{Aead, KeyInit},
+        Aes256Gcm, Nonce,
+    },
+    rand::RngCore,
+    sha2::{Digest, Sha256},
+    tracing::warn,
+};
 
-    keyring::Entry::new(SERVICE, &user).map_err(|e| format!("初始化系统密钥环失败: {}", e))
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+const SUDO_PASSWORD_KEY: &str = "sudo_password_cipher_v1";
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+const NONCE_LEN: usize = 12;
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn derive_crypto_key(app: &AppHandle) -> Result<[u8; 32], String> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("无法定位应用数据目录: {}", e))?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(data_dir.to_string_lossy().as_bytes());
+    hasher.update(b"|sing-box-windows|sudo|v1");
+    let digest = hasher.finalize();
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&digest);
+    Ok(key)
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn has_saved_password() -> Result<bool, String> {
-    let entry = keyring_entry()?;
-    match entry.get_password() {
-        Ok(pwd) => Ok(!pwd.is_empty()),
-        Err(err) => {
-            // NoEntry/NotFound 等错误在不同后端实现上文案不同，这里统一视为“未保存”
-            let msg = err.to_string().to_lowercase();
-            if msg.contains("no entry")
-                || msg.contains("not found")
-                || msg.contains("no password")
-                || msg.contains("credential not found")
-            {
-                Ok(false)
-            } else {
-                Err(format!("读取系统密钥环失败: {}", err))
-            }
-        }
+fn encrypt_password(app: &AppHandle, password: &str) -> Result<String, String> {
+    let key = derive_crypto_key(app)?;
+    let cipher =
+        Aes256Gcm::new_from_slice(&key).map_err(|e| format!("初始化加密器失败: {}", e))?;
+
+    let mut nonce_bytes = [0u8; NONCE_LEN];
+    rand::thread_rng().fill_bytes(&mut nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let ciphertext = cipher
+        .encrypt(nonce, password.as_bytes())
+        .map_err(|e| format!("加密密码失败: {}", e))?;
+
+    let mut combined = Vec::with_capacity(NONCE_LEN + ciphertext.len());
+    combined.extend_from_slice(&nonce_bytes);
+    combined.extend_from_slice(&ciphertext);
+
+    Ok(BASE64_ENGINE.encode(combined))
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn decrypt_password(app: &AppHandle, encoded: &str) -> Result<String, String> {
+    let raw = BASE64_ENGINE
+        .decode(encoded)
+        .map_err(|e| format!("解码密码失败: {}", e))?;
+    if raw.len() <= NONCE_LEN {
+        return Err("保存的密码数据已损坏，请重新输入".to_string());
     }
+
+    let (nonce_bytes, cipher_bytes) = raw.split_at(NONCE_LEN);
+    let key = derive_crypto_key(app)?;
+    let cipher =
+        Aes256Gcm::new_from_slice(&key).map_err(|e| format!("初始化解密器失败: {}", e))?;
+
+    let plaintext = cipher
+        .decrypt(Nonce::from_slice(nonce_bytes), cipher_bytes)
+        .map_err(|e| format!("解密密码失败: {}", e))?;
+
+    String::from_utf8(plaintext).map_err(|e| format!("解密后的密码不是有效 UTF-8: {}", e))
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn get_saved_password() -> Result<Option<String>, String> {
-    let entry = keyring_entry()?;
-    match entry.get_password() {
-        Ok(pwd) if !pwd.is_empty() => Ok(Some(pwd)),
-        Ok(_) => Ok(None),
-        Err(err) => {
-            let msg = err.to_string().to_lowercase();
-            if msg.contains("no entry")
-                || msg.contains("not found")
-                || msg.contains("no password")
-                || msg.contains("credential not found")
-            {
+async fn has_saved_password(app: &AppHandle) -> Result<bool, String> {
+    Ok(load_saved_password(app).await?.is_some())
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+async fn load_saved_password(app: &AppHandle) -> Result<Option<String>, String> {
+    use crate::app::storage::enhanced_storage_service::get_enhanced_storage;
+
+    let storage = get_enhanced_storage(app).await?;
+    let cipher: Option<String> = storage
+        .get_config(SUDO_PASSWORD_KEY)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if let Some(cipher) = cipher {
+        match decrypt_password(app, &cipher) {
+            Ok(pwd) if !pwd.is_empty() => Ok(Some(pwd)),
+            Ok(_) => Ok(None),
+            Err(err) => {
+                warn!("保存的 sudo 密码解密失败，清除缓存: {}", err);
+                let _ = storage.remove_config(SUDO_PASSWORD_KEY).await;
                 Ok(None)
-            } else {
-                Err(format!("读取系统密钥环失败: {}", err))
             }
         }
+    } else {
+        Ok(None)
     }
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn set_saved_password(password: &str) -> Result<(), String> {
-    let entry = keyring_entry()?;
-    entry
-        .set_password(password)
-        .map_err(|e| format!("写入系统密钥环失败: {}", e))
+async fn save_password(app: &AppHandle, password: &str) -> Result<(), String> {
+    use crate::app::storage::enhanced_storage_service::get_enhanced_storage;
+
+    let cipher = encrypt_password(app, password)?;
+    let storage = get_enhanced_storage(app).await?;
+    storage
+        .save_config(SUDO_PASSWORD_KEY, &cipher)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn delete_saved_password() -> Result<(), String> {
-    let entry = keyring_entry()?;
-    match entry.delete_credential() {
-        Ok(_) => Ok(()),
-        Err(err) => {
-            let msg = err.to_string().to_lowercase();
-            // 未保存时删除也视为成功
-            if msg.contains("no entry")
-                || msg.contains("not found")
-                || msg.contains("no password")
-                || msg.contains("credential not found")
-            {
-                Ok(())
-            } else {
-                Err(format!("清除系统密钥环失败: {}", err))
-            }
-        }
-    }
+async fn delete_saved_password(app: &AppHandle) -> Result<(), String> {
+    use crate::app::storage::enhanced_storage_service::get_enhanced_storage;
+
+    let storage = get_enhanced_storage(app).await?;
+    storage
+        .remove_config(SUDO_PASSWORD_KEY)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -212,7 +260,8 @@ fn can_run_sudo_non_interactive() -> bool {
 /// - 每次启动前先用 `sudo -S -k -v` 校验/刷新凭据
 /// - 尽量用 `sudo -n` 启动内核，避免把密码写进内核 stdin
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-pub fn spawn_kernel_with_saved_password(
+pub async fn spawn_kernel_with_saved_password(
+    app_handle: &AppHandle,
     kernel_path: &str,
     work_dir: &str,
     config_path: &str,
@@ -220,7 +269,8 @@ pub fn spawn_kernel_with_saved_password(
     use std::io::Write;
     use std::process::{Command, Stdio};
 
-    let Some(password) = get_saved_password()? else {
+    let saved = load_saved_password(app_handle).await?;
+    let Some(password) = saved else {
         return Err(SUDO_PASSWORD_REQUIRED.to_string());
     };
 
@@ -228,8 +278,11 @@ pub fn spawn_kernel_with_saved_password(
     if let Err(err) = validate_sudo_password(&password) {
         // 密码不对时，避免后续反复失败，直接清空缓存。
         if err == SUDO_PASSWORD_INVALID {
-            let _ = delete_saved_password();
-            return Err(SUDO_PASSWORD_INVALID.to_string());
+            let _ = delete_saved_password(app_handle).await;
+            return Err(format!(
+                "{}: saved password cleared, please re-enter",
+                SUDO_PASSWORD_INVALID
+            ));
         }
         return Err(err);
     }

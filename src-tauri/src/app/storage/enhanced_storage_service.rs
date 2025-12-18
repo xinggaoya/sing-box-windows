@@ -36,7 +36,7 @@ fn sync_settings_to_config_file(
 }
 
 /// 获取数据库服务的辅助函数（单例初始化）
-async fn get_enhanced_storage(app: &AppHandle) -> Result<Arc<EnhancedStorageService>, String> {
+pub async fn get_enhanced_storage(app: &AppHandle) -> Result<Arc<EnhancedStorageService>, String> {
     let cell_state = app.state::<Arc<OnceCell<Arc<EnhancedStorageService>>>>();
     let cell = Arc::clone(&*cell_state);
 
@@ -193,12 +193,17 @@ impl EnhancedStorageService {
     {
         self.database.save_config(key, value).await
     }
+
+    pub async fn remove_config(&self, key: &str) -> StorageResult<()> {
+        self.database.remove_config(key).await
+    }
 }
 
 // Tauri 命令实现
 #[tauri::command]
 pub async fn db_get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     let storage = get_enhanced_storage(&app).await?;
+    #[allow(unused_mut)]
     let mut config = storage.get_app_config().await.map_err(|e| e.to_string())?;
 
     // Windows：非管理员启动时自动关闭 TUN，避免因缺少权限导致内核无法拉起

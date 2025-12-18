@@ -103,7 +103,7 @@ export default {
     sudoPassword: {
       title: 'System password required',
       description:
-        'Enabling TUN for the first time requires sudo privileges to start the kernel. The password will be stored securely in your system keychain/keyring and will never be uploaded.',
+        'Enabling TUN for the first time requires sudo privileges to start the kernel. The password will be encrypted and stored locally for sudo use only, and will never be uploaded.',
       placeholder: 'Enter your system password',
       save: 'Save & continue',
       saved: 'System password saved',

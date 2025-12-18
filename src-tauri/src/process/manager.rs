@@ -6,6 +6,7 @@ use crate::utils::proxy_util::disable_system_proxy;
 use std::os::windows::process::CommandExt;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
+use tauri::AppHandle;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
 use tracing::{debug, error, info, warn};
@@ -23,7 +24,12 @@ impl ProcessManager {
 
     // 启动进程（带系统环境检查和重试机制）
     // tun_enabled: 是否启用 TUN 模式，在 Linux/macOS 上需要特殊权限提升
-    pub async fn start(&self, config_path: &std::path::Path, tun_enabled: bool) -> Result<()> {
+    pub async fn start(
+        &self,
+        app_handle: &AppHandle,
+        config_path: &std::path::Path,
+        tun_enabled: bool,
+    ) -> Result<()> {
         info!("🚀 开始启动内核进程... TUN模式: {}", tun_enabled);
 
         // 验证配置文件有效性
@@ -100,7 +106,13 @@ impl ProcessManager {
             info!("🔧 尝试启动内核进程，第 {}/{} 次", attempt, max_attempts);
 
             match self
-                .try_start_kernel_process(&kernel_path, &kernel_work_dir, config_path, tun_enabled)
+                .try_start_kernel_process(
+                    app_handle,
+                    &kernel_path,
+                    &kernel_work_dir,
+                    config_path,
+                    tun_enabled,
+                )
                 .await
             {
                 Ok(child) => {
@@ -192,6 +204,7 @@ impl ProcessManager {
     // tun_enabled 参数用于在 Linux/macOS 上启用 TUN 时进行权限提升
     async fn try_start_kernel_process(
         &self,
+        app_handle: &AppHandle,
         kernel_path: &std::path::Path,
         kernel_work_dir: &std::path::Path,
         config_path: &std::path::Path,
@@ -210,7 +223,7 @@ impl ProcessManager {
         // Windows: 直接启动（假设应用已以管理员权限运行）
         #[cfg(target_os = "windows")]
         {
-            let _ = (tun_enabled, kernel_str); // Windows 不使用这些参数，由应用整体权限控制
+            let _ = (tun_enabled, kernel_str, app_handle); // Windows 不使用这些参数，由应用整体权限控制
             let mut cmd = Command::new(kernel_path);
             cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
             cmd.stdout(Stdio::null()).stderr(Stdio::null());
@@ -228,10 +241,12 @@ impl ProcessManager {
             if tun_enabled {
                 info!("🔐 TUN 模式启用，使用 sudo 提升内核权限");
                 return crate::app::system::sudo_service::spawn_kernel_with_saved_password(
+                    app_handle,
                     kernel_str,
                     work_dir_str,
                     config_str,
                 )
+                .await
                 .map_err(ProcessError::StartFailed);
             } else {
                 let mut cmd = Command::new(kernel_path);
@@ -251,10 +266,12 @@ impl ProcessManager {
             if tun_enabled {
                 info!("🔐 TUN 模式启用，使用 sudo 提升内核权限");
                 return crate::app::system::sudo_service::spawn_kernel_with_saved_password(
+                    app_handle,
                     kernel_str,
                     work_dir_str,
                     config_str,
                 )
+                .await
                 .map_err(ProcessError::StartFailed);
             } else {
                 let mut cmd = Command::new(kernel_path);
@@ -271,7 +288,7 @@ impl ProcessManager {
         // 其他平台回退
         #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
         {
-            let _ = tun_enabled;
+            let _ = (tun_enabled, app_handle);
             let mut cmd = Command::new(kernel_path);
             cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
             cmd.stdout(Stdio::null()).stderr(Stdio::null());
@@ -411,11 +428,16 @@ impl ProcessManager {
     }
 
     // 重启进程
-    pub async fn restart(&self, config_path: &std::path::Path, tun_enabled: bool) -> Result<()> {
+    pub async fn restart(
+        &self,
+        app_handle: &AppHandle,
+        config_path: &std::path::Path,
+        tun_enabled: bool,
+    ) -> Result<()> {
         info!("正在重启内核进程，TUN模式: {}", tun_enabled);
         self.stop().await?;
         sleep(Duration::from_millis(1000)).await;
-        self.start(config_path, tun_enabled).await?;
+        self.start(app_handle, config_path, tun_enabled).await?;
         info!("内核进程重启完成");
         Ok(())
     }

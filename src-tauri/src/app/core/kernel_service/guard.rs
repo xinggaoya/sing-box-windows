@@ -2,7 +2,7 @@ use crate::app::constants::paths;
 use crate::app::core::kernel_service::event::start_websocket_relay;
 use crate::app::core::kernel_service::status::is_kernel_running;
 use crate::app::core::kernel_service::utils::{
-    emit_kernel_started, emit_kernel_stopped, resolve_config_path_or_default,
+    emit_kernel_error, emit_kernel_started, emit_kernel_stopped, resolve_config_path_or_default,
 };
 use crate::app::core::kernel_service::PROCESS_MANAGER;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
@@ -66,8 +66,26 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                     }
 
                     let tun_enabled = GUARDED_TUN_ENABLED.load(Ordering::Relaxed);
-                    if let Err(err) = PROCESS_MANAGER.start(&config_path, tun_enabled).await {
+                    if let Err(err) =
+                        PROCESS_MANAGER.start(&app_handle, &config_path, tun_enabled).await
+                    {
                         warn!("守护重启内核失败: {}", err);
+
+                        let err_str = err.to_string();
+                        if err_str.contains("SUDO_PASSWORD_REQUIRED")
+                            || err_str.contains("SUDO_PASSWORD_INVALID")
+                        {
+                            // 若因 sudo 密码失效而重启失败，停止守护并提示用户重新设置密码。
+                            emit_kernel_error(
+                                &app_handle,
+                                "TUN 提权失败：sudo 密码无效，请重新输入系统密码后重启内核。",
+                            );
+                            KEEP_ALIVE_ENABLED.store(false, Ordering::Relaxed);
+                            GUARDED_API_PORT.store(0, Ordering::Relaxed);
+                            GUARDED_TUN_ENABLED.store(false, Ordering::Relaxed);
+                            break;
+                        }
+
                         continue;
                     }
 
