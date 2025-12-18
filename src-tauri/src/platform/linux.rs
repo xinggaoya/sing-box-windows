@@ -1,43 +1,80 @@
 //! Linux 平台实现
 
-use tracing::info;
+use tracing::{info, warn};
 
 /// 检测进程是否运行（Linux）
 pub async fn platform_is_process_running(process_name: &str) -> Result<bool, String> {
+    let self_pid = std::process::id();
+
     // 方法1: 使用 pidof
     if let Ok(output) = std::process::Command::new("pidof")
+        .arg("-x")
         .arg(process_name)
         .output()
     {
-        if output.status.success() && !output.stdout.is_empty() {
-            info!("通过pidof检测到进程");
-            return Ok(true);
+        if output.status.success() {
+            if let Some(pid) = String::from_utf8_lossy(&output.stdout)
+                .split_whitespace()
+                .filter_map(|s| s.parse::<u32>().ok())
+                .find(|pid| *pid != self_pid)
+            {
+                info!("通过pidof检测到进程: {}", pid);
+                return Ok(true);
+            }
         }
     }
 
     // 方法2: 使用 pgrep
     if let Ok(output) = std::process::Command::new("pgrep")
-        .arg(process_name)
+        .args(&["-x", process_name])
         .output()
     {
-        if output.status.success() && !output.stdout.is_empty() {
-            info!("通过pgrep检测到进程");
-            return Ok(true);
-        }
-    }
-
-    // 方法3: 使用 ps
-    if let Ok(output) = std::process::Command::new("ps")
-        .args(&["-ef"])
-        .output()
-    {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        for line in stdout.lines() {
-            if line.contains(process_name) {
-                info!("通过ps检测到进程");
+        if output.status.success() {
+            if let Some(pid) = String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .filter_map(|s| s.trim().parse::<u32>().ok())
+                .find(|pid| *pid != self_pid)
+            {
+                info!("通过pgrep检测到进程: {}", pid);
                 return Ok(true);
             }
         }
+    }
+
+    // 方法3: 直接遍历 /proc，避免模糊匹配误杀自身
+    if let Ok(entries) = std::fs::read_dir("/proc") {
+        for entry in entries.flatten() {
+            let pid: u32 = match entry.file_name().to_string_lossy().parse() {
+                Ok(pid) => pid,
+                Err(_) => continue,
+            };
+            if pid == self_pid {
+                continue;
+            }
+
+            let comm_path = entry.path().join("comm");
+            if let Ok(name) = std::fs::read_to_string(&comm_path) {
+                if name.trim() == process_name {
+                    info!("通过 /proc/{}/comm 检测到进程", pid);
+                    return Ok(true);
+                }
+            }
+
+            let exe_path = entry.path().join("exe");
+            if let Ok(target) = std::fs::read_link(&exe_path) {
+                if target
+                    .file_name()
+                    .and_then(|f| f.to_str())
+                    .map(|f| f == process_name)
+                    .unwrap_or(false)
+                {
+                    info!("通过 /proc/{}/exe 检测到进程", pid);
+                    return Ok(true);
+                }
+            }
+        }
+    } else {
+        warn!("无法遍历 /proc 目录，进程检测可能不准确");
     }
 
     Ok(false)
@@ -46,8 +83,7 @@ pub async fn platform_is_process_running(process_name: &str) -> Result<bool, Str
 /// 杀死指定名称的进程（Linux）
 pub async fn platform_kill_processes_by_name(process_name: &str) -> Result<(), String> {
     let output = std::process::Command::new("pkill")
-        .arg("-9")
-        .arg(process_name)
+        .args(&["-9", "-x", process_name])
         .output()
         .map_err(|e| format!("执行pkill失败: {}", e))?;
 
