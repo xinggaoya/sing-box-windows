@@ -4,5 +4,5 @@
 
 pub mod config_generator;
 pub mod settings_patch;
-mod common;
+pub mod common;
 mod config_schema;

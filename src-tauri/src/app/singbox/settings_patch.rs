@@ -129,6 +129,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
     // 4) route：同步 final / hijack-dns / ads reject / rule_set download_detour
     if let Some(route_obj) = config_obj.get_mut("route").and_then(|v| v.as_object_mut()) {
         route_obj.insert("final".to_string(), json!(default_outbound));
+        route_obj.insert("default_domain_resolver".to_string(), json!(DNS_RESOLVER));
 
         if let Some(rule_sets) = route_obj.get_mut("rule_set").and_then(|v| v.as_array_mut()) {
             // 仅对 remote 规则集更新 download_detour，避免影响本地文件规则集

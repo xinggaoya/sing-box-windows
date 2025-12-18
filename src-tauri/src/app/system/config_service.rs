@@ -1,4 +1,5 @@
 use crate::app::constants::paths;
+use crate::app::singbox::common::{PRIVATE_IP_CIDRS, RS_GEOIP_PRIVATE, RS_GEOSITE_PRIVATE, TAG_DIRECT};
 use crate::app::singbox::config_generator;
 use crate::app::storage::state_model::AppConfig;
 use serde_json::json;
@@ -7,6 +8,7 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 use tracing::{error, info, warn};
+use serde_json::Map;
 
 fn backup_corrupted_config(path: &Path) {
     if !path.exists() {
@@ -196,6 +198,8 @@ async fn update_singbox_config_ports(
 
     // 修改API端口和代理端口
     if let Some(config_obj) = config.as_object_mut() {
+        sanitize_geoip_private_rule_sets(config_obj);
+
         // 修改experimental.clash_api配置（如果存在）
         if let Some(experimental) = config_obj.get_mut("experimental") {
             if let Some(exp_obj) = experimental.as_object_mut() {
@@ -273,5 +277,64 @@ pub async fn update_singbox_ports(
     match update_singbox_config_ports(&app_handle, proxy_port, api_port).await {
         Ok(_) => Ok(true),
         Err(e) => Err(format!("更新sing-box配置端口失败: {}", e)),
+    }
+}
+
+fn sanitize_geoip_private_rule_sets(config_obj: &mut Map<String, Value>) {
+    if let Some(route_obj) = config_obj.get_mut("route").and_then(|v| v.as_object_mut()) {
+        if let Some(rule_sets) = route_obj.get_mut("rule_set").and_then(|v| v.as_array_mut()) {
+            rule_sets.retain(|rs| rs.get("tag").and_then(|v| v.as_str()) != Some(RS_GEOIP_PRIVATE));
+        }
+
+        if let Some(rules) = route_obj.get_mut("rules").and_then(|v| v.as_array_mut()) {
+            for rule in rules.iter_mut() {
+                if let Some(rule_obj) = rule.as_object_mut() {
+                    if let Some(rule_set) = rule_obj.get_mut("rule_set") {
+                        match rule_set {
+                            Value::String(tag) if tag == RS_GEOIP_PRIVATE => {
+                                *rule_set = Value::String(RS_GEOSITE_PRIVATE.to_string());
+                            }
+                            Value::Array(arr) => {
+                                let original_len = arr.len();
+                                arr.retain(|v| v.as_str() != Some(RS_GEOIP_PRIVATE));
+                                // 如果数组被清空，后续会在 retain 中移除此规则
+                                if arr.is_empty() && original_len > 0 {
+                                    rule_obj.remove("rule_set");
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+
+            // 移除被清空 rule_set 的规则，避免生成无效条目
+            rules.retain(|rule| {
+                if let Some(obj) = rule.as_object() {
+                    if let Some(Value::Array(arr)) = obj.get("rule_set") {
+                        return !arr.is_empty();
+                    }
+                }
+                true
+            });
+
+            ensure_private_ip_rule(rules);
+        }
+    }
+}
+
+fn ensure_private_ip_rule(rules: &mut Vec<Value>) {
+    let has_private_rule = rules.iter().any(|rule| {
+        rule.get("ip_cidr").and_then(|v| v.as_array()).map_or(false, |cidrs| {
+            // 只要已有规则包含了所有私网段，就视为已存在
+            PRIVATE_IP_CIDRS.iter().all(|cidr| cidrs.iter().any(|v| v.as_str() == Some(*cidr)))
+        })
+    });
+
+    if !has_private_rule {
+        rules.push(json!({
+            "ip_cidr": PRIVATE_IP_CIDRS,
+            "outbound": TAG_DIRECT
+        }));
     }
 }

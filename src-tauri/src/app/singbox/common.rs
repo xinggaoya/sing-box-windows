@@ -29,6 +29,17 @@ pub const RS_GEOSITE_NETFLIX: &str = "geosite-netflix";
 pub const RS_GEOSITE_OPENAI: &str = "geosite-openai";
 pub const RS_GEOIP_CN: &str = "geoip-cn";
 pub const RS_GEOIP_PRIVATE: &str = "geoip-private";
+pub const PRIVATE_IP_CIDRS: &[&str] = &[
+    "10.0.0.0/8",
+    "100.64.0.0/10",
+    "127.0.0.0/8",
+    "169.254.0.0/16",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "::1/128",
+    "fc00::/7",
+    "fe80::/10",
+];
 
 pub fn normalize_default_outbound(app_config: &AppConfig) -> &'static str {
     match app_config.singbox_default_proxy_outbound.as_str() {
@@ -39,9 +50,9 @@ pub fn normalize_default_outbound(app_config: &AppConfig) -> &'static str {
 
 pub fn normalize_download_detour(app_config: &AppConfig) -> &'static str {
     match app_config.singbox_download_detour.as_str() {
-        "direct" => TAG_DIRECT,
-        // 订阅规则集/Clash UI 下载默认走“手动切换”，便于用户用可用节点下载（适配国内网络）
-        _ => TAG_MANUAL,
+        "manual" => TAG_MANUAL,
+        // 默认值调整为直连：gh-proxy 已经加速，避免多余的代理链路
+        _ => TAG_DIRECT,
     }
 }
 
