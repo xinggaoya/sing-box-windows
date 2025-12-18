@@ -306,9 +306,9 @@ impl ProcessManager {
     async fn verify_startup(&self) -> bool {
         info!("🔍 验证内核启动状态...");
 
-        // 多次检查，确保真正启动成功
-        for i in 1..=5 {
-            tokio::time::sleep(Duration::from_secs(1)).await;
+        // 短轮询快速确认，不长时间阻塞启动流程
+        for i in 1..=3 {
+            tokio::time::sleep(Duration::from_millis(500)).await;
 
             if self.is_running().await {
                 info!("✅ 内核状态验证通过（第{}次检查）", i);
@@ -389,19 +389,27 @@ impl ProcessManager {
         };
 
         if let Some(mut child) = child_opt.take() {
-            // 强制终止进程
+            // Windows 优先使用强制终止，避免长时间等待
+            #[cfg(windows)]
+            {
+                let pid = child.id();
+                if let Err(e) = kill_process_by_pid(pid) {
+                    warn!("强制终止内核进程失败: {}", e);
+                } else {
+                    info!("已强制终止内核进程 (pid={})", pid);
+                }
+            }
+
+            // 其他平台或兜底再尝试优雅 kill
             match child.kill() {
                 Ok(_) => {
                     info!("{}", messages::INFO_PROCESS_STOPPED);
-                    // 等待进程退出
-                    match child.wait() {
-                        Ok(status) => info!("内核进程已终止，退出状态: {}", status),
-                        Err(e) => warn!("等待内核进程终止失败: {}", e),
+                    if let Err(e) = child.wait() {
+                        warn!("等待内核进程终止失败: {}", e);
                     }
                 }
                 Err(e) => {
                     warn!("终止内核进程失败: {}", e);
-                    // 尝试使用更强力的方式终止
                     #[cfg(windows)]
                     {
                         let pid = child.id();

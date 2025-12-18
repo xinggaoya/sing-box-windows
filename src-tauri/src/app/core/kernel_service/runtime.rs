@@ -290,7 +290,7 @@ pub async fn apply_proxy_settings(
 
 #[tauri::command]
 pub async fn kernel_stop_enhanced(app_handle: AppHandle) -> Result<serde_json::Value, String> {
-    info!("?? 停止内核增强版");
+    info!("?? 停止内核（快速模式）");
 
     disable_kernel_guard().await;
 
@@ -314,59 +314,69 @@ pub async fn kernel_stop_enhanced(app_handle: AppHandle) -> Result<serde_json::V
     }
 }
 
+/// 快速重启：后台强制停止旧进程后立即启动，不阻塞前端
 #[tauri::command]
-pub async fn kernel_stop_background(app_handle: AppHandle) -> Result<serde_json::Value, String> {
-    info!("?? 后台请求停止内核（快速返回）");
+pub async fn kernel_restart_fast(
+    app_handle: AppHandle,
+    proxy_mode: Option<String>,
+    api_port: Option<u16>,
+    proxy_port: Option<u16>,
+    prefer_ipv6: Option<bool>,
+    system_proxy_bypass: Option<String>,
+    tun_options: Option<TunProxyOptions>,
+    keep_alive: Option<bool>,
+    system_proxy_enabled: Option<bool>,
+    tun_enabled: Option<bool>,
+) -> Result<serde_json::Value, String> {
+    info!("?? 收到快速重启请求");
 
+    let overrides = ProxyOverrides {
+        proxy_mode,
+        api_port,
+        proxy_port,
+        prefer_ipv6,
+        system_proxy_bypass,
+        tun_options,
+        system_proxy_enabled,
+        tun_enabled,
+        keep_alive,
+    };
+
+    let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
     let handle = app_handle.clone();
+
     tauri::async_runtime::spawn(async move {
-        let stop_result = tokio::time::timeout(Duration::from_secs(6), stop_kernel()).await;
+        // 先尝试停止，超时时强杀
+        let stop_result = tokio::time::timeout(Duration::from_secs(4), stop_kernel()).await;
         match stop_result {
-            Ok(Ok(_)) => info!("? 后台停止内核完成"),
+            Ok(Ok(_)) => info!("? 快速重启：停止阶段完成"),
             Ok(Err(e)) => {
-                error!("? 后台停止内核失败: {}", e);
-                emit_kernel_error(&handle, &format!("停止失败: {}", e));
+                warn!("? 快速重启：停止失败，继续强杀: {}", e);
+                if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+                    error!("强制清理内核进程失败: {}", e);
+                }
             }
             Err(_) => {
-                warn!("? 停止内核超时，尝试强制清理");
+                warn!("? 快速重启：停止超时，强制清理");
                 if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
                     error!("强制清理内核进程失败: {}", e);
                 }
             }
         }
 
-        emit_kernel_stopped(&handle);
-    });
-
-    Ok(json!({
-        "success": true,
-        "message": "已在后台请求停止内核"
-    }))
-}
-
-#[tauri::command]
-pub async fn force_stop_and_exit(app_handle: AppHandle) -> Result<serde_json::Value, String> {
-    info!("?? 收到强制退出请求，后台停止内核并退出应用");
-
-    let handle = app_handle.clone();
-    tauri::async_runtime::spawn(async move {
-        SHOULD_STOP_EVENTS.store(true, std::sync::atomic::Ordering::Relaxed);
-        cleanup_event_relay_tasks().await;
-
-        if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
-            error!("强制清理内核进程失败: {}", e);
+        if let Err(e) = start_kernel_with_state(handle.clone(), &resolved).await {
+            error!("快速重启失败: {}", e);
+            emit_kernel_error(&handle, &format!("快速重启失败: {}", e));
         }
-
-        emit_kernel_stopped(&handle);
-
-        handle.exit(0);
     });
 
     Ok(json!({
         "success": true,
-        "message": "正在后台停止内核并退出"
+        "message": "已发起快速重启"
     }))
 }
+
+// 退出+停核逻辑不再保留单独 API，前端统一使用快速重启或停止
 
 pub async fn stop_kernel() -> Result<String, String> {
     disable_kernel_guard().await;
@@ -378,12 +388,14 @@ pub async fn stop_kernel() -> Result<String, String> {
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_STOP_FAILED, e))?;
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    if !is_kernel_running().await.unwrap_or(true) {
-        info!("? 内核停止成功");
-        Ok("内核停止成功".to_string())
-    } else {
-        Err(messages::ERR_PROCESS_STOP_FAILED.to_string())
+    // 快速轮询确认，避免固定长等待
+    for i in 1..=2 {
+        if !is_kernel_running().await.unwrap_or(true) {
+            info!("? 内核停止成功（第{}次检查）", i);
+            return Ok("内核停止成功".to_string());
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
     }
+
+    Err(messages::ERR_PROCESS_STOP_FAILED.to_string())
 }

@@ -130,34 +130,6 @@ export const useKernelStore = defineStore('kernel', () => {
     }
   }
 
-  // 后台快速停止内核，不阻塞前端退出流程
-  const stopKernelFast = async () => {
-    try {
-      const result = await kernelService.stopKernelFast()
-      if (!result.success) {
-        lastError.value = result.message
-      }
-      return result.success
-    } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '内核停止失败'
-      return false
-    }
-  }
-
-  // 强制停止内核并退出应用（后端处理退出）
-  const forceStopAndExit = async () => {
-    try {
-      const result = await kernelService.forceStopAndExit()
-      if (!result.success) {
-        lastError.value = result.message
-      }
-      return result.success
-    } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '退出时停止内核失败'
-      return false
-    }
-  }
-
   const switchProxyMode = async (mode: ProxyMode) => {
     try {
       const result = await kernelService.switchProxyMode(mode)
@@ -284,8 +256,6 @@ export const useKernelStore = defineStore('kernel', () => {
     refreshStatus,
     restartKernel,
     stopKernel,
-    stopKernelFast,
-    forceStopAndExit,
     switchProxyMode,
     applyProxySettings,
     toggleIpVersion,

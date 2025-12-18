@@ -29,10 +29,10 @@ pub(super) async fn start_websocket_relay(
     info!("?? 开始启动事件中继服务，端口: {}", port);
 
     let wait_time = if is_system_recently_started().await {
-        info!("?? 检测到系统刚启动，增加事件中继启动等待时间");
-        Duration::from_secs(5)
+        info!("?? 检测到系统刚启动，使用较短延迟后启动事件中继");
+        Duration::from_millis(1000)
     } else {
-        Duration::from_secs(2)
+        Duration::from_millis(500)
     };
     tokio::time::sleep(wait_time).await;
 

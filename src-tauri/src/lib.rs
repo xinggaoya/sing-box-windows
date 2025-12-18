@@ -121,8 +121,7 @@ pub fn run() {
             // Core - Kernel service commands (enhanced)
             crate::app::core::kernel_service::runtime::kernel_start_enhanced,
             crate::app::core::kernel_service::runtime::kernel_stop_enhanced,
-            crate::app::core::kernel_service::runtime::kernel_stop_background,
-            crate::app::core::kernel_service::runtime::force_stop_and_exit,
+            crate::app::core::kernel_service::runtime::kernel_restart_fast,
             crate::app::core::kernel_service::status::kernel_get_status_enhanced,
             crate::app::core::kernel_service::status::kernel_check_health,
             crate::app::core::kernel_auto_manage::kernel_auto_manage,

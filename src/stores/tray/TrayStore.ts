@@ -392,10 +392,11 @@ export const useTrayStore = defineStore('tray', () => {
         text: t('tray.quit'),
         action: async () => {
           try {
-            // 交给后端强制停止并退出，前端快速返回
-            kernelStore.forceStopAndExit().catch((e) => {
-              console.warn('强制停止内核并退出失败（已忽略以便退出）：', e)
+            // 先尝试快速停止内核，再关闭窗口退出应用
+            kernelStore.stopKernel({ force: true }).catch((e) => {
+              console.warn('退出前停止内核失败（已忽略以便退出）：', e)
             })
+            await Window.getCurrent().close()
           } catch (e) {
             console.error('退出应用失败:', e)
           }

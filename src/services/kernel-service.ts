@@ -135,14 +135,46 @@ class KernelService {
   }
 
   async restartKernel(options: KernelStartOptions & KernelStopOptions = {}): Promise<{ success: boolean; message: string }> {
-    const stopResult = await this.stopKernel(options)
-    if (!stopResult.success) {
-      return { success: false, message: `重启失败: ${stopResult.message}` }
-    }
+    // 走后端快速重启：后台强制停+立即启动，前端不做长等待
+    return withAppStore(async store => {
+      await store.waitForDataRestore()
 
-    await new Promise(resolve => setTimeout(resolve, 1000))
+      const args: Record<string, unknown> = {}
 
-    return this.startKernel(options)
+      if (options.config?.proxy_mode) {
+        args.proxy_mode = options.config.proxy_mode
+        args.proxyMode = options.config.proxy_mode
+      }
+
+      if (options.config?.api_port) {
+        args.api_port = options.config.api_port
+        args.apiPort = options.config.api_port
+      }
+
+      if (options.config?.proxy_port) {
+        args.proxy_port = options.config.proxy_port
+        args.proxyPort = options.config.proxy_port
+      }
+
+      if (typeof options.config?.system_proxy_enabled === 'boolean') {
+        args.system_proxy_enabled = options.config.system_proxy_enabled
+      }
+
+      if (typeof options.config?.tun_enabled === 'boolean') {
+        args.tun_enabled = options.config.tun_enabled
+      }
+
+      if (options.keepAlive !== undefined) {
+        args.keep_alive = options.keepAlive
+        args.keepAlive = options.keepAlive
+      }
+
+      return invokeWithAppContext<{ success: boolean; message: string }>(
+        'kernel_restart_fast',
+        Object.keys(args).length > 0 ? args : undefined,
+        { skipDataRestore: true }
+      )
+    })
   }
 
   /**
@@ -310,44 +342,6 @@ class KernelService {
         { skipDataRestore: true }
       )
     })
-  }
-
-  /**
-   * 后台快速停止内核：仅发起请求，立即返回
-   */
-  async stopKernelFast(): Promise<{ success: boolean; message: string }> {
-    try {
-      return await invokeWithAppContext<{ success: boolean; message: string }>(
-        'kernel_stop_background',
-        undefined,
-        { skipDataRestore: true }
-      )
-    } catch (error) {
-      console.error('后台停止内核失败:', error)
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : '后台停止内核失败'
-      }
-    }
-  }
-
-  /**
-   * 强制停止内核并退出应用（后端后台执行，前端快速返回）
-   */
-  async forceStopAndExit(): Promise<{ success: boolean; message: string }> {
-    try {
-      return await invokeWithAppContext<{ success: boolean; message: string }>(
-        'force_stop_and_exit',
-        undefined,
-        { skipDataRestore: true }
-      )
-    } catch (error) {
-      console.error('强制停止并退出失败:', error)
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : '强制停止并退出失败'
-      }
-    }
   }
 
   

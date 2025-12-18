@@ -53,7 +53,7 @@ pub async fn kernel_get_status_enhanced(
 
         api_ready = match client
             .get(&api_url)
-            .timeout(Duration::from_secs(2))
+            .timeout(Duration::from_millis(500))
             .send()
             .await
         {
@@ -73,7 +73,7 @@ pub async fn kernel_get_status_enhanced(
             let url_str = format!("ws://127.0.0.1:{}/traffic?token={}", port, token);
 
             websocket_ready = tokio::time::timeout(
-                Duration::from_secs(3),
+                Duration::from_secs(1),
                 tokio_tungstenite::connect_async(&url_str),
             )
             .await
@@ -94,7 +94,7 @@ pub async fn kernel_get_status_enhanced(
         let api_url = format!("http://127.0.0.1:{}/version", port);
         match client
             .get(&api_url)
-            .timeout(Duration::from_secs(2))
+            .timeout(Duration::from_millis(500))
             .send()
             .await
         {

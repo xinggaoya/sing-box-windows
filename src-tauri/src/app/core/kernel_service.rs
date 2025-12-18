@@ -17,9 +17,9 @@ pub mod versioning;
 
 pub use download::download_kernel;
 pub use runtime::{
-    apply_proxy_settings, force_stop_and_exit, kernel_start_enhanced, kernel_stop_background,
-    kernel_stop_enhanced, resolve_proxy_runtime_state, start_kernel_with_state, stop_kernel,
-    ProxyOverrides, ResolvedProxyState,
+    apply_proxy_settings, kernel_restart_fast, kernel_start_enhanced, kernel_stop_enhanced,
+    resolve_proxy_runtime_state, start_kernel_with_state, stop_kernel, ProxyOverrides,
+    ResolvedProxyState,
 };
 pub use status::{
     get_system_uptime, is_kernel_running, kernel_check_health, kernel_get_status_enhanced,
