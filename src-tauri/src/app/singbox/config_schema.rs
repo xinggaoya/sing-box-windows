@@ -73,6 +73,8 @@ pub(crate) struct RouteConfig {
     #[serde(rename = "final")]
     pub final_outbound: String,
     pub auto_detect_interface: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_domain_resolver: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

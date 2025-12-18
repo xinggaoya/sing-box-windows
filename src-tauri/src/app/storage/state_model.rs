@@ -75,7 +75,8 @@ impl Default for AppConfig {
             singbox_urltest_url: "http://cp.cloudflare.com/generate_204".to_string(),
             singbox_default_proxy_outbound: "manual".to_string(),
             singbox_block_ads: true,
-            singbox_download_detour: "manual".to_string(),
+            // gh-proxy 已经做加速，默认走直连下载，避免额外经过代理
+            singbox_download_detour: "direct".to_string(),
             singbox_dns_hijack: true,
             singbox_enable_app_groups: true,
         }

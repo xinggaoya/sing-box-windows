@@ -2,7 +2,7 @@ use crate::app::singbox::settings_patch::apply_app_settings_to_config;
 use crate::app::storage::state_model::AppConfig;
 use super::common::{
     dns_strategy, node_domain_resolver_strategy, normalize_default_outbound, normalize_download_detour,
-    DNS_BLOCK, DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOIP_CN, RS_GEOIP_PRIVATE,
+    PRIVATE_IP_CIDRS, DNS_BLOCK, DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOIP_CN,
     RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_NETFLIX,
     RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
 };
@@ -153,12 +153,6 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             "7d",
         ),
         remote_rule_set_value(
-            RS_GEOIP_PRIVATE,
-            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-private.srs",
-            TAG_DIRECT,
-            "7d",
-        ),
-        remote_rule_set_value(
             RS_GEOIP_CN,
             "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
             download_detour,
@@ -192,8 +186,10 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         ]);
     }
 
+    // 直接内置私网段，避免依赖不存在的 geoip-private 规则集导致启动 404 退出
     route_rules.extend([
-        json!({ "rule_set": [RS_GEOSITE_PRIVATE, RS_GEOIP_PRIVATE], "outbound": TAG_DIRECT }),
+        json!({ "rule_set": RS_GEOSITE_PRIVATE, "outbound": TAG_DIRECT }),
+        json!({ "ip_cidr": PRIVATE_IP_CIDRS, "outbound": TAG_DIRECT }),
         json!({ "rule_set": [RS_GEOSITE_CN, RS_GEOIP_CN], "outbound": TAG_DIRECT }),
         json!({ "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN, "outbound": default_outbound }),
     ]);
@@ -267,6 +263,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             rules: route_rules,
             final_outbound: default_outbound.to_string(),
             auto_detect_interface: true,
+            default_domain_resolver: Some(DNS_RESOLVER.to_string()),
         },
     };
 
