@@ -148,15 +148,14 @@ pub async fn kernel_check_health(api_port: Option<u16>) -> Result<serde_json::Va
         let client = http_client::get_client();
         let api_url = format!("http://127.0.0.1:{}/version", port);
 
-        let api_ready = match client
-            .get(&api_url)
-            .timeout(Duration::from_secs(2))
-            .send()
-            .await
-        {
-            Ok(response) if response.status().is_success() => true,
-            _ => false,
-        };
+        let api_ready = matches!(
+            client
+                .get(&api_url)
+                .timeout(Duration::from_secs(2))
+                .send()
+                .await,
+            Ok(response) if response.status().is_success()
+        );
 
         if !api_ready {
             issues.push(format!("内核进程运行但API不可用（端口: {}）", port));

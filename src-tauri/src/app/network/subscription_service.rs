@@ -47,6 +47,7 @@ fn try_decode_base64_to_text(raw: &str) -> Option<String> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // Tauri 接口需与前端参数保持一致
 pub async fn download_subscription(
     url: String,
     use_original_config: bool,
@@ -75,7 +76,7 @@ pub async fn download_subscription(
     download_and_process_subscription(
         url,
         use_original_config,
-        &app_handle,
+        app_handle,
         &app_config,
         &target_path,
     )
@@ -93,16 +94,17 @@ pub async fn download_subscription(
         }
 
         let runtime_state = runtime_state_from_config(&app_config);
-        if let Err(e) = apply_proxy_runtime_state(&app_handle, &runtime_state).await {
+        if let Err(e) = apply_proxy_runtime_state(app_handle, &runtime_state).await {
             warn!("应用代理配置失败: {}", e);
         }
-        auto_manage_with_saved_config(&app_handle, true, "subscription-download").await;
+        auto_manage_with_saved_config(app_handle, true, "subscription-download").await;
     }
 
     Ok(target_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // Tauri 接口需与前端参数保持一致
 pub async fn add_manual_subscription(
     content: String,
     use_original_config: bool,
@@ -132,7 +134,7 @@ pub async fn add_manual_subscription(
     process_subscription_content(
         content,
         use_original_config,
-        &app_handle,
+        app_handle,
         &app_config,
         &target_path,
     )
@@ -149,10 +151,10 @@ pub async fn add_manual_subscription(
         }
 
         let runtime_state = runtime_state_from_config(&app_config);
-        if let Err(e) = apply_proxy_runtime_state(&app_handle, &runtime_state).await {
+        if let Err(e) = apply_proxy_runtime_state(app_handle, &runtime_state).await {
             warn!("应用代理配置失败: {}", e);
         }
-        auto_manage_with_saved_config(&app_handle, true, "subscription-manual").await;
+        auto_manage_with_saved_config(app_handle, true, "subscription-manual").await;
     }
 
     Ok(target_path.to_string_lossy().to_string())

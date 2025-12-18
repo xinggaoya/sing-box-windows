@@ -325,10 +325,15 @@ fn sanitize_geoip_private_rule_sets(config_obj: &mut Map<String, Value>) {
 
 fn ensure_private_ip_rule(rules: &mut Vec<Value>) {
     let has_private_rule = rules.iter().any(|rule| {
-        rule.get("ip_cidr").and_then(|v| v.as_array()).map_or(false, |cidrs| {
-            // 只要已有规则包含了所有私网段，就视为已存在
-            PRIVATE_IP_CIDRS.iter().all(|cidr| cidrs.iter().any(|v| v.as_str() == Some(*cidr)))
-        })
+        rule
+            .get("ip_cidr")
+            .and_then(|v| v.as_array())
+            .is_some_and(|cidrs| {
+                // 只要已有规则包含了所有私网段，就视为已存在
+                PRIVATE_IP_CIDRS
+                    .iter()
+                    .all(|cidr| cidrs.iter().any(|v| v.as_str() == Some(*cidr)))
+            })
     });
 
     if !has_private_rule {

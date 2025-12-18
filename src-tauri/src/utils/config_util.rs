@@ -79,7 +79,7 @@ impl ConfigUtil {
         let mut current = &mut self.json;
 
         for key in &target_keys[0..target_keys.len() - 1] {
-            if !current.get(key).is_some() {
+            if current.get(key).is_none() {
                 current[key] = json!({});
             }
             current = current.get_mut(key).unwrap();

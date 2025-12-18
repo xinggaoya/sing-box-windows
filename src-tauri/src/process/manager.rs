@@ -15,6 +15,12 @@ pub struct ProcessManager {
     process: Arc<RwLock<Option<Child>>>,
 }
 
+impl Default for ProcessManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProcessManager {
     pub fn new() -> Self {
         Self {
@@ -225,14 +231,14 @@ impl ProcessManager {
         {
             let _ = (tun_enabled, kernel_str, app_handle); // Windows 不使用这些参数，由应用整体权限控制
             let mut cmd = Command::new(kernel_path);
-            cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
+            cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
             cmd.stdout(Stdio::null()).stderr(Stdio::null());
             cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
             let child = cmd
                 .spawn()
                 .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
-            return Ok(child);
+            Ok(child)
         }
 
         // Linux: TUN 模式使用 sudo + 系统密钥环提权（由前端首次收集系统密码）
@@ -250,13 +256,13 @@ impl ProcessManager {
                 .map_err(ProcessError::StartFailed);
             } else {
                 let mut cmd = Command::new(kernel_path);
-                cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
+                cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
                 cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
                 let child = cmd
                     .spawn()
                     .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
-                return Ok(child);
+                Ok(child)
             }
         }
 
@@ -275,13 +281,13 @@ impl ProcessManager {
                 .map_err(ProcessError::StartFailed);
             } else {
                 let mut cmd = Command::new(kernel_path);
-                cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
+                cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
                 cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
                 let child = cmd
                     .spawn()
                     .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
-                return Ok(child);
+                Ok(child)
             }
         }
 
@@ -290,7 +296,7 @@ impl ProcessManager {
         {
             let _ = (tun_enabled, app_handle);
             let mut cmd = Command::new(kernel_path);
-            cmd.args(&["run", "-D", work_dir_str, "-c", config_str]);
+            cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
             cmd.stdout(Stdio::null()).stderr(Stdio::null());
 
             let child = cmd
@@ -507,5 +513,5 @@ impl ProcessManager {
 // 使用PID强制终止进程
 fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
     crate::platform::kill_process_by_pid(pid)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .map_err(std::io::Error::other)
 }

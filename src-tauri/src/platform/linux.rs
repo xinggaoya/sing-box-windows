@@ -26,7 +26,7 @@ pub async fn platform_is_process_running(process_name: &str) -> Result<bool, Str
 
     // 方法2: 使用 pgrep
     if let Ok(output) = std::process::Command::new("pgrep")
-        .args(&["-x", process_name])
+        .args(["-x", process_name])
         .output()
     {
         if output.status.success() {
@@ -83,7 +83,7 @@ pub async fn platform_is_process_running(process_name: &str) -> Result<bool, Str
 /// 杀死指定名称的进程（Linux）
 pub async fn platform_kill_processes_by_name(process_name: &str) -> Result<(), String> {
     let output = std::process::Command::new("pkill")
-        .args(&["-9", "-x", process_name])
+        .args(["-9", "-x", process_name])
         .output()
         .map_err(|e| format!("执行pkill失败: {}", e))?;
 
@@ -99,7 +99,7 @@ pub async fn platform_kill_processes_by_name(process_name: &str) -> Result<(), S
 /// 杀死指定 PID 的进程（Linux）
 pub fn platform_kill_process_by_pid(pid: u32) -> Result<(), String> {
     let output = std::process::Command::new("kill")
-        .args(&["-9", &pid.to_string()])
+        .args(["-9", &pid.to_string()])
         .output()
         .map_err(|e| format!("执行kill失败: {}", e))?;
 

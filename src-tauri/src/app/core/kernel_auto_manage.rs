@@ -186,6 +186,7 @@ pub async fn auto_manage_with_saved_config(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // Tauri 命令需要保持与前端一致的参数形态
 pub async fn kernel_auto_manage(
     app_handle: AppHandle,
     proxy_mode: Option<String>,

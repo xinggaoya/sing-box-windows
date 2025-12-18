@@ -62,6 +62,13 @@ withDefaults(defineProps<StatusCardProps>(), {
   flex-shrink: 0;
 }
 
+/* 保证插槽中的 SVG 图标在不同平台有统一尺寸 */
+.card-icon :deep(svg) {
+  width: 1.2em;
+  height: 1.2em;
+  display: block;
+}
+
 .status-card.primary .card-icon {
   background: rgba(99, 102, 241, 0.1);
   color: var(--primary-color);

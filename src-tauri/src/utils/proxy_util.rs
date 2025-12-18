@@ -18,7 +18,7 @@ fn parse_bypass_entries(raw: Option<&str>) -> Vec<String> {
         .unwrap_or(DEFAULT_BYPASS_LIST);
 
     source
-        .split(|c| c == ';' || c == ',' || c == '\n')
+        .split([';', ',', '\n'])
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
@@ -99,36 +99,38 @@ fn disable_system_proxy_linux() -> io::Result<()> {
     std::env::remove_var("NO_PROXY");
 
     // 尝试使用gsettings重置代理设置 (GNOME/Unity/XFCE等)
-    if let Ok(_) = std::process::Command::new("which")
+    if std::process::Command::new("which")
         .arg("gsettings")
         .output()
+        .is_ok()
     {
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy.http", "host", "''"])
+            .args(["set", "org.gnome.system.proxy.http", "host", "''"])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy.http", "port", "0"])
+            .args(["set", "org.gnome.system.proxy.http", "port", "0"])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy.https", "host", "''"])
+            .args(["set", "org.gnome.system.proxy.https", "host", "''"])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy.https", "port", "0"])
+            .args(["set", "org.gnome.system.proxy.https", "port", "0"])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy", "mode", "'none'"])
+            .args(["set", "org.gnome.system.proxy", "mode", "'none'"])
             .output();
     }
 
     // 尝试使用kwriteconfig5/6重置代理设置 (KDE Plasma)
     for kwriteconfig in &["kwriteconfig6", "kwriteconfig5"] {
-        if let Ok(_) = std::process::Command::new("which")
+        if std::process::Command::new("which")
             .arg(kwriteconfig)
             .output()
+            .is_ok()
         {
             // 设置代理模式为无代理 (0)
             let _ = std::process::Command::new(kwriteconfig)
-                .args(&[
+                .args([
                     "--file",
                     "kioslaverc",
                     "--group",
@@ -141,7 +143,7 @@ fn disable_system_proxy_linux() -> io::Result<()> {
 
             // 通知KDE配置已更改
             let _ = std::process::Command::new("dbus-send")
-                .args(&[
+                .args([
                     "--type=signal",
                     "/KIO/Scheduler",
                     "org.kde.KIO.Scheduler.reparseSlaveConfiguration",
@@ -160,7 +162,7 @@ fn disable_system_proxy_macos() -> io::Result<()> {
     // macOS使用networksetup命令来管理系统代理设置
     // 获取所有网络服务
     let output = std::process::Command::new("networksetup")
-        .args(&["-listallnetworkservices"])
+        .args(["-listallnetworkservices"])
         .output()?;
 
     if output.status.success() {
@@ -172,17 +174,17 @@ fn disable_system_proxy_macos() -> io::Result<()> {
             if !service.is_empty() && service != "*" {
                 // 禁用HTTP代理
                 let _ = std::process::Command::new("networksetup")
-                    .args(&["-setwebproxystate", service, "off"])
+                    .args(["-setwebproxystate", service, "off"])
                     .output();
 
                 // 禁用HTTPS代理
                 let _ = std::process::Command::new("networksetup")
-                    .args(&["-setsecurewebproxystate", service, "off"])
+                    .args(["-setsecurewebproxystate", service, "off"])
                     .output();
 
                 // 禁用SOCKS代理
                 let _ = std::process::Command::new("networksetup")
-                    .args(&["-setsocksfirewallproxystate", service, "off"])
+                    .args(["-setsocksfirewallproxystate", service, "off"])
                     .output();
             }
         }
@@ -245,15 +247,16 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
     std::env::set_var("NO_PROXY", &no_proxy);
 
     // 尝试使用gsettings设置代理 (GNOME/Unity/XFCE等)
-    if let Ok(_) = std::process::Command::new("which")
+    if std::process::Command::new("which")
         .arg("gsettings")
         .output()
+        .is_ok()
     {
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy.http", "host", host])
+            .args(["set", "org.gnome.system.proxy.http", "host", host])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&[
+            .args([
                 "set",
                 "org.gnome.system.proxy.http",
                 "port",
@@ -261,10 +264,10 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
             ])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy.https", "host", host])
+            .args(["set", "org.gnome.system.proxy.https", "host", host])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&[
+            .args([
                 "set",
                 "org.gnome.system.proxy.https",
                 "port",
@@ -272,21 +275,22 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
             ])
             .output();
         let _ = std::process::Command::new("gsettings")
-            .args(&["set", "org.gnome.system.proxy", "mode", "'manual'"])
+            .args(["set", "org.gnome.system.proxy", "mode", "'manual'"])
             .output();
     }
 
     // 尝试使用kwriteconfig5/6设置代理 (KDE Plasma)
     for kwriteconfig in &["kwriteconfig6", "kwriteconfig5"] {
-        if let Ok(_) = std::process::Command::new("which")
+        if std::process::Command::new("which")
             .arg(kwriteconfig)
             .output()
+            .is_ok()
         {
             let proxy_url = format!("http://{}:{}", host, port);
 
             // 设置HTTP代理
             let _ = std::process::Command::new(kwriteconfig)
-                .args(&[
+                .args([
                     "--file",
                     "kioslaverc",
                     "--group",
@@ -299,7 +303,7 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
 
             // 设置HTTPS代理
             let _ = std::process::Command::new(kwriteconfig)
-                .args(&[
+                .args([
                     "--file",
                     "kioslaverc",
                     "--group",
@@ -312,7 +316,7 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
 
             // 设置代理模式为手动 (1)
             let _ = std::process::Command::new(kwriteconfig)
-                .args(&[
+                .args([
                     "--file",
                     "kioslaverc",
                     "--group",
@@ -325,7 +329,7 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
 
             // 通知KDE配置已更改
             let _ = std::process::Command::new("dbus-send")
-                .args(&[
+                .args([
                     "--type=signal",
                     "/KIO/Scheduler",
                     "org.kde.KIO.Scheduler.reparseSlaveConfiguration",
@@ -343,7 +347,7 @@ fn enable_system_proxy_linux(host: &str, port: u16, bypass: Option<&str>) -> io:
 fn enable_system_proxy_macos(host: &str, port: u16, bypass: Option<&str>) -> io::Result<()> {
     // 获取所有网络服务
     let output = std::process::Command::new("networksetup")
-        .args(&["-listallnetworkservices"])
+        .args(["-listallnetworkservices"])
         .output()?;
 
     if output.status.success() {
@@ -356,28 +360,28 @@ fn enable_system_proxy_macos(host: &str, port: u16, bypass: Option<&str>) -> io:
             if !service.is_empty() && service != "*" {
                 // 设置HTTP代理
                 let _ = std::process::Command::new("networksetup")
-                    .args(&["-setwebproxy", service, host, &port.to_string()])
+                    .args(["-setwebproxy", service, host, &port.to_string()])
                     .output();
 
                 // 启用HTTP代理
                 let _ = std::process::Command::new("networksetup")
-                    .args(&["-setwebproxystate", service, "on"])
+                    .args(["-setwebproxystate", service, "on"])
                     .output();
 
                 // 设置HTTPS代理
                 let _ = std::process::Command::new("networksetup")
-                    .args(&["-setsecurewebproxy", service, host, &port.to_string()])
+                    .args(["-setsecurewebproxy", service, host, &port.to_string()])
                     .output();
 
                 // 启用HTTPS代理
                 let _ = std::process::Command::new("networksetup")
-                    .args(&["-setsecurewebproxystate", service, "on"])
+                    .args(["-setsecurewebproxystate", service, "on"])
                     .output();
 
                 // 设置代理绕过列表
                 if !entries.is_empty() {
                     let mut cmd = std::process::Command::new("networksetup");
-                    cmd.args(&["-setproxybypassdomains", service]);
+                    cmd.args(["-setproxybypassdomains", service]);
                     for entry in &entries {
                         cmd.arg(entry);
                     }

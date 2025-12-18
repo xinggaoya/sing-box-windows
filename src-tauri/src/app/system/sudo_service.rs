@@ -20,10 +20,10 @@ pub async fn sudo_password_status(app: AppHandle) -> Result<SudoPasswordStatus, 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         let has_saved = has_saved_password(&app).await?;
-        return Ok(SudoPasswordStatus {
+        Ok(SudoPasswordStatus {
             supported: true,
             has_saved,
-        });
+        })
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -43,7 +43,7 @@ pub async fn sudo_set_password(password: String, app: AppHandle) -> Result<(), S
         // 必要的安全措施：不保存无效密码，避免后续启动卡死/失败。
         validate_sudo_password(&password)?;
         save_password(&app, &password).await?;
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -58,7 +58,7 @@ pub async fn sudo_clear_password(app: AppHandle) -> Result<(), String> {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         delete_saved_password(&app).await?;
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]

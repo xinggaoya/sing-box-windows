@@ -227,6 +227,7 @@ pub async fn start_kernel_with_state(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // 保持 Tauri 调用签名，参数拆分由前端传入
 pub async fn kernel_start_enhanced(
     app_handle: AppHandle,
     proxy_mode: Option<String>,
@@ -316,6 +317,7 @@ pub async fn kernel_stop_enhanced(app_handle: AppHandle) -> Result<serde_json::V
 
 /// 快速重启：后台强制停止旧进程后立即启动，不阻塞前端
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // 保持 Tauri 调用签名，参数拆分由前端传入
 pub async fn kernel_restart_fast(
     app_handle: AppHandle,
     proxy_mode: Option<String>,

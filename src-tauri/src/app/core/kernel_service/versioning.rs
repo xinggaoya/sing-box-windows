@@ -18,7 +18,7 @@ pub(super) async fn get_latest_kernel_version(
         .user_agent("sing-box-windows/1.8.2")
         .build()?;
 
-    let api_urls = vec![
+    let api_urls = [
         "https://api.github.com/repos/SagerNet/sing-box/releases/latest",
         "https://v6.gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest",
         "https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest",
@@ -34,8 +34,8 @@ pub(super) async fn get_latest_kernel_version(
                     let release: GitHubRelease = response.json().await?;
                     let tag_name = release.tag_name;
 
-                    let version = if tag_name.starts_with('v') {
-                        tag_name[1..].to_string()
+                    let version = if let Some(stripped) = tag_name.strip_prefix('v') {
+                        stripped.to_string()
                     } else {
                         tag_name
                     };
@@ -71,7 +71,7 @@ pub(super) async fn get_kernel_releases() -> Result<Vec<String>, Box<dyn std::er
         .user_agent("sing-box-windows/1.8.2")
         .build()?;
 
-    let api_urls = vec![
+    let api_urls = [
         "https://api.github.com/repos/SagerNet/sing-box/releases",
         "https://v6.gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases",
         "https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases",
@@ -85,15 +85,15 @@ pub(super) async fn get_kernel_releases() -> Result<Vec<String>, Box<dyn std::er
             Ok(response) => {
                 if response.status().is_success() {
                     let releases: Vec<GitHubRelease> = response.json().await?;
-                    let versions: Vec<String> = releases.into_iter()
+                    let versions: Vec<String> = releases
+                        .into_iter()
                         .filter(|r| !r.prerelease) // Filter out GitHub pre-releases
                         .map(|r| {
-                            let v = if r.tag_name.starts_with('v') {
-                                r.tag_name[1..].to_string()
+                            if let Some(stripped) = r.tag_name.strip_prefix('v') {
+                                stripped.to_string()
                             } else {
                                 r.tag_name
-                            };
-                            v
+                            }
                         })
                         .filter(|v| {
                             let lower = v.to_lowercase();

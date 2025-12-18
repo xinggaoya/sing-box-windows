@@ -19,7 +19,7 @@ pub fn extract_nodes_from_subscription(
             if let Some(outbounds) = json.get("outbounds").and_then(|o| o.as_array()) {
                 info!("检测到sing-box格式，outbounds数组长度: {}", outbounds.len());
 
-                for (_i, outbound) in outbounds.iter().enumerate() {
+                for outbound in outbounds.iter() {
                     let outbound_type = outbound.get("type").and_then(|t| t.as_str());
 
                     let node_with_tag = if outbound.get("tag").is_none() {
@@ -57,9 +57,7 @@ pub fn extract_nodes_from_subscription(
                         {
                             for sub_outbound in sub_outbounds {
                                 if let Some(sub_tag) = sub_outbound.as_str() {
-                                    if let Some(actual_node) =
-                                        find_outbound_by_tag(&outbounds, sub_tag)
-                                    {
+                                    if let Some(actual_node) = find_outbound_by_tag(outbounds, sub_tag) {
                                         let node_type =
                                             actual_node.get("type").and_then(|t| t.as_str());
                                         if let Some(type_str) = node_type {
@@ -178,15 +176,14 @@ pub fn extract_nodes_from_subscription(
 
             // 2) URI 列表（如：vmess:// / ss:// / trojan:// / vless:// 一行一个）
             // 说明：这里不直接返回错误，避免“部分节点格式不标准”导致整个订阅无法导入。
-            if nodes.is_empty() {
-                if normalized_text.contains("vmess://")
+            if nodes.is_empty()
+                && (normalized_text.contains("vmess://")
                     || normalized_text.contains("ss://")
                     || normalized_text.contains("trojan://")
-                    || normalized_text.contains("vless://")
-                {
-                    info!("检测到可能包含URI格式的节点，尝试逐行解析...");
-                    nodes.extend(extract_nodes_from_uri_list(&normalized_text));
-                }
+                    || normalized_text.contains("vless://"))
+            {
+                info!("检测到可能包含URI格式的节点，尝试逐行解析...");
+                nodes.extend(extract_nodes_from_uri_list(&normalized_text));
             }
         }
     }
@@ -258,39 +255,37 @@ pub fn clean_json_content(content: &str) -> String {
             } else {
                 cleaned.push(' ');
             }
-        } else {
-            if c == '"' {
-                in_string = true;
-                cleaned.push(c);
-            } else if c == '{'
-                || c == '}'
-                || c == '['
-                || c == ']'
-                || c == ':'
-                || c == ','
-                || c == '.'
-                || c == '-'
-                || c == '+'
-                || c.is_ascii_digit()
-            {
-                cleaned.push(c);
-            } else if c.is_ascii_whitespace() {
-                if let Some(last) = last_char {
-                    if !last.is_ascii_whitespace() {
-                        cleaned.push(c);
-                    }
-                } else {
+        } else if c == '"' {
+            in_string = true;
+            cleaned.push(c);
+        } else if c == '{'
+            || c == '}'
+            || c == '['
+            || c == ']'
+            || c == ':'
+            || c == ','
+            || c == '.'
+            || c == '-'
+            || c == '+'
+            || c.is_ascii_digit()
+        {
+            cleaned.push(c);
+        } else if c.is_ascii_whitespace() {
+            if let Some(last) = last_char {
+                if !last.is_ascii_whitespace() {
                     cleaned.push(c);
                 }
-            } else if c.is_ascii_alphabetic() || !c.is_ascii() {
-                cleaned.push(c);
-            } else if let Some(last) = last_char {
-                if !last.is_ascii_whitespace() {
-                    cleaned.push(' ');
-                }
             } else {
+                cleaned.push(c);
+            }
+        } else if c.is_ascii_alphabetic() || !c.is_ascii() {
+            cleaned.push(c);
+        } else if let Some(last) = last_char {
+            if !last.is_ascii_whitespace() {
                 cleaned.push(' ');
             }
+        } else {
+            cleaned.push(' ');
         }
         last_char = Some(c);
     }

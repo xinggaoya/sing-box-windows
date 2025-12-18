@@ -63,7 +63,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
         format!("sing-box-{}-linux-{}.tar.gz", version, arch)
     };
 
-    let download_urls = vec![
+    let download_urls = [
         format!(
             "https://v6.gh-proxy.com/https://github.com/SagerNet/sing-box/releases/download/v{}/{}",
             version, filename
@@ -608,5 +608,4 @@ fn set_executable_permission(file_path: &Path) -> Result<(), std::io::Error> {
 fn set_executable_permission(_file_path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
-
 

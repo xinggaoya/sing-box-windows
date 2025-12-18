@@ -100,7 +100,7 @@ where
     }
 
     // 完成下载，重命名临时文件
-    std::fs::rename(&temp_path, &file_path)
+    std::fs::rename(&temp_path, file_path)
         .map_err(|e| format!("{}: {}", messages::ERR_WRITE_FILE_FAILED, e))?;
 
     Ok(())

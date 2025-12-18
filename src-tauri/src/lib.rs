@@ -41,16 +41,15 @@ pub fn run() {
             // }
             // 判断参数
             let args: Vec<String> = std::env::args().collect();
-            if args.len() > 1 {
-                if args[1] == "--hide" {
-                    let window = app.get_window("main").unwrap();
-                    window.hide().unwrap();
-                }
+            if args.len() > 1 && args[1] == "--hide" {
+                let window = app.get_window("main").unwrap();
+                window.hide().unwrap();
             }
 
             // 启动日志目录定时清理
             if let Some(dir) = log_dir.clone() {
-                let _ = log_util::spawn_log_cleanup_task(dir);
+                // 后台清理日志，不阻塞应用启动
+                log_util::spawn_log_cleanup_task(dir);
             }
 
             // 重新启用增强版存储服务（数据库）

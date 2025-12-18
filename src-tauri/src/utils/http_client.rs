@@ -8,6 +8,12 @@ pub struct HttpClientManager {
     proxy_client: Client,
 }
 
+impl Default for HttpClientManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HttpClientManager {
     /// 创建新的 HTTP 客户端管理器
     pub fn new() -> Self {

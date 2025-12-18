@@ -9,12 +9,13 @@ use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
 use std::sync::Arc;
 
 /// 内核运行状态枚举
-/// 
+///
 /// 使用状态机模式管理内核生命周期，确保状态转换的一致性。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum KernelState {
     /// 内核已停止
+    #[default]
     Stopped = 0,
     /// 内核正在启动
     Starting = 1,
@@ -26,12 +27,6 @@ pub enum KernelState {
     Failed = 4,
     /// 内核意外崩溃（由守护进程检测）
     Crashed = 5,
-}
-
-impl Default for KernelState {
-    fn default() -> Self {
-        KernelState::Stopped
-    }
 }
 
 impl From<u8> for KernelState {
