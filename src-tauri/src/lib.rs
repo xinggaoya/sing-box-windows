@@ -1,9 +1,9 @@
 use app::storage::EnhancedStorageService;
+use crate::utils::log_util;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tokio::sync::OnceCell;
-use tracing_subscriber::{fmt, EnvFilter}; // 重新启用数据库存储
 
 pub mod app;
 pub mod entity;
@@ -13,20 +13,8 @@ pub mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 设置默认的 debug 日志级别
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        // 使用 RUST_LOG 环境变量，或者默认启用 debug 级别
-        std::env::set_var("RUST_LOG", "debug,sing_box_windows=debug,tauri=info");
-        EnvFilter::from_default_env()
-    });
-
-    fmt()
-        .with_env_filter(env_filter)
-        .with_target(false)
-        .with_thread_ids(true)
-        .with_file(true)
-        .with_line_number(true)
-        .init();
+    // 初始化日志，支持文件输出 + 定期清理
+    let log_dir = log_util::init_logging();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build()) // 重新启用 store 插件
@@ -43,7 +31,7 @@ pub fn run() {
             show_window(app);
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .setup(|app| {
+        .setup(move |app| {
             // if cfg!(debug_assertions) {
             //     app.handle().plugin(
             //         tauri_plugin_log::Builder::default()
@@ -58,6 +46,11 @@ pub fn run() {
                     let window = app.get_window("main").unwrap();
                     window.hide().unwrap();
                 }
+            }
+
+            // 启动日志目录定时清理
+            if let Some(dir) = log_dir.clone() {
+                let _ = log_util::spawn_log_cleanup_task(dir);
             }
 
             // 重新启用增强版存储服务（数据库）

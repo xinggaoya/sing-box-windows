@@ -25,6 +25,7 @@ ts-rs = "11.1"
 # 日志
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "local-time"] }
+tracing-appender = "0.2"
 base64 = "0.22"
 sha2 = "0.10"
 semver = "1.0"
