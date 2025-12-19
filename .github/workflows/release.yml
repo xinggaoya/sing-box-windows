@@ -21,9 +21,9 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             name: macos
-          # - os: macos-13
-          #   target: x86_64-apple-darwin
-          #   name: macos-intel
+          - os: macos-13
+            target: x86_64-apple-darwin
+            name: macos-intel
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -147,12 +147,6 @@ jobs:
           name: macos-artifacts
           path: macos-artifacts/
 
-      - name: Download macOS Intel artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-intel-artifacts
-          path: macos-intel-artifacts/
-
       - name: Extract tag name
         id: tag
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
@@ -165,7 +159,6 @@ jobs:
           find windows-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
           find linux-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
           find macos-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
-          find macos-intel-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
 
       - name: Extract Release Notes
         id: extract_notes
@@ -187,8 +180,6 @@ jobs:
             linux-artifacts/deb/sing-box-windows_*.deb*
             macos-artifacts/dmg/sing-box-windows_*.dmg*
             macos-artifacts/macos/sing-box-windows.app.tar.gz*
-            macos-intel-artifacts/dmg/sing-box-windows_*.dmg*
-            macos-intel-artifacts/macos/sing-box-windows.app.tar.gz*
             windows-artifacts/portable/sing-box-windows-portable.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
