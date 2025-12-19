@@ -21,9 +21,6 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             name: macos
-          - os: macos-13
-            target: x86_64-apple-darwin
-            name: macos-intel
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
