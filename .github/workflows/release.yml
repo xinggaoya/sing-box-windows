@@ -167,14 +167,19 @@ jobs:
           find macos-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
           find macos-intel-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
 
+      - name: Extract Release Notes
+        id: extract_notes
+        run: node .github/scripts/extract-release-notes.js
+
       - name: Update Release Assets
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           prerelease: true
-          generate_release_notes: true
+          generate_release_notes: false
           name: "[Pre-release] ${{ steps.tag.outputs.tag }}"
           tag_name: ${{ steps.tag.outputs.tag }}
+          body: ${{ steps.extract_notes.outputs.release_notes }}
           files: |
             windows-artifacts/msi/*.msi
             windows-artifacts/nsis/*.exe
