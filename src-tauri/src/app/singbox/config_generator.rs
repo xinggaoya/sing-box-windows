@@ -194,7 +194,8 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         json!({ "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN, "outbound": default_outbound }),
     ]);
 
-    // 注意：这里的 outbounds 只是骨架，订阅节点注入后会补齐 TAG_AUTO/TAG_MANUAL 的候选列表。
+    // 注意：这里的 outbounds 只是骨架，订阅节点注入后会补齐 TAG_AUTO/TAG_MANUAL
+    // 以及各业务分流组的候选列表。
     //
     // 这里用结构体序列化生成 JSON，减少“字符串 key + json! 拼装”的维护成本：
     // - 字段改名/移动时更容易被编译器发现
@@ -383,7 +384,9 @@ pub fn inject_nodes(config: &mut Value, app_config: &AppConfig, nodes: &[Value])
 
     // 1) 更新 TAG_AUTO(urltest) 只包含节点（避免把 direct 当作最快导致全直连）。
     // 2) 更新 TAG_MANUAL(selector) 包含自动选择 + 每个节点（不包含 direct，避免 UI 误选直连）。
+    // 3) 业务分流组补齐节点列表，避免只剩“自动/手动”无法直选节点。
     ensure_urltest_and_selector(outbounds, &group_node_tags)?;
+    ensure_app_group_selectors(outbounds, &group_node_tags)?;
 
     // 追加节点出站
     for node in normalized_nodes {
@@ -473,6 +476,34 @@ fn ensure_urltest_and_selector(outbounds: &mut Vec<Value>, node_tags: &[String])
             .and_then(|v| v.as_object_mut())
             .ok_or_else(|| format!("outbound(tag={}) 不是对象", TAG_MANUAL))?;
         manual.insert("outbounds".to_string(), Value::Array(manual_list));
+    }
+
+    Ok(())
+}
+
+fn ensure_app_group_selectors(outbounds: &mut Vec<Value>, node_tags: &[String]) -> Result<(), String> {
+    let group_tags = [TAG_TELEGRAM, TAG_YOUTUBE, TAG_NETFLIX, TAG_OPENAI];
+
+    for group_tag in group_tags {
+        let Some(idx) = outbounds
+            .iter()
+            .position(|o| o.get("tag").and_then(|t| t.as_str()) == Some(group_tag))
+        else {
+            continue;
+        };
+
+        let mut group_list = Vec::<Value>::with_capacity(2 + node_tags.len());
+        group_list.push(Value::String(TAG_MANUAL.to_string()));
+        group_list.push(Value::String(TAG_AUTO.to_string()));
+        for tag in node_tags {
+            group_list.push(Value::String(tag.clone()));
+        }
+
+        let group = outbounds
+            .get_mut(idx)
+            .and_then(|v| v.as_object_mut())
+            .ok_or_else(|| format!("outbound(tag={}) 不是对象", group_tag))?;
+        group.insert("outbounds".to_string(), Value::Array(group_list));
     }
 
     Ok(())
