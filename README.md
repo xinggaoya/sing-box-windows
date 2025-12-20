@@ -98,8 +98,8 @@ For detailed usage tutorials, please refer to the project documentation.
 
 - **sing-box JSON config** (top-level `outbounds`): `vless`, `vmess`, `trojan`, `shadowsocks`, `shadowsocksr`, `socks`, `http`, `hysteria2`
 - **Clash/Mihomo YAML** (`proxies`): `vmess`, `vless`, `trojan`, `ss` (shadowsocks)
-- **URI list** (one line per node): `vmess://`, `vless://`, `trojan://`, `ss://`
-- **Note**: `hysteria2://` URI and YAML `hysteria2` are not parsed yet
+- **URI list** (one line per node): `vmess://`, `vless://`, `trojan://`, `ss://`, `hysteria2://`
+- **Note**: YAML `hysteria2` is not parsed yet
 
 ---
 

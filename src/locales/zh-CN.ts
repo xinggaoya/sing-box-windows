@@ -278,6 +278,7 @@ export default {
     uriContentRequired: '请输入节点链接或 Clash YAML',
     manualContent: '手动配置内容',
     autoUpdate: '自动更新',
+    autoUpdateManualHint: '手动输入内容不支持自动更新',
     autoUpdateOff: '关闭自动更新',
     autoUpdate6h: '每 6 小时',
     autoUpdate12h: '每 12 小时',

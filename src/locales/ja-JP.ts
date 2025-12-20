@@ -309,6 +309,7 @@ export default {
     uriContentRequired: 'ノードリンクまたは Clash YAML を入力してください',
     manualContent: '手動設定コンテンツ',
     autoUpdate: '自動更新',
+    autoUpdateManualHint: '手動入力の内容は自動更新に対応していません',
     autoUpdateOff: '自動更新を無効化',
     autoUpdate6h: '6時間ごと',
     autoUpdate12h: '12時間ごと',

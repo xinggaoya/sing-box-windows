@@ -41,7 +41,7 @@
                   {{ t('sub.inUse') }}
                 </n-tag>
                 <n-tag
-                  v-if="(item.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES) > 0"
+                  v-if="!item.isManual && (item.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES) > 0"
                   size="small"
                   round
                   :bordered="false"
@@ -179,7 +179,11 @@
             v-model:value="formValue.autoUpdateIntervalMinutes"
             :options="autoUpdateOptions"
             size="small"
+            :disabled="autoUpdateDisabled"
           />
+          <p v-if="autoUpdateDisabled" class="form-hint">
+            {{ t('sub.autoUpdateManualHint') }}
+          </p>
         </n-form-item>
       </n-form>
 
@@ -319,6 +323,8 @@ const autoUpdateOptions = computed(() => [
   { label: t('sub.autoUpdate12h'), value: 720 },
   { label: t('sub.autoUpdate1d'), value: 1440 },
 ])
+
+const autoUpdateDisabled = computed(() => activeTab.value !== 'url')
 
 const rules: FormRules = {
   name: [{ required: true, message: t('sub.nameRequired'), trigger: 'blur' }],
@@ -497,6 +503,7 @@ const handleConfirm = () => {
           isManual,
           manualContent: isManual ? resolvedManualContent : undefined,
           useOriginalConfig,
+          autoUpdateIntervalMinutes: isManual ? 0 : base.autoUpdateIntervalMinutes,
           configPath: savedPath || undefined,
           backupPath: savedPath ? `${savedPath}.bak` : undefined,
         }
@@ -528,6 +535,7 @@ const handleConfirm = () => {
           isManual,
           manualContent: isManual ? resolvedManualContent : undefined,
           useOriginalConfig,
+          autoUpdateIntervalMinutes: isManual ? 0 : base.autoUpdateIntervalMinutes,
         }
         message.success(t('sub.updateSuccess'))
       }
@@ -738,6 +746,7 @@ const runAutoUpdate = async () => {
   const now = Date.now()
   for (let i = 0; i < subStore.list.length; i += 1) {
     const item = subStore.list[i]
+    if (item.isManual) continue
     const interval = item.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES
     const last = item.lastUpdate ?? 0
     if (interval > 0 && now - last >= interval * 60 * 1000 && !item.isLoading) {
@@ -770,6 +779,9 @@ onUnmounted(() => {
 watch(activeTab, (value) => {
   if (value === 'uri') {
     formValue.value.useOriginalConfig = false
+  }
+  if (value !== 'url') {
+    formValue.value.autoUpdateIntervalMinutes = 0
   }
 })
 </script>
@@ -927,6 +939,12 @@ watch(activeTab, (value) => {
   background: var(--bg-tertiary);
   border-radius: 8px;
   margin-top: 16px;
+}
+
+.form-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 .switch-label {

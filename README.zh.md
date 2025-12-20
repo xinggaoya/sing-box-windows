@@ -86,9 +86,12 @@ Sing-Box GUI 客户端是一款尖端的跨平台应用程序（支持 Windows�
 ## 🎯 快速开始
 
 1. **安装应用**：下载并安装 sing-box-windows
-2. **添加订阅**：在订阅页面添加您的订阅链接
-3. **选择代理**：在代理页面选择节点并设置代理模式
-4. **开始使用**：启用代理，享受网络访问
+2. **安装内核**：首次启动时，进入设置页面下载并安装 Sing-Box 内核
+3. **添加订阅**：在订阅页面添加您的订阅链接
+4. **选择代理**：在代理页面选择节点并设置代理模式
+5. **开始使用**：启用代理，享受网络访问
+
+⚠️ **重要提示**：必须先安装内核才能添加和使用订阅，内核是运行代理服务的核心组件。
 
 详细使用教程请参考项目文档。
 
@@ -98,8 +101,8 @@ Sing-Box GUI 客户端是一款尖端的跨平台应用程序（支持 Windows�
 
 - **sing-box JSON 配置**（顶层 `outbounds`）：`vless`、`vmess`、`trojan`、`shadowsocks`、`shadowsocksr`、`socks`、`http`、`hysteria2`
 - **Clash/Mihomo YAML**（`proxies`）：`vmess`、`vless`、`trojan`、`ss`（shadowsocks）
-- **URI 列表**（每行一个节点）：`vmess://`、`vless://`、`trojan://`、`ss://`
-- **说明**：`hysteria2://` URI 与 YAML `hysteria2` 暂未解析
+- **URI 列表**（每行一个节点）：`vmess://`、`vless://`、`trojan://`、`ss://`、`hysteria2://`
+- **说明**：YAML 的 `hysteria2` 暂未解析
 
 ---
 

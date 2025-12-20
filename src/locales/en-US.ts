@@ -278,6 +278,7 @@ export default {
     uriContentRequired: 'Please enter node links or Clash YAML',
     manualContent: 'Manual Configuration Content',
     autoUpdate: 'Auto Update',
+    autoUpdateManualHint: 'Manual content does not support auto update',
     autoUpdateOff: 'Disable auto update',
     autoUpdate6h: 'Every 6 hours',
     autoUpdate12h: 'Every 12 hours',

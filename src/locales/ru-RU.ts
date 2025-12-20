@@ -313,6 +313,7 @@ export default {
     uriContentRequired: 'Введите ссылки узлов или Clash YAML',
     manualContent: 'Содержимое ручной конфигурации',
     autoUpdate: 'Автообновление',
+    autoUpdateManualHint: 'Для ручного ввода автообновление не поддерживается',
     autoUpdateOff: 'Отключить автообновление',
     autoUpdate6h: 'Каждые 6 часов',
     autoUpdate12h: 'Каждые 12 часов',
