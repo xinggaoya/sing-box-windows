@@ -94,6 +94,15 @@ Sing-Box GUI 客户端是一款尖端的跨平台应用程序（支持 Windows�
 
 ---
 
+## 📦 支持的订阅格式
+
+- **sing-box JSON 配置**（顶层 `outbounds`）：`vless`、`vmess`、`trojan`、`shadowsocks`、`shadowsocksr`、`socks`、`http`、`hysteria2`
+- **Clash/Mihomo YAML**（`proxies`）：`vmess`、`vless`、`trojan`、`ss`（shadowsocks）
+- **URI 列表**（每行一个节点）：`vmess://`、`vless://`、`trojan://`、`ss://`
+- **说明**：`hysteria2://` URI 与 YAML `hysteria2` 暂未解析
+
+---
+
 ## 📸 界面截图
 
 <div align="center">

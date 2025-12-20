@@ -94,6 +94,15 @@ For detailed usage tutorials, please refer to the project documentation.
 
 ---
 
+## 📦 Supported Subscription Formats
+
+- **sing-box JSON config** (top-level `outbounds`): `vless`, `vmess`, `trojan`, `shadowsocks`, `shadowsocksr`, `socks`, `http`, `hysteria2`
+- **Clash/Mihomo YAML** (`proxies`): `vmess`, `vless`, `trojan`, `ss` (shadowsocks)
+- **URI list** (one line per node): `vmess://`, `vless://`, `trojan://`, `ss://`
+- **Note**: `hysteria2://` URI and YAML `hysteria2` are not parsed yet
+
+---
+
 ## 📸 Screenshots
 
 <div align="center">
