@@ -296,7 +296,8 @@ async fn download_and_process_subscription(
             .replace("vmess://", "")
             .replace("ss://", "")
             .replace("trojan://", "")
-            .replace("vless://", "");
+            .replace("vless://", "")
+            .replace("hysteria2://", "");
 
         if let Ok(decoded) = general_purpose::STANDARD.decode(&stripped_text) {
             if let Ok(decoded_text) = String::from_utf8(decoded) {

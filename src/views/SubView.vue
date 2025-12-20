@@ -153,9 +153,20 @@
               />
             </n-form-item>
           </n-tab-pane>
+          <n-tab-pane name="uri" :tab="t('sub.uriList')">
+            <n-form-item :label="t('sub.uriContent')" path="uriContent">
+              <n-input
+                v-model:value="formValue.uriContent"
+                type="textarea"
+                :rows="6"
+                :placeholder="t('sub.uriContentPlaceholder')"
+                class="code-input"
+              />
+            </n-form-item>
+          </n-tab-pane>
         </n-tabs>
 
-        <div class="form-switch">
+        <div v-if="activeTab !== 'uri'" class="form-switch">
           <div class="switch-label">
             <span>{{ t('sub.useOriginalConfig') }}</span>
             <span class="switch-desc">{{ formValue.useOriginalConfig ? t('sub.useOriginal') : t('sub.useExtractedNodes') }}</span>
@@ -211,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, h } from 'vue'
+import { ref, computed, onMounted, onUnmounted, h, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useSubStore } from '@/stores/subscription/SubStore'
 import { useAppStore } from '@/stores'
@@ -255,6 +266,10 @@ interface Subscription {
   autoUpdateIntervalMinutes?: number
 }
 
+interface SubscriptionForm extends Subscription {
+  uriContent?: string
+}
+
 const DEFAULT_AUTO_UPDATE_MINUTES = 720
 
 const message = useMessage()
@@ -272,12 +287,13 @@ const showConfigModal = ref(false)
 const currentConfig = ref('')
 const isConfigLoading = ref(false)
 
-const formValue = ref<Subscription>({
+const formValue = ref<SubscriptionForm>({
   name: '',
   url: '',
   isLoading: false,
   isManual: false,
   manualContent: '',
+  uriContent: '',
   useOriginalConfig: false,
   autoUpdateIntervalMinutes: DEFAULT_AUTO_UPDATE_MINUTES,
 })
@@ -321,7 +337,15 @@ const rules: FormRules = {
       trigger: 'blur',
       validator: (rule, value) => activeTab.value === 'manual' ? !!value : true
     }
-  ]
+  ],
+  uriContent: [
+    {
+      required: true,
+      message: t('sub.uriContentRequired'),
+      trigger: 'blur',
+      validator: (rule, value) => activeTab.value === 'uri' ? !!value : true
+    }
+  ],
 }
 
 const generateConfigFileName = (name: string) => {
@@ -347,6 +371,15 @@ const formatIntervalLabel = (minutes?: number) => {
   if (value % 720 === 0) return t('sub.autoUpdate12h')
   if (value % 360 === 0) return t('sub.autoUpdate6h')
   return `${value} min`
+}
+
+const isJsonContent = (value: string) => {
+  try {
+    const parsed = JSON.parse(value)
+    return typeof parsed === 'object' && parsed !== null
+  } catch {
+    return false
+  }
 }
 
 const getDropdownOptions = (index: number): DropdownOption[] => [
@@ -398,6 +431,7 @@ const resetForm = () => {
     isLoading: false,
     isManual: false,
     manualContent: '',
+    uriContent: '',
     useOriginalConfig: false,
     autoUpdateIntervalMinutes: DEFAULT_AUTO_UPDATE_MINUTES,
   }
@@ -406,9 +440,16 @@ const resetForm = () => {
 }
 
 const handleEdit = (index: number, item: Subscription) => {
+  const manualContent = item.manualContent ?? ''
+  const isJson = isJsonContent(manualContent)
+  const isNodeList = !isJson && manualContent.trim().length > 0
   editIndex.value = index
-  formValue.value = { ...item }
-  activeTab.value = item.isManual ? 'manual' : 'url'
+  formValue.value = {
+    ...item,
+    manualContent: item.isManual && isJson ? manualContent : '',
+    uriContent: item.isManual && !isJson && isNodeList ? manualContent : '',
+  }
+  activeTab.value = item.isManual ? (isNodeList ? 'uri' : 'manual') : 'url'
   showAddModal.value = true
 }
 
@@ -417,30 +458,45 @@ const handleConfirm = () => {
     if (errors) return
     try {
       isLoading.value = true
-      const isManual = activeTab.value === 'manual'
+      const isUrlTab = activeTab.value === 'url'
+      const isJsonTab = activeTab.value === 'manual'
+      const isUriTab = activeTab.value === 'uri'
+      const urlInput = formValue.value.url?.trim() ?? ''
+      const manualInput = formValue.value.manualContent?.trim() ?? ''
+      const uriInput = formValue.value.uriContent?.trim() ?? ''
+      const resolvedManualContent = isJsonTab ? manualInput : isUriTab ? uriInput : ''
+      const isManual = !isUrlTab
+      const useOriginalConfig = isUriTab ? false : formValue.value.useOriginalConfig
       const persistOptions = { fileName: generateConfigFileName(formValue.value.name || 'sub') }
       let savedPath: string | null = null
 
       if (editIndex.value === null) {
-        if (isManual && formValue.value.manualContent) {
+        if (isManual && resolvedManualContent) {
+          if (useOriginalConfig && !isJsonContent(resolvedManualContent)) {
+            message.warning(t('sub.originalConfigJsonOnly'))
+            return
+          }
           savedPath = await subscriptionService.addManualSubscription(
-            formValue.value.manualContent,
-            formValue.value.useOriginalConfig,
+            resolvedManualContent,
+            useOriginalConfig,
             { ...persistOptions, applyRuntime: false },
           )
         } else if (!isManual) {
           savedPath = await subscriptionService.downloadSubscription(
-            formValue.value.url,
-            formValue.value.useOriginalConfig,
+            urlInput,
+            useOriginalConfig,
             { ...persistOptions, applyRuntime: false },
           )
         }
 
+        const { uriContent, ...base } = formValue.value
         const newItem: Subscription = {
-          ...formValue.value,
+          ...base,
+          url: isManual ? '' : urlInput,
           lastUpdate: Date.now(),
           isManual,
-          manualContent: isManual ? formValue.value.manualContent : undefined,
+          manualContent: isManual ? resolvedManualContent : undefined,
+          useOriginalConfig,
           configPath: savedPath || undefined,
           backupPath: savedPath ? `${savedPath}.bak` : undefined,
         }
@@ -458,11 +514,20 @@ const handleConfirm = () => {
           await kernelService.restartKernel()
         }
       } else {
+        if (isManual && resolvedManualContent && useOriginalConfig) {
+          if (!isJsonContent(resolvedManualContent)) {
+            message.warning(t('sub.originalConfigJsonOnly'))
+            return
+          }
+        }
+        const { uriContent, ...base } = formValue.value
         subStore.list[editIndex.value] = {
           ...subStore.list[editIndex.value],
-          ...formValue.value,
+          ...base,
+          url: isManual ? '' : urlInput,
           isManual,
-          manualContent: isManual ? formValue.value.manualContent : undefined,
+          manualContent: isManual ? resolvedManualContent : undefined,
+          useOriginalConfig,
         }
         message.success(t('sub.updateSuccess'))
       }
@@ -508,6 +573,10 @@ const refreshSubscription = async (index: number, applyRuntime = false, silent =
 
   if (item.isManual && !item.manualContent) {
     message.error(t('sub.manualContentMissing'))
+    return
+  }
+  if (item.isManual && item.useOriginalConfig && !isJsonContent(item.manualContent ?? '')) {
+    message.warning(t('sub.originalConfigJsonOnly'))
     return
   }
 
@@ -696,6 +765,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopAutoUpdateLoop()
+})
+
+watch(activeTab, (value) => {
+  if (value === 'uri') {
+    formValue.value.useOriginalConfig = false
+  }
 })
 </script>
 

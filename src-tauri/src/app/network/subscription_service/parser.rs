@@ -180,7 +180,8 @@ pub fn extract_nodes_from_subscription(
                 && (normalized_text.contains("vmess://")
                     || normalized_text.contains("ss://")
                     || normalized_text.contains("trojan://")
-                    || normalized_text.contains("vless://"))
+                    || normalized_text.contains("vless://")
+                    || normalized_text.contains("hysteria2://"))
             {
                 info!("检测到可能包含URI格式的节点，尝试逐行解析...");
                 nodes.extend(extract_nodes_from_uri_list(&normalized_text));
@@ -528,6 +529,9 @@ fn convert_uri_node_to_singbox(uri: &str) -> Option<Value> {
     if uri.starts_with("ss://") {
         return parse_ss_uri(uri);
     }
+    if uri.starts_with("hysteria2://") {
+        return parse_hysteria2_uri(uri);
+    }
     None
 }
 
@@ -690,6 +694,70 @@ fn parse_trojan_uri(uri: &str) -> Option<Value> {
     }
 
     Some(node)
+}
+
+fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
+    let url = Url::parse(uri).ok()?;
+    let password = url.username().trim();
+    if password.is_empty() {
+        return None;
+    }
+
+    let server = url.host_str()?.to_string();
+    let server_port = url.port().unwrap_or(443) as u64;
+
+    let mut query = std::collections::HashMap::<String, String>::new();
+    for (k, v) in url.query_pairs() {
+        query.insert(k.to_string(), v.to_string());
+    }
+
+    let tag = {
+        let decoded = decode_tag(url.fragment());
+        if decoded.is_empty() {
+            default_tag_for_url(&url)
+        } else {
+            decoded
+        }
+    };
+
+    let sni = query
+        .get("sni")
+        .or_else(|| query.get("peer"))
+        .or_else(|| query.get("servername"))
+        .map(|s| s.trim())
+        .unwrap_or("");
+
+    let insecure = query
+        .get("insecure")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    let mut tls = json!({
+        "enabled": true,
+        "server_name": if sni.is_empty() { server.clone() } else { sni.to_string() },
+        "insecure": insecure
+    });
+
+    if let Some(alpn) = query.get("alpn") {
+        let list: Vec<Value> = alpn
+            .split(',')
+            .map(|item| item.trim())
+            .filter(|item| !item.is_empty())
+            .map(|item| Value::String(item.to_string()))
+            .collect();
+        if !list.is_empty() {
+            tls["alpn"] = Value::Array(list);
+        }
+    }
+
+    Some(json!({
+        "tag": tag,
+        "type": "hysteria2",
+        "server": server,
+        "server_port": server_port,
+        "password": password,
+        "tls": tls
+    }))
 }
 
 fn parse_vmess_uri(uri: &str) -> Option<Value> {
@@ -908,5 +976,14 @@ proxies:
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0]["type"].as_str().unwrap(), "shadowsocks");
         assert_eq!(nodes[0]["tag"].as_str().unwrap(), "ss-test");
+    }
+
+    #[test]
+    fn parse_uri_list_hysteria2() {
+        let content = "hysteria2://password@example.com:443?peer=example.com&insecure=1&alpn=h3#Hysteria2";
+        let nodes = extract_nodes_from_subscription(content).expect("should parse");
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0]["type"].as_str().unwrap(), "hysteria2");
+        assert_eq!(nodes[0]["tag"].as_str().unwrap(), "Hysteria2");
     }
 }

@@ -54,10 +54,10 @@ pub async fn sudo_set_password(password: String, app: AppHandle) -> Result<(), S
 
 /// 清除已保存的 sudo 密码（例如用户修改了系统密码后需要重新设置）。
 #[tauri::command]
-pub async fn sudo_clear_password(app: AppHandle) -> Result<(), String> {
+pub async fn sudo_clear_password(_app: AppHandle) -> Result<(), String> {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        delete_saved_password(&app).await?;
+        delete_saved_password(&_app).await?;
         Ok(())
     }
 
