@@ -9,11 +9,28 @@ use tauri::{AppHandle, Manager};
 use tokio::sync::OnceCell;
 
 /// 将全局设置同步到指定的配置文件
+enum ConfigPatchMode {
+    Full,
+    PortsOnly,
+}
+
+fn resolve_patch_mode_for_subscription(
+    subscription: Option<&Subscription>,
+) -> ConfigPatchMode {
+    match subscription {
+        Some(sub) if sub.use_original_config => ConfigPatchMode::PortsOnly,
+        _ => ConfigPatchMode::Full,
+    }
+}
+
 fn sync_settings_to_config_file(
     config_path: &std::path::Path,
     app_config: &AppConfig,
+    patch_mode: ConfigPatchMode,
 ) -> Result<(), String> {
-    use crate::app::singbox::settings_patch::apply_app_settings_to_config;
+    use crate::app::singbox::settings_patch::{
+        apply_app_settings_to_config, apply_port_settings_only,
+    };
      
     // 读取现有配置
     let content = std::fs::read_to_string(config_path)
@@ -24,7 +41,10 @@ fn sync_settings_to_config_file(
         .map_err(|e| format!("解析配置文件失败: {}", e))?;
     
     // 应用全局设置
-    apply_app_settings_to_config(&mut config, app_config);
+    match patch_mode {
+        ConfigPatchMode::Full => apply_app_settings_to_config(&mut config, app_config),
+        ConfigPatchMode::PortsOnly => apply_port_settings_only(&mut config, app_config),
+    }
     
     // 写回文件
     let updated = serde_json::to_string_pretty(&config)
@@ -246,10 +266,21 @@ pub async fn db_save_app_config(config: AppConfig, app: AppHandle) -> Result<(),
     // 保存设置后，尽量把变更同步到“当前生效配置文件”，避免用户需要重新下载订阅/重启应用才能生效。
     // 同步逻辑采用“局部 patch”策略：如果配置文件不是本程序生成的结构，会尽量只修改端口/TUN/DNS 策略等通用字段。
     let effective_config = db_get_app_config(app.clone()).await?;
+    let storage = get_enhanced_storage(&app).await?;
     if let Some(path) = effective_config.active_config_path.clone() {
         let config_path = std::path::PathBuf::from(path);
         if config_path.exists() {
-            if let Err(e) = sync_settings_to_config_file(&config_path, &effective_config) {
+            let active_path = config_path.to_string_lossy();
+            let patch_mode = match storage.get_subscriptions().await {
+                Ok(subs) => resolve_patch_mode_for_subscription(
+                    subs.iter()
+                        .find(|sub| sub.config_path.as_deref() == Some(active_path.as_ref())),
+                ),
+                Err(_) => ConfigPatchMode::Full,
+            };
+            if let Err(e) =
+                sync_settings_to_config_file(&config_path, &effective_config, patch_mode)
+            {
                 tracing::warn!("保存设置后同步到配置文件失败: {}", e);
             }
         }
@@ -369,19 +400,22 @@ pub async fn db_save_active_subscription_index(
     // 但为了保持原有能力：当用户切换订阅时，把全局设置（端口/TUN/系统代理等）同步到该订阅配置文件。
     let app_config = storage.get_app_config().await.map_err(|e| e.to_string())?;
 
-    let target_config_path = if let Some(idx) = index {
+    let (target_config_path, patch_mode) = if let Some(idx) = index {
         let subscriptions = storage.get_subscriptions().await.map_err(|e| e.to_string())?;
-        subscriptions
-            .get(idx as usize)
-            .and_then(|subscription| subscription.config_path.clone())
-            .map(std::path::PathBuf::from)
+        let subscription = subscriptions.get(idx as usize);
+        (
+            subscription
+                .and_then(|sub| sub.config_path.clone())
+                .map(std::path::PathBuf::from),
+            resolve_patch_mode_for_subscription(subscription),
+        )
     } else {
-        None
+        (None, ConfigPatchMode::Full)
     };
 
     if let Some(config_path) = target_config_path {
         if config_path.exists() {
-            match sync_settings_to_config_file(&config_path, &app_config) {
+            match sync_settings_to_config_file(&config_path, &app_config, patch_mode) {
                 Ok(_) => {
                     tracing::info!("已将全局设置同步到配置文件: {:?}", config_path);
                 }

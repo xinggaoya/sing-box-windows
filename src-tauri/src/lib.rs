@@ -74,6 +74,14 @@ pub fn run() {
 
                 tracing::info!("Enhanced storage service initialized successfully");
 
+                // 启动时清理可能残留的内核进程，避免复用非本程序启动的内核实例。
+                if let Err(e) = crate::process::manager::ProcessManager::new()
+                    .kill_existing_processes()
+                    .await
+                {
+                    tracing::warn!("启动时清理内核进程失败: {}", e);
+                }
+
                 // 后端启动后立即尝试自动管理内核（尊重 auto_start_kernel 设置）
                 crate::app::core::kernel_auto_manage::auto_manage_with_saved_config(
                     &app_handle,

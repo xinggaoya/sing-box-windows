@@ -141,9 +141,10 @@
                 :placeholder="t('sub.urlPlaceholder')"
               />
             </n-form-item>
+            <p class="form-hint">{{ t('sub.urlHint') }}</p>
           </n-tab-pane>
           <n-tab-pane name="manual" :tab="t('sub.manualConfig')">
-            <n-form-item :label="t('sub.content')" path="manualContent">
+            <n-form-item :label="t('sub.content')" path="manualContent">        
               <n-input
                 v-model:value="formValue.manualContent"
                 type="textarea"
@@ -152,9 +153,10 @@
                 class="code-input"
               />
             </n-form-item>
+            <p class="form-hint">{{ t('sub.manualHint') }}</p>
           </n-tab-pane>
           <n-tab-pane name="uri" :tab="t('sub.uriList')">
-            <n-form-item :label="t('sub.uriContent')" path="uriContent">
+            <n-form-item :label="t('sub.uriContent')" path="uriContent">        
               <n-input
                 v-model:value="formValue.uriContent"
                 type="textarea"
@@ -163,6 +165,7 @@
                 class="code-input"
               />
             </n-form-item>
+            <p class="form-hint">{{ t('sub.uriHint') }}</p>
           </n-tab-pane>
         </n-tabs>
 
@@ -171,8 +174,11 @@
             <span>{{ t('sub.useOriginalConfig') }}</span>
             <span class="switch-desc">{{ formValue.useOriginalConfig ? t('sub.useOriginal') : t('sub.useExtractedNodes') }}</span>
           </div>
-          <n-switch v-model:value="formValue.useOriginalConfig" />
+          <n-switch v-model:value="formValue.useOriginalConfig" @update:value="markUseOriginalTouched" />
         </div>
+        <p v-if="formValue.useOriginalConfig" class="form-hint warning">
+          {{ t('sub.originalConfigWarning') }}
+        </p>
 
         <n-form-item :label="t('sub.autoUpdate')" path="autoUpdateIntervalMinutes">
           <n-select
@@ -286,6 +292,7 @@ const editIndex = ref<number | null>(null)
 const formRef = ref<FormInst | null>(null)
 const isLoading = ref(false)
 const activeTab = ref('url')
+const useOriginalTouched = ref(false)
 
 const showConfigModal = ref(false)
 const currentConfig = ref('')
@@ -325,6 +332,10 @@ const autoUpdateOptions = computed(() => [
 ])
 
 const autoUpdateDisabled = computed(() => activeTab.value !== 'url')
+
+const markUseOriginalTouched = () => {
+  useOriginalTouched.value = true
+}
 
 const rules: FormRules = {
   name: [{ required: true, message: t('sub.nameRequired'), trigger: 'blur' }],
@@ -441,9 +452,15 @@ const resetForm = () => {
     useOriginalConfig: false,
     autoUpdateIntervalMinutes: DEFAULT_AUTO_UPDATE_MINUTES,
   }
+  useOriginalTouched.value = false
   editIndex.value = null
   activeTab.value = 'url'
 }
+
+watch(activeTab, (tab) => {
+  if (editIndex.value !== null || useOriginalTouched.value) return
+  formValue.value.useOriginalConfig = tab === 'manual'
+})
 
 const handleEdit = (index: number, item: Subscription) => {
   const manualContent = item.manualContent ?? ''
@@ -664,6 +681,20 @@ const useSubscription = async (index: number) => {
 
   try {
     subStore.list[index].isLoading = true
+    const activePath = appStore.activeConfigPath
+    if (activePath && item.configPath === activePath && subStore.activeIndex !== index) {
+      message.warning(t('sub.configPathCollision'))
+      const regeneratedPath = await regenerateConfigFor(item)
+      if (regeneratedPath) {
+        subStore.list[index].configPath = regeneratedPath
+        subStore.list[index].backupPath = `${regeneratedPath}.bak`
+        subStore.list[index].lastUpdate = Date.now()
+        item.configPath = regeneratedPath
+      }
+    }
+    if (!item.configPath) {
+      throw new Error(t('sub.missingConfigFile'))
+    }
     await subscriptionService.setActiveConfig(item.configPath)
     await appStore.setActiveConfigPath(item.configPath)
     await subStore.setActiveIndex(index)
@@ -688,6 +719,26 @@ const copyUrl = (url: string) => {
 
 const formatTime = (timestamp: number): string => {
   return new Date(timestamp).toLocaleString()
+}
+
+const regenerateConfigFor = async (item: Subscription) => {
+  const persistOptions = { fileName: generateConfigFileName(item.name || 'sub'), applyRuntime: false }
+  if (item.isManual) {
+    const content = item.manualContent?.trim() ?? ''
+    if (!content) {
+      throw new Error(t('sub.manualContentMissing'))
+    }
+    return await subscriptionService.addManualSubscription(
+      content,
+      item.useOriginalConfig,
+      persistOptions,
+    )
+  }
+  return await subscriptionService.downloadSubscription(
+    item.url,
+    item.useOriginalConfig,
+    persistOptions,
+  )
 }
 
 const editCurrentConfig = async () => {
@@ -945,6 +996,10 @@ watch(activeTab, (value) => {
   margin-top: 6px;
   font-size: 12px;
   color: var(--text-tertiary);
+}
+
+.form-hint.warning {
+  color: #f59e0b;
 }
 
 .switch-label {

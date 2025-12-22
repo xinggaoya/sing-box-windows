@@ -48,6 +48,40 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
     }
 }
 
+pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
+    if let Some(config_obj) = config.as_object_mut() {
+        if let Some(experimental) = config_obj.get_mut("experimental").and_then(|v| v.as_object_mut())
+        {
+            if let Some(clash_api) = experimental.get_mut("clash_api").and_then(|v| v.as_object_mut())
+            {
+                if clash_api.contains_key("external_controller") {
+                    clash_api.insert(
+                        "external_controller".to_string(),
+                        json!(format!("127.0.0.1:{}", app_config.api_port)),
+                    );
+                }
+            }
+        }
+
+        if let Some(inbounds) = config_obj.get_mut("inbounds").and_then(|v| v.as_array_mut()) {
+            for inbound in inbounds.iter_mut() {
+                if let Some(inbound_obj) = inbound.as_object_mut() {
+                    let is_mixed =
+                        matches!(inbound_obj.get("type").and_then(|v| v.as_str()), Some("mixed"));
+                    let is_mixed_in = matches!(
+                        inbound_obj.get("tag").and_then(|v| v.as_str()),
+                        Some("mixed-in")
+                    );
+                    if (is_mixed || is_mixed_in) && inbound_obj.contains_key("listen_port") {
+                        inbound_obj
+                            .insert("listen_port".to_string(), json!(app_config.proxy_port));
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_config: &AppConfig) {
     let default_outbound = normalize_default_outbound(app_config);
     let download_detour = normalize_download_detour(app_config);

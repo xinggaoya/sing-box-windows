@@ -279,6 +279,10 @@
           <h3>{{ t('setting.singboxProfile.title') }}</h3>
         </div>
         <div class="section-card">
+          <div v-if="usingOriginalConfig" class="alert-box info">
+            <n-icon size="18"><InformationCircleOutline /></n-icon>
+            <span>{{ t('setting.singboxProfile.originalConfigHint') }}</span>
+          </div>
           <n-form label-placement="top" class="advanced-form">
             <n-grid :cols="24" :x-gap="24" :y-gap="16">
               <n-grid-item :span="24">
@@ -545,6 +549,7 @@ import {
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore, useThemeStore } from '@/stores'
+import { useSubStore } from '@/stores/subscription/SubStore'
 import type { Locale } from '@/stores/app/LocaleStore'
 import type { ThemeMode } from '@/stores/app/ThemeStore'
 import { APP_EVENTS } from '@/constants/events'
@@ -561,6 +566,7 @@ const kernelStore = useKernelStore()
 const updateStore = useUpdateStore()
 const localeStore = useLocaleStore()
 const themeStore = useThemeStore()
+const subStore = useSubStore()
 
 // State
 const loading = ref(false)
@@ -638,6 +644,8 @@ const downloadDetourOptions = [
 
 // Computed
 const kernelLatestVersion = computed(() => kernelStore.latestAvailableVersion || '')
+const activeSubscription = computed(() => subStore.getActiveSubscription())
+const usingOriginalConfig = computed(() => activeSubscription.value?.useOriginalConfig ?? false)
 const hasNewVersion = computed(() => kernelStore.hasKernelUpdate)
 const kernelVersionOptions = computed(() => {
   const versions = kernelStore.availableVersions || []
@@ -1128,6 +1136,12 @@ onUnmounted(() => {
 .alert-box.warning {
   background: rgba(245, 158, 11, 0.1);
   color: #f59e0b;
+}
+
+.alert-box.info {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0ea5e9;
+  margin-bottom: 12px;
 }
 
 .download-box {

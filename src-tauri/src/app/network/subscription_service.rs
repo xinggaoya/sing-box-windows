@@ -7,7 +7,7 @@ use crate::app::constants::{messages, paths};
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::proxy_service::apply_proxy_runtime_state;
 use crate::app::singbox::config_generator;
-use crate::app::singbox::settings_patch::apply_app_settings_to_config;
+use crate::app::singbox::settings_patch::apply_port_settings_only;
 use crate::app::storage::enhanced_storage_service::{db_get_app_config, db_save_app_config};
 use crate::app::storage::state_model::AppConfig;
 use crate::utils::http_client;
@@ -414,55 +414,10 @@ fn process_original_config(
     app_config: &AppConfig,
     target_path: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    info!("处理原始订阅配置，调整端口和地址");
+    info!("处理原始订阅配置，仅调整端口");
 
     let mut config: Value = serde_json::from_str(content)?;
-    apply_app_settings_to_config(&mut config, app_config);
-
-    if let Some(config_obj) = config.as_object_mut() {
-        if let Some(experimental) = config_obj.get_mut("experimental") {
-            if let Some(exp_obj) = experimental.as_object_mut() {
-                let clash_api = exp_obj.entry("clash_api".to_string()).or_insert(json!({}));
-
-                if let Some(clash_api_obj) = clash_api.as_object_mut() {
-                    clash_api_obj.insert(
-                        "external_controller".to_string(),
-                        json!(format!("127.0.0.1:{}", app_config.api_port)),
-                    );
-
-                    clash_api_obj.insert("external_ui".to_string(), json!("metacubexd"));
-
-                    if !clash_api_obj.contains_key("default_mode") {
-                        clash_api_obj.insert("default_mode".to_string(), json!("rule"));
-                    }
-                }
-            }
-        } else {
-            config_obj.insert(
-                "experimental".to_string(),
-                json!({
-                    "clash_api": {
-                        "external_controller": format!("127.0.0.1:{}", app_config.api_port),
-                        "external_ui": "metacubexd",
-                        "default_mode": "rule"
-                    }
-                }),
-            );
-        }
-
-        if let Some(inbounds) = config_obj.get_mut("inbounds") {
-            if let Some(inbounds_array) = inbounds.as_array_mut() {
-                for inbound in inbounds_array {
-                    if let Some(inbound_obj) = inbound.as_object_mut() {
-                        if inbound_obj.get("tag").and_then(|t| t.as_str()) == Some("mixed-in") {
-                            inbound_obj
-                                .insert("listen_port".to_string(), json!(app_config.proxy_port));
-                        }
-                    }
-                }
-            }
-        }
-    }
+    apply_port_settings_only(&mut config, app_config);
 
     info!("正在保存配置到: {:?}", target_path);
 
