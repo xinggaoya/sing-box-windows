@@ -1,6 +1,6 @@
 [package]
 name = "sing-box-windows"
-version = "2.2.1"
+version = "2.2.2"
 description = "A Tauri App"
 authors = ["XingGao"]
 license = "MIT"

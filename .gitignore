@@ -28,7 +28,6 @@ coverage
 *.sw?
 
 *.tsbuildinfo
-/src-tauri/sing-box
-/src-tauri/resources/kernel/**
+/src-tauri/resources
 
 target
