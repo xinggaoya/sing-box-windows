@@ -3123,7 +3123,7 @@ dependencies = [
 
 [[package]]
 name = "parking"
-version = "2.2.2"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f38d5652c16fde515bb1ecef450ab0f6a219d619a7274976324d5e377f7dceba"
 
@@ -4246,7 +4246,7 @@ checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
 name = "sing-box-windows"
-version = "2.2.2"
+version = "2.2.3"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
