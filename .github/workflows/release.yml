@@ -70,18 +70,11 @@ jobs:
           pnpm install --no-frozen-lockfile
           pnpm store prune
 
-      - name: Install Tauri CLI
-        run: pnpm add -D @tauri-apps/cli
-
       - name: Build application
         shell: bash
         run: |
           pnpm run build
-          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
-            pnpm exec tauri build --target ${{ matrix.target }}
-          else
-            pnpm exec tauri build --target ${{ matrix.target }}
-          fi
+          pnpm tauri build --target ${{ matrix.target }}
 
       - name: Create Windows portable zip
         if: matrix.os == 'windows-latest'

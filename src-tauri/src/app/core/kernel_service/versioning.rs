@@ -193,6 +193,10 @@ pub async fn check_kernel_version(app_handle: AppHandle) -> Result<String, Strin
     let kernel_path = paths::get_kernel_path();
 
     if !kernel_path.exists() {
+        let _ = crate::app::core::kernel_service::embedded::ensure_embedded_kernel(&app_handle).await;
+    }
+
+    if !kernel_path.exists() {
         return Err(messages::ERR_KERNEL_NOT_FOUND.to_string());
     }
 

@@ -7,6 +7,7 @@ lazy_static::lazy_static! {
 }
 
 pub mod download;
+pub mod embedded;
 pub mod event;
 pub mod guard;
 pub mod runtime;

@@ -3,6 +3,7 @@ use crate::app::core::kernel_service::{
     check_config_validity, is_kernel_running, resolve_proxy_runtime_state, start_kernel_with_state,
     stop_kernel, KernelRuntimeConfig, ProxyOverrides,
 };
+use crate::app::core::kernel_service::embedded::ensure_embedded_kernel;
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use crate::app::storage::state_model::AppConfig;
@@ -113,6 +114,10 @@ async fn auto_manage_kernel_internal(
     app_handle: AppHandle,
     options: AutoManageOptions,
 ) -> Result<AutoManageResult, String> {
+    if let Err(err) = ensure_embedded_kernel(&app_handle).await {
+        warn!("安装内嵌内核失败，继续按现有逻辑处理: {}", err);
+    }
+
     let resolved_state = resolve_proxy_runtime_state(&app_handle, options.to_overrides()).await?;
 
     let kernel_installed = kernel_binary_exists();

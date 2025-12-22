@@ -346,6 +346,10 @@ sing-box-windows/
 # 检查 Tauri 环境
 pnpm tauri info
 
+# 只需记住两个命令（会自动拉取当前平台内核，缺失才下载）
+pnpm tauri dev
+pnpm tauri build
+
 # 运行健康检查
 pnpm run type-check  # TypeScript 类型检查
 pnpm run lint        # 代码质量检查
@@ -355,6 +359,27 @@ pnpm tauri dev
 ```
 
 成功启动后，应该能看到应用程序窗口并且控制台没有致命错误。
+
+### 内嵌内核资源拉取
+
+开发或打包前可执行脚本，将对应平台的 sing-box 内核下载到 `src-tauri/resources`：
+
+```bash
+# 默认使用当前平台/架构，自动获取最新版本
+pnpm kernel:fetch
+
+# 一次拉取全平台（Windows/Linux/macOS）
+pnpm kernel:fetch:all
+
+# 指定平台/架构/版本
+pnpm kernel:fetch -- --platform windows --arch amd64 --version 1.12.10
+
+# 只在缺失时拉取（适合自动化）
+pnpm kernel:fetch -- --skip-existing
+
+# 强制重新下载
+pnpm kernel:fetch -- --force
+```
 
 ## 核心功能模块
 
@@ -395,6 +420,21 @@ pnpm tauri dev
 - `kernel_get_status_enhanced` / `kernel_check_health`：查询状态与健康检查
 - `kernel_auto_manage`：按保存的配置自动管理启动流程
 - `check_kernel_version` / `get_latest_kernel_version_cmd`：检查与获取内核版本
+
+#### 内嵌内核资源
+
+项目支持将 sing-box 内核作为打包资源随应用发布，首次启动时会自动复制到工作目录。
+
+- 资源路径：`src-tauri/resources/kernel/<platform>/<arch>/sing-box(.exe)`
+- 构建脚本按平台选择资源配置文件，只会打包对应平台的内核文件
+- 可选版本文件：在同目录放置 `version.txt`，用于写入 `installed_kernel_version`
+- 开发模式下也会从 `src-tauri/resources` 读取内嵌内核
+
+示例（Windows x64）：
+
+```
+src-tauri/resources/kernel/windows/amd64/sing-box.exe
+```
 
 ### 代理服务 (core/proxy_service.rs)
 
