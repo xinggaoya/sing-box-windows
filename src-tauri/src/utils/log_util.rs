@@ -15,7 +15,6 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 static FILE_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
 const CLEANUP_INTERVAL_HOURS: u64 = 24;
-const RETENTION_DAYS: u64 = 1;
 
 /// 初始化日志：控制台输出 + 按天轮转的文件输出
 /// 返回日志目录，供后续定时清理使用
@@ -55,7 +54,7 @@ pub fn init_logging() -> Option<PathBuf> {
     }
 }
 
-/// 启动定时清理任务，按数量和单文件大小清理旧日志
+/// 启动定时清理任务，仅保留最新的日志文件
 pub fn spawn_log_cleanup_task(log_dir: PathBuf) -> JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         if let Err(e) = cleanup_once(log_dir.clone()).await {
@@ -126,9 +125,9 @@ fn perform_cleanup(log_dir: &Path) -> io::Result<()> {
     }
 
     let max_files = log_constants::DEFAULT_MAX_FILES as usize;
-    let max_file_size_bytes = log_constants::DEFAULT_MAX_FILE_SIZE * 1024 * 1024;
+    let base_file_name = format!("{}.log", log_constants::DEFAULT_FILE_PREFIX);
 
-    let mut entries: Vec<(PathBuf, std::fs::Metadata)> = std::fs::read_dir(log_dir)?
+    let mut entries: Vec<(PathBuf, SystemTime)> = std::fs::read_dir(log_dir)?
         .filter_map(Result::ok)
         .filter_map(|entry| {
             let path = entry.path();
@@ -136,48 +135,24 @@ fn perform_cleanup(log_dir: &Path) -> io::Result<()> {
                 return None;
             }
 
-            // 仅清理日志文件，避免误删其他文件
-            if path.extension().and_then(|ext| ext.to_str()) != Some("log") {
+            let file_name = path.file_name()?.to_string_lossy();
+            // 仅清理 app.log 及其每日滚动文件（app.log.YYYY-MM-DD）
+            if !file_name.starts_with(&base_file_name) {
                 return None;
             }
 
-            entry.metadata().ok().map(|metadata| (path, metadata))
+            let modified = entry
+                .metadata()
+                .ok()
+                .and_then(|metadata| metadata.modified().ok())
+                .unwrap_or(UNIX_EPOCH);
+            Some((path, modified))
         })
         .collect();
 
     let mut removed = 0usize;
-    let retention = Duration::from_secs(RETENTION_DAYS * 24 * 3600);
-    let now = SystemTime::now();
-    entries.retain(|(path, metadata)| {
-        if metadata.len() > max_file_size_bytes {
-            if let Err(e) = std::fs::remove_file(path) {
-                warn!("删除超大日志文件失败 {:?}: {}", path, e);
-            } else {
-                removed += 1;
-            }
-            false
-        } else if let Ok(modified) = metadata.modified() {
-            // 按天数保留，过期直接删除
-            if now
-                .duration_since(modified)
-                .map(|age| age > retention)
-                .unwrap_or(false)
-            {
-                if let Err(e) = std::fs::remove_file(path) {
-                    warn!("删除过期日志失败 {:?}: {}", path, e);
-                } else {
-                    removed += 1;
-                }
-                false
-            } else {
-                true
-            }
-        } else {
-            true
-        }
-    });
 
-    entries.sort_by_key(|(_, metadata)| metadata.modified().unwrap_or(UNIX_EPOCH));
+    entries.sort_by_key(|(_, modified)| *modified);
     entries.reverse(); // 最新在前，方便按数量截断
 
     for (idx, (path, _)) in entries.iter().enumerate() {
