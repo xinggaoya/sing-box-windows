@@ -37,6 +37,8 @@
 
 Sing-Box GUI Client is a cutting-edge cross-platform application for Windows, Linux, and macOS that provides a modern, intuitive interface for managing Sing-Box proxy configurations. Built with the powerful combination of Tauri 2.0 and Vue 3, it offers exceptional performance, security, and user experience.
 
+> **📱 Android Users**: An Android version of this project is also available at [sing-box-windows-android](https://github.com/xinggaoya/sing-box-windows-android)!
+
 ### 🎯 Key Highlights
 
 - **🚀 Blazing Fast**: Built with Rust backend and optimized Vue 3 frontend
