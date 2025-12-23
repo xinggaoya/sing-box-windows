@@ -60,12 +60,9 @@ pub mod log {
         pub const HOURLY: &str = "hourly";
         pub const DAILY: &str = "daily";
         pub const NEVER: &str = "never";
-        pub const DEFAULT: &str = "hourly";
+        pub const DEFAULT: &str = "daily";
     }
 
-    /// 默认最大文件大小(MB) —— 控制单个日志文件上限，降低磁盘与内存占用
-    pub const DEFAULT_MAX_FILE_SIZE: u64 = 10;
-
-    /// 默认最大文件数量 —— 仅保留最新 5 个文件
+    /// 默认最大文件数量 —— 每天一个文件，仅保留最近 5 天
     pub const DEFAULT_MAX_FILES: u32 = 5;
 }
