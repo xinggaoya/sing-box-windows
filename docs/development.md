@@ -30,19 +30,19 @@ Sing-Box Windows 是一个基于 [Sing-Box](https://github.com/SagerNet/sing-box
 
 ### 前端技术
 
-- **Vue 3 (v3.5.13)**：核心前端框架，使用 Composition API
+- **Vue 3 (v3.5.25)**：核心前端框架，使用 Composition API
 - **TypeScript (v5.6.3)**：类型安全的 JavaScript 超集
-- **Naive UI (v2.41.0)**：高质量 Vue 3 组件库，支持亮暗主题
+- **Naive UI (v2.43.2)**：高质量 Vue 3 组件库，支持亮暗主题
 - **Pinia (v2.3.1)**：Vue 状态管理库，支持持久化存储
 - **Vue Router (v4.5.1)**：Vue 路由管理，支持Hash路由
-- **Vue I18n (v9.14.4)**：国际化支持，多语言切换
-- **VueUse (v12.8.2)**：Vue 实用工具集合
-- **Vite (v6.3.5)**：快速构建工具
+- **Vue I18n (v9.14.5)**：国际化支持，多语言切换
+- **VueUse (v14.1.0)**：Vue 实用工具集合
+- **Vite (v7.3.0)**：快速构建工具
 
 ### 后端技术
 
 - **Rust (1.77.2+)**：高性能系统编程语言
-- **Tauri 2.0 (v2.5.0)**：构建跨平台应用的框架
+- **Tauri 2.0 (v2.2)**：构建跨平台应用的框架
 - **tokio**：异步运行时
 - **serde & serde_json**：序列化和反序列化
 - **reqwest**：HTTP 客户端，支持TLS
@@ -96,24 +96,31 @@ sing-box-windows/
 │   ├── router/        # 路由配置
 │   │   └── index.ts   # 路由定义
 │   ├── services/      # 服务层
-│   │   ├── notification-service.ts # 通知服务
-│   │   ├── proxy-service.ts        # 代理服务
-│   │   ├── tauri/                # Tauri API 分层封装
-│   │   │   ├── index.ts         # 聚合导出，兼容旧接口
-│   │   │   ├── kernel.ts        # 内核命令封装
-│   │   │   ├── proxy.ts         # 代理命令封装
-│   │   │   ├── subscription.ts  # 订阅命令封装
-│   │   │   ├── system.ts        # 系统命令封装
-│   │   │   └── config.ts        # 配置命令封装
-│   │   └── websocket-service.ts   # WebSocket 服务
+│   │   ├── database-service.ts         # 数据库服务
+│   │   ├── event-service.ts            # 事件服务
+│   │   ├── initialization-service.ts   # 初始化服务
+│   │   ├── invoke-client.ts            # Tauri命令统一调用
+│   │   ├── kernel-service.ts           # 内核命令封装
+│   │   ├── kernel/                     # 内核相关服务
+│   │   │   ├── lifecycle-controller.ts # 生命周期控制器
+│   │   │   └── status-cache.ts         # 状态缓存
+│   │   ├── notification-service.ts     # 通知服务
+│   │   ├── proxy-service.ts            # 代理服务
+│   │   ├── subscription-service.ts     # 订阅服务
+│   │   ├── sudo-service.ts             # sudo提权服务
+│   │   └── system-service.ts           # 系统服务
 │   ├── stores/        # Pinia 状态管理
 │   │   ├── index.ts   # Store 主入口和插件配置
 │   │   ├── app/       # 应用相关 store
+│   │   │   ├── composables/             # 组合式函数
+│   │   │   │   ├── messaging.ts        # 消息处理
+│   │   │   │   └── persistence.ts      # 持久化处理
 │   │   │   ├── AppStore.ts     # 核心应用状态
-│   │   │   ├── ThemeStore.ts   # 主题管理
 │   │   │   ├── LocaleStore.ts  # 国际化状态
-│   │   │   ├── WindowStore.ts  # 窗口管理
-│   │   │   └── UpdateStore.ts  # 更新状态
+│   │   │   ├── SudoStore.ts    # sudo提权状态
+│   │   │   ├── ThemeStore.ts   # 主题管理
+│   │   │   ├── UpdateStore.ts  # 更新状态
+│   │   │   └── WindowStore.ts  # 窗口管理
 │   │   ├── kernel/    # 内核相关 store
 │   │   │   ├── KernelStore.ts         # 内核状态
 │   │   │   ├── KernelRuntimeStore.ts  # 内核运行时状态
@@ -156,18 +163,49 @@ sing-box-windows/
 │   │   │   │   ├── system.rs     # 系统常量(注册表、数据库)
 │   │   │   │   └── common.rs     # 通用常量(消息、日志)
 │   │   │   ├── core/           # 核心服务模块
-│   │   │   │   ├── kernel_service.rs  # 内核服务(启动/停止/管理)
-│   │   │   │   ├── proxy_service.rs   # 代理服务(系统代理/TUN模式)
-│   │   │   │   ├── task_manager.rs    # 任务管理器
-│   │   │   │   └── mod.rs             # 核心模块入口
+│   │   │   │   ├── kernel_service/  # 内核服务子模块
+│   │   │   │   │   ├── download.rs    # 内核下载
+│   │   │   │   │   ├── embedded.rs    # 内嵌内核资源
+│   │   │   │   │   ├── event.rs       # 事件处理
+│   │   │   │   │   ├── guard.rs       # 守护进程
+│   │   │   │   │   ├── runtime.rs     # 运行时管理
+│   │   │   │   │   ├── state.rs       # 状态管理
+│   │   │   │   │   ├── status.rs      # 状态查询
+│   │   │   │   │   ├── utils.rs       # 工具函数
+│   │   │   │   │   └── versioning.rs  # 版本管理
+│   │   │   │   ├── kernel_service.rs  # 内核服务主入口
+│   │   │   │   ├── kernel_auto_manage.rs  # 内核自动管理
+│   │   │   │   ├── event_relay.rs    # 事件中继
+│   │   │   │   ├── proxy_service.rs  # 代理服务
+│   │   │   │   ├── tun_profile.rs    # TUN配置文件
+│   │   │   │   └── mod.rs            # 核心模块入口
 │   │   │   ├── network/        # 网络服务模块
-│   │   │   │   ├── subscription_service.rs # 订阅服务
+│   │   │   │   ├── subscription_service/  # 订阅服务子模块
+│   │   │   │   │   ├── auto_update.rs  # 自动更新
+│   │   │   │   │   ├── helpers.rs      # 辅助函数
+│   │   │   │   │   ├── mode.rs         # 模式处理
+│   │   │   │   │   └── parser.rs       # 订阅解析
+│   │   │   │   ├── subscription_service.rs  # 订阅服务主入口
 │   │   │   │   └── mod.rs              # 网络模块入口
 │   │   │   ├── system/         # 系统服务模块
-│   │   │   │   ├── system_service.rs   # 系统功能(权限/服务)
-│   │   │   │   ├── update_service.rs   # 更新服务
-│   │   │   │   ├── config_service.rs   # 配置服务
-│   │   │   │   └── mod.rs              # 系统模块入口
+│   │   │   │   ├── background_tasks.rs   # 后台任务
+│   │   │   │   ├── config_service.rs     # 配置服务
+│   │   │   │   ├── sudo_service.rs       # sudo提权服务
+│   │   │   │   ├── system_service.rs     # 系统功能
+│   │   │   │   ├── update_service.rs     # 更新服务
+│   │   │   │   └── mod.rs                # 系统模块入口
+│   │   │   ├── singbox/        # Sing-box相关模块
+│   │   │   │   ├── common.rs          # 通用函数
+│   │   │   │   ├── config_generator.rs # 配置生成器
+│   │   │   │   ├── config_schema.rs   # 配置Schema
+│   │   │   │   ├── settings_patch.rs  # 设置补丁
+│   │   │   │   └── mod.rs             # Sing-box模块入口
+│   │   │   ├── storage/       # 存储服务模块
+│   │   │   │   ├── database.rs             # 数据库定义
+│   │   │   │   ├── enhanced_storage_service.rs  # 增强存储服务
+│   │   │   │   ├── error.rs                # 错误处理
+│   │   │   │   ├── state_model.rs          # 状态模型
+│   │   │   │   └── mod.rs                  # 存储模块入口
 │   │   │   └── mod.rs          # 应用模块入口
 │   │   ├── entity/    # 数据实体模型
 │   │   │   ├── config_model.rs # 配置数据模型
