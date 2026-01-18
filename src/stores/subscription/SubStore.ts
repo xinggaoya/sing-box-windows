@@ -16,6 +16,10 @@ interface FrontendSubscription {
   configPath?: string
   backupPath?: string
   autoUpdateIntervalMinutes?: number
+  subscriptionUpload?: number
+  subscriptionDownload?: number
+  subscriptionTotal?: number
+  subscriptionExpire?: number
 }
 
 const DEFAULT_AUTO_UPDATE_MINUTES = 720 // 12h
@@ -39,6 +43,10 @@ export const useSubStore = defineStore(
         configPath: sub.config_path || undefined,
         backupPath: sub.backup_path || undefined,
         autoUpdateIntervalMinutes: sub.auto_update_interval_minutes ?? DEFAULT_AUTO_UPDATE_MINUTES,
+        subscriptionUpload: sub.subscription_upload ?? undefined,
+        subscriptionDownload: sub.subscription_download ?? undefined,
+        subscriptionTotal: sub.subscription_total ?? undefined,
+        subscriptionExpire: sub.subscription_expire ?? undefined,
       }))
     }
 
@@ -55,6 +63,10 @@ export const useSubStore = defineStore(
         config_path: sub.configPath || undefined,
         backup_path: sub.backupPath || undefined,
         auto_update_interval_minutes: sub.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES,
+        subscription_upload: sub.subscriptionUpload ?? null,
+        subscription_download: sub.subscriptionDownload ?? null,
+        subscription_total: sub.subscriptionTotal ?? null,
+        subscription_expire: sub.subscriptionExpire ?? null,
       }))
     }
 

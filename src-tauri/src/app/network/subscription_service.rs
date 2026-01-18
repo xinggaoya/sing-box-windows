@@ -8,7 +8,9 @@ use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::proxy_service::apply_proxy_runtime_state;
 use crate::app::singbox::config_generator;
 use crate::app::singbox::settings_patch::apply_port_settings_only;
-use crate::app::storage::enhanced_storage_service::{db_get_app_config, db_save_app_config};
+use crate::app::storage::enhanced_storage_service::{
+    db_get_app_config, db_get_subscriptions, db_save_app_config, db_save_subscriptions,
+};
 use crate::app::storage::state_model::AppConfig;
 use crate::utils::http_client;
 use base64::{Engine as _, engine::general_purpose};
@@ -16,7 +18,9 @@ use helpers::{
     backup_existing_config, resolve_target_config_path, runtime_state_from_config,
 };
 use parser::extract_nodes_from_subscription;
-use serde_json::{json, Value};
+use reqwest::header::HeaderMap;
+use serde::Serialize;
+use serde_json::Value;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
@@ -46,6 +50,138 @@ fn try_decode_base64_to_text(raw: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct SubscriptionPersistResult {
+    pub config_path: String,
+    pub subscription_upload: Option<u64>,
+    pub subscription_download: Option<u64>,
+    pub subscription_total: Option<u64>,
+    pub subscription_expire: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+struct SubscriptionUserInfo {
+    upload: Option<u64>,
+    download: Option<u64>,
+    total: Option<u64>,
+    expire: Option<u64>,
+}
+
+fn parse_subscription_userinfo(raw: &str) -> Option<SubscriptionUserInfo> {
+    let mut info = SubscriptionUserInfo {
+        upload: None,
+        download: None,
+        total: None,
+        expire: None,
+    };
+
+    let mut has_value = false;
+    for segment in raw.split(';') {
+        let segment = segment.trim();
+        if segment.is_empty() {
+            continue;
+        }
+        let (key, value) = match segment.split_once('=') {
+            Some(pair) => pair,
+            None => continue,
+        };
+
+        let value = value.trim().parse::<u64>().ok();
+        match key.trim().to_ascii_lowercase().as_str() {
+            "upload" => {
+                info.upload = value;
+                has_value = true;
+            }
+            "download" => {
+                info.download = value;
+                has_value = true;
+            }
+            "total" => {
+                info.total = value;
+                has_value = true;
+            }
+            "expire" => {
+                info.expire = value;
+                has_value = true;
+            }
+            _ => {}
+        }
+    }
+
+    if has_value { Some(info) } else { None }
+}
+
+fn extract_subscription_userinfo(headers: &HeaderMap) -> Option<SubscriptionUserInfo> {
+    let header = headers
+        .get("subscription-userinfo")
+        .or_else(|| headers.get("Subscription-Userinfo"))?;
+    let raw = header.to_str().ok()?;
+    parse_subscription_userinfo(raw)
+}
+
+async fn fetch_subscription_content(
+    url: &str,
+) -> Result<(String, Option<SubscriptionUserInfo>), Box<dyn Error>> {
+    let response = http_client::get_client().get(url).send().await?;
+    response.error_for_status_ref()?;
+    let headers = response.headers().clone();
+    let body = response.text().await?;
+    let userinfo = extract_subscription_userinfo(&headers);
+    Ok((body, userinfo))
+}
+
+async fn update_subscription_userinfo(
+    app_handle: &AppHandle,
+    target_path: &Path,
+    url: &str,
+    userinfo: Option<SubscriptionUserInfo>,
+) -> Result<(), String> {
+    let mut subscriptions = db_get_subscriptions(app_handle.clone())
+        .await
+        .map_err(|e| format!("读取订阅配置失败: {}", e))?;
+
+    let trimmed_url = url.trim();
+    let target_path = target_path.to_string_lossy();
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| format!("获取时间失败: {}", e))?
+        .as_millis() as u64;
+
+    let mut updated = false;
+    for sub in subscriptions.iter_mut() {
+        let path_match = sub
+            .config_path
+            .as_deref()
+            .map(|path| path == target_path.as_ref())
+            .unwrap_or(false);
+        let url_match = !trimmed_url.is_empty() && sub.url.trim() == trimmed_url;
+
+        if path_match || url_match {
+            sub.last_update = Some(now_ms);
+            if let Some(info) = &userinfo {
+                sub.subscription_upload = info.upload;
+                sub.subscription_download = info.download;
+                sub.subscription_total = info.total;
+                sub.subscription_expire = info.expire;
+            } else {
+                sub.subscription_upload = None;
+                sub.subscription_download = None;
+                sub.subscription_total = None;
+                sub.subscription_expire = None;
+            }
+            updated = true;
+        }
+    }
+
+    if updated {
+        db_save_subscriptions(subscriptions, app_handle.clone())
+            .await
+            .map_err(|e| format!("保存订阅配置失败: {}", e))?;
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)] // Tauri 接口需与前端参数保持一致
 pub async fn download_subscription(
@@ -57,7 +193,7 @@ pub async fn download_subscription(
     window: tauri::Window,
     proxy_port: Option<u16>,
     api_port: Option<u16>,
-) -> Result<String, String> {
+) -> Result<SubscriptionPersistResult, String> {
     let app_handle = window.app_handle();
     let apply_runtime = apply_runtime.unwrap_or(true);
 
@@ -73,8 +209,9 @@ pub async fn download_subscription(
     }
 
     let target_path = resolve_target_config_path(file_name, config_path)?;
-    download_and_process_subscription(
-        url,
+    let trimmed_url = url.trim();
+    let userinfo = download_and_process_subscription(
+        trimmed_url,
         use_original_config,
         app_handle,
         &app_config,
@@ -100,7 +237,24 @@ pub async fn download_subscription(
         auto_manage_with_saved_config(app_handle, true, "subscription-download").await;
     }
 
-    Ok(target_path.to_string_lossy().to_string())
+    if let Err(e) = update_subscription_userinfo(
+        &app_handle,
+        &target_path,
+        trimmed_url,
+        userinfo.clone(),
+    )
+    .await
+    {
+        warn!("同步订阅信息失败: {}", e);
+    }
+
+    Ok(SubscriptionPersistResult {
+        config_path: target_path.to_string_lossy().to_string(),
+        subscription_upload: userinfo.as_ref().and_then(|info| info.upload),
+        subscription_download: userinfo.as_ref().and_then(|info| info.download),
+        subscription_total: userinfo.as_ref().and_then(|info| info.total),
+        subscription_expire: userinfo.as_ref().and_then(|info| info.expire),
+    })
 }
 
 #[tauri::command]
@@ -114,7 +268,7 @@ pub async fn add_manual_subscription(
     window: tauri::Window,
     proxy_port: Option<u16>,
     api_port: Option<u16>,
-) -> Result<String, String> {
+) -> Result<SubscriptionPersistResult, String> {
     let app_handle = window.app_handle();
     let apply_runtime = apply_runtime.unwrap_or(true);
 
@@ -157,7 +311,13 @@ pub async fn add_manual_subscription(
         auto_manage_with_saved_config(app_handle, true, "subscription-manual").await;
     }
 
-    Ok(target_path.to_string_lossy().to_string())
+    Ok(SubscriptionPersistResult {
+        config_path: target_path.to_string_lossy().to_string(),
+        subscription_upload: None,
+        subscription_download: None,
+        subscription_total: None,
+        subscription_expire: None,
+    })
 }
 
 #[tauri::command]
@@ -243,12 +403,12 @@ pub fn get_current_proxy_mode() -> Result<String, String> {
 }
 
 async fn download_and_process_subscription(
-    url: String,
+    url: &str,
     use_original_config: bool,
     _app_handle: &AppHandle,
     app_config: &AppConfig,
     target_path: &Path,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Option<SubscriptionUserInfo>, Box<dyn Error>> {
     let work_dir = crate::utils::app_util::get_work_dir_sync();
     let sing_box_dir = Path::new(&work_dir).join("sing-box");
 
@@ -263,7 +423,7 @@ async fn download_and_process_subscription(
 
     info!("开始下载订阅: {}", url);
 
-    let response_text = http_client::get_text(url.trim())
+    let (response_text, userinfo) = fetch_subscription_content(url)
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
 
@@ -272,7 +432,7 @@ async fn download_and_process_subscription(
     if use_original_config {
         info!("使用原始订阅内容，仅修改必要的端口和地址");
         process_original_config(&response_text, app_config, target_path)?;
-        return Ok(());
+        return Ok(userinfo);
     }
 
     let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
@@ -356,7 +516,7 @@ async fn download_and_process_subscription(
 
     info!("配置已成功保存到: {:?}", target_path);
     info!("订阅已更新并应用到模板，配置已保存");
-    Ok(())
+    Ok(userinfo)
 }
 
 fn process_subscription_content(

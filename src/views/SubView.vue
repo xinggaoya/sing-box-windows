@@ -76,6 +76,14 @@
                 {{ item.lastUpdate ? formatTime(item.lastUpdate) : t('sub.neverUsed') }}
               </span>
             </div>
+            <div v-if="hasSubscriptionTraffic(item)" class="info-row">
+              <n-icon size="14"><StatsChartOutline /></n-icon>
+              <span class="info-text">{{ formatTrafficSummary(item) }}</span>
+            </div>
+            <div v-if="item.subscriptionExpire" class="info-row">
+              <n-icon size="14"><CalendarOutline /></n-icon>
+              <span class="info-text">{{ formatExpireTime(item.subscriptionExpire) }}</span>
+            </div>
           </div>
 
           <div class="sub-card-footer">
@@ -237,6 +245,7 @@ import { useMessage } from 'naive-ui'
 import { useSubStore } from '@/stores/subscription/SubStore'
 import { useAppStore } from '@/stores'
 import { subscriptionService } from '@/services/subscription-service'
+import type { SubscriptionPersistResult } from '@/services/subscription-service'
 import { kernelService } from '@/services/kernel-service'
 import { useI18n } from 'vue-i18n'
 import {
@@ -251,6 +260,8 @@ import {
   EllipsisVerticalOutline,
   GlobeOutline,
   TimeOutline,
+  StatsChartOutline,
+  CalendarOutline,
   RefreshOutline,
   ArrowUndoOutline,
   TimerOutline,
@@ -274,6 +285,10 @@ interface Subscription {
   configPath?: string
   backupPath?: string
   autoUpdateIntervalMinutes?: number
+  subscriptionUpload?: number
+  subscriptionDownload?: number
+  subscriptionTotal?: number
+  subscriptionExpire?: number
 }
 
 interface SubscriptionForm extends Subscription {
@@ -491,7 +506,7 @@ const handleConfirm = () => {
       const isManual = !isUrlTab
       const useOriginalConfig = isUriTab ? false : formValue.value.useOriginalConfig
       const persistOptions = { fileName: generateConfigFileName(formValue.value.name || 'sub') }
-      let savedPath: string | null = null
+      let savedResult: SubscriptionPersistResult | null = null
 
       if (editIndex.value === null) {
         if (isManual && resolvedManualContent) {
@@ -499,18 +514,19 @@ const handleConfirm = () => {
             message.warning(t('sub.originalConfigJsonOnly'))
             return
           }
-          savedPath = await subscriptionService.addManualSubscription(
+          savedResult = await subscriptionService.addManualSubscription(
             resolvedManualContent,
             useOriginalConfig,
             { ...persistOptions, applyRuntime: false },
           )
         } else if (!isManual) {
-          savedPath = await subscriptionService.downloadSubscription(
+          savedResult = await subscriptionService.downloadSubscription(
             urlInput,
             useOriginalConfig,
             { ...persistOptions, applyRuntime: false },
           )
         }
+        const savedPath = savedResult?.configPath ?? null
 
         const { uriContent, ...base } = formValue.value
         const newItem: Subscription = {
@@ -524,6 +540,7 @@ const handleConfirm = () => {
           configPath: savedPath || undefined,
           backupPath: savedPath ? `${savedPath}.bak` : undefined,
         }
+        applySubscriptionUserinfo(newItem, savedResult, isManual)
 
         subStore.list.push(newItem)
         await subStore.setActiveIndex(subStore.list.length - 1)
@@ -553,6 +570,9 @@ const handleConfirm = () => {
           manualContent: isManual ? resolvedManualContent : undefined,
           useOriginalConfig,
           autoUpdateIntervalMinutes: isManual ? 0 : base.autoUpdateIntervalMinutes,
+        }
+        if (isManual) {
+          applySubscriptionUserinfo(subStore.list[editIndex.value], null, true)
         }
         message.success(t('sub.updateSuccess'))
       }
@@ -612,7 +632,7 @@ const refreshSubscription = async (index: number, applyRuntime = false, silent =
 
   try {
     subStore.list[index].isLoading = true
-    const savedPath = item.isManual
+    const savedResult = item.isManual
       ? await subscriptionService.addManualSubscription(
         item.manualContent || '',
         item.useOriginalConfig,
@@ -624,6 +644,7 @@ const refreshSubscription = async (index: number, applyRuntime = false, silent =
         persistOptions,
       )
 
+    const savedPath = savedResult.configPath
     if (savedPath) {
       subStore.list[index].configPath = savedPath
       subStore.list[index].backupPath = `${savedPath}.bak`
@@ -632,6 +653,7 @@ const refreshSubscription = async (index: number, applyRuntime = false, silent =
         await appStore.setActiveConfigPath(savedPath)
       }
     }
+    applySubscriptionUserinfo(subStore.list[index], savedResult, item.isManual)
     subStore.list[index].lastUpdate = Date.now()
 
     if (!silent) {
@@ -717,6 +739,66 @@ const copyUrl = (url: string) => {
   message.success(t('sub.linkCopied'))
 }
 
+const applySubscriptionUserinfo = (
+  target: Subscription,
+  result: SubscriptionPersistResult | null,
+  isManual: boolean,
+) => {
+  if (isManual || !result) {
+    target.subscriptionUpload = undefined
+    target.subscriptionDownload = undefined
+    target.subscriptionTotal = undefined
+    target.subscriptionExpire = undefined
+    return
+  }
+
+  target.subscriptionUpload = result.subscriptionUpload
+  target.subscriptionDownload = result.subscriptionDownload
+  target.subscriptionTotal = result.subscriptionTotal
+  target.subscriptionExpire = result.subscriptionExpire
+}
+
+const hasSubscriptionTraffic = (item: Subscription) => {
+  return (
+    item.subscriptionUpload !== undefined ||
+    item.subscriptionDownload !== undefined ||
+    item.subscriptionTotal !== undefined
+  )
+}
+
+const formatBytes = (bytes?: number) => {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const value = bytes / Math.pow(1024, index)
+  return `${value.toFixed(2)} ${units[index]}`
+}
+
+const formatTrafficSummary = (item: Subscription) => {
+  const upload = item.subscriptionUpload ?? 0
+  const download = item.subscriptionDownload ?? 0
+  const used = upload + download
+  const total = item.subscriptionTotal
+
+  if (total !== undefined) {
+    const remaining = Math.max(total - used, 0)
+    return t('sub.trafficWithTotal', {
+      used: formatBytes(used),
+      total: formatBytes(total),
+      remaining: formatBytes(remaining),
+    })
+  }
+
+  return t('sub.trafficUsedOnly', { used: formatBytes(used) })
+}
+
+const formatExpireTime = (timestamp?: number) => {
+  if (!timestamp) return ''
+  const date = new Date(timestamp * 1000)
+  if (Number.isNaN(date.getTime())) return ''
+  return t('sub.expireAt', { time: date.toLocaleString() })
+}
+
 const formatTime = (timestamp: number): string => {
   return new Date(timestamp).toLocaleString()
 }
@@ -728,17 +810,19 @@ const regenerateConfigFor = async (item: Subscription) => {
     if (!content) {
       throw new Error(t('sub.manualContentMissing'))
     }
-    return await subscriptionService.addManualSubscription(
+    const result = await subscriptionService.addManualSubscription(
       content,
       item.useOriginalConfig,
       persistOptions,
     )
+    return result.configPath
   }
-  return await subscriptionService.downloadSubscription(
+  const result = await subscriptionService.downloadSubscription(
     item.url,
     item.useOriginalConfig,
     persistOptions,
   )
+  return result.configPath
 }
 
 const editCurrentConfig = async () => {
@@ -764,11 +848,12 @@ const saveCurrentConfig = async () => {
       ? { configPath: activeItem.configPath, applyRuntime: true }
       : { fileName: generateConfigFileName(activeItem?.name || 'sub'), applyRuntime: true }
 
-    const savedPath = await subscriptionService.addManualSubscription(
+    const savedResult = await subscriptionService.addManualSubscription(
       currentConfig.value,
       false,
       persistOptions,
     )
+    const savedPath = savedResult.configPath
 
     if (activeItem) {
       if (activeItem.isManual) {

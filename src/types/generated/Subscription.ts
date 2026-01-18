@@ -9,4 +9,8 @@ export interface Subscription {
   config_path?: string
   backup_path?: string
   auto_update_interval_minutes?: number
+  subscription_upload?: number | null
+  subscription_download?: number | null
+  subscription_total?: number | null
+  subscription_expire?: number | null
 }

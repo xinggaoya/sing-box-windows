@@ -6,9 +6,33 @@ export interface SubscriptionPersistOptions {
   applyRuntime?: boolean
 }
 
+interface BackendSubscriptionPersistResult {
+  config_path: string
+  subscription_upload?: number | null
+  subscription_download?: number | null
+  subscription_total?: number | null
+  subscription_expire?: number | null
+}
+
+export interface SubscriptionPersistResult {
+  configPath: string
+  subscriptionUpload?: number
+  subscriptionDownload?: number
+  subscriptionTotal?: number
+  subscriptionExpire?: number
+}
+
+const mapPersistResult = (result: BackendSubscriptionPersistResult): SubscriptionPersistResult => ({
+  configPath: result.config_path,
+  subscriptionUpload: result.subscription_upload ?? undefined,
+  subscriptionDownload: result.subscription_download ?? undefined,
+  subscriptionTotal: result.subscription_total ?? undefined,
+  subscriptionExpire: result.subscription_expire ?? undefined,
+})
+
 export const subscriptionService = {
   downloadSubscription(url: string, useOriginalConfig: boolean, options: SubscriptionPersistOptions = {}) {
-    return invokeWithAppContext<string>(
+    return invokeWithAppContext<BackendSubscriptionPersistResult>(
       'download_subscription',
       {
         url,
@@ -18,11 +42,11 @@ export const subscriptionService = {
         applyRuntime: options.applyRuntime,
       },
       { withProxyPort: true, withApiPort: true },
-    )
+    ).then(mapPersistResult)
   },
 
   addManualSubscription(content: string, useOriginalConfig: boolean, options: SubscriptionPersistOptions = {}) {
-    return invokeWithAppContext<string>(
+    return invokeWithAppContext<BackendSubscriptionPersistResult>(
       'add_manual_subscription',
       {
         content,
@@ -32,7 +56,7 @@ export const subscriptionService = {
         applyRuntime: options.applyRuntime,
       },
       { withProxyPort: true, withApiPort: true },
-    )
+    ).then(mapPersistResult)
   },
 
   setActiveConfig(configPath: string | null) {

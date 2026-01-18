@@ -170,4 +170,8 @@ pub struct Subscription {
     pub config_path: Option<String>,
     pub backup_path: Option<String>,
     pub auto_update_interval_minutes: Option<u64>,
+    pub subscription_upload: Option<u64>,
+    pub subscription_download: Option<u64>,
+    pub subscription_total: Option<u64>,
+    pub subscription_expire: Option<u64>,
 }
