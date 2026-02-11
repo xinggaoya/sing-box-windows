@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 🔧 优化改进
+- **Google AI 分流增强** - 新增 `geosite-google-gemini` 与 `geosite-google-deepmind` 规则集，并复用 OpenAI 分流组提升相关服务可用性
+- **错误提示优化** - 管理员重启失败时，首页弹窗会展示后端返回的具体错误信息，便于定位问题
+
+### 🐛 问题修复
+- **Windows 提权重启修复** - 移除易受路径编码影响的 VBS 提权流程，改用 PowerShell `Start-Process -Verb RunAs`，修复中文用户名路径下“找不到可执行文件”问题
+
 ## [v2.2.3] - 2025-12-22
 ### 🐛 问题修复
 - 修复 Cargo.lock 依赖版本被错误改写导致的 Linux 构建失败

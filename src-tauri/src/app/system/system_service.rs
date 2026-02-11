@@ -50,55 +50,53 @@ fn restart_as_admin_windows(app_handle: tauri::AppHandle) -> Result<(), String> 
         return Err(format!("找不到程序可执行文件: {}", current_exe.display()));
     }
 
-    // 创建VBS脚本实现UAC提权
-    let temp_dir = std::env::temp_dir();
-    let vbs_path = temp_dir.join("elevate.vbs");
-
-    // 确保路径正确格式化
-    let exe_path = current_exe.to_string_lossy().replace("\\", "\\\\");
-
-    let vbs_content = format!(
-        "Set UAC = CreateObject(\"Shell.Application\")\n\
-        UAC.ShellExecute \"{}\", \"\", \"\", \"runas\", 1\n",
-        exe_path
-    );
-
-    // 写入VBS脚本
-    std::fs::write(&vbs_path, vbs_content).map_err(|e| format!("无法创建提权脚本: {}", e))?;
-
-    // 运行VBS脚本
-    let result = std::process::Command::new("wscript")
-        .arg(vbs_path.to_str().unwrap())
+    // 直接使用 PowerShell 的 Start-Process -Verb RunAs 触发 UAC。
+    // 说明：旧实现依赖临时 VBS 脚本，在中文用户名/UTF-8 编码场景下容易出现路径解析错误。
+    let result = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            "Start-Process -FilePath $env:SINGBOX_RESTART_EXE -Verb RunAs",
+        ])
+        .env("SINGBOX_RESTART_EXE", &current_exe)
         .creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW)
         .spawn();
 
     match result {
         Ok(_) => {
+            info!("已请求管理员权限重启应用");
             // 启动成功，退出当前进程
             app_handle.exit(0);
             Ok(())
         }
         Err(e) => {
-            // 尝试备用方法 - 使用cmd的start命令
-            let result = std::process::Command::new("cmd")
-                .args(&[
-                    "/C",
-                    "start",
-                    "",
-                    "/B",
-                    "runas",
-                    current_exe.to_str().unwrap(),
+            warn!("使用 powershell 触发 UAC 失败: {}", e);
+
+            // 备用方案：显式使用 powershell.exe 再尝试一次，处理 PATH 异常场景。
+            let result = std::process::Command::new("powershell.exe")
+                .args([
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-WindowStyle",
+                    "Hidden",
+                    "-Command",
+                    "Start-Process -FilePath $env:SINGBOX_RESTART_EXE -Verb RunAs",
                 ])
+                .env("SINGBOX_RESTART_EXE", &current_exe)
                 .creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW)
                 .spawn();
 
             match result {
                 Ok(_) => {
+                    info!("已通过备用命令请求管理员权限重启应用");
                     app_handle.exit(0);
                     Ok(())
                 }
                 Err(e2) => Err(format!(
-                    "{}: {} 然后尝试备用方法失败: {}",
+                    "{}: 主方法失败: {}；备用方法失败: {}",
                     messages::ERR_RESTART_FAILED,
                     e,
                     e2

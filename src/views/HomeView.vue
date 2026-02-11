@@ -322,6 +322,13 @@ const parseSudoCode = (raw: unknown) => {
   return null
 }
 
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) {
+    return error.message
+  }
+  return String(error || '')
+}
+
 const enableTunWithKernelRestart = async (options?: { allowSudoRetry?: boolean }) => {
   try {
     modeSwitchPending.value = true
@@ -445,14 +452,19 @@ const restartKernel = async () => {
 
 const restartAsAdmin = async () => {
   try {
-    const { systemService } = await import('@/services/system-service')
-    await systemService.restartAsAdmin()
+    await requestRestartAsAdmin()
   } catch (error) {
-    message.error(t('home.restartFailed'))
+    const details = getErrorMessage(error)
+    message.error(details ? `${t('home.restartFailed')}：${details}` : t('home.restartFailed'))
   }
 }
 
 // 已移除switchProxyModeAndRefreshKernel - 不再需要，因为System Proxy和TUN是独立的
+
+const requestRestartAsAdmin = async () => {
+  const { systemService } = await import('@/services/system-service')
+  await systemService.restartAsAdmin()
+}
 
 const prepareTunModeWithAdminRestart = async () => {
   try {
@@ -472,11 +484,12 @@ const prepareTunModeWithAdminRestart = async () => {
     }
 
     // 重启为管理员
-    await restartAsAdmin()
+    await requestRestartAsAdmin()
     return true
   } catch (error) {
     await appStore.toggleTun(false)
-    message.error(t('home.restartFailed'))
+    const details = getErrorMessage(error)
+    message.error(details ? `${t('home.restartFailed')}：${details}` : t('home.restartFailed'))
     return false
   }
 }

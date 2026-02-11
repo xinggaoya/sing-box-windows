@@ -4,7 +4,8 @@ use super::common::{
     dns_strategy, node_domain_resolver_strategy, normalize_default_outbound, normalize_download_detour,
     PRIVATE_IP_CIDRS, DNS_BLOCK, DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOIP_CN,
     RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_NETFLIX,
-    RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
+    RS_GEOSITE_GOOGLE_DEEPMIND, RS_GEOSITE_GOOGLE_GEMINI, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE,
+    RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
 };
 use super::config_schema::{
     CacheFileConfig, ClashApiConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, LogConfig,
@@ -142,6 +143,18 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
                 download_detour,
                 "7d",
             ),
+            remote_rule_set_value(
+                RS_GEOSITE_GOOGLE_GEMINI,
+                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google-gemini.srs",
+                download_detour,
+                "7d",
+            ),
+            remote_rule_set_value(
+                RS_GEOSITE_GOOGLE_DEEPMIND,
+                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google-deepmind.srs",
+                download_detour,
+                "7d",
+            ),
         ]);
     }
 
@@ -183,6 +196,9 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             json!({ "rule_set": RS_GEOSITE_YOUTUBE, "outbound": TAG_YOUTUBE }),
             json!({ "rule_set": RS_GEOSITE_NETFLIX, "outbound": TAG_NETFLIX }),
             json!({ "rule_set": RS_GEOSITE_OPENAI, "outbound": TAG_OPENAI }),
+            // Google AI 业务域名（Gemini / DeepMind）复用 OpenAI 分组，避免新增 UI 分组造成迁移成本。
+            json!({ "rule_set": RS_GEOSITE_GOOGLE_GEMINI, "outbound": TAG_OPENAI }),
+            json!({ "rule_set": RS_GEOSITE_GOOGLE_DEEPMIND, "outbound": TAG_OPENAI }),
         ]);
     }
 

@@ -2,7 +2,8 @@ use crate::app::core::tun_profile::TUN_ROUTE_EXCLUDES;
 use crate::app::storage::state_model::AppConfig;
 use super::common::{
     dns_strategy, normalize_default_outbound, normalize_download_detour, DNS_BLOCK, DNS_CN, DNS_PROXY,
-    DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_NETFLIX,
+    DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE_DEEPMIND,
+    RS_GEOSITE_GOOGLE_GEMINI, RS_GEOSITE_NETFLIX,
     RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE, TAG_AUTO,
     TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
 };
@@ -186,7 +187,12 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     let tag = rs.get("tag").and_then(|v| v.as_str()).unwrap_or("");
                     !matches!(
                         tag,
-                        RS_GEOSITE_TELEGRAM | RS_GEOSITE_YOUTUBE | RS_GEOSITE_NETFLIX | RS_GEOSITE_OPENAI
+                        RS_GEOSITE_TELEGRAM
+                            | RS_GEOSITE_YOUTUBE
+                            | RS_GEOSITE_NETFLIX
+                            | RS_GEOSITE_OPENAI
+                            | RS_GEOSITE_GOOGLE_GEMINI
+                            | RS_GEOSITE_GOOGLE_DEEPMIND
                     )
                 });
             }
@@ -248,7 +254,12 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     let rs = rule.get("rule_set").and_then(|v| v.as_str()).unwrap_or("");
                     !matches!(
                         rs,
-                        RS_GEOSITE_TELEGRAM | RS_GEOSITE_YOUTUBE | RS_GEOSITE_NETFLIX | RS_GEOSITE_OPENAI
+                        RS_GEOSITE_TELEGRAM
+                            | RS_GEOSITE_YOUTUBE
+                            | RS_GEOSITE_NETFLIX
+                            | RS_GEOSITE_OPENAI
+                            | RS_GEOSITE_GOOGLE_GEMINI
+                            | RS_GEOSITE_GOOGLE_DEEPMIND
                     )
                 });
             }

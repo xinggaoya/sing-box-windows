@@ -27,6 +27,8 @@ pub const RS_GEOSITE_TELEGRAM: &str = "geosite-telegram";
 pub const RS_GEOSITE_YOUTUBE: &str = "geosite-youtube";
 pub const RS_GEOSITE_NETFLIX: &str = "geosite-netflix";
 pub const RS_GEOSITE_OPENAI: &str = "geosite-openai";
+pub const RS_GEOSITE_GOOGLE_GEMINI: &str = "geosite-google-gemini";
+pub const RS_GEOSITE_GOOGLE_DEEPMIND: &str = "geosite-google-deepmind";
 pub const RS_GEOIP_CN: &str = "geoip-cn";
 pub const RS_GEOIP_PRIVATE: &str = "geoip-private";
 pub const PRIVATE_IP_CIDRS: &[&str] = &[
@@ -72,4 +74,3 @@ pub fn node_domain_resolver_strategy(app_config: &AppConfig) -> &'static str {
         "ipv4_only"
     }
 }
-
