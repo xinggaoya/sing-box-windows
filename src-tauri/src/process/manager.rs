@@ -164,24 +164,6 @@ impl ProcessManager {
     async fn check_system_environment(&self) -> Result<()> {
         info!("🔍 检查系统环境...");
 
-        // 检查是否有足够的系统资源
-        #[cfg(windows)]
-        {
-            // 检查系统启动时间，如果是刚启动，可能需要等待更长时间
-            match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
-                Ok(uptime) => {
-                    let uptime_minutes = uptime.as_secs() / 60;
-                    if uptime_minutes < 2 {
-                        info!("⏰ 系统刚启动{}分钟，增加启动等待时间", uptime_minutes);
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                    }
-                }
-                Err(e) => {
-                    warn!("无法获取系统启动时间: {}", e);
-                }
-            }
-        }
-
         // 检查内核文件是否可执行
         let kernel_path = paths::get_kernel_path();
         if !kernel_path.exists() {

@@ -4,7 +4,6 @@ use crate::app::core::event_relay::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
@@ -28,13 +27,8 @@ pub(super) async fn start_websocket_relay(
 
     info!("?? 开始启动事件中继服务，端口: {}", port);
 
-    let wait_time = if is_system_recently_started().await {
-        info!("?? 检测到系统刚启动，使用较短延迟后启动事件中继");
-        Duration::from_millis(1000)
-    } else {
-        Duration::from_millis(500)
-    };
-    tokio::time::sleep(wait_time).await;
+    // 固定短延迟，给内核 API 一点时间完成初始化，避免立即连接抖动。
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     let token = crate::app::core::proxy_service::get_api_token();
 
@@ -89,11 +83,4 @@ pub(super) async fn cleanup_event_relay_tasks() {
     }
 
     info!("已清理所有事件中继任务");
-}
-
-async fn is_system_recently_started() -> bool {
-    match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
-        Ok(uptime) => uptime.as_secs() < 300,
-        Err(_) => false,
-    }
 }

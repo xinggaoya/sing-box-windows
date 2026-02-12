@@ -1,7 +1,7 @@
 use futures_util::StreamExt;
 use serde::Serialize;
 use serde_json::Value;
-use std::cmp::max;
+use std::cmp::min;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
@@ -179,7 +179,7 @@ pub fn create_connection_event_relay(
     )
 }
 
-/// 启动事件中继器的便捷函数（增强版本，支持开机自启动场景）
+/// 启动事件中继器并在失败时按退避策略重试
 pub async fn start_event_relay_with_retry(
     relay: EventDirectRelay<Value>,
     relay_type: &str,
@@ -215,7 +215,7 @@ pub async fn start_event_relay_with_retry(
                 if retry_count <= 3 {
                     retry_delay = std::time::Duration::from_secs(retry_count as u64);
                 } else {
-                    retry_delay = max(retry_delay * 2, max_retry_delay);
+                    retry_delay = min(retry_delay * 2, max_retry_delay);
                 }
 
                 warn!(
@@ -226,25 +226,6 @@ pub async fn start_event_relay_with_retry(
                     max_retries,
                     e
                 );
-
-                // 对于前几次重试，添加额外的系统检查
-                if retry_count <= 2 {
-                    info!("🔍 执行系统环境检查（第{}次重试）", retry_count);
-
-                    // 检查是否是开机自启动场景
-                    if let Ok(uptime) =
-                        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-                    {
-                        let uptime_minutes = uptime.as_secs() / 60;
-                        if uptime_minutes < 5 {
-                            info!(
-                                "🕐 检测到系统刚启动（{}分钟），增加额外等待时间",
-                                uptime_minutes
-                            );
-                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                        }
-                    }
-                }
 
                 tokio::time::sleep(retry_delay).await;
             }
