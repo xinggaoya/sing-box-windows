@@ -4,6 +4,8 @@ use crate::utils::proxy_util::disable_system_proxy;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+#[cfg(target_os = "macos")]
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use tauri::AppHandle;
@@ -25,6 +27,109 @@ impl ProcessManager {
     pub fn new() -> Self {
         Self {
             process: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    fn managed_pid_file() -> std::path::PathBuf {
+        paths::get_kernel_work_dir().join(".managed-kernel.pid")
+    }
+
+    fn persist_managed_pid(&self, pid: u32) -> std::io::Result<()> {
+        let pid_file = Self::managed_pid_file();
+        if let Some(parent) = pid_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(pid_file, pid.to_string())
+    }
+
+    fn read_managed_pid(&self) -> Option<u32> {
+        let pid_file = Self::managed_pid_file();
+        let content = std::fs::read_to_string(pid_file).ok()?;
+        content.trim().parse::<u32>().ok()
+    }
+
+    fn clear_managed_pid(&self) {
+        let pid_file = Self::managed_pid_file();
+        if let Err(e) = std::fs::remove_file(&pid_file) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                warn!("清理托管 PID 文件失败 {:?}: {}", pid_file, e);
+            }
+        }
+    }
+
+    fn is_pid_matching_kernel_name(&self, pid: u32, kernel_name: &str) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            let comm_path = format!("/proc/{}/comm", pid);
+            if let Ok(name) = std::fs::read_to_string(&comm_path) {
+                if name.trim() == kernel_name {
+                    return true;
+                }
+            }
+
+            let exe_path = format!("/proc/{}/exe", pid);
+            if let Ok(target) = std::fs::read_link(&exe_path) {
+                return target
+                    .file_name()
+                    .and_then(|f| f.to_str())
+                    .map(|f| f == kernel_name)
+                    .unwrap_or(false);
+            }
+
+            return false;
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let output = std::process::Command::new("ps")
+                .args(["-p", &pid.to_string(), "-o", "comm="])
+                .output();
+            if let Ok(output) = output {
+                if output.status.success() {
+                    let comm = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    let cmd_base = Path::new(&comm)
+                        .file_name()
+                        .and_then(|f| f.to_str())
+                        .unwrap_or(comm.as_str());
+                    return cmd_base == kernel_name;
+                }
+            }
+            return false;
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let output = std::process::Command::new("tasklist")
+                .args([
+                    "/FI",
+                    &format!("PID eq {}", pid),
+                    "/FO",
+                    "CSV",
+                    "/NH",
+                ])
+                .output();
+
+            if let Ok(output) = output {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    for line in stdout.lines() {
+                        let parts: Vec<&str> = line
+                            .split('"')
+                            .filter(|s| !s.is_empty() && *s != ",")
+                            .collect();
+                        if let Some(image_name) = parts.first() {
+                            return image_name.eq_ignore_ascii_case(kernel_name);
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+        {
+            let _ = (pid, kernel_name);
+            false
         }
     }
 
@@ -63,6 +168,7 @@ impl ProcessManager {
                                     Err(e) => warn!("等待内核进程终止失败: {}", e),
                                 }
                                 *process_guard = None;
+                                self.clear_managed_pid();
                                 true
                             }
                             Err(e) => {
@@ -73,6 +179,7 @@ impl ProcessManager {
                                     error!("强制终止进程失败: {}", e);
                                 }
                                 *process_guard = None;
+                                self.clear_managed_pid();
                                 true
                             }
                         }
@@ -80,11 +187,13 @@ impl ProcessManager {
                     Ok(Some(status)) => {
                         info!("发现已退出的内核进程，退出状态: {}", status);
                         *process_guard = None;
+                        self.clear_managed_pid();
                         true
                     }
                     Err(e) => {
                         warn!("检查内核进程状态失败: {}", e);
                         *process_guard = None;
+                        self.clear_managed_pid();
                         true
                     }
                 }
@@ -122,10 +231,14 @@ impl ProcessManager {
                 .await
             {
                 Ok(child) => {
+                    let child_pid = child.id();
                     // 保存进程句柄
                     {
                         let mut process_guard = self.process.write().await;
                         *process_guard = Some(child);
+                    }
+                    if let Err(e) = self.persist_managed_pid(child_pid) {
+                        warn!("记录托管内核 PID 失败 (pid={}): {}", child_pid, e);
                     }
 
                     // 更稳健的启动检查
@@ -326,37 +439,33 @@ impl ProcessManager {
                 }
             }
         }
+        self.clear_managed_pid();
         Ok(())
     }
 
-    // 检查并终止系统中已存在的sing-box进程
+    // 仅清理本程序托管过的内核 PID，避免误杀用户自行运行的 sing-box 进程。
     pub async fn kill_existing_processes(&self) -> std::io::Result<()> {
-        info!("检查系统中是否有sing-box进程在运行");
-
         let kernel_name = crate::platform::get_kernel_executable_name();
-        
-        // 检查是否有进程运行
-        match crate::platform::is_process_running(kernel_name).await {
-            Ok(true) => {
-                info!("发现已有 {} 进程，正在终止", kernel_name);
-                
-                // 终止进程
-                if let Err(e) = crate::platform::kill_processes_by_name(kernel_name).await {
-                    warn!("终止 {} 进程可能失败: {}", kernel_name, e);
-                } else {
-                    info!("成功终止所有 {} 进程", kernel_name);
-                }
-                
-                // 等待进程完全终止
-                sleep(Duration::from_millis(500)).await;
-            }
-            Ok(false) => {
-                info!("未发现已有 {} 进程", kernel_name);
-            }
-            Err(e) => {
-                warn!("无法检查 {} 进程状态: {}", kernel_name, e);
-            }
+        let Some(pid) = self.read_managed_pid() else {
+            info!("未发现托管 PID 记录，跳过内核进程清理");
+            return Ok(());
+        };
+
+        if !self.is_pid_matching_kernel_name(pid, kernel_name) {
+            warn!(
+                "托管 PID({}) 与当前内核进程名({})不匹配，已跳过清理并清除记录",
+                pid, kernel_name
+            );
+            self.clear_managed_pid();
+            return Ok(());
         }
+
+        info!("发现托管内核进程 PID: {}，开始清理", pid);
+        if let Err(e) = kill_process_by_pid(pid) {
+            warn!("终止托管内核进程失败 (pid={}): {}", pid, e);
+        }
+        self.clear_managed_pid();
+        sleep(Duration::from_millis(300)).await;
 
         Ok(())
     }
@@ -411,13 +520,14 @@ impl ProcessManager {
                     }
                 }
             }
+            self.clear_managed_pid();
         } else {
             info!("没有正在运行的内核进程");
         }
 
-        // 确保系统中所有sing-box进程都被终止
+        // 兜底：尝试清理托管 PID 记录对应的进程
         if let Err(e) = self.kill_existing_processes().await {
-            warn!("清理系统中的sing-box进程失败: {}", e);
+            warn!("清理托管内核进程失败: {}", e);
         }
 
         Ok(())
@@ -475,11 +585,13 @@ impl ProcessManager {
                     Ok(Some(_)) => {
                         // 进程已退出，清理状态
                         *process_guard = None;
+                        self.clear_managed_pid();
                         false
                     }
                     Err(_) => {
                         // 检查失败，清理状态
                         *process_guard = None;
+                        self.clear_managed_pid();
                         false
                     }
                 }

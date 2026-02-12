@@ -22,7 +22,8 @@ export const systemService = {
     },
 
     checkUpdate(currentVersion?: string, includePrerelease?: boolean) {
-        const version = currentVersion || '1.8.2'
+        // 未传入版本时使用最低占位版本，避免写死历史版本号。
+        const version = currentVersion || '0.0.0'
         const includePre = includePrerelease || false
         return invokeWithAppContext<unknown>('check_update', {
             currentVersion: version,
