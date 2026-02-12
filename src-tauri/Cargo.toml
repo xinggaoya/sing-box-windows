@@ -32,7 +32,7 @@ semver = "1.0"
 serde_yaml = "0.9"
 
 # Tauri 2.0 最新版本
-tauri = { version = "2.2", features = ["tray-icon", "unstable", "devtools"] }
+tauri = { version = "2.10", features = ["tray-icon", "unstable", "devtools"] }
 reqwest = { version = "0.12", features = ["json", "stream", "native-tls-vendored"] }
 dirs = "5.0.1"
 tokio = { version = "1.48", features = ["full"] }
@@ -49,8 +49,8 @@ lazy_static = "1.5"
 sqlx = { version = "0.8.6", features = ["runtime-tokio-native-tls", "sqlite", "chrono", "uuid"] }
 chrono = { version = "0.4.42", features = ["serde"] }
 thiserror = "2.0"
-tauri-plugin-store = "2.2"
-tauri-plugin-os = "2.2"
+tauri-plugin-store = "2.3"
+tauri-plugin-os = "2.3"
 aes-gcm = "0.10"
 rand = "0.8"
 
@@ -59,10 +59,10 @@ winreg = "0.52.0"
 winapi = { version = "0.3", features = ["wininet"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-autostart = "2.2"
-tauri-plugin-single-instance = "2.2"
-tauri-plugin-window-state = "2.2"
-tauri-plugin-websocket = "2.2"
+tauri-plugin-autostart = "2.3"
+tauri-plugin-single-instance = "2.3"
+tauri-plugin-window-state = "2.3"
+tauri-plugin-websocket = "2.3"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29", features = ["user"] }
