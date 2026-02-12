@@ -2,10 +2,9 @@ use crate::app::core::tun_profile::TUN_ROUTE_EXCLUDES;
 use crate::app::storage::state_model::AppConfig;
 use super::common::{
     dns_strategy, normalize_default_outbound, normalize_download_detour, DNS_BLOCK, DNS_CN, DNS_PROXY,
-    DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE_DEEPMIND,
-    RS_GEOSITE_GOOGLE_GEMINI, RS_GEOSITE_NETFLIX,
-    RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE, TAG_AUTO,
-    TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
+    DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE,
+    RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
+    TAG_AUTO, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
 };
 use serde_json::{json, Map, Value};
 
@@ -191,8 +190,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                             | RS_GEOSITE_YOUTUBE
                             | RS_GEOSITE_NETFLIX
                             | RS_GEOSITE_OPENAI
-                            | RS_GEOSITE_GOOGLE_GEMINI
-                            | RS_GEOSITE_GOOGLE_DEEPMIND
+                            | RS_GEOSITE_GOOGLE
                     )
                 });
             }
@@ -248,7 +246,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                 rules.remove(i);
             }
 
-            // 业务分流组：关闭后移除相关规则，避免“空组/无意义分流”
+            // 业务分流组：关闭后移除相关规则，避免"空组/无意义分流"
             if !app_config.singbox_enable_app_groups {
                 rules.retain(|rule| {
                     let rs = rule.get("rule_set").and_then(|v| v.as_str()).unwrap_or("");
@@ -258,8 +256,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                             | RS_GEOSITE_YOUTUBE
                             | RS_GEOSITE_NETFLIX
                             | RS_GEOSITE_OPENAI
-                            | RS_GEOSITE_GOOGLE_GEMINI
-                            | RS_GEOSITE_GOOGLE_DEEPMIND
+                            | RS_GEOSITE_GOOGLE
                     )
                 });
             }
@@ -271,7 +268,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
         if !app_config.singbox_enable_app_groups {
             outbounds.retain(|ob| {
                 let tag = ob.get("tag").and_then(|v| v.as_str()).unwrap_or("");
-                !matches!(tag, TAG_TELEGRAM | TAG_YOUTUBE | TAG_NETFLIX | TAG_OPENAI)
+                !matches!(tag, TAG_TELEGRAM | TAG_YOUTUBE | TAG_NETFLIX | TAG_OPENAI | TAG_GOOGLE)
             });
         }
     }

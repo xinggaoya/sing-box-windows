@@ -4,7 +4,7 @@ use super::common::{
     dns_strategy, node_domain_resolver_strategy, normalize_default_outbound, normalize_download_detour,
     PRIVATE_IP_CIDRS, DNS_BLOCK, DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOIP_CN,
     RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_NETFLIX,
-    RS_GEOSITE_GOOGLE_DEEPMIND, RS_GEOSITE_GOOGLE_GEMINI, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE,
+    RS_GEOSITE_GOOGLE, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE,
     RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
 };
 use super::config_schema::{
@@ -14,7 +14,7 @@ use super::config_schema::{
 use serde_json::{json, Value};
 // 兼容旧引用：这些 tag 之前是 `config_generator` 的 `pub const`，保留同名导出以降低未来重构的破坏性。
 pub use super::common::{
-    TAG_AUTO, TAG_BLOCK, TAG_DIRECT, TAG_MANUAL, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
+    TAG_AUTO, TAG_BLOCK, TAG_DIRECT, TAG_MANUAL, TAG_NETFLIX, TAG_OPENAI, TAG_GOOGLE, TAG_TELEGRAM, TAG_YOUTUBE,
 };
 
 /// 生成一份“通用且更适合国内环境”的 sing-box 配置骨架（不依赖模板文件）。
@@ -71,6 +71,11 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             json!({
                 "type": "selector",
                 "tag": TAG_OPENAI,
+                "outbounds": [TAG_MANUAL, TAG_AUTO]
+            }),
+            json!({
+                "type": "selector",
+                "tag": TAG_GOOGLE,
                 "outbounds": [TAG_MANUAL, TAG_AUTO]
             }),
         ]);
@@ -144,14 +149,8 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
                 "7d",
             ),
             remote_rule_set_value(
-                RS_GEOSITE_GOOGLE_GEMINI,
-                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google-gemini.srs",
-                download_detour,
-                "7d",
-            ),
-            remote_rule_set_value(
-                RS_GEOSITE_GOOGLE_DEEPMIND,
-                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google-deepmind.srs",
+                RS_GEOSITE_GOOGLE,
+                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs",
                 download_detour,
                 "7d",
             ),
@@ -196,9 +195,8 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             json!({ "rule_set": RS_GEOSITE_YOUTUBE, "outbound": TAG_YOUTUBE }),
             json!({ "rule_set": RS_GEOSITE_NETFLIX, "outbound": TAG_NETFLIX }),
             json!({ "rule_set": RS_GEOSITE_OPENAI, "outbound": TAG_OPENAI }),
-            // Google AI 业务域名（Gemini / DeepMind）复用 OpenAI 分组，避免新增 UI 分组造成迁移成本。
-            json!({ "rule_set": RS_GEOSITE_GOOGLE_GEMINI, "outbound": TAG_OPENAI }),
-            json!({ "rule_set": RS_GEOSITE_GOOGLE_DEEPMIND, "outbound": TAG_OPENAI }),
+            // Google 服务分流（包含 Gemini、DeepMind、搜索、云服务等所有 Google 相关域名）
+            json!({ "rule_set": RS_GEOSITE_GOOGLE, "outbound": TAG_GOOGLE }),
         ]);
     }
 
@@ -498,7 +496,7 @@ fn ensure_urltest_and_selector(outbounds: &mut Vec<Value>, node_tags: &[String])
 }
 
 fn ensure_app_group_selectors(outbounds: &mut Vec<Value>, node_tags: &[String]) -> Result<(), String> {
-    let group_tags = [TAG_TELEGRAM, TAG_YOUTUBE, TAG_NETFLIX, TAG_OPENAI];
+    let group_tags = [TAG_TELEGRAM, TAG_YOUTUBE, TAG_NETFLIX, TAG_OPENAI, TAG_GOOGLE];
 
     for group_tag in group_tags {
         let Some(idx) = outbounds

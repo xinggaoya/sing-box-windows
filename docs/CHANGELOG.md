@@ -1,9 +1,9 @@
 ﻿# 更新日志
 
-## [Unreleased]
+## [v2.2.4] - 2026-02-12
 
 ### 🔧 优化改进
-- **Google AI 分流增强** - 新增 `geosite-google-gemini` 与 `geosite-google-deepmind` 规则集，并复用 OpenAI 分流组提升相关服务可用性
+- **Google 分流** - 新增 Google 分流组，使用 `geosite-google` 规则集覆盖所有 Google 服务（搜索、Gmail、YouTube、Gemini、Cloud 等）
 - **错误提示优化** - 管理员重启失败时，首页弹窗会展示后端返回的具体错误信息，便于定位问题
 
 ### 🐛 问题修复
