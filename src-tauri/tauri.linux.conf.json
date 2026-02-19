@@ -1,5 +1,8 @@
 {
   "bundle": {
-    "resources": ["resources/kernel/linux/amd64/sing-box"]
+    "resources": [
+      "resources/kernel/linux/amd64/sing-box",
+      "resources/kernel/linux/amd64/version.txt"
+    ]
   }
 }

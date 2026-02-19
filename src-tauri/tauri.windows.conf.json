@@ -1,5 +1,8 @@
 {
   "bundle": {
-    "resources": ["resources/kernel/windows/amd64/sing-box.exe"]
+    "resources": [
+      "resources/kernel/windows/amd64/sing-box.exe",
+      "resources/kernel/windows/amd64/version.txt"
+    ]
   }
 }

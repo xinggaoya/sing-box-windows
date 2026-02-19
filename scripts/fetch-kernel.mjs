@@ -144,7 +144,12 @@ async function fetchKernel(platform, arch, version, baseDir, options = {}) {
 
   await fsPromises.mkdir(targetDir, { recursive: true })
 
-  if (options.skipExisting && !options.force && fs.existsSync(targetExecutable)) {
+  if (
+    options.skipExisting &&
+    !options.force &&
+    fs.existsSync(targetExecutable) &&
+    fs.existsSync(versionPath)
+  ) {
     console.log(`[${platform}/${arch}] Exists, skipping download.`)
     return
   }
