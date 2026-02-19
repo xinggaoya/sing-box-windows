@@ -1,77 +1,41 @@
 #!/usr/bin/env node
 import fs from 'node:fs'
+import fsPromises from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
+import {
+  getKernelResourcePaths,
+  resolveKernelTarget,
+  resolveKernelTargetForHost,
+  resolveKernelTargetFromRustTarget
+} from './kernel-targets.mjs'
+
+const WINDOWS_TARGET = requireTarget('windows', 'amd64')
+const LINUX_TARGET = requireTarget('linux', 'amd64')
+const MACOS_ARM64_TARGET = requireTarget('macos', 'arm64')
+const MACOS_AMD64_TARGET = requireTarget('macos', 'amd64')
 
 let args = process.argv.slice(2)
 const aliasMap = new Map([
-  [
-    'build:linux',
-    ['build', '--target', 'x86_64-unknown-linux-gnu', '--config', 'src-tauri/tauri.linux.conf.json']
-  ],
+  ['build:linux', ['build', '--target', LINUX_TARGET.tauriTarget]],
   [
     'build:linux:deb',
-    [
-      'build',
-      '--target',
-      'x86_64-unknown-linux-gnu',
-      '--config',
-      'src-tauri/tauri.linux.conf.json',
-      '--',
-      '--bundle',
-      'deb'
-    ]
+    ['build', '--target', LINUX_TARGET.tauriTarget, '--', '--bundle', 'deb']
   ],
   [
     'build:linux:appimage',
-    [
-      'build',
-      '--target',
-      'x86_64-unknown-linux-gnu',
-      '--config',
-      'src-tauri/tauri.linux.conf.json',
-      '--',
-      '--bundle',
-      'appimage'
-    ]
+    ['build', '--target', LINUX_TARGET.tauriTarget, '--', '--bundle', 'appimage']
   ],
-  [
-    'build:windows',
-    ['build', '--target', 'x86_64-pc-windows-msvc', '--config', 'src-tauri/tauri.windows.conf.json']
-  ],
-  [
-    'build:macos',
-    ['build', '--target', 'aarch64-apple-darwin', '--config', 'src-tauri/tauri.macos.arm64.conf.json']
-  ],
-  [
-    'build:macos:intel',
-    ['build', '--target', 'x86_64-apple-darwin', '--config', 'src-tauri/tauri.macos.x64.conf.json']
-  ],
+  ['build:windows', ['build', '--target', WINDOWS_TARGET.tauriTarget]],
+  ['build:macos', ['build', '--target', MACOS_ARM64_TARGET.tauriTarget]],
+  ['build:macos:intel', ['build', '--target', MACOS_AMD64_TARGET.tauriTarget]],
   [
     'build:macos:dmg',
-    [
-      'build',
-      '--target',
-      'aarch64-apple-darwin',
-      '--config',
-      'src-tauri/tauri.macos.arm64.conf.json',
-      '--',
-      '--bundle',
-      'dmg'
-    ]
+    ['build', '--target', MACOS_ARM64_TARGET.tauriTarget, '--', '--bundle', 'dmg']
   ],
   [
     'build:macos:app',
-    [
-      'build',
-      '--target',
-      'aarch64-apple-darwin',
-      '--config',
-      'src-tauri/tauri.macos.arm64.conf.json',
-      '--',
-      '--bundle',
-      'app'
-    ]
+    ['build', '--target', MACOS_ARM64_TARGET.tauriTarget, '--', '--bundle', 'app']
   ]
 ])
 
@@ -82,33 +46,40 @@ if (aliasMap.has(initialCommand)) {
 }
 
 const command = args[0] ?? ''
-const hasConfig = hasArg(args, '--config') || hasArg(args, '-c')
-
-if (command === 'build' && !hasConfig) {
-  const configPath = resolveConfigPath(args)
-  if (configPath) {
-    args = insertBeforeSeparator(args, ['--config', configPath])
-  }
-}
+const target = resolveTargetFromArgs(args)
+const hasConfig = hasOption(args, '--config', '-c')
 const shouldFetch = command === 'dev' || command === 'build'
 
-if (shouldFetch) {
-  const targetInfo = resolveTargetInfo(args)
-  const platform = targetInfo?.platform ?? normalizePlatform(process.platform)
-  const arch = targetInfo?.arch ?? normalizeArch(process.arch)
+if (shouldFetch && !target) {
+  console.error(
+    'Unsupported kernel target. Please set a supported --target or extend scripts/kernel-targets.mjs.'
+  )
+  process.exit(1)
+}
 
-  if (platform && arch) {
-    const fetchExitCode = await runCommand(process.execPath, [
-      path.resolve('scripts', 'fetch-kernel.mjs'),
-      '--platform',
-      platform,
-      '--arch',
-      arch,
-      '--skip-existing'
-    ])
-    if (fetchExitCode !== 0) {
-      process.exit(fetchExitCode)
-    }
+if (command === 'build' && !hasConfig && target) {
+  const generatedConfigPath = await generateBuildConfig(target)
+  args = insertBeforeSeparator(args, ['--config', generatedConfigPath])
+}
+
+if (shouldFetch && target) {
+  const fetchMode = String(process.env.SING_BOX_KERNEL_FETCH_MODE ?? 'skip').toLowerCase()
+  const fetchArgs = [
+    path.resolve('scripts', 'fetch-kernel.mjs'),
+    '--platform',
+    target.platform,
+    '--arch',
+    target.arch
+  ]
+  if (fetchMode === 'force') {
+    fetchArgs.push('--force')
+  } else {
+    fetchArgs.push('--skip-existing')
+  }
+
+  const fetchExitCode = await runCommand(process.execPath, fetchArgs)
+  if (fetchExitCode !== 0) {
+    process.exit(fetchExitCode)
   }
 }
 
@@ -118,75 +89,67 @@ const exitCode = await runCommand(tauriCommand.command, tauriCommand.args, {
 })
 process.exit(exitCode)
 
-function resolveTargetInfo(argv) {
-  const targetIndex = argv.findIndex((item) => item === '--target' || item === '-t')
-  if (targetIndex === -1) {
-    return null
-  }
-
-  const target = argv[targetIndex + 1]
+function requireTarget(platform, arch) {
+  const target = resolveKernelTarget(platform, arch)
   if (!target) {
-    return null
+    throw new Error(`Kernel target not configured: ${platform}/${arch}`)
   }
-
-  const parts = target.split('-')
-  if (parts.length < 2) {
-    return null
-  }
-
-  const archToken = parts[0]
-  const osToken = parts.find((part) => ['windows', 'darwin', 'linux'].includes(part))
-
-  return {
-    platform:
-      osToken === 'darwin'
-        ? 'macos'
-        : osToken === 'windows'
-          ? 'windows'
-          : osToken === 'linux'
-            ? 'linux'
-            : null,
-    arch: normalizeArch(archToken)
-  }
+  return target
 }
 
-function resolveConfigPath(argv) {
-  const targetInfo = resolveTargetInfo(argv)
-  const platform = targetInfo?.platform ?? normalizePlatform(process.platform)
-  const arch = targetInfo?.arch ?? normalizeArch(process.arch)
+function resolveTargetFromArgs(argv) {
+  const rustTarget = getOptionValue(argv, '--target', '-t')
+  if (rustTarget) {
+    return resolveKernelTargetFromRustTarget(rustTarget)
+  }
+  return resolveKernelTargetForHost()
+}
 
-  if (platform === 'windows') {
-    return 'src-tauri/tauri.windows.conf.json'
-  }
-  if (platform === 'linux') {
-    return 'src-tauri/tauri.linux.conf.json'
-  }
-  if (platform === 'macos') {
-    if (arch === 'arm64') {
-      return 'src-tauri/tauri.macos.arm64.conf.json'
+async function generateBuildConfig(target) {
+  const generatedDir = path.resolve('src-tauri', '.generated')
+  await fsPromises.mkdir(generatedDir, { recursive: true })
+
+  const generatedConfigPath = path.join(
+    generatedDir,
+    `tauri.kernel.${target.platform}.${target.arch}.conf.json`
+  )
+  const config = {
+    bundle: {
+      resources: getKernelResourcePaths(target.platform, target.arch)
     }
-    return 'src-tauri/tauri.macos.x64.conf.json'
+  }
+  await fsPromises.writeFile(generatedConfigPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
+  return toPosixRelativePath(generatedConfigPath)
+}
+
+function toPosixRelativePath(filePath) {
+  return path.relative(process.cwd(), filePath).split(path.sep).join('/')
+}
+
+function hasOption(argv, longFlag, shortFlag) {
+  return argv.some(
+    (item) =>
+      item === longFlag ||
+      item === shortFlag ||
+      item.startsWith(`${longFlag}=`) ||
+      item.startsWith(`${shortFlag}=`)
+  )
+}
+
+function getOptionValue(argv, longFlag, shortFlag) {
+  for (let i = 0; i < argv.length; i += 1) {
+    const item = argv[i]
+    if (item === longFlag || item === shortFlag) {
+      return argv[i + 1] ?? null
+    }
+    if (item.startsWith(`${longFlag}=`)) {
+      return item.slice(longFlag.length + 1)
+    }
+    if (item.startsWith(`${shortFlag}=`)) {
+      return item.slice(shortFlag.length + 1)
+    }
   }
   return null
-}
-
-function normalizePlatform(raw) {
-  if (raw === 'win32' || raw === 'windows') return 'windows'
-  if (raw === 'linux') return 'linux'
-  if (raw === 'darwin' || raw === 'macos') return 'macos'
-  return null
-}
-
-function normalizeArch(raw) {
-  if (raw === 'x64' || raw === 'amd64' || raw === 'x86_64') return 'amd64'
-  if (raw === 'ia32' || raw === 'x86' || raw === 'i686' || raw === '386') return '386'
-  if (raw === 'arm64' || raw === 'aarch64') return 'arm64'
-  if (raw === 'arm' || raw === 'armv5') return 'armv5'
-  return null
-}
-
-function hasArg(argv, flag) {
-  return argv.includes(flag)
 }
 
 function insertBeforeSeparator(argv, toInsert) {
@@ -194,11 +157,7 @@ function insertBeforeSeparator(argv, toInsert) {
   if (separatorIndex === -1) {
     return [...argv, ...toInsert]
   }
-  return [
-    ...argv.slice(0, separatorIndex),
-    ...toInsert,
-    ...argv.slice(separatorIndex)
-  ]
+  return [...argv.slice(0, separatorIndex), ...toInsert, ...argv.slice(separatorIndex)]
 }
 
 function resolveTauriCommand(argv) {
@@ -206,7 +165,7 @@ function resolveTauriCommand(argv) {
   if (process.platform === 'win32') {
     const cmdPath = path.join(binDir, 'tauri.cmd')
     if (fs.existsSync(cmdPath)) {
-      return { command: cmdPath, args: argv, shell: true }
+      return wrapWindowsCmd(cmdPath, argv)
     }
     const exePath = path.join(binDir, 'tauri.exe')
     if (fs.existsSync(exePath)) {
@@ -219,10 +178,14 @@ function resolveTauriCommand(argv) {
     }
   }
 
+  if (process.platform === 'win32') {
+    return wrapWindowsCmd('pnpm', ['exec', 'tauri', ...argv])
+  }
+
   return {
     command: 'pnpm',
     args: ['exec', 'tauri', ...argv],
-    shell: process.platform === 'win32'
+    shell: false
   }
 }
 
@@ -235,4 +198,24 @@ function runCommand(command, commandArgs, options = {}) {
     child.on('error', reject)
     child.on('close', (code) => resolve(code ?? 1))
   })
+}
+
+function wrapWindowsCmd(command, args) {
+  const commandLine = [quoteWindowsArg(command), ...args.map(quoteWindowsArg)].join(' ')
+  return {
+    command: 'cmd.exe',
+    args: ['/d', '/s', '/c', commandLine],
+    shell: false
+  }
+}
+
+function quoteWindowsArg(arg) {
+  if (arg.length === 0) {
+    return '""'
+  }
+  if (!/[ \t"]/u.test(arg)) {
+    return arg
+  }
+  const escaped = arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/g, '$1$1')
+  return `"${escaped}"`
 }

@@ -29,5 +29,9 @@ coverage
 
 *.tsbuildinfo
 /src-tauri/resources
+/src-tauri/.generated
+
+/auto-imports.d.ts
+/components.d.ts
 
 target

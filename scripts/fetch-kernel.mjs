@@ -6,6 +6,12 @@ import os from 'node:os'
 import { spawn } from 'node:child_process'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
+import {
+  getAllKernelTargets,
+  normalizeArch,
+  normalizePlatform,
+  resolveKernelTarget
+} from './kernel-targets.mjs'
 
 const args = parseArgs(process.argv.slice(2))
 if (args.help) {
@@ -22,20 +28,15 @@ const skipExisting = Boolean(args['skip-existing'] || args.skipExisting)
 const force = Boolean(args.force)
 
 const targets = isAll
-  ? [
-      { platform: 'windows', arch: 'amd64' },
-      { platform: 'linux', arch: 'amd64' },
-      { platform: 'macos', arch: 'arm64' },
-      { platform: 'macos', arch: 'amd64' }
-    ]
+  ? getAllKernelTargets()
   : [
-      {
-        platform: normalizePlatform(args.platform ?? process.platform),
-        arch: normalizeArch(args.arch ?? process.arch)
-      }
-    ]
+      resolveKernelTarget(
+        normalizePlatform(args.platform ?? process.platform),
+        normalizeArch(args.arch ?? process.arch)
+      )
+    ].filter(Boolean)
 
-if (targets.some((item) => !item.platform || !item.arch)) {
+if (targets.length === 0) {
   console.error('Unsupported platform/arch. Use --platform and --arch.')
   process.exit(1)
 }
@@ -43,7 +44,7 @@ if (targets.some((item) => !item.platform || !item.arch)) {
 const errors = []
 for (const target of targets) {
   try {
-    await fetchKernel(target.platform, target.arch, resolvedVersion, baseDir, {
+    await fetchKernel(target, resolvedVersion, baseDir, {
       skipExisting,
       force,
       getVersion: async () => {
@@ -94,23 +95,6 @@ Examples:
 `)
 }
 
-function normalizePlatform(raw) {
-  if (!raw) return null
-  if (raw === 'win32' || raw === 'windows') return 'windows'
-  if (raw === 'linux') return 'linux'
-  if (raw === 'darwin' || raw === 'macos') return 'macos'
-  return null
-}
-
-function normalizeArch(raw) {
-  if (!raw) return null
-  if (raw === 'x64' || raw === 'amd64') return 'amd64'
-  if (raw === 'ia32' || raw === 'x86' || raw === '386') return '386'
-  if (raw === 'arm64' || raw === 'aarch64') return 'arm64'
-  if (raw === 'arm' || raw === 'armv5') return 'armv5'
-  return null
-}
-
 function buildFilename(platformName, archName, versionName) {
   if (platformName === 'windows') {
     return `sing-box-${versionName}-windows-${archName}.zip`
@@ -134,12 +118,9 @@ function buildDownloadUrls(versionName, filenameName) {
   ]
 }
 
-async function fetchKernel(platform, arch, version, baseDir, options = {}) {
-  const targetDir = path.join(baseDir, platform, arch)
-  const targetExecutable = path.join(
-    targetDir,
-    platform === 'windows' ? 'sing-box.exe' : 'sing-box'
-  )
+async function fetchKernel(target, version, kernelBaseDir, options = {}) {
+  const targetDir = path.join(kernelBaseDir, target.platform, target.arch)
+  const targetExecutable = path.join(targetDir, target.executable)
   const versionPath = path.join(targetDir, 'version.txt')
 
   await fsPromises.mkdir(targetDir, { recursive: true })
@@ -150,17 +131,17 @@ async function fetchKernel(platform, arch, version, baseDir, options = {}) {
     fs.existsSync(targetExecutable) &&
     fs.existsSync(versionPath)
   ) {
-    console.log(`[${platform}/${arch}] Exists, skipping download.`)
+    console.log(`[${target.platform}/${target.arch}] Exists, skipping download.`)
     return
   }
 
-  const resolvedVersion = version ?? (await options.getVersion?.())
-  if (!resolvedVersion) {
-    throw new Error(`[${platform}/${arch}] Missing version info.`)
+  const resolvedTargetVersion = version ?? (await options.getVersion?.())
+  if (!resolvedTargetVersion) {
+    throw new Error(`[${target.platform}/${target.arch}] Missing version info.`)
   }
 
-  const filename = buildFilename(platform, arch, resolvedVersion)
-  const downloadUrls = buildDownloadUrls(resolvedVersion, filename)
+  const filename = buildFilename(target.platform, target.arch, resolvedTargetVersion)
+  const downloadUrls = buildDownloadUrls(resolvedTargetVersion, filename)
   const tempDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'sing-box-'))
   const archivePath = path.join(tempDir, filename)
   const extractDir = path.join(tempDir, 'extract')
@@ -169,18 +150,20 @@ async function fetchKernel(platform, arch, version, baseDir, options = {}) {
   let downloaded = false
   for (const url of downloadUrls) {
     try {
-      console.log(`[${platform}/${arch}] Downloading: ${url}`)
+      console.log(`[${target.platform}/${target.arch}] Downloading: ${url}`)
       await downloadFile(url, archivePath)
       downloaded = true
       break
     } catch (error) {
-      console.warn(`[${platform}/${arch}] Download failed: ${error?.message ?? error}`)
+      console.warn(
+        `[${target.platform}/${target.arch}] Download failed: ${error?.message ?? error}`
+      )
     }
   }
 
   if (!downloaded) {
     await cleanupTemp(tempDir)
-    throw new Error(`[${platform}/${arch}] All download sources failed.`)
+    throw new Error(`[${target.platform}/${target.arch}] All download sources failed.`)
   }
 
   await extractArchive(archivePath, extractDir)
@@ -188,18 +171,18 @@ async function fetchKernel(platform, arch, version, baseDir, options = {}) {
 
   if (!foundExecutable) {
     await cleanupTemp(tempDir)
-    throw new Error(`[${platform}/${arch}] Executable not found in archive.`)
+    throw new Error(`[${target.platform}/${target.arch}] Executable not found in archive.`)
   }
 
   await fsPromises.copyFile(foundExecutable, targetExecutable)
-  if (platform !== 'windows') {
+  if (target.platform !== 'windows') {
     await fsPromises.chmod(targetExecutable, 0o755)
   }
 
-  await fsPromises.writeFile(versionPath, `${resolvedVersion}\n`, 'utf8')
+  await fsPromises.writeFile(versionPath, `${resolvedTargetVersion}\n`, 'utf8')
 
   await cleanupTemp(tempDir)
-  console.log(`[${platform}/${arch}] Saved: ${targetExecutable}`)
+  console.log(`[${target.platform}/${target.arch}] Saved: ${targetExecutable}`)
 }
 
 async function getLatestVersion() {

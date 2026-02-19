@@ -20,7 +20,7 @@
     "tauri build": "node scripts/tauri-wrapper.mjs build"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-autostart": "^2.5.0",
     "@tauri-apps/plugin-store": "~2.4.1",
     "@tauri-apps/plugin-updater": "^2.9.0",
@@ -37,7 +37,7 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.8.4",
+    "@tauri-apps/cli": "^2.10.0",
     "@tsconfig/node20": "^20.1.6",
     "@types/node": "^20.19.19",
     "@vitejs/plugin-vue": "^5.2.4",

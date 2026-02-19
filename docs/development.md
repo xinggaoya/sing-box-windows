@@ -464,7 +464,7 @@ pnpm kernel:fetch -- --force
 项目支持将 sing-box 内核作为打包资源随应用发布，首次启动时会自动复制到工作目录。
 
 - 资源路径：`src-tauri/resources/kernel/<platform>/<arch>/sing-box(.exe)`
-- 构建脚本按平台选择资源配置文件，只会打包对应平台的内核文件
+- 构建时由 `scripts/tauri-wrapper.mjs` 动态生成平台资源配置（`src-tauri/.generated/`），只会打包当前目标平台/架构的内核与 `version.txt`
 - 可选版本文件：在同目录放置 `version.txt`，用于写入 `installed_kernel_version`
 - 开发模式下也会从 `src-tauri/resources` 读取内嵌内核
 

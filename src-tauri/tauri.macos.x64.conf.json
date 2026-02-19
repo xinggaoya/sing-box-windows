@@ -1,8 +1,0 @@
-{
-  "bundle": {
-    "resources": [
-      "resources/kernel/macos/amd64/sing-box",
-      "resources/kernel/macos/amd64/version.txt"
-    ]
-  }
-}
