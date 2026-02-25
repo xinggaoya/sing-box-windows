@@ -3,6 +3,8 @@
 //! 提供内核服务各模块共用的工具函数，避免代码重复。
 
 use crate::app::constants::paths;
+use crate::app::core::kernel_service::orchestrator::current_state_version;
+use crate::app::core::kernel_service::state::KERNEL_STATE;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use serde_json::json;
 use std::path::PathBuf;
@@ -80,7 +82,9 @@ impl KernelStatusPayload {
         json!({
             "process_running": self.process_running,
             "api_ready": self.api_ready,
-            "websocket_ready": self.websocket_ready
+            "websocket_ready": self.websocket_ready,
+            "kernel_state": KERNEL_STATE.get_state().as_str(),
+            "state_version": current_state_version()
         })
     }
 }
@@ -116,10 +120,13 @@ pub fn emit_kernel_started(
     let started_payload = json!({
         "process_running": true,
         "api_ready": true,
+        "websocket_ready": true,
         "proxy_mode": proxy_mode,
         "api_port": api_port,
         "proxy_port": proxy_port,
-        "auto_restarted": auto_restarted
+        "auto_restarted": auto_restarted,
+        "kernel_state": KERNEL_STATE.get_state().as_str(),
+        "state_version": current_state_version()
     });
     
     let _ = app_handle.emit("kernel-started", started_payload);

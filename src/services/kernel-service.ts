@@ -13,6 +13,18 @@ export interface KernelStatus {
   uptime_ms?: number
   version?: string
   error?: string
+  kernel_state?: 'stopped' | 'starting' | 'running' | 'stopping' | 'failed' | 'crashed'
+  state_version?: number
+  op_id?: string
+  operation?: string
+}
+
+export interface KernelCommandResult {
+  success: boolean
+  message: string
+  op_id?: string
+  operation?: string
+  state_version?: number
 }
 
 export interface TunSettings {
@@ -78,7 +90,7 @@ class KernelService {
   /**
    * 启动内核
    */
-  async startKernel(options: KernelStartOptions = {}): Promise<{ success: boolean; message: string }> {
+  async startKernel(options: KernelStartOptions = {}): Promise<KernelCommandResult> {
     return withAppStore(async store => {
       await store.waitForDataRestore()
 
@@ -113,7 +125,7 @@ class KernelService {
         args.keepAlive = options.keepAlive
       }
 
-      return invokeWithAppContext<{ success: boolean; message: string }>(
+      return invokeWithAppContext<KernelCommandResult>(
         'kernel_start_enhanced',
         Object.keys(args).length > 0 ? args : undefined,
         { skipDataRestore: true }
@@ -124,17 +136,17 @@ class KernelService {
   /**
    * 停止内核
    */
-  async stopKernel(_options: KernelStopOptions = {}): Promise<{ success: boolean; message: string }> {
+  async stopKernel(_options: KernelStopOptions = {}): Promise<KernelCommandResult> {
     // 如果是强制停止，可能需要调用不同的后端API，或者传递参数
     // 目前后端 kernel_stop_enhanced 似乎不接受参数，但我们保留 options 接口以备将来扩展
-    return invokeWithAppContext<{ success: boolean; message: string }>(
+    return invokeWithAppContext<KernelCommandResult>(
       'kernel_stop_enhanced',
       undefined,
       { skipDataRestore: true }
     )
   }
 
-  async restartKernel(options: KernelStartOptions & KernelStopOptions = {}): Promise<{ success: boolean; message: string }> {
+  async restartKernel(options: KernelStartOptions & KernelStopOptions = {}): Promise<KernelCommandResult> {
     // 走后端快速重启：后台强制停+立即启动，前端不做长等待
     return withAppStore(async store => {
       await store.waitForDataRestore()
@@ -169,7 +181,7 @@ class KernelService {
         args.keepAlive = options.keepAlive
       }
 
-      return invokeWithAppContext<{ success: boolean; message: string }>(
+      return invokeWithAppContext<KernelCommandResult>(
         'kernel_restart_fast',
         Object.keys(args).length > 0 ? args : undefined,
         { skipDataRestore: true }
@@ -183,7 +195,7 @@ class KernelService {
   async getKernelStatus(): Promise<KernelStatus> {
     try {
       return await invokeWithAppContext<KernelStatus>('kernel_get_status_enhanced', undefined, {
-        withApiPort: true
+        withApiPort: 'api_port'
       })
     } catch (error) {
       console.error('获取内核状态失败:', error)
@@ -191,8 +203,20 @@ class KernelService {
         process_running: false,
         api_ready: false,
         websocket_ready: false,
-        error: error instanceof Error ? error.message : '获取状态失败'
+        error: error instanceof Error ? error.message : '获取状态失败',
+        kernel_state: 'failed'
       }
+    }
+  }
+
+  async getKernelSnapshot(): Promise<KernelStatus> {
+    try {
+      return await invokeWithAppContext<KernelStatus>('kernel_get_snapshot', undefined, {
+        withApiPort: 'api_port'
+      })
+    } catch (error) {
+      console.error('获取内核快照失败，回退到状态查询:', error)
+      return this.getKernelStatus()
     }
   }
 
@@ -373,6 +397,18 @@ class KernelService {
 
   async onKernelStopped(callback: (data: unknown) => void): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelStopped, callback)
+  }
+
+  async onKernelOperationStarted(callback: (data: unknown) => void): Promise<() => void> {
+    return eventService.on(APP_EVENTS.kernelOperationStarted, callback)
+  }
+
+  async onKernelOperationFinished(callback: (data: unknown) => void): Promise<() => void> {
+    return eventService.on(APP_EVENTS.kernelOperationFinished, callback)
+  }
+
+  async onKernelOperationFailed(callback: (data: unknown) => void): Promise<() => void> {
+    return eventService.on(APP_EVENTS.kernelOperationFailed, callback)
   }
 
   async updateSingboxPorts(proxyPort: number, apiPort: number): Promise<void> {

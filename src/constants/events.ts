@@ -20,6 +20,9 @@ export const APP_EVENTS = {
   kernelStarting: 'kernel-starting',
   kernelStarted: 'kernel-started',
   kernelStopped: 'kernel-stopped',
+  kernelOperationStarted: 'kernel-operation-started',
+  kernelOperationFinished: 'kernel-operation-finished',
+  kernelOperationFailed: 'kernel-operation-failed',
   kernelDownloadProgress: 'kernel-download-progress',
   updateProgress: 'update-progress',
   updateAvailable: 'update-available',
@@ -40,6 +43,9 @@ export type AppEventPayloads = {
   [APP_EVENTS.kernelStarting]: unknown
   [APP_EVENTS.kernelStarted]: unknown
   [APP_EVENTS.kernelStopped]: unknown
+  [APP_EVENTS.kernelOperationStarted]: unknown
+  [APP_EVENTS.kernelOperationFinished]: unknown
+  [APP_EVENTS.kernelOperationFailed]: unknown
   [APP_EVENTS.kernelDownloadProgress]: KernelDownloadPayload
   [APP_EVENTS.updateProgress]: {
     status: 'downloading' | 'completed' | 'error' | 'installing'

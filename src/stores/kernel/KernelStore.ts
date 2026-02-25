@@ -20,6 +20,8 @@ export const useKernelStore = defineStore('kernel', () => {
   const lastError = ref('')
   const isLoading = ref(false)
   const isKernelInstalled = ref(false)
+  const stateVersion = ref(0)
+  const lastOperationId = ref('')
   const healthStatus = ref<{ healthy: boolean; issues: string[]; lastChecked?: number }>({
     healthy: true,
     issues: [],
@@ -33,7 +35,18 @@ export const useKernelStore = defineStore('kernel', () => {
   let lastEventTime = 0
 
   const applyStatus = (next: KernelStatus) => {
-    status.value = next
+    if (typeof next.state_version === 'number') {
+      // 避免旧状态覆盖新状态（事件乱序或请求返回较慢时尤其重要）。
+      if (next.state_version < stateVersion.value) {
+        return
+      }
+      stateVersion.value = next.state_version
+    }
+    if (next.op_id) {
+      lastOperationId.value = next.op_id
+    }
+
+    status.value = { ...status.value, ...next }
     appStore.setRunningState(next.process_running)
     if (next.version) {
       isKernelInstalled.value = true
@@ -52,6 +65,13 @@ export const useKernelStore = defineStore('kernel', () => {
       // 只要有新事件到来，就认为主动查询的结果可能已经过时，特别是当涉及 api_ready 等状态变化时
       if (lastEventTime > startTime) {
         console.log('⚠️ 忽略过期的状态刷新，因为已收到更新的事件')
+        return status.value
+      }
+      if (
+        typeof latest.state_version === 'number' &&
+        latest.state_version < stateVersion.value
+      ) {
+        console.log('⚠️ 忽略过期的状态刷新(state_version)')
         return status.value
       }
 
@@ -82,8 +102,9 @@ export const useKernelStore = defineStore('kernel', () => {
       })
     }
 
-    // 2. 获取当前状态
-    await refreshStatus()
+    // 2. 先走“快照”初始化，再通过事件增量更新
+    const snapshot = await kernelService.getKernelSnapshot()
+    applyStatus(snapshot)
 
     // 3. 移除主动轮询，完全依赖后端事件推送
     // 用户反馈：直接选用推送即可，无需主动定时查询
@@ -267,6 +288,8 @@ export const useKernelStore = defineStore('kernel', () => {
     hasKernelUpdate,
     latestAvailableVersion,
     availableVersions,
+    stateVersion,
+    lastOperationId,
   }
 })
 

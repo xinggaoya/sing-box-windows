@@ -1,7 +1,7 @@
 use crate::app::constants::paths;
 use crate::app::core::kernel_service::{
-    check_config_validity, is_kernel_running, resolve_proxy_runtime_state, start_kernel_with_state,
-    stop_kernel, KernelRuntimeConfig, ProxyOverrides,
+    check_config_validity, is_kernel_running, orchestrated_restart_kernel,
+    orchestrated_start_kernel, KernelRuntimeConfig, ProxyOverrides,
 };
 use crate::app::core::kernel_service::embedded::ensure_embedded_kernel;
 use crate::app::core::tun_profile::TunProxyOptions;
@@ -9,7 +9,6 @@ use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use crate::app::storage::state_model::AppConfig;
 use serde::Serialize;
 use tauri::AppHandle;
-use tokio::time::Duration;
 use tracing::{info, warn};
 
 #[derive(Debug, Clone)]
@@ -118,7 +117,7 @@ async fn auto_manage_kernel_internal(
         warn!("安装内嵌内核失败，继续按现有逻辑处理: {}", err);
     }
 
-    let resolved_state = resolve_proxy_runtime_state(&app_handle, options.to_overrides()).await?;
+    let overrides = options.to_overrides();
 
     let kernel_installed = kernel_binary_exists();
     if !kernel_installed {
@@ -129,15 +128,34 @@ async fn auto_manage_kernel_internal(
         return Ok(AutoManageResult::invalid_config(err));
     }
 
-    let mut was_running = is_kernel_running().await.unwrap_or(false);
+    let was_running = is_kernel_running().await.unwrap_or(false);
+    let attempted_start = !was_running || options.config.force_restart;
+
     if options.config.force_restart && was_running {
         info!("自动管理请求触发内核重启");
-        let _ = stop_kernel().await;
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        was_running = false;
+        let restart_response = orchestrated_restart_kernel(app_handle.clone(), overrides.clone()).await?;
+        let success = restart_response
+            .get("success")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        let message = restart_response
+            .get("message")
+            .and_then(|value| value.as_str())
+            .unwrap_or("内核重启状态未知")
+            .to_string();
+
+        if success {
+            return Ok(AutoManageResult::running(
+                message.clone(),
+                attempted_start,
+                Some(message),
+            ));
+        }
+
+        return Ok(AutoManageResult::error(message, attempted_start));
     }
 
-    let start_response = start_kernel_with_state(app_handle.clone(), &resolved_state).await?;
+    let start_response = orchestrated_start_kernel(app_handle.clone(), overrides).await?;
 
     let success = start_response
         .get("success")
@@ -148,8 +166,6 @@ async fn auto_manage_kernel_internal(
         .and_then(|value| value.as_str())
         .unwrap_or("内核启动状态未知")
         .to_string();
-
-    let attempted_start = !was_running || options.config.force_restart;
 
     if success {
         Ok(AutoManageResult::running(

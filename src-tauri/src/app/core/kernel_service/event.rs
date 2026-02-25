@@ -78,8 +78,16 @@ pub(super) async fn cleanup_event_relay_tasks() {
     SHOULD_STOP_EVENTS.store(true, Ordering::Relaxed);
 
     let mut tasks = EVENT_RELAY_TASKS.lock().await;
-    for task in tasks.drain(..) {
+    let pending_tasks: Vec<JoinHandle<()>> = tasks.drain(..).collect();
+    drop(tasks);
+
+    for task in pending_tasks {
         task.abort();
+        if let Err(err) = task.await {
+            if !err.is_cancelled() {
+                error!("事件中继任务退出异常: {}", err);
+            }
+        }
     }
 
     info!("已清理所有事件中继任务");

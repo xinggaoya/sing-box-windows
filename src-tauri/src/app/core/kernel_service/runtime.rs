@@ -3,6 +3,8 @@ use crate::app::core::kernel_service::event::{
     cleanup_event_relay_tasks, start_websocket_relay, SHOULD_STOP_EVENTS,
 };
 use crate::app::core::kernel_service::guard::{disable_kernel_guard, enable_kernel_guard};
+use crate::app::core::kernel_service::orchestrator::execute_kernel_operation;
+use crate::app::core::kernel_service::state::{KernelState, KERNEL_STATE};
 use crate::app::core::kernel_service::status::is_kernel_running;
 use crate::app::core::kernel_service::utils::{
     emit_kernel_error, emit_kernel_started, emit_kernel_starting, emit_kernel_stopped,
@@ -14,6 +16,7 @@ use crate::app::core::proxy_service::{
 };
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
+use futures::FutureExt;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -123,6 +126,8 @@ pub async fn start_kernel_with_state(
     app_handle: AppHandle,
     resolved: &ResolvedProxyState,
 ) -> Result<serde_json::Value, String> {
+    KERNEL_STATE.set_state(KernelState::Starting);
+
     info!(
         "?? 启动内核增强版，代理模式: {}, API端口: {}, 代理端口: {}",
         resolved.derived_mode(),
@@ -139,7 +144,10 @@ pub async fn start_kernel_with_state(
 
     crate::app::system::config_service::ensure_singbox_config(&app_handle)
         .await
-        .map_err(|e| format!("准备内核配置失败: {}", e))?;
+        .map_err(|e| {
+            KERNEL_STATE.mark_failed();
+            format!("准备内核配置失败: {}", e)
+        })?;
     if let Err(e) = crate::app::system::config_service::update_singbox_ports(
         app_handle.clone(),
         resolved.proxy.proxy_port,
@@ -151,6 +159,7 @@ pub async fn start_kernel_with_state(
     }
 
     if let Err(e) = apply_proxy_runtime_state(&app_handle, &resolved.proxy).await {
+        KERNEL_STATE.mark_failed();
         return Ok(json!({
             "success": false,
             "message": format!("应用代理配置失败: {}", e)
@@ -162,6 +171,7 @@ pub async fn start_kernel_with_state(
     }
 
     if is_kernel_running().await.unwrap_or(false) {
+        KERNEL_STATE.mark_running(resolved.api_port);
         enable_kernel_guard(app_handle.clone(), resolved.api_port, resolved.proxy.tun_enabled).await;
         info!("内核已在运行中");
         return Ok(serde_json::json!({
@@ -170,7 +180,10 @@ pub async fn start_kernel_with_state(
         }));
     }
 
-    let config_path = resolve_config_path(&app_handle).await?;
+    let config_path = resolve_config_path(&app_handle).await.map_err(|e| {
+        KERNEL_STATE.mark_failed();
+        e
+    })?;
 
     match PROCESS_MANAGER
         .start(&app_handle, &config_path, resolved.proxy.tun_enabled)
@@ -178,6 +191,7 @@ pub async fn start_kernel_with_state(
     {
         Ok(_) => {
             info!("? 内核进程启动成功");
+            KERNEL_STATE.mark_running(resolved.api_port);
 
             info!("?? 启动事件中继服务，端口: {}", resolved.api_port);
             match start_websocket_relay(app_handle.clone(), Some(resolved.api_port)).await {
@@ -215,6 +229,7 @@ pub async fn start_kernel_with_state(
         }
         Err(e) => {
             error!("? 内核启动失败: {}", e);
+            KERNEL_STATE.mark_failed();
 
             emit_kernel_error(&app_handle, &format!("启动失败: {}", e));
 
@@ -224,6 +239,96 @@ pub async fn start_kernel_with_state(
             }))
         }
     }
+}
+
+async fn stop_kernel_command_impl(app_handle: AppHandle) -> Result<serde_json::Value, String> {
+    info!("?? 停止内核（编排器模式）");
+
+    match stop_kernel().await {
+        Ok(_) => {
+            emit_kernel_stopped(&app_handle);
+            Ok(serde_json::json!({
+                "success": true,
+                "message": "内核停止成功".to_string()
+            }))
+        }
+        Err(e) => {
+            emit_kernel_error(&app_handle, &format!("停止失败: {}", e));
+            Ok(serde_json::json!({
+                "success": false,
+                "message": format!("内核停止失败: {}", e)
+            }))
+        }
+    }
+}
+
+async fn restart_kernel_internal(
+    app_handle: AppHandle,
+    overrides: ProxyOverrides,
+) -> Result<serde_json::Value, String> {
+    info!("?? 收到快速重启请求（编排器模式）");
+
+    let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
+
+    // 先尝试停止，超时时强杀
+    let stop_result = tokio::time::timeout(Duration::from_secs(4), stop_kernel()).await;
+    match stop_result {
+        Ok(Ok(_)) => info!("? 快速重启：停止阶段完成"),
+        Ok(Err(e)) => {
+            warn!("? 快速重启：停止失败，继续强杀: {}", e);
+            if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+                error!("强制清理内核进程失败: {}", e);
+            }
+        }
+        Err(_) => {
+            warn!("? 快速重启：停止超时，强制清理");
+            if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+                error!("强制清理内核进程失败: {}", e);
+            }
+        }
+    }
+
+    start_kernel_with_state(app_handle.clone(), &resolved).await
+}
+
+pub async fn orchestrated_start_kernel(
+    app_handle: AppHandle,
+    overrides: ProxyOverrides,
+) -> Result<serde_json::Value, String> {
+    let event_handle = app_handle.clone();
+    execute_kernel_operation(
+        event_handle,
+        "kernel.start",
+        async move {
+            let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
+            start_kernel_with_state(app_handle, &resolved).await
+        }
+        .boxed(),
+    )
+    .await
+}
+
+pub async fn orchestrated_stop_kernel(app_handle: AppHandle) -> Result<serde_json::Value, String> {
+    let event_handle = app_handle.clone();
+    execute_kernel_operation(
+        event_handle,
+        "kernel.stop",
+        async move { stop_kernel_command_impl(app_handle).await }.boxed(),
+    )
+    .await
+}
+
+pub async fn orchestrated_restart_kernel(
+    app_handle: AppHandle,
+    overrides: ProxyOverrides,
+) -> Result<serde_json::Value, String> {
+    let event_handle = app_handle.clone();
+    execute_kernel_operation(
+        event_handle,
+        "kernel.restart",
+        async move { restart_kernel_internal(app_handle, overrides).await }.boxed(),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -252,8 +357,7 @@ pub async fn kernel_start_enhanced(
         keep_alive,
     };
 
-    let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
-    start_kernel_with_state(app_handle, &resolved).await
+    orchestrated_start_kernel(app_handle, overrides).await
 }
 
 #[tauri::command]
@@ -291,31 +395,10 @@ pub async fn apply_proxy_settings(
 
 #[tauri::command]
 pub async fn kernel_stop_enhanced(app_handle: AppHandle) -> Result<serde_json::Value, String> {
-    info!("?? 停止内核（快速模式）");
-
-    disable_kernel_guard().await;
-
-    match stop_kernel().await {
-        Ok(_) => {
-            emit_kernel_stopped(&app_handle);
-
-            Ok(serde_json::json!({
-                "success": true,
-                "message": "内核停止成功".to_string()
-            }))
-        }
-        Err(e) => {
-            emit_kernel_error(&app_handle, &format!("停止失败: {}", e));
-
-            Ok(serde_json::json!({
-                "success": false,
-                "message": format!("内核停止失败: {}", e)
-            }))
-        }
-    }
+    orchestrated_stop_kernel(app_handle).await
 }
 
-/// 快速重启：后台强制停止旧进程后立即启动，不阻塞前端
+/// 快速重启：串行执行停止与启动，保证生命周期命令有序
 #[tauri::command]
 #[allow(clippy::too_many_arguments)] // 保持 Tauri 调用签名，参数拆分由前端传入
 pub async fn kernel_restart_fast(
@@ -330,8 +413,6 @@ pub async fn kernel_restart_fast(
     system_proxy_enabled: Option<bool>,
     tun_enabled: Option<bool>,
 ) -> Result<serde_json::Value, String> {
-    info!("?? 收到快速重启请求");
-
     let overrides = ProxyOverrides {
         proxy_mode,
         api_port,
@@ -344,60 +425,32 @@ pub async fn kernel_restart_fast(
         keep_alive,
     };
 
-    let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
-    let handle = app_handle.clone();
-
-    tauri::async_runtime::spawn(async move {
-        // 先尝试停止，超时时强杀
-        let stop_result = tokio::time::timeout(Duration::from_secs(4), stop_kernel()).await;
-        match stop_result {
-            Ok(Ok(_)) => info!("? 快速重启：停止阶段完成"),
-            Ok(Err(e)) => {
-                warn!("? 快速重启：停止失败，继续强杀: {}", e);
-                if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
-                    error!("强制清理内核进程失败: {}", e);
-                }
-            }
-            Err(_) => {
-                warn!("? 快速重启：停止超时，强制清理");
-                if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
-                    error!("强制清理内核进程失败: {}", e);
-                }
-            }
-        }
-
-        if let Err(e) = start_kernel_with_state(handle.clone(), &resolved).await {
-            error!("快速重启失败: {}", e);
-            emit_kernel_error(&handle, &format!("快速重启失败: {}", e));
-        }
-    });
-
-    Ok(json!({
-        "success": true,
-        "message": "已发起快速重启"
-    }))
+    orchestrated_restart_kernel(app_handle, overrides).await
 }
 
 // 退出+停核逻辑不再保留单独 API，前端统一使用快速重启或停止
 
 pub async fn stop_kernel() -> Result<String, String> {
+    KERNEL_STATE.set_state(KernelState::Stopping);
     disable_kernel_guard().await;
     SHOULD_STOP_EVENTS.store(true, std::sync::atomic::Ordering::Relaxed);
     cleanup_event_relay_tasks().await;
 
-    PROCESS_MANAGER
-        .stop()
-        .await
-        .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_STOP_FAILED, e))?;
+    if let Err(e) = PROCESS_MANAGER.stop().await {
+        KERNEL_STATE.mark_failed();
+        return Err(format!("{}: {}", messages::ERR_PROCESS_STOP_FAILED, e));
+    }
 
     // 快速轮询确认，避免固定长等待
     for i in 1..=2 {
         if !is_kernel_running().await.unwrap_or(true) {
             info!("? 内核停止成功（第{}次检查）", i);
+            KERNEL_STATE.mark_stopped();
             return Ok("内核停止成功".to_string());
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
 
+    KERNEL_STATE.mark_failed();
     Err(messages::ERR_PROCESS_STOP_FAILED.to_string())
 }

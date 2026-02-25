@@ -1,4 +1,6 @@
 use crate::app::constants::paths;
+use crate::app::core::kernel_service::orchestrator::current_state_version;
+use crate::app::core::kernel_service::state::KERNEL_STATE;
 use crate::app::core::kernel_service::PROCESS_MANAGER;
 use crate::platform;
 use crate::utils::http_client;
@@ -121,8 +123,19 @@ pub async fn kernel_get_status_enhanced(
         "websocket_ready": websocket_ready,
         "uptime_ms": 0,
         "version": version,
-        "error": error
+        "error": error,
+        "kernel_state": KERNEL_STATE.get_state().as_str(),
+        "state_version": current_state_version()
     }))
+}
+
+#[tauri::command]
+pub async fn kernel_get_snapshot(
+    app_handle: tauri::AppHandle,
+    api_port: Option<u16>,
+) -> Result<serde_json::Value, String> {
+    // 快照接口复用增强状态接口，避免维护两套语义。
+    kernel_get_status_enhanced(app_handle, api_port).await
 }
 
 #[tauri::command]
