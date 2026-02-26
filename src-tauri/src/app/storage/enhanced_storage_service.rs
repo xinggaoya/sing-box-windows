@@ -260,8 +260,19 @@ pub async fn db_save_app_config_internal(config: AppConfig, app: AppHandle) -> R
 }
 
 #[tauri::command]
-pub async fn db_save_app_config(config: AppConfig, app: AppHandle) -> Result<(), String> {
+pub async fn db_save_app_config(
+    config: AppConfig,
+    app: AppHandle,
+    apply_runtime: Option<bool>,
+) -> Result<(), String> {
     db_save_app_config_internal(config, app.clone()).await?;
+    let apply_runtime = apply_runtime.unwrap_or(false);
+
+    // 默认仅持久化，不自动触发运行态变更。
+    // 这样可避免前端自动保存（输入框逐字变化）频繁触发内核重启/配置同步。
+    if !apply_runtime {
+        return Ok(());
+    }
 
     // 保存设置后，尽量把变更同步到“当前生效配置文件”，避免用户需要重新下载订阅/重启应用才能生效。
     // 同步逻辑采用“局部 patch”策略：如果配置文件不是本程序生成的结构，会尽量只修改端口/TUN/DNS 策略等通用字段。

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { sudoService } from '@/services/sudo-service'
 
 // 仅负责“弹窗状态 + Promise 协调”，不直接做 i18n/message，避免在非组件上下文使用。
 export const useSudoStore = defineStore('sudo', () => {
@@ -45,7 +46,6 @@ export const useSudoStore = defineStore('sudo', () => {
     errorCode.value = ''
     errorDetail.value = ''
     try {
-      const { sudoService } = await import('@/services/sudo-service')
       await sudoService.setPassword(trimmed)
       close(true)
       return true

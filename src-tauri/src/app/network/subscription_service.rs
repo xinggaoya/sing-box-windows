@@ -357,7 +357,7 @@ pub async fn set_active_config_path(
         previous, app_config.active_config_path
     );
 
-    db_save_app_config(app_config, app_handle)
+    db_save_app_config(app_config, app_handle, Some(true))
         .await
         .map_err(|e| format!("保存配置路径失败: {}", e))
 }

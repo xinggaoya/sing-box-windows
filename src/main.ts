@@ -23,54 +23,22 @@ app.use(i18n)
 const initializeApp = async () => {
   try {
     console.log('🚀 开始应用初始化...')
-    
+
     // 使用新的初始化服务
     await initializationService.initializeApp()
-    
+
     console.log('✅ 应用初始化完成，挂载Vue应用')
-    
+
     // 应用挂载（在初始化完成后）
     app.mount('#app')
-    
+
   } catch (error) {
     console.error('❌ 应用初始化失败:', error)
-    
+
     // 即使初始化失败，也尝试挂载应用以显示错误页面
     app.mount('#app')
   }
 }
-
-// 初始化事件服务（替代WebSocket服务）
-import { eventService } from '@/services/event-service'
-console.log('🔧 Tauri 事件服务已导入')
-
-const handleBeforeUnload = () => {
-  console.log('应用关闭，执行清理...')
-
-  try {
-    eventService.destroy()
-    console.log('事件服务已清理')
-  } catch (error) {
-    console.error('事件服务清理失败:', error)
-  }
-}
-
-type WindowWithCleanup = Window & {
-  __appBeforeUnloadHandler?: () => void
-}
-
-const windowWithCleanup = window as WindowWithCleanup
-
-if (windowWithCleanup.__appBeforeUnloadHandler) {
-  window.removeEventListener('beforeunload', windowWithCleanup.__appBeforeUnloadHandler)
-}
-
-const beforeUnloadHandler = () => {
-  handleBeforeUnload()
-}
-
-window.addEventListener('beforeunload', beforeUnloadHandler)
-windowWithCleanup.__appBeforeUnloadHandler = beforeUnloadHandler
 
 // 开始初始化
 initializeApp()

@@ -269,8 +269,9 @@ pub async fn check_update(
                 file_size = asset["size"].as_u64();
                 best_priority = priority;
 
-                // 如果找到了最高优先级的包，可以提前退出
-                if priority == 2 {
+                // 最高优先级约为 27（基础 20 + 架构 5 + 特殊 2），
+                // 达到 25 以上即可认为“当前平台最佳候选”，提前结束遍历。
+                if priority >= 25 {
                     break;
                 }
             }

@@ -552,12 +552,13 @@ import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore, useThemeSt
 import { useSubStore } from '@/stores/subscription/SubStore'
 import type { Locale } from '@/stores/app/LocaleStore'
 import type { ThemeMode } from '@/stores/app/ThemeStore'
-import { APP_EVENTS } from '@/constants/events'
 import { systemService } from '@/services/system-service'
-import { eventService } from '@/services/event-service'
 import { supportedLocales } from '@/locales'
-import type { KernelDownloadPayload } from '@/services/kernel-service'
 import PageHeader from '@/components/common/PageHeader.vue'
+import { ACCENT_PRESETS, TUN_STACK_OPTIONS } from '@/views/setting/setting-options'
+import { useKernelDownload } from '@/views/setting/useKernelDownload'
+import { useUpdateProgressListener } from '@/views/setting/useUpdateProgressListener'
+import { useAdvancedSettingsForm } from '@/views/setting/useAdvancedSettingsForm'
 
 const message = useMessage()
 const { t } = useI18n()
@@ -569,78 +570,33 @@ const themeStore = useThemeStore()
 const subStore = useSubStore()
 
 // State
-const loading = ref(false)
-const downloading = ref(false)
-const downloadProgress = ref(0)
-const downloadMessage = ref('')
-const downloadError = ref('')
-let downloadListener: (() => void) | null = null
-let updateProgressListener: (() => void) | null = null
 const selectedKernelVersion = ref<string | undefined>(undefined)
 const platformInfo = ref<{ os: string; arch: string; display_name: string } | null>(null)
 
 const autoStart = ref(false)
-const locale = ref(localeStore.locale)
 const checkingUpdate = ref(false)
 const themeForm = reactive({
   mode: 'system' as ThemeMode,
   accentColor: '#6366f1',
   compactMode: false,
 })
-const accentPresets = ['#6366f1', '#0ea5e9', '#22c55e', '#f59e0b', '#e11d48', '#8b5cf6']
+const accentPresets = ACCENT_PRESETS
 
 const showPortModal = ref(false)
 const tempProxyPort = ref(12080)
 const tempApiPort = ref(12081)
 const portSettingsLoading = ref(false)
 
-const savingAdvanced = ref(false)
-const proxyAdvancedForm = reactive({
-  systemProxyBypass: '',
-  tunMtu: 9000,
-  tunStack: 'mixed' as 'system' | 'gvisor' | 'mixed',
-  tunEnableIpv6: false,
-  tunAutoRoute: true,
-  tunStrictRoute: true
-})
-
-const savingSingboxProfile = ref(false)
-const singboxProfileForm = reactive({
-  defaultProxyOutbound: 'manual' as 'manual' | 'auto',
-  downloadDetour: 'manual' as 'manual' | 'direct',
-  blockAds: true,
-  dnsHijack: true,
-  enableAppGroups: true,
-  dnsProxy: '',
-  dnsCn: '',
-  dnsResolver: '',
-  urltestUrl: '',
-})
-
 // Options
-const languageOptions: { label: string; value: Locale }[] = [
+const languageOptions = computed<{ label: string; value: Locale }[]>(() => [
   { label: t('setting.language.auto'), value: 'auto' },
   ...supportedLocales.map((item) => ({
     label: item.name,
     value: item.code as Locale,
   })),
-]
+])
 
-const tunStackOptions = [
-  { label: 'System', value: 'system' },
-  { label: 'gVisor', value: 'gvisor' },
-  { label: 'Mixed', value: 'mixed' }
-]
-
-const defaultOutboundOptions = [
-  { label: t('setting.singboxProfile.outboundManual'), value: 'manual' },
-  { label: t('setting.singboxProfile.outboundAuto'), value: 'auto' },
-]
-
-const downloadDetourOptions = [
-  { label: t('setting.singboxProfile.detourManual'), value: 'manual' },
-  { label: t('setting.singboxProfile.detourDirect'), value: 'direct' },
-]
+const tunStackOptions = TUN_STACK_OPTIONS
 
 // Computed
 const kernelLatestVersion = computed(() => kernelStore.latestAvailableVersion || '')
@@ -662,55 +618,44 @@ const showUpdateProgress = computed(() =>
   ['downloading', 'installing', 'completed'].includes(updateStatus.value) || updateProgress.value > 0
 )
 
+const {
+  loading,
+  downloading,
+  downloadProgress,
+  downloadMessage,
+  downloadTheKernel,
+  cleanupDownloadListener,
+} = useKernelDownload({
+  selectedVersion: selectedKernelVersion,
+  message,
+  t,
+  checkKernelInstallation: () => kernelStore.checkKernelInstallation(),
+})
+
+const { setupUpdateProgressListener, cleanupUpdateProgressListener } = useUpdateProgressListener({
+  message,
+  updateStore,
+  t,
+})
+
+const {
+  savingAdvanced,
+  proxyAdvancedForm,
+  savingSingboxProfile,
+  singboxProfileForm,
+  defaultOutboundOptions,
+  downloadDetourOptions,
+  saveProxyAdvancedSettings,
+  saveSingboxProfileSettings,
+} = useAdvancedSettingsForm({
+  appStore,
+  message,
+  t,
+})
+
 // Methods
 const formatVersion = (v: string) => v.replace(/^v/, '')
-const isSupportedLocale = (l: string) => languageOptions.some(opt => opt.value === l)
-
-// Initialize form data
-watch(() => appStore.isDataRestored, (restored) => {
-  if (restored) {
-    proxyAdvancedForm.systemProxyBypass = appStore.systemProxyBypass
-    proxyAdvancedForm.tunMtu = appStore.tunMtu
-    proxyAdvancedForm.tunStack = appStore.tunStack as 'system' | 'gvisor' | 'mixed'
-    proxyAdvancedForm.tunEnableIpv6 = appStore.tunEnableIpv6
-    proxyAdvancedForm.tunAutoRoute = appStore.tunAutoRoute
-    proxyAdvancedForm.tunStrictRoute = appStore.tunStrictRoute
-
-    singboxProfileForm.defaultProxyOutbound = appStore.singboxDefaultProxyOutbound as 'manual' | 'auto'
-    singboxProfileForm.downloadDetour = appStore.singboxDownloadDetour as 'manual' | 'direct'
-    singboxProfileForm.blockAds = appStore.singboxBlockAds
-    singboxProfileForm.dnsHijack = appStore.singboxDnsHijack
-    singboxProfileForm.enableAppGroups = appStore.singboxEnableAppGroups
-    singboxProfileForm.dnsProxy = appStore.singboxDnsProxy
-    singboxProfileForm.dnsCn = appStore.singboxDnsCn
-    singboxProfileForm.dnsResolver = appStore.singboxDnsResolver
-    singboxProfileForm.urltestUrl = appStore.singboxUrltestUrl
-  }
-}, { immediate: true })
-
-const saveSingboxProfileSettings = async () => {
-  try {
-    savingSingboxProfile.value = true
-
-    appStore.singboxDefaultProxyOutbound = singboxProfileForm.defaultProxyOutbound
-    appStore.singboxDownloadDetour = singboxProfileForm.downloadDetour
-    appStore.singboxBlockAds = singboxProfileForm.blockAds
-    appStore.singboxDnsHijack = singboxProfileForm.dnsHijack
-    appStore.singboxEnableAppGroups = singboxProfileForm.enableAppGroups
-    appStore.singboxDnsProxy = singboxProfileForm.dnsProxy.trim() || appStore.singboxDnsProxy
-    appStore.singboxDnsCn = singboxProfileForm.dnsCn.trim() || appStore.singboxDnsCn
-    appStore.singboxDnsResolver = singboxProfileForm.dnsResolver.trim() || appStore.singboxDnsResolver
-    appStore.singboxUrltestUrl = singboxProfileForm.urltestUrl.trim() || appStore.singboxUrltestUrl
-
-    await appStore.saveToBackend()
-    message.success(t('common.saveSuccess'))
-  } catch (error) {
-    console.error('保存 sing-box 配置生成高级选项失败:', error)
-    message.error(t('common.saveFailed'))
-  } finally {
-    savingSingboxProfile.value = false
-  }
-}
+const isSupportedLocale = (l: string) => languageOptions.value.some(opt => opt.value === l)
 
 const syncThemeForm = () => {
   themeForm.mode = themeStore.mode as ThemeMode
@@ -742,7 +687,6 @@ const handleChangeLanguage = async (value: string) => {
   // 选择 auto 时明确切回自动模式，避免保留旧值
   const nextLocale = value === 'auto' ? 'auto' : value
   await localeStore.setLocale(nextLocale as Locale)
-  locale.value = localeStore.currentLocale
 }
 
 const onIpVersionChange = async (value: boolean) => {
@@ -780,73 +724,6 @@ const onCompactModeChange = async (value: boolean) => {
   await themeStore.setCompactMode(value)
 }
 
-const cleanupDownloadListener = () => {
-  if (downloadListener) {
-    downloadListener()
-    downloadListener = null
-  }
-}
-
-const downloadTheKernel = async () => {
-  if (downloading.value) return
-  let downloadCompleted = false
-  loading.value = true
-  downloading.value = true
-  downloadProgress.value = 0
-  downloadMessage.value = t('setting.kernel.preparingDownload')
-  downloadError.value = ''
-
-  // 监听后端推送的下载进度，实时刷新 UI
-  cleanupDownloadListener()
-  downloadListener = await eventService.on(APP_EVENTS.kernelDownloadProgress, (payload) => {
-    const data = payload as KernelDownloadPayload
-    if (typeof data.progress === 'number') {
-      downloadProgress.value = Math.min(100, Math.max(0, data.progress))
-    }
-    if (data.message) {
-      downloadMessage.value = data.message
-    }
-
-    if (data.status === 'completed') {
-      downloadCompleted = true
-      downloading.value = false
-      loading.value = false
-      message.success(t('setting.kernel.downloadSuccess'))
-      kernelStore.checkKernelInstallation()
-      cleanupDownloadListener()
-    } else if (data.status === 'error') {
-      downloading.value = false
-      loading.value = false
-      downloadError.value = data.message || t('setting.kernel.downloadFailed')
-      message.error(downloadError.value)
-      cleanupDownloadListener()
-    } else {
-      downloadMessage.value ||= t('setting.kernel.downloadingDescription')
-    }
-  })
-
-  try {
-    await systemService.downloadKernel(selectedKernelVersion.value)
-    // 如果后端未推送完成事件，也主动校验一次安装结果
-    if (!downloadCompleted) {
-      await kernelStore.checkKernelInstallation()
-    }
-  } catch (e) {
-    console.error('下载内核失败:', e)
-    downloadError.value = e instanceof Error ? e.message : t('setting.kernel.downloadFailed')
-    message.error(downloadError.value)
-    downloading.value = false
-    loading.value = false
-    cleanupDownloadListener()
-  } finally {
-    // 最终状态由事件驱动更新；若未收到事件则确保按钮可再次点击
-    if (downloading.value) {
-      loading.value = false
-      downloading.value = false
-    }
-  }
-}
-
 const showManualDownloadModal = () => {
   message.info('Manual download not implemented yet')
 }
@@ -868,24 +745,6 @@ const handleUpdateNow = async () => {
     console.error('启动更新失败:', error)
     const errMsg = error instanceof Error ? error.message : t('setting.update.updateFailed')
     message.error(`${t('setting.update.updateFailed')}: ${errMsg}`)
-  }
-}
-
-const saveProxyAdvancedSettings = async () => {
-  savingAdvanced.value = true
-  try {
-    appStore.systemProxyBypass = proxyAdvancedForm.systemProxyBypass
-    appStore.tunMtu = proxyAdvancedForm.tunMtu
-    appStore.tunAutoRoute = proxyAdvancedForm.tunAutoRoute
-    appStore.tunStrictRoute = proxyAdvancedForm.tunStrictRoute
-    appStore.tunStack = proxyAdvancedForm.tunStack
-    appStore.tunEnableIpv6 = proxyAdvancedForm.tunEnableIpv6
-    await appStore.saveToBackend()
-    message.success(t('common.saveSuccess'))
-  } catch (e) {
-    message.error(t('common.saveFailed'))
-  } finally {
-    savingAdvanced.value = false
   }
 }
 
@@ -927,36 +786,6 @@ const savePortSettings = async () => {
     message.error(t('common.saveFailed'))
   } finally {
     portSettingsLoading.value = false
-  }
-}
-
-// 监听更新下载进度，保持设置页状态与后端事件同步
-const setupUpdateProgressListener = async () => {
-  try {
-    updateProgressListener = await eventService.on(APP_EVENTS.updateProgress, (payload) => {
-      const data = payload as { status?: string; progress?: number; message?: string }
-      const progress = typeof data.progress === 'number' ? data.progress : updateProgress.value
-      const status = data.status || updateStatus.value
-      const rawMessage = data.message || ''
-      const localizedMessage = status === 'installing' ? t('setting.update.installStarted') : rawMessage
-
-      updateStore.updateProgress(status, progress, localizedMessage)
-
-      if (status === 'completed') {
-        message.success(t('notification.updateDownloaded'))
-      } else if (status === 'error') {
-        message.error(localizedMessage || t('setting.update.updateFailed'))
-      }
-    })
-  } catch (error) {
-    console.error('监听更新进度失败:', error)
-  }
-}
-
-const cleanupUpdateProgressListener = () => {
-  if (updateProgressListener) {
-    updateProgressListener()
-    updateProgressListener = null
   }
 }
 

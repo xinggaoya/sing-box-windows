@@ -30,6 +30,7 @@ coverage
 *.tsbuildinfo
 /src-tauri/resources
 /src-tauri/.generated
+/src-tauri/src/types/generated
 
 auto-imports.d.ts
 components.d.ts

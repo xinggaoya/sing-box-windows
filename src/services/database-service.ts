@@ -8,8 +8,15 @@ export class DatabaseService {
     return await invoke('db_get_app_config')
   }
 
-  static async saveAppConfig(config: AppConfig): Promise<void> {
-    return await invoke('db_save_app_config', { config })
+  static async saveAppConfig(
+    config: AppConfig,
+    options: { applyRuntime?: boolean } = {},
+  ): Promise<void> {
+    return await invoke('db_save_app_config', {
+      config,
+      applyRuntime: options.applyRuntime ?? false,
+      apply_runtime: options.applyRuntime ?? false,
+    })
   }
 
   // 主题配置

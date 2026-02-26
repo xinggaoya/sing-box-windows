@@ -248,6 +248,17 @@ import { subscriptionService } from '@/services/subscription-service'
 import type { SubscriptionPersistResult } from '@/services/subscription-service'
 import { kernelService } from '@/services/kernel-service'
 import { useI18n } from 'vue-i18n'
+import { DEFAULT_AUTO_UPDATE_MINUTES, type FrontendSubscription } from '@/stores/subscription/types'
+import {
+  formatExpireTime as formatExpireTimeText,
+  formatIntervalLabel as formatIntervalLabelText,
+  formatLocalTime,
+  formatTrafficSummary as formatTrafficSummaryText,
+  generateConfigFileName,
+  hasSubscriptionTraffic,
+  isJsonContent,
+} from '@/views/sub/subscription-utils'
+import { useSubscriptionAutoUpdate } from '@/views/sub/useSubscriptionAutoUpdate'
 import {
   AddOutline,
   LinkOutline,
@@ -268,34 +279,16 @@ import {
 } from '@vicons/ionicons5'
 import type { FormInst, FormRules, DropdownOption } from 'naive-ui'
 import PageHeader from '@/components/common/PageHeader.vue'
-import StatusCard from '@/components/common/StatusCard.vue'
 
 defineOptions({
   name: 'SubView'
 })
 
-interface Subscription {
-  name: string
-  url: string
-  lastUpdate?: number
-  isLoading: boolean
-  isManual: boolean
-  manualContent?: string
-  useOriginalConfig: boolean
-  configPath?: string
-  backupPath?: string
-  autoUpdateIntervalMinutes?: number
-  subscriptionUpload?: number
-  subscriptionDownload?: number
-  subscriptionTotal?: number
-  subscriptionExpire?: number
-}
+type Subscription = FrontendSubscription
 
 interface SubscriptionForm extends Subscription {
   uriContent?: string
 }
-
-const DEFAULT_AUTO_UPDATE_MINUTES = 720
 
 const message = useMessage()
 const subStore = useSubStore()
@@ -323,21 +316,6 @@ const formValue = ref<SubscriptionForm>({
   useOriginalConfig: false,
   autoUpdateIntervalMinutes: DEFAULT_AUTO_UPDATE_MINUTES,
 })
-
-const subscriptionStats = computed(() => [
-  {
-    label: t('sub.total'),
-    value: subStore.list.length,
-    icon: LinkOutline,
-    type: 'primary' as const,
-  },
-  {
-    label: t('sub.active'),
-    value: subStore.activeIndex !== null && subStore.activeIndex >= 0 ? 1 : 0,
-    icon: CheckmarkCircleOutline,
-    type: 'success' as const,
-  },
-])
 
 const autoUpdateOptions = computed(() => [
   { label: t('sub.autoUpdateOff'), value: 0 },
@@ -380,15 +358,6 @@ const rules: FormRules = {
   ],
 }
 
-const generateConfigFileName = (name: string) => {
-  const safe = name
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-  return `${safe || 'subscription'}-${Date.now()}.json`
-}
-
 const resolvePersistOptionsFor = (item: Subscription) => {
   if (item.configPath && item.configPath.length > 0) {
     return { configPath: item.configPath }
@@ -396,23 +365,8 @@ const resolvePersistOptionsFor = (item: Subscription) => {
   return { fileName: generateConfigFileName(item.name || 'sub') }
 }
 
-const formatIntervalLabel = (minutes?: number) => {
-  const value = minutes ?? DEFAULT_AUTO_UPDATE_MINUTES
-  if (!value) return t('sub.autoUpdateOff')
-  if (value % 1440 === 0) return t('sub.autoUpdate1d')
-  if (value % 720 === 0) return t('sub.autoUpdate12h')
-  if (value % 360 === 0) return t('sub.autoUpdate6h')
-  return `${value} min`
-}
-
-const isJsonContent = (value: string) => {
-  try {
-    const parsed = JSON.parse(value)
-    return typeof parsed === 'object' && parsed !== null
-  } catch {
-    return false
-  }
-}
+const formatIntervalLabel = (minutes?: number) =>
+  formatIntervalLabelText(minutes, t, DEFAULT_AUTO_UPDATE_MINUTES)
 
 const getDropdownOptions = (index: number): DropdownOption[] => [
   {
@@ -473,6 +427,12 @@ const resetForm = () => {
 }
 
 watch(activeTab, (tab) => {
+  if (tab === 'uri') {
+    formValue.value.useOriginalConfig = false
+  }
+  if (tab !== 'url') {
+    formValue.value.autoUpdateIntervalMinutes = 0
+  }
   if (editIndex.value !== null || useOriginalTouched.value) return
   formValue.value.useOriginalConfig = tab === 'manual'
 })
@@ -758,50 +718,9 @@ const applySubscriptionUserinfo = (
   target.subscriptionExpire = result.subscriptionExpire
 }
 
-const hasSubscriptionTraffic = (item: Subscription) => {
-  return (
-    item.subscriptionUpload !== undefined ||
-    item.subscriptionDownload !== undefined ||
-    item.subscriptionTotal !== undefined
-  )
-}
-
-const formatBytes = (bytes?: number) => {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  const value = bytes / Math.pow(1024, index)
-  return `${value.toFixed(2)} ${units[index]}`
-}
-
-const formatTrafficSummary = (item: Subscription) => {
-  const upload = item.subscriptionUpload ?? 0
-  const download = item.subscriptionDownload ?? 0
-  const used = upload + download
-  const total = item.subscriptionTotal
-
-  if (total !== undefined) {
-    const remaining = Math.max(total - used, 0)
-    return t('sub.trafficWithTotal', {
-      used: formatBytes(used),
-      total: formatBytes(total),
-      remaining: formatBytes(remaining),
-    })
-  }
-
-  return t('sub.trafficUsedOnly', { used: formatBytes(used) })
-}
-
-const formatExpireTime = (timestamp?: number) => {
-  if (!timestamp) return ''
-  const date = new Date(timestamp * 1000)
-  if (Number.isNaN(date.getTime())) return ''
-  return t('sub.expireAt', { time: date.toLocaleString() })
-}
-
-const formatTime = (timestamp: number): string => {
-  return new Date(timestamp).toLocaleString()
-}
+const formatTrafficSummary = (item: Subscription) => formatTrafficSummaryText(item, t)
+const formatExpireTime = (timestamp?: number) => formatExpireTimeText(timestamp, t)
+const formatTime = (timestamp: number): string => formatLocalTime(timestamp)
 
 const regenerateConfigFor = async (item: Subscription) => {
   const persistOptions = { fileName: generateConfigFileName(item.name || 'sub'), applyRuntime: false }
@@ -875,33 +794,13 @@ const saveCurrentConfig = async () => {
   }
 }
 
-const AUTO_UPDATE_CHECK_INTERVAL = 30 * 60 * 1000
-let autoUpdateTimer: number | null = null
-
-const runAutoUpdate = async () => {
-  const now = Date.now()
-  for (let i = 0; i < subStore.list.length; i += 1) {
-    const item = subStore.list[i]
-    if (item.isManual) continue
-    const interval = item.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES
-    const last = item.lastUpdate ?? 0
-    if (interval > 0 && now - last >= interval * 60 * 1000 && !item.isLoading) {
-      await refreshSubscription(i, subStore.activeIndex === i && appStore.isRunning, true)
-    }
-  }
-}
-
-const startAutoUpdateLoop = () => {
-  stopAutoUpdateLoop()
-  autoUpdateTimer = window.setInterval(runAutoUpdate, AUTO_UPDATE_CHECK_INTERVAL)
-}
-
-const stopAutoUpdateLoop = () => {
-  if (autoUpdateTimer) {
-    window.clearInterval(autoUpdateTimer)
-    autoUpdateTimer = null
-  }
-}
+const { startAutoUpdateLoop, stopAutoUpdateLoop } = useSubscriptionAutoUpdate({
+  getSubscriptions: () => subStore.list,
+  getActiveIndex: () => subStore.activeIndex,
+  isKernelRunning: () => appStore.isRunning,
+  defaultIntervalMinutes: DEFAULT_AUTO_UPDATE_MINUTES,
+  onRefresh: refreshSubscription,
+})
 
 onMounted(() => {
   subStore.resetLoadingState()
@@ -912,14 +811,6 @@ onUnmounted(() => {
   stopAutoUpdateLoop()
 })
 
-watch(activeTab, (value) => {
-  if (value === 'uri') {
-    formValue.value.useOriginalConfig = false
-  }
-  if (value !== 'url') {
-    formValue.value.autoUpdateIntervalMinutes = 0
-  }
-})
 </script>
 
 <style scoped>

@@ -7,16 +7,13 @@ import { defaultWindowIcon } from '@tauri-apps/api/app'
 import { Menu } from '@tauri-apps/api/menu'
 import { MenuItem } from '@tauri-apps/api/menu/menuItem'
 import { Submenu } from '@tauri-apps/api/menu/submenu'
-import { useAppStore } from '@/stores'
-import { useSubStore } from '@/stores'
-import { useKernelStore } from '@/stores'
+import { useAppStore, useKernelStore, useLocaleStore, useSubStore, useSudoStore } from '@/stores'
 import { useWindowStore } from '@/stores/app/WindowStore'
 import i18n from '@/locales'
 import type { ProxyMode } from '@/types'
 import { useRouter } from 'vue-router'
 import { systemService } from '@/services/system-service'
 import { sudoService } from '@/services/sudo-service'
-import { useSudoStore } from '@/stores'
 
 // 自定义菜单项类型定义
 export interface TrayMenuOptions {
@@ -516,7 +513,6 @@ export const useTrayStore = defineStore('tray', () => {
         },
       )
 
-      const { useLocaleStore } = await import('@/stores')
       const localeStore = useLocaleStore()
       registerWatcher(
         () => localeStore.currentLocale,

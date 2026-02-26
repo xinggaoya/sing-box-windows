@@ -75,7 +75,7 @@ impl DatabaseService {
                 singbox_urltest_url TEXT DEFAULT 'http://cp.cloudflare.com/generate_204',
                 singbox_default_proxy_outbound TEXT DEFAULT 'manual',
                 singbox_block_ads BOOLEAN DEFAULT TRUE,
-                singbox_download_detour TEXT DEFAULT 'manual',
+                singbox_download_detour TEXT DEFAULT 'direct',
                 singbox_dns_hijack BOOLEAN DEFAULT TRUE,
                 singbox_enable_app_groups BOOLEAN DEFAULT TRUE,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -107,7 +107,7 @@ impl DatabaseService {
             "ALTER TABLE app_config ADD COLUMN singbox_urltest_url TEXT DEFAULT 'http://cp.cloudflare.com/generate_204'",
             "ALTER TABLE app_config ADD COLUMN singbox_default_proxy_outbound TEXT DEFAULT 'manual'",
             "ALTER TABLE app_config ADD COLUMN singbox_block_ads BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN singbox_download_detour TEXT DEFAULT 'manual'",
+            "ALTER TABLE app_config ADD COLUMN singbox_download_detour TEXT DEFAULT 'direct'",
             "ALTER TABLE app_config ADD COLUMN singbox_dns_hijack BOOLEAN DEFAULT TRUE",
             "ALTER TABLE app_config ADD COLUMN singbox_enable_app_groups BOOLEAN DEFAULT TRUE",
         ];

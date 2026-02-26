@@ -86,6 +86,7 @@ const themeOverrides = computed(() => themeStore.themeOverrides)
 
 const cleanupFunctions: (() => void)[] = []
 let sudoPromptRunning = false
+let eventServiceDestroyed = false
 
 const extractKernelErrorMessage = (raw: unknown) => {
   if (typeof raw === 'string') return raw
@@ -173,6 +174,12 @@ onMounted(async () => {
 function cleanup() {
   cleanupFunctions.forEach((fn) => fn())
   cleanupFunctions.length = 0
+
+  // 事件服务仅需销毁一次，避免 beforeunload 与组件卸载双触发时重复执行。
+  if (!eventServiceDestroyed) {
+    eventServiceDestroyed = true
+    eventService.destroy()
+  }
 }
 
 onBeforeUnmount(() => {

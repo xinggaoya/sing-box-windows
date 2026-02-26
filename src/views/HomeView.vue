@@ -180,6 +180,8 @@ import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useThemeStore } from '@/stores/app/ThemeStore'
 import { kernelService } from '@/services/kernel-service'
+import { sudoService } from '@/services/sudo-service'
+import { systemService } from '@/services/system-service'
 import StatusCard from '@/components/common/StatusCard.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
@@ -390,7 +392,6 @@ const toggleTunProxy = async (value: boolean) => {
       }
     } else if (isUnixPlatform.value) {
       // Linux/macOS：首次启用 TUN 弹窗收集系统密码，后续自动 sudo 提权启动内核
-      const { sudoService } = await import('@/services/sudo-service')
       const status = await sudoService.getStatus()
       if (!status.supported) {
         message.error(t('home.sudoPassword.unsupported'))
@@ -462,7 +463,6 @@ const restartAsAdmin = async () => {
 // 已移除switchProxyModeAndRefreshKernel - 不再需要，因为System Proxy和TUN是独立的
 
 const requestRestartAsAdmin = async () => {
-  const { systemService } = await import('@/services/system-service')
   await systemService.restartAsAdmin()
 }
 
@@ -508,7 +508,6 @@ const handleNodeProxyModeChange = async (mode: string) => {
 
 const checkAdmin = async () => {
   try {
-    const { systemService } = await import('@/services/system-service')
     isAdmin.value = await systemService.checkAdmin()
   } catch (error) {
     isAdmin.value = false
@@ -517,7 +516,6 @@ const checkAdmin = async () => {
 
 onMounted(async () => {
   try {
-    const { systemService } = await import('@/services/system-service')
     const raw = await systemService.getPlatformInfo()
     platform.value = raw === 'windows' || raw === 'linux' || raw === 'macos' ? raw : 'unknown'
   } catch (error) {

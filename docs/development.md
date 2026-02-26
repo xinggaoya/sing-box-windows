@@ -64,184 +64,48 @@ Sing-Box Windows 是一个基于 [Sing-Box](https://github.com/SagerNet/sing-box
 
 ```
 sing-box-windows/
-├── src/                # 前端源代码
-│   ├── assets/        # 静态资源
-│   │   ├── base.css           # 基础样式
-│   │   ├── main.css           # 主样式文件
-│   │   ├── icon.png           # 应用图标
-│   │   ├── logo.svg           # Logo 图标
-│   │   └── naive-ui-theme-overrides.json # UI主题覆盖配置
-│   ├── components/    # 通用组件
-│   │   ├── home/             # 主页组件
-│   │   │   ├── ProxyModeCard.vue     # 代理模式卡片
-│   │   │   ├── StatusCard.vue        # 状态卡片
-│   │   │   └── TrafficStatsCard.vue  # 流量统计卡片
-│   │   ├── layout/           # 布局组件
-│   │   │   ├── MainLayout.vue        # 主布局
-│   │   │   └── TrafficChart.vue      # 流量图表
-│   │   ├── LazyComponent.vue  # 懒加载组件
-│   │   ├── UpdateModal.vue    # 更新弹窗
-│   │   ├── UpdateNotification.vue # 更新通知
-│   │   └── VirtualList.vue    # 虚拟列表组件
-│   ├── composables/   # 组合式API
-│   │   └── useVirtualization.ts # 虚拟化工具
-│   ├── constants/     # 前端常量
-│   │   └── index.ts   # 常量定义
-│   ├── locales/       # 国际化文件
-│   │   ├── zh-CN.ts   # 中文翻译
-│   │   ├── en-US.ts   # 英文翻译
-│   │   ├── ja-JP.ts   # 日文翻译
-│   │   ├── ru-RU.ts   # 俄文翻译
-│   │   └── index.ts   # i18n配置
-│   ├── router/        # 路由配置
-│   │   └── index.ts   # 路由定义
-│   ├── services/      # 服务层
-│   │   ├── database-service.ts         # 数据库服务
-│   │   ├── event-service.ts            # 事件服务
-│   │   ├── initialization-service.ts   # 初始化服务
-│   │   ├── invoke-client.ts            # Tauri命令统一调用
-│   │   ├── kernel-service.ts           # 内核命令封装
-│   │   ├── kernel/                     # 内核相关服务
-│   │   │   ├── lifecycle-controller.ts # 生命周期控制器
-│   │   │   └── status-cache.ts         # 状态缓存
-│   │   ├── notification-service.ts     # 通知服务
-│   │   ├── proxy-service.ts            # 代理服务
-│   │   ├── subscription-service.ts     # 订阅服务
-│   │   ├── sudo-service.ts             # sudo提权服务
-│   │   └── system-service.ts           # 系统服务
-│   ├── stores/        # Pinia 状态管理
-│   │   ├── index.ts   # Store 主入口和插件配置
-│   │   ├── app/       # 应用相关 store
-│   │   │   ├── composables/             # 组合式函数
-│   │   │   │   ├── messaging.ts        # 消息处理
-│   │   │   │   └── persistence.ts      # 持久化处理
-│   │   │   ├── AppStore.ts     # 核心应用状态
-│   │   │   ├── LocaleStore.ts  # 国际化状态
-│   │   │   ├── SudoStore.ts    # sudo提权状态
-│   │   │   ├── ThemeStore.ts   # 主题管理
-│   │   │   ├── UpdateStore.ts  # 更新状态
-│   │   │   └── WindowStore.ts  # 窗口管理
-│   │   ├── kernel/    # 内核相关 store
-│   │   │   ├── KernelStore.ts         # 内核状态
-│   │   │   ├── KernelRuntimeStore.ts  # 内核运行时状态
-│   │   │   ├── ProxyStore.ts          # 代理状态
-│   │   │   ├── ConnectionStore.ts     # 连接管理
-│   │   │   ├── TrafficStore.ts        # 流量统计
-│   │   │   └── LogStore.ts            # 日志管理
-│   │   ├── subscription/ # 订阅相关 store
-│   │   │   └── SubStore.ts     # 订阅管理
-│   │   └── tray/      # 系统托盘 store
-│   │       └── TrayStore.ts    # 托盘状态管理
-│   ├── types/         # TypeScript 类型定义
-│   │   ├── api.ts     # API 类型
-│   │   ├── index.d.ts # 全局类型声明
-│   │   ├── models.ts  # 数据模型类型
-│   │   └── process.ts # 进程相关类型
-│   ├── utils/         # 工具函数
-│   │   ├── index.ts   # 通用工具函数
-│   │   ├── mitt.ts    # 事件总线
-│   │   └── mitt.d.ts  # mitt 类型声明
-│   ├── views/         # 页面组件
-│   │   ├── BlankView.vue      # 空白页面(托盘模式)
-│   │   ├── HomeView.vue       # 主页
-│   │   ├── ProxyView.vue      # 代理管理
-│   │   ├── SubView.vue        # 订阅管理
-│   │   ├── LogView.vue        # 日志查看
-│   │   ├── SettingView.vue    # 设置页面
-│   │   ├── RulesView.vue      # 规则管理
-│   │   └── ConnectionsView.vue # 连接管理
-│   ├── App.vue        # 根组件
-│   ├── main.ts        # 应用入口
-│   └── env.d.ts       # 环境类型声明
-├── src-tauri/         # Rust 后端代码
-│   ├── src/           # 源代码
-│   │   ├── app/       # 应用服务层
-│   │   │   ├── constants/      # 常量定义模块
-│   │   │   │   ├── mod.rs        # 常量模块入口
-│   │   │   │   ├── core.rs       # 核心常量(进程、路径)
-│   │   │   │   ├── network.rs    # 网络常量(API、配置)
-│   │   │   │   ├── system.rs     # 系统常量(注册表、数据库)
-│   │   │   │   └── common.rs     # 通用常量(消息、日志)
-│   │   │   ├── core/           # 核心服务模块
-│   │   │   │   ├── kernel_service/  # 内核服务子模块
-│   │   │   │   │   ├── download.rs    # 内核下载
-│   │   │   │   │   ├── embedded.rs    # 内嵌内核资源
-│   │   │   │   │   ├── event.rs       # 事件处理
-│   │   │   │   │   ├── guard.rs       # 守护进程
-│   │   │   │   │   ├── runtime.rs     # 运行时管理
-│   │   │   │   │   ├── state.rs       # 状态管理
-│   │   │   │   │   ├── status.rs      # 状态查询
-│   │   │   │   │   ├── utils.rs       # 工具函数
-│   │   │   │   │   └── versioning.rs  # 版本管理
-│   │   │   │   ├── kernel_service.rs  # 内核服务主入口
-│   │   │   │   ├── kernel_auto_manage.rs  # 内核自动管理
-│   │   │   │   ├── event_relay.rs    # 事件中继
-│   │   │   │   ├── proxy_service.rs  # 代理服务
-│   │   │   │   ├── tun_profile.rs    # TUN配置文件
-│   │   │   │   └── mod.rs            # 核心模块入口
-│   │   │   ├── network/        # 网络服务模块
-│   │   │   │   ├── subscription_service/  # 订阅服务子模块
-│   │   │   │   │   ├── auto_update.rs  # 自动更新
-│   │   │   │   │   ├── helpers.rs      # 辅助函数
-│   │   │   │   │   ├── mode.rs         # 模式处理
-│   │   │   │   │   └── parser.rs       # 订阅解析
-│   │   │   │   ├── subscription_service.rs  # 订阅服务主入口
-│   │   │   │   └── mod.rs              # 网络模块入口
-│   │   │   ├── system/         # 系统服务模块
-│   │   │   │   ├── background_tasks.rs   # 后台任务
-│   │   │   │   ├── config_service.rs     # 配置服务
-│   │   │   │   ├── sudo_service.rs       # sudo提权服务
-│   │   │   │   ├── system_service.rs     # 系统功能
-│   │   │   │   ├── update_service.rs     # 更新服务
-│   │   │   │   └── mod.rs                # 系统模块入口
-│   │   │   ├── singbox/        # Sing-box相关模块
-│   │   │   │   ├── common.rs          # 通用函数
-│   │   │   │   ├── config_generator.rs # 配置生成器
-│   │   │   │   ├── config_schema.rs   # 配置Schema
-│   │   │   │   ├── settings_patch.rs  # 设置补丁
-│   │   │   │   └── mod.rs             # Sing-box模块入口
-│   │   │   ├── storage/       # 存储服务模块
-│   │   │   │   ├── database.rs             # 数据库定义
-│   │   │   │   ├── enhanced_storage_service.rs  # 增强存储服务
-│   │   │   │   ├── error.rs                # 错误处理
-│   │   │   │   ├── state_model.rs          # 状态模型
-│   │   │   │   └── mod.rs                  # 存储模块入口
-│   │   │   └── mod.rs          # 应用模块入口
-│   │   ├── entity/    # 数据实体模型
-│   │   │   ├── config_model.rs # 配置数据模型
-│   │   │   ├── github_model.rs # GitHub API模型
-│   │   │   └── mod.rs          # 实体模块入口
-│   │   ├── process/   # 进程管理模块
-│   │   │   ├── manager.rs      # 进程管理器
-│   │   │   ├── error.rs        # 进程错误处理
-│   │   │   └── mod.rs          # 进程模块入口
-│   │   ├── utils/     # 工具函数模块
-│   │   │   ├── app_util.rs     # 应用工具
-│   │   │   ├── config_util.rs  # 配置工具
-│   │   │   ├── file_util.rs    # 文件工具
-│   │   │   ├── http_client.rs  # HTTP客户端
-│   │   │   ├── proxy_util.rs   # 代理工具
-│   │   │   └── mod.rs          # 工具模块入口
-│   │   ├── error.rs   # 全局错误处理
-│   │   ├── lib.rs     # 库入口和命令注册
-│   │   └── main.rs    # 程序主入口
-│   ├── config/        # 配置模板
-│   │   └── template.json # Sing-box配置模板
-│   ├── Cargo.toml     # Rust 依赖配置
-│   ├── build.rs       # 构建脚本
-│   └── tauri.conf.json # Tauri 应用配置
-├── docs/              # 项目文档
-│   ├── development.md # 开发文档
-│   ├── i18n.md       # 国际化文档
-│   └── image.png     # 文档图片
-├── public/            # 静态资源
-│   └── favicon.ico   # 网站图标
-├── auto-imports.d.ts  # 自动导入类型声明
-├── components.d.ts    # 组件类型声明
-├── package.json       # 前端依赖配置
-├── vite.config.ts     # Vite 构建配置
-├── tsconfig.json      # TypeScript 配置
-└── README.zh.md       # 中文说明文档
+├── src/                         # 前端（Vue 3 + TypeScript）
+│   ├── assets/                  # 全局样式、图标、主题覆盖
+│   ├── boot/                    # 启动编排（App bootstrap）
+│   ├── components/              # 通用组件与布局组件
+│   ├── composables/             # 组合式逻辑
+│   ├── constants/               # 前端事件与常量
+│   ├── locales/                 # 多语言文案
+│   ├── router/                  # 路由配置
+│   ├── services/                # Tauri 命令调用与业务服务
+│   ├── stores/                  # Pinia 状态管理
+│   │   ├── app/                 # 应用级状态（主题/窗口/更新/权限）
+│   │   ├── kernel/              # 内核实时状态（连接/流量/日志/代理）
+│   │   ├── subscription/        # 订阅状态
+│   │   └── tray/                # 托盘交互状态
+│   ├── types/                   # TypeScript 类型
+│   │   └── generated/           # 前端实际使用的共享模型类型
+│   ├── utils/                   # 工具函数
+│   ├── views/                   # 页面（Home/Sub/Proxy/Log/Setting/...）
+│   ├── App.vue                  # 根组件
+│   └── main.ts                  # 前端入口
+├── src-tauri/                   # 后端（Rust + Tauri）
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── constants/       # 常量定义
+│   │   │   ├── core/            # 内核生命周期/代理/事件中继
+│   │   │   ├── network/         # 订阅下载、解析、自动更新
+│   │   │   ├── singbox/         # 配置生成与补丁
+│   │   │   ├── storage/         # SQLite 与配置持久化
+│   │   │   └── system/          # 平台能力、更新、后台任务、sudo
+│   │   ├── entity/              # 数据模型
+│   │   ├── platform/            # 跨平台系统能力抽象
+│   │   ├── process/             # 进程管理
+│   │   ├── utils/               # 工具模块
+│   │   ├── lib.rs               # Tauri 命令注册与应用 setup
+│   │   └── main.rs              # 程序入口
+│   ├── Cargo.toml               # Rust 依赖
+│   ├── tauri.conf.json          # Tauri 配置
+│   └── capabilities/            # Tauri capabilities
+├── scripts/                     # 构建与内核下载脚本
+├── docs/                        # 开发文档与更新日志
+├── package.json                 # 前端脚本与依赖
+└── README.zh.md                 # 项目说明
 ```
 
 这种模块化的结构有以下优点：

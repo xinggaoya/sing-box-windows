@@ -3,26 +3,7 @@ import { defineStore } from 'pinia'
 import { DatabaseService } from '@/services/database-service'
 import type { Subscription } from '@/types/database'
 import mitt from '@/utils/mitt'
-
-// 为了前端兼容性，创建一个适配器接口
-interface FrontendSubscription {
-  name: string
-  url: string
-  isLoading: boolean
-  lastUpdate?: number
-  isManual: boolean
-  manualContent?: string
-  useOriginalConfig: boolean
-  configPath?: string
-  backupPath?: string
-  autoUpdateIntervalMinutes?: number
-  subscriptionUpload?: number
-  subscriptionDownload?: number
-  subscriptionTotal?: number
-  subscriptionExpire?: number
-}
-
-const DEFAULT_AUTO_UPDATE_MINUTES = 720 // 12h
+import { DEFAULT_AUTO_UPDATE_MINUTES, type FrontendSubscription } from './types'
 
 export const useSubStore = defineStore(
   'sub',

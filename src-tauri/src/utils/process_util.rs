@@ -63,7 +63,9 @@ pub fn create_hidden_async_command(program: &str) -> tokio::process::Command {
 /// # Examples
 ///
 /// ```
-/// let mut cmd = tokio::process::Command::new("tasklist");
+/// use app_lib::utils::process_util::ensure_hidden_window;
+///
+/// let mut cmd = std::process::Command::new("tasklist");
 /// ensure_hidden_window(&mut cmd);
 /// ```
 pub fn ensure_hidden_window<T: CommandExt>(cmd: &mut T) {

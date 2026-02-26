@@ -179,7 +179,9 @@ export function createAppPersistence(state: PersistenceState) {
         singbox_dns_hijack: state.singboxDnsHijack.value,
         singbox_enable_app_groups: state.singboxEnableAppGroups.value,
       }
-      await DatabaseService.saveAppConfig(config)
+      // 前端自动保存仅负责持久化，不直接触发后端运行态重配。
+      // 运行态变更统一由显式业务动作触发（如切换代理模式、重启内核、切换订阅）。
+      await DatabaseService.saveAppConfig(config, { applyRuntime: false })
       console.log('✅ 应用配置已保存到数据库')
     } catch (error) {
       console.error('保存应用配置到数据库失败:', error)
