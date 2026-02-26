@@ -9,7 +9,7 @@
           {{ statusTitle }}
         </div>
       </div>
-      
+
       <div class="header-actions">
         <n-tooltip trigger="hover">
           <template #trigger>
@@ -48,7 +48,6 @@
       </div>
     </div>
 
-
     <!-- Main Grid -->
     <div class="dashboard-grid">
       <!-- Traffic Stats -->
@@ -57,16 +56,20 @@
           <StatusCard
             :label="t('home.traffic.up')"
             :value="formatSpeed(trafficStore.traffic.up)"
-            :description="t('home.traffic.total') + ': ' + formatBytes(trafficStore.traffic.totalUp)"
+            :description="
+              t('home.traffic.total') + ': ' + formatBytes(trafficStore.traffic.totalUp)
+            "
             type="primary"
           >
             <template #icon><ArrowUpOutline /></template>
           </StatusCard>
-          
+
           <StatusCard
             :label="t('home.traffic.down')"
             :value="formatSpeed(trafficStore.traffic.down)"
-            :description="t('home.traffic.total') + ': ' + formatBytes(trafficStore.traffic.totalDown)"
+            :description="
+              t('home.traffic.total') + ': ' + formatBytes(trafficStore.traffic.totalDown)
+            "
             type="success"
           >
             <template #icon><ArrowDownOutline /></template>
@@ -82,12 +85,11 @@
           </StatusCard>
         </div>
 
-        
         <!-- Traffic Chart -->
         <div class="chart-section">
-          <TrafficChart 
-            :upload-speed="trafficStore.traffic.up" 
-            :download-speed="trafficStore.traffic.down" 
+          <TrafficChart
+            :upload-speed="trafficStore.traffic.up"
+            :download-speed="trafficStore.traffic.down"
           />
         </div>
       </div>
@@ -98,8 +100,8 @@
           <h3 class="section-title">{{ t('home.proxyHeader.flowMode') }}</h3>
         </div>
         <div class="mode-cards">
-          <div 
-            class="mode-card" 
+          <div
+            class="mode-card"
             :class="{ active: systemProxyEnabled }"
             @click="toggleSystemProxy(!systemProxyEnabled)"
           >
@@ -113,8 +115,8 @@
             <n-switch :value="systemProxyEnabled" size="small" :disabled="modeSwitchPending" />
           </div>
 
-          <div 
-            class="mode-card" 
+          <div
+            class="mode-card"
             :class="{ active: tunProxyEnabled }"
             @click="toggleTunProxy(!tunProxyEnabled)"
           >
@@ -136,7 +138,7 @@
           <h3 class="section-title">{{ t('home.proxyHeader.nodeMode') }}</h3>
         </div>
         <div class="mode-cards">
-          <div 
+          <div
             v-for="mode in nodeProxyModes"
             :key="mode.value"
             class="mode-card"
@@ -155,7 +157,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -172,7 +173,7 @@ import {
   GlobeOutline,
   FlashOutline,
   RadioOutline,
-  SettingsOutline
+  SettingsOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -186,6 +187,7 @@ import StatusCard from '@/components/common/StatusCard.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
 import { useSudoStore } from '@/stores'
+import { formatBytes, formatSpeed } from '@/utils'
 
 defineOptions({
   name: 'HomeView',
@@ -204,8 +206,12 @@ const themeStore = useThemeStore()
 const sudoStore = useSudoStore()
 
 // Kernel status (shared with layout)
-const { statusClass, statusState, isRunning: kernelRunning, isLoading: kernelLoading } =
-  useKernelStatus(kernelStore)
+const {
+  statusClass,
+  statusState,
+  isRunning: kernelRunning,
+  isLoading: kernelLoading,
+} = useKernelStatus(kernelStore)
 const isAdmin = ref(false)
 const platform = ref<'windows' | 'linux' | 'macos' | 'unknown'>('unknown')
 const currentNodeProxyMode = ref('rule')
@@ -213,16 +219,6 @@ const modeSwitchPending = ref(false)
 
 const isWindowsPlatform = computed(() => platform.value === 'windows')
 const isUnixPlatform = computed(() => platform.value === 'linux' || platform.value === 'macos')
-
-const formatBytes = (bytes: number) => {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  const value = bytes / Math.pow(1024, index)
-  return `${value.toFixed(2)} ${units[index]}`
-}
-
-const formatSpeed = (bytes: number) => `${formatBytes(bytes)}/s`
 
 const statusTitle = computed(() => {
   switch (statusState.value) {
@@ -260,7 +256,7 @@ const nodeProxyModes = [
 // Methods
 const toggleSystemProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
-  
+
   try {
     modeSwitchPending.value = true
     await appStore.toggleSystemProxy(value)
@@ -355,7 +351,9 @@ const enableTunWithKernelRestart = async (options?: { allowSudoRetry?: boolean }
     if (isUnixPlatform.value) {
       const code = parseSudoCode(kernelStore.lastError)
       if (code === 'required' || code === 'invalid') {
-        message.error(code === 'invalid' ? t('home.sudoPassword.invalid') : t('home.sudoPassword.required'))
+        message.error(
+          code === 'invalid' ? t('home.sudoPassword.invalid') : t('home.sudoPassword.required'),
+        )
 
         const allowRetry = options?.allowSudoRetry ?? true
         const ok = await sudoStore.requestPassword()
@@ -379,7 +377,7 @@ const enableTunWithKernelRestart = async (options?: { allowSudoRetry?: boolean }
 
 const toggleTunProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
-  
+
   if (value) {
     if (isWindowsPlatform.value) {
       // Windows：启用TUN模式前先刷新管理员状态，有权限时不弹窗直接处理
@@ -417,7 +415,7 @@ const toggleTunProxy = async (value: boolean) => {
         message.error(t('notification.proxyModeChangeFailed'))
         return
       }
-      
+
       // TUN模式切换需要重启内核
       const success = await kernelStore.restartKernel()
       if (success) {
@@ -731,11 +729,11 @@ onMounted(async () => {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .grid-section.full-width {
     grid-column: span 1;
   }
-  
+
   .stats-row {
     grid-template-columns: 1fr;
   }
@@ -750,5 +748,4 @@ onMounted(async () => {
   overflow: hidden;
   padding: 16px;
 }
-
 </style>

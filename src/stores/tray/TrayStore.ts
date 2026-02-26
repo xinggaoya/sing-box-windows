@@ -122,7 +122,6 @@ export const useTrayStore = defineStore('tray', () => {
         const trayIcon = await TrayIcon.getById(currentId)
         if (trayIcon) {
           await trayIcon.setTooltip(tooltipText)
-          console.log('更新托盘提示成功:', tooltipText)
         } else {
           console.warn('托盘实例不存在，无法更新提示')
         }
@@ -228,7 +227,7 @@ export const useTrayStore = defineStore('tray', () => {
               appStore.showWarningMessage?.(
                 code === 'invalid'
                   ? i18n.global.t('home.sudoPassword.invalid')
-                  : i18n.global.t('home.sudoPassword.required')
+                  : i18n.global.t('home.sudoPassword.required'),
               )
 
               await windowStore.showWindow()
@@ -301,8 +300,6 @@ export const useTrayStore = defineStore('tray', () => {
       // 更新上次菜单刷新时的代理模式
       lastProxyMode.value = currentProxyMode
 
-      console.log(`创建托盘菜单, 当前代理模式: ${currentProxyMode}`)
-
       // 创建基本菜单项
       const showMenuItem = await MenuItem.new({
         id: 'show',
@@ -354,25 +351,20 @@ export const useTrayStore = defineStore('tray', () => {
         })
       }
 
-      const systemProxyMenuItem = await createProxyMenuItem(
-        'system',
-        t('home.proxyMode.system'),
-      )
+      const systemProxyMenuItem = await createProxyMenuItem('system', t('home.proxyMode.system'))
       const tunProxyMenuItem = await createProxyMenuItem('tun', t('home.proxyMode.tun'))
-      const manualProxyMenuItem = await createProxyMenuItem(
-        'manual',
-        t('home.proxyMode.manual'),
-      )
+      const manualProxyMenuItem = await createProxyMenuItem('manual', t('home.proxyMode.manual'))
 
       // 当前模式指示器菜单项（仅作为标签，不可点击）
       const currentModeMenuItem = await MenuItem.new({
         id: 'current_mode',
-        text: `${t('proxy.currentMode')} ${currentProxyMode === 'system'
-          ? t('home.proxyMode.system')
-          : currentProxyMode === 'manual'
-            ? t('home.proxyMode.manual')
-            : t('home.proxyMode.tun')
-          }`,
+        text: `${t('proxy.currentMode')} ${
+          currentProxyMode === 'system'
+            ? t('home.proxyMode.system')
+            : currentProxyMode === 'manual'
+              ? t('home.proxyMode.manual')
+              : t('home.proxyMode.tun')
+        }`,
         enabled: false,
       })
 
@@ -488,10 +480,8 @@ export const useTrayStore = defineStore('tray', () => {
         () => appStore.proxyMode as ProxyMode,
         (newMode) => {
           const mode = newMode as unknown as ProxyMode
-          console.log(`代理模式变更为: ${mode}, 上次菜单模式: ${lastProxyMode.value}`)
           updateTrayTooltip()
           if (mode !== lastProxyMode.value) {
-            console.log('模式已变化，强制刷新托盘菜单')
             refreshTrayMenu()
           }
         },
@@ -500,7 +490,6 @@ export const useTrayStore = defineStore('tray', () => {
       registerWatcher(
         () => i18n.global.locale.value,
         () => {
-          console.log('语言已变更，刷新托盘菜单')
           refreshTrayMenu()
           updateTrayTooltip()
         },
@@ -517,7 +506,6 @@ export const useTrayStore = defineStore('tray', () => {
       registerWatcher(
         () => localeStore.currentLocale,
         () => {
-          console.log('LocaleStore 语言变更，刷新托盘菜单')
           refreshTrayMenu()
           updateTrayTooltip()
         },
@@ -573,7 +561,6 @@ export const useTrayStore = defineStore('tray', () => {
     }
 
     cleanupWatchers()
-    console.log('托盘事件监听器已清理')
   }
 
   return {
@@ -583,6 +570,4 @@ export const useTrayStore = defineStore('tray', () => {
     updateTrayTooltip,
     refreshTrayMenu,
   }
-
-
 })

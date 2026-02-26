@@ -13,7 +13,7 @@ export const useSubStore = defineStore(
 
     // 从数据库格式转换为前端格式
     const convertToFrontendFormat = (backendSubs: Subscription[]): FrontendSubscription[] => {
-      return backendSubs.map(sub => ({
+      return backendSubs.map((sub) => ({
         name: sub.name,
         url: sub.url,
         isLoading: sub.is_loading,
@@ -33,7 +33,7 @@ export const useSubStore = defineStore(
 
     // 从前端格式转换为数据库格式
     const convertToBackendFormat = (frontendSubs: FrontendSubscription[]): Subscription[] => {
-      return frontendSubs.map(sub => ({
+      return frontendSubs.map((sub) => ({
         name: sub.name,
         url: sub.url,
         is_loading: sub.isLoading,
@@ -54,19 +54,14 @@ export const useSubStore = defineStore(
     // 从数据库加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('?? 从数据库加载订阅配置...')
-
         // 订阅列表与 AppConfig 分开存储：
         // - 订阅列表：包含每条订阅对应的 configPath
-        // - AppConfig.active_config_path：内核实际会读取的“生效配置路径”
+        // - AppConfig.active_config_path：内核实际会读取的"生效配置路径"
         // 因此这里以 active_config_path 作为权威来源来恢复高亮，避免索引漂移造成前端/内核不一致。
         const [subscriptions, appConfig, savedActiveIndex] = await Promise.all([
           DatabaseService.getSubscriptions(),
           DatabaseService.getAppConfig(),
-          DatabaseService.getActiveIndex().catch((error) => {
-            console.warn('加载激活索引失败，使用默认值:', error)
-            return null
-          }),
+          DatabaseService.getActiveIndex().catch(() => null),
         ])
 
         // 更新响应式状态
@@ -76,23 +71,21 @@ export const useSubStore = defineStore(
 
         // 1) 优先使用 active_config_path（更稳定）
         if (activePath) {
-          const matchIndex = list.value.findIndex(item => item.configPath === activePath)
+          const matchIndex = list.value.findIndex((item) => item.configPath === activePath)
           if (matchIndex >= 0) {
             activeIndex.value = matchIndex
-            console.log('?? 通过 active_config_path 恢复激活订阅索引:', matchIndex)
 
             // 同步修正后端保存的 active_subscription_index，避免后续刷新又被旧索引覆盖高亮
             if (savedActiveIndex !== matchIndex) {
               try {
                 await DatabaseService.saveActiveIndex(matchIndex)
-              } catch (error) {
-                console.warn('同步保存激活索引失败:', error)
+              } catch {
+                // ignore
               }
             }
           } else {
             // active_config_path 指向的配置不在订阅列表中（可能是默认配置/自定义配置）
             activeIndex.value = null
-            console.log('?? active_config_path 未匹配到订阅，重置激活索引为 null')
           }
         }
         // 2) 若没有 active_config_path，则回退读取历史索引
@@ -102,18 +95,10 @@ export const useSubStore = defineStore(
           savedActiveIndex < list.value.length
         ) {
           activeIndex.value = savedActiveIndex
-          console.log('?? 通过历史索引恢复激活订阅:', savedActiveIndex)
         } else {
           activeIndex.value = null
-          console.log('?? 历史激活索引无效，重置为 null')
         }
-
-        console.log('?? 订阅配置加载完成：', {
-          count: list.value.length,
-          activeIndex: activeIndex.value,
-        })
-      } catch (error) {
-        console.error('从数据库加载订阅配置失败:', error)
+      } catch {
         // 加载失败时使用默认值
         list.value = []
         activeIndex.value = null
@@ -124,9 +109,8 @@ export const useSubStore = defineStore(
     const saveToBackend = async () => {
       try {
         await DatabaseService.saveSubscriptions(convertToBackendFormat(list.value))
-        console.log('? 订阅配置已保存到数据库')
-      } catch (error) {
-        console.error('保存订阅配置到数据库失败:', error)
+      } catch {
+        // 保存失败时静默处理
       }
     }
 
@@ -175,15 +159,15 @@ export const useSubStore = defineStore(
       // 持久化激活索引到本地存储
       try {
         await DatabaseService.saveActiveIndex(index)
-      } catch (error) {
-        console.error('保存激活索引失败:', error)
+      } catch {
+        // 保存失败时静默处理
       }
     }
 
     // 重置所有订阅的加载状态
     const resetLoadingState = async () => {
       if (list.value.length > 0) {
-        list.value = list.value.map(item => ({
+        list.value = list.value.map((item) => ({
           ...item,
           isLoading: false,
         }))
@@ -256,7 +240,7 @@ export const useSubStore = defineStore(
         isInitializing = true
         await loadFromBackend()
         // 等待一下确保数据加载完成
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
         isInitializing = false
         hasInitialized = true
 

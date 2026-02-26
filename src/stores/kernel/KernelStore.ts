@@ -64,14 +64,9 @@ export const useKernelStore = defineStore('kernel', () => {
       // 如果在请求期间收到了事件更新，优先信任事件（因为它通常更新）
       // 只要有新事件到来，就认为主动查询的结果可能已经过时，特别是当涉及 api_ready 等状态变化时
       if (lastEventTime > startTime) {
-        console.log('⚠️ 忽略过期的状态刷新，因为已收到更新的事件')
         return status.value
       }
-      if (
-        typeof latest.state_version === 'number' &&
-        latest.state_version < stateVersion.value
-      ) {
-        console.log('⚠️ 忽略过期的状态刷新(state_version)')
+      if (typeof latest.state_version === 'number' && latest.state_version < stateVersion.value) {
         return status.value
       }
 
@@ -111,7 +106,7 @@ export const useKernelStore = defineStore('kernel', () => {
 
     // 4. Eager load available versions for better UX (dropdown ready on open)
     if (availableVersions.value.length === 0) {
-      fetchKernelReleases().catch(err => {
+      fetchKernelReleases().catch((err) => {
         console.warn('Failed to eager load kernel versions:', err)
       })
     }
@@ -227,7 +222,7 @@ export const useKernelStore = defineStore('kernel', () => {
   const fetchKernelReleases = async () => {
     try {
       const versions = await kernelService.getKernelReleases()
-      availableVersions.value = versions.map(v => normalizeKernelVersion(v))
+      availableVersions.value = versions.map((v) => normalizeKernelVersion(v))
       return availableVersions.value
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : '获取内核版本列表失败'
@@ -320,8 +315,12 @@ function trimPrefix(version: string): string {
 
 // 简单的语义版本比较：>0 表示 a > b，0 表示相等，<0 表示 a < b
 function compareVersion(a: string, b: string): number {
-  const partsA = trimPrefix(a).split('.').map(n => parseInt(n, 10) || 0)
-  const partsB = trimPrefix(b).split('.').map(n => parseInt(n, 10) || 0)
+  const partsA = trimPrefix(a)
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0)
+  const partsB = trimPrefix(b)
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0)
   const maxLen = Math.max(partsA.length, partsB.length)
   for (let i = 0; i < maxLen; i += 1) {
     const diff = (partsA[i] || 0) - (partsB[i] || 0)

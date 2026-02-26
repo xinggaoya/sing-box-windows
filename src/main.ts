@@ -22,19 +22,12 @@ app.use(i18n)
 // 异步初始化应用
 const initializeApp = async () => {
   try {
-    console.log('🚀 开始应用初始化...')
-
     // 使用新的初始化服务
     await initializationService.initializeApp()
 
-    console.log('✅ 应用初始化完成，挂载Vue应用')
-
     // 应用挂载（在初始化完成后）
     app.mount('#app')
-
-  } catch (error) {
-    console.error('❌ 应用初始化失败:', error)
-
+  } catch {
     // 即使初始化失败，也尝试挂载应用以显示错误页面
     app.mount('#app')
   }
@@ -43,32 +36,7 @@ const initializeApp = async () => {
 // 开始初始化
 initializeApp()
 
-// 应用性能测量（开发环境）
-if (import.meta.env.DEV) {
-  const navigationEntry = performance.getEntriesByType(
-    'navigation',
-  )[0] as PerformanceNavigationTiming
-
-  if (navigationEntry) {
-    const domContentLoaded =
-      navigationEntry.domContentLoadedEventEnd - navigationEntry.domContentLoadedEventStart
-    const loadComplete = navigationEntry.loadEventEnd - navigationEntry.loadEventStart
-
-    console.log('应用性能指标:')
-    console.log(`- DOMContentLoaded: ${domContentLoaded.toFixed(2)}ms`)
-    console.log(`- Load Complete: ${loadComplete.toFixed(2)}ms`)
-  }
-}
-
 // 错误边界
-app.config.errorHandler = (err, instance, info) => {
-  console.error('Vue应用错误:', err)
-  console.error('错误信息:', info)
-  console.error('组件实例:', instance)
-
-  // 可以在这里发送错误报告到监控服务
-  if (import.meta.env.PROD) {
-    // 生产环境错误报告
-    // reportError(err, instance, info)
-  }
+app.config.errorHandler = (err, _instance, info) => {
+  console.error('Vue应用错误:', err, info)
 }
