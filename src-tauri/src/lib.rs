@@ -17,7 +17,7 @@ pub fn run() {
     let log_dir = log_util::init_logging();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_store::Builder::new().build()) // 重新启用 store 插件
+        .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_os::init()) // 添加 OS 信息插件
         .plugin(tauri_plugin_autostart::init(

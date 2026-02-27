@@ -15,7 +15,7 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.5", features = [] }
 
 [dependencies]
 # 使用最新稳定版本
@@ -32,7 +32,7 @@ semver = "1.0"
 serde_yaml = "0.9"
 
 # Tauri 2.0 最新版本
-tauri = { version = "2.10", features = ["tray-icon", "unstable", "devtools"] }
+tauri = { version = "2.10.2", features = ["tray-icon", "unstable", "devtools"] }
 reqwest = { version = "0.12", features = ["json", "stream", "native-tls-vendored"] }
 dirs = "5.0.1"
 tokio = { version = "1.48", features = ["full"] }
@@ -49,7 +49,6 @@ lazy_static = "1.5"
 sqlx = { version = "0.8.6", features = ["runtime-tokio-native-tls", "sqlite", "chrono", "uuid"] }
 chrono = { version = "0.4.42", features = ["serde"] }
 thiserror = "2.0"
-tauri-plugin-store = "2.3"
 tauri-plugin-os = "2.3"
 aes-gcm = "0.10"
 rand = "0.8"

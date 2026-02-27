@@ -81,10 +81,11 @@ cd src-tauri && cargo clippy
 - Custom release notes extracted from `docs/CHANGELOG.md`
 
 ## Storage
+- All data stored in SQLite database (`app_data.db`)
 - Windows: `%APPDATA%\sing-box-windows\`
 - Linux: `~/.local/share/sing-box-windows/`
 - macOS: `~/Library/Application Support/sing-box-windows/`
-- Hybrid: Tauri Store (settings) + SQLite (structured data)
+- Tables: app_config, theme_config, locale_config, window_config, update_config, subscriptions
 
 ## Notes
 - Single-instance app (tauri_plugin_single_instance)
