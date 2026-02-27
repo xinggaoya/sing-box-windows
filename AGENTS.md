@@ -1,39 +1,93 @@
-# Repository Guidelines
+# Project Knowledge Base
 
-## Project Structure & Module Organization
-- `src/` contains the Vue 3 + TypeScript frontend.
-- Key frontend folders: `views/` (route pages like `HomeView.vue`), `components/`, `stores/`, `services/`, `composables/`, `router/`, `locales/`, and `utils/`.
-- `src-tauri/` contains the Rust backend and desktop packaging logic.
-- Core backend modules live in `src-tauri/src/app/` (for example `core/`, `network/`, `system/`), with Tauri command registration in `src-tauri/src/lib.rs`.
-- `scripts/` holds Node helpers (such as `fetch-kernel.mjs` and `tauri-wrapper.mjs`).
-- `docs/` stores development docs and changelog; build artifacts in `dist/` and `src-tauri/target/` should not be committed.
+## Project Overview
+Cross-platform Sing-Box proxy client (Windows/Linux/macOS) built with Tauri 2.0 + Vue 3 + TypeScript + Rust backend.
 
-## Build, Test, and Development Commands
-- `pnpm install`: install frontend/tooling dependencies.
-- `pnpm tauri dev`: run the desktop app in local development mode.
-- `pnpm build`: run TypeScript checks and build frontend assets.
-- `pnpm tauri build`: produce platform bundles/installers.
-- `pnpm lint`: run ESLint + oxlint (with autofix enabled by scripts).
-- `pnpm format`: format frontend code under `src/` with Prettier.
-- `cargo test --manifest-path src-tauri/Cargo.toml`: run Rust unit tests.
+## Structure
+```
+. (root)
+├── src/                    # Vue 3 + TypeScript frontend
+│   ├── views/              # Route pages (*View.vue)
+│   ├── components/         # Reusable Vue components
+│   ├── stores/             # Pinia state management (app/, kernel/)
+│   ├── services/           # API layer (Tauri commands, WebSocket)
+│   ├── composables/        # Vue composables
+│   ├── router/             # Vue Router config
+│   ├── locales/            # i18n translations
+│   ├── types/              # TypeScript definitions
+│   └── utils/              # Utility functions
+├── src-tauri/              # Rust + Tauri backend
+│   ├── src/
+│   │   ├── app/           # Core services (core/, network/, system/, storage/)
+│   │   ├── entity/         # Data models
+│   │   ├── process/        # Process management
+│   │   ├── utils/          # Backend utilities
+│   │   ├── main.rs         # Entry point
+│   │   └── lib.rs          # Tauri command registration
+│   └── Cargo.toml
+├── scripts/                 # Build helpers (fetch-kernel.mjs, tauri-wrapper.mjs)
+└── docs/                   # Development docs & changelog
+```
 
-## Coding Style & Naming Conventions
-- Follow `.editorconfig`: UTF-8, 2-space indentation for JS/TS/Vue, final newline, trimmed trailing whitespace.
-- Prettier rules: `singleQuote: true`, `semi: false`, `printWidth: 100`.
-- Vue component files use PascalCase (for example `UpdateModal.vue`); routed views use `*View.vue`.
-- Composables use `useXxx.ts`; Rust module/file names use `snake_case`.
-- Keep comments concise and focused on non-obvious behavior.
+## Entry Points
+| Layer | File | Purpose |
+|-------|------|---------|
+| Frontend | `src/main.ts` | Vue app bootstrap, Pinia, router, i18n init |
+| Frontend | `src/router/index.ts` | Hash routing, /blank for tray mode |
+| Frontend | `src/services/initialization-service.ts` | Async pre-mount setup |
+| Backend | `src-tauri/src/main.rs` | Platform entry → calls lib::run() |
+| Backend | `src-tauri/src/lib.rs` | Tauri Builder, plugins, command registration |
 
-## Testing Guidelines
-- Prefer Rust unit tests near implementation (`#[cfg(test)] mod tests`).
-- Existing backend tests cover parser/state/process utilities; extend these modules when adding logic.
-- Frontend test automation is not part of the current CI workflow, so PRs must at least pass `pnpm type-check`, `pnpm lint`, and manual smoke checks via `pnpm tauri dev`.
+## Key Services
+- **InitializationService**: Async pre-mount setup in frontend
+- **KernelService**: Sing-Box kernel lifecycle management
+- **EnhancedStorageService**: SQLite-backed data persistence
+- **SubscriptionService**: Proxy subscription parsing & updates
+- **WebSocket**: Real-time traffic/status updates
 
-## Commit & Pull Request Guidelines
-- Use Conventional Commits seen in history: `feat(scope): ...`, `fix(scope): ...`, `refactor(scope): ...`, `docs: ...`, `chore: ...`.
-- Keep each commit focused and explain platform-specific impact when relevant.
-- PRs should include: change summary, linked issue (`Closes #123`), verification commands run, and screenshots/recordings for UI changes.
+## Commands
+```bash
+# Development
+pnpm tauri dev
 
-## Security & Configuration Tips
-- Do not commit secrets, logs, or local override files (see `.gitignore`).
-- `src-tauri/resources/` and `src-tauri/.generated/` are generated/ignored; use `pnpm kernel:fetch` to prepare local kernel resources when needed.
+# Build
+pnpm tauri build           # All platforms
+pnpm tauri build:windows   # Windows only
+
+# Quality
+pnpm type-check
+pnpm lint
+pnpm format
+cd src-tauri && cargo clippy
+```
+
+## Conventions
+- EditorConfig: 2-space indent, UTF-8, trailing whitespace trimmed
+- Prettier: `singleQuote: true`, `semi: false`, `printWidth: 100`
+- Vue: PascalCase components, `*View.vue` for routes, `useXxx.ts` for composables
+- Rust: `snake_case` modules, `Result<T, String>` for commands
+- Path alias: `@/*` → `src/*`
+
+## Anti-Patterns
+- DO NOT commit secrets, logs, or local override files
+- DO NOT use `as any` or `@ts-ignore` for type suppression
+- DO NOT skip `pnpm type-check` and `pnpm lint` before PR
+- DO NOT forget `pnpm kernel:fetch` before first build
+
+## CI/CD
+- `.github/workflows/release.yml`: Multi-platform matrix (win/linux/mac)
+- Linux glibc check: max version 2.38
+- Kernel auto-fetched during build via `scripts/fetch-kernel.mjs`
+- Custom release notes extracted from `docs/CHANGELOG.md`
+
+## Storage
+- Windows: `%APPDATA%\sing-box-windows\`
+- Linux: `~/.local/share/sing-box-windows/`
+- macOS: `~/Library/Application Support/sing-box-windows/`
+- Hybrid: Tauri Store (settings) + SQLite (structured data)
+
+## Notes
+- Single-instance app (tauri_plugin_single_instance)
+- Frameless window with custom title bar controls
+- WebSocket for real-time kernel status & traffic stats
+- Auto-debounced persistence (300ms) with `waitForSaveCompletion()`
