@@ -1,94 +1,94 @@
-# Project Knowledge Base
+# PROJECT KNOWLEDGE BASE
 
-## Project Overview
-Cross-platform Sing-Box proxy client (Windows/Linux/macOS) built with Tauri 2.0 + Vue 3 + TypeScript + Rust backend.
+**Generated:** 2026-03-01T20:44:47+08:00  
+**Commit:** 5a3d46c  
+**Branch:** master
 
-## Structure
+## OVERVIEW
+
+跨平台 Sing-Box 图形客户端（Windows/Linux/macOS）。
+前端为 Vue 3 + TypeScript，后端为 Tauri 2 + Rust；前后端通过 Tauri command + event 双通道通信。
+
+## STRUCTURE
+
 ```
-. (root)
-├── src/                    # Vue 3 + TypeScript frontend
-│   ├── views/              # Route pages (*View.vue)
-│   ├── components/         # Reusable Vue components
-│   ├── stores/             # Pinia state management (app/, kernel/)
-│   ├── services/           # API layer (Tauri commands, WebSocket)
-│   ├── composables/        # Vue composables
-│   ├── router/             # Vue Router config
-│   ├── locales/            # i18n translations
-│   ├── types/              # TypeScript definitions
-│   └── utils/              # Utility functions
-├── src-tauri/              # Rust + Tauri backend
-│   ├── src/
-│   │   ├── app/           # Core services (core/, network/, system/, storage/)
-│   │   ├── entity/         # Data models
-│   │   ├── process/        # Process management
-│   │   ├── utils/          # Backend utilities
-│   │   ├── main.rs         # Entry point
-│   │   └── lib.rs          # Tauri command registration
-│   └── Cargo.toml
-├── scripts/                 # Build helpers (fetch-kernel.mjs, tauri-wrapper.mjs)
-└── docs/                   # Development docs & changelog
+./
+├── src/                 # 前端应用（路由/页面/store/service）
+├── src-tauri/           # Rust 后端 + Tauri 打包
+├── scripts/             # 内核下载与 tauri wrapper
+├── docs/                # 开发文档（包含详细命令与约束）
+└── .github/workflows/   # Release CI（多平台矩阵）
 ```
 
-## Entry Points
-| Layer | File | Purpose |
-|-------|------|---------|
-| Frontend | `src/main.ts` | Vue app bootstrap, Pinia, router, i18n init |
-| Frontend | `src/router/index.ts` | Hash routing, /blank for tray mode |
-| Frontend | `src/services/initialization-service.ts` | Async pre-mount setup |
-| Backend | `src-tauri/src/main.rs` | Platform entry → calls lib::run() |
-| Backend | `src-tauri/src/lib.rs` | Tauri Builder, plugins, command registration |
+## WHERE TO LOOK
 
-## Key Services
-- **InitializationService**: Async pre-mount setup in frontend
-- **KernelService**: Sing-Box kernel lifecycle management
-- **EnhancedStorageService**: SQLite-backed data persistence
-- **SubscriptionService**: Proxy subscription parsing & updates
-- **WebSocket**: Real-time traffic/status updates
+| Task               | Location                                          | Notes                           |
+| ------------------ | ------------------------------------------------- | ------------------------------- |
+| 前端启动链路       | `src/main.ts`, `src/boot/useAppBootstrap.ts`      | 初始化顺序与事件桥都在这里      |
+| 前端调用后端       | `src/services/invoke-client.ts`                   | 命令调用统一入口（上下文注入）  |
+| 路由与托盘空白页   | `src/router/index.ts`, `src/views/BlankView.vue`  | `/blank` 是非标准但关键路径     |
+| 后端入口与命令注册 | `src-tauri/src/lib.rs`                            | `setup + invoke_handler` 为核心 |
+| 内核生命周期       | `src-tauri/src/app/core/kernel_service/`          | 高复杂度热点目录                |
+| 订阅解析与模式切换 | `src-tauri/src/app/network/subscription_service/` | parser/mode/helpers 分层明显    |
+| 存储实现           | `src-tauri/src/app/storage/`                      | SQLite + OnceCell 单例初始化    |
+| 发布流水线         | `.github/workflows/release.yml`                   | glibc 兼容检查与多平台产物      |
 
-## Commands
+## CODE MAP
+
+> 本地 LSP 不可用（缺少 `oxlint` 与 `rust-analyzer`），以下为静态扫描结果。
+
+| Symbol / Area              | Type               | Location                                                | Role                                |
+| -------------------------- | ------------------ | ------------------------------------------------------- | ----------------------------------- |
+| `useAppBootstrap`          | Frontend bootstrap | `src/boot/useAppBootstrap.ts`                           | 统一串联 store 初始化与后端事件桥接 |
+| `run()`                    | Backend entry      | `src-tauri/src/lib.rs`                                  | 插件注册、异步初始化、命令暴露      |
+| `kernel_start_enhanced` 等 | Tauri commands     | `src-tauri/src/app/core/kernel_service/*`               | 内核启停与健康检查                  |
+| `download_subscription` 等 | Tauri commands     | `src-tauri/src/app/network/subscription_service.rs`     | 订阅下载、切换、回滚                |
+| `EnhancedStorageService`   | Storage service    | `src-tauri/src/app/storage/enhanced_storage_service.rs` | 应用配置与结构化数据持久化          |
+
+## CONVENTIONS
+
+- 命名：组件 PascalCase，页面 `*View.vue`，组合式函数 `useXxx.ts`。
+- 路径别名：`@/* -> src/*`。
+- TS 禁止：`as any`、`@ts-ignore`、`@ts-nocheck`。
+- Rust 约定：命令返回 `Result<T, String>`，模块/函数 snake_case。
+- 格式化：2 空格、`singleQuote: true`、`semi: false`、`printWidth: 100`。
+
+## ANTI-PATTERNS (THIS PROJECT)
+
+- ❌ 提交 secrets、日志、临时文件、本地覆盖文件。
+- ❌ 为“过类型检查”使用类型压制。
+- ❌ 跳过 `pnpm lint` / `pnpm type-check` / `cargo clippy`。
+- ❌ 首次构建前不执行 `pnpm kernel:fetch`。
+- ❌ 在 commit 中保留调试输出与一次性脚本改动。
+
+## UNIQUE STYLES
+
+- 前端与后端都使用“事件驱动”：前端 `mitt` + 后端 Tauri event。
+- 启动链是双阶段：`main.ts` 初始化 + `useAppBootstrap` 实际业务引导。
+- 后端 `lib.rs` 在启动后异步做：存储初始化、残留进程清理、自动任务启动。
+- Linux CI 固定 Ubuntu 22.04，并强制 glibc <= 2.38 兼容性检查。
+
+## COMMANDS
+
 ```bash
-# Development
+# 开发
+pnpm kernel:fetch
 pnpm tauri dev
 
-# Build
-pnpm tauri build           # All platforms
-pnpm tauri build:windows   # Windows only
-
-# Quality
-pnpm type-check
+# 质量门禁
 pnpm lint
-pnpm format
+pnpm type-check
 cd src-tauri && cargo clippy
+
+# 测试（当前主要为 Rust 单测）
+cd src-tauri && cargo test
+
+# 构建
+pnpm tauri build
 ```
 
-## Conventions
-- EditorConfig: 2-space indent, UTF-8, trailing whitespace trimmed
-- Prettier: `singleQuote: true`, `semi: false`, `printWidth: 100`
-- Vue: PascalCase components, `*View.vue` for routes, `useXxx.ts` for composables
-- Rust: `snake_case` modules, `Result<T, String>` for commands
-- Path alias: `@/*` → `src/*`
+## NOTES
 
-## Anti-Patterns
-- DO NOT commit secrets, logs, or local override files
-- DO NOT use `as any` or `@ts-ignore` for type suppression
-- DO NOT skip `pnpm type-check` and `pnpm lint` before PR
-- DO NOT forget `pnpm kernel:fetch` before first build
-
-## CI/CD
-- `.github/workflows/release.yml`: Multi-platform matrix (win/linux/mac)
-- Linux glibc check: max version 2.38
-- Kernel auto-fetched during build via `scripts/fetch-kernel.mjs`
-- Custom release notes extracted from `docs/CHANGELOG.md`
-
-## Storage
-- All data stored in SQLite database (`app_data.db`)
-- Windows: `%APPDATA%\sing-box-windows\`
-- Linux: `~/.local/share/sing-box-windows/`
-- macOS: `~/Library/Application Support/sing-box-windows/`
-- Tables: app_config, theme_config, locale_config, window_config, update_config, subscriptions
-
-## Notes
-- Single-instance app (tauri_plugin_single_instance)
-- Frameless window with custom title bar controls
-- WebSocket for real-time kernel status & traffic stats
-- Auto-debounced persistence (300ms) with `waitForSaveCompletion()`
+- 当前前端测试文件极少，回归验证以类型检查 + Rust 测试 + 实机联调为主。
+- `src-tauri/src/lib.rs` 存在重复 websocket plugin 注册，改动此文件前先确认行为影响。
+- 分层 AGENTS 已在 `src/`、`src/stores/`、`src-tauri/`、`src-tauri/src/app/` 细化。

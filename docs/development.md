@@ -9,6 +9,7 @@
 - [核心功能模块](#核心功能模块)
 - [前端开发指南](#前端开发指南)
 - [后端开发指南](#后端开发指南)
+- [代码风格指南](#代码风格指南)
 - [多语言开发指南](#多语言开发指南)
 - [构建与发布](#构建与发布)
 - [常见问题](#常见问题)
@@ -42,12 +43,11 @@ Sing-Box Windows 是一个基于 [Sing-Box](https://github.com/SagerNet/sing-box
 ### 后端技术
 
 - **Rust (1.77.2+)**：高性能系统编程语言
-- **Tauri 2.0 (v2.2)**：构建跨平台应用的框架
-- **tokio**：异步运行时
+- **Tauri 2.0 (v2.10.2)**：构建跨平台应用的框架
+- **tokio (v1.48)**：异步运行时
 - **serde & serde_json**：序列化和反序列化
-- **reqwest**：HTTP 客户端，支持TLS
+- **reqwest (v0.12)**：HTTP 客户端，支持TLS
 - **tracing & tracing-subscriber**：结构化日志记录
-- **tauri-plugin-store**：持久化存储插件
 - **tauri-plugin-websocket**：WebSocket 支持
 
 ### 开发工具
@@ -172,7 +172,6 @@ sing-box-windows/
    ```
 
    确保安装以下工作负载：
-
    - **C++ build tools** (C++构建工具)
    - **Windows 10/11 SDK** (最新版本)
    - **CMake tools** (可选，但推荐)
@@ -221,7 +220,6 @@ sing-box-windows/
 ### 开发工具推荐
 
 1. **代码编辑器**：
-
    - **Visual Studio Code** (推荐) + 以下扩展：
      - `rust-analyzer` - Rust 语言支持
      - `Tauri` - Tauri 项目支持
@@ -231,7 +229,6 @@ sing-box-windows/
      - `Prettier` - 代码格式化
 
 2. **调试工具**：
-
    - **Rust**: 内置 `println!` 和 `tracing` 日志
    - **前端**: Vue DevTools 浏览器扩展
    - **Tauri**: 内置开发者工具 (开发模式自动启用)
@@ -290,27 +287,24 @@ pnpm kernel:fetch -- --force
 应用常量按功能模块分类组织，便于维护和扩展：
 
 - `constants/core.rs` - 核心相关常量
-
   - `process` - 进程管理相关常量
   - `paths` - 文件路径相关常量
   - `config` - 配置相关常量
 
 - `constants/network.rs` - 网络相关常量
-
   - `network_config` - 网络配置常量
   - `api` - API相关常量
   - `server` - 服务器相关常量
   - `rate_limit` - 速率限制常量
 
 - `constants/system.rs` - 系统相关常量
-
   - `registry` - 注册表相关常量
   - `database` - 数据库相关常量
   - `jwt` - JWT认证相关常量
 
 - `constants/common.rs` - 通用常量
   - `messages` - 提示消息常量
- - `log` - 日志相关常量
+- `log` - 日志相关常量
 
 ### 内核管理 (core/kernel_service.rs)
 
@@ -429,13 +423,11 @@ themeStore.toggleTheme()
 ### 组件开发规范
 
 1. **组件命名**：
-
    - 页面组件使用 `XxxView.vue` 格式
    - 通用组件使用 `XxxComponent.vue` 格式
    - 布局组件使用 `XxxLayout.vue` 格式
 
 2. **样式规范**：
-
    - 使用 scoped CSS
    - 遵循 BEM 命名规范
    - 颜色和尺寸使用变量管理
@@ -455,28 +447,24 @@ themeStore.toggleTheme()
 项目使用 [vue-i18n v9.14.4](https://vue-i18n.intlify.dev/) 实现完整的多语言支持，支持 4 种语言，主要包含以下部分：
 
 1. **支持的语言**：
-
    - **中文 (zh-CN)**：简体中文，默认语言
    - **英语 (en-US)**：英文
    - **日语 (ja-JP)**：日本語
    - **俄语 (ru-RU)**：Русский
 
 2. **语言文件结构**：
-
    - 位于 `src/locales/` 目录
    - 每个语言文件约 500+ 行翻译条目
    - 按功能模块分类：`common`、`nav`、`home`、`proxy`、`settings`、`logs` 等
    - 使用嵌套对象结构组织翻译项，便于维护
 
 3. **i18n 配置** (`src/locales/index.ts`)：
-
    - 使用 Vue 3 Composition API 模式 (`legacy: false`)
    - 支持全局注入 `$t` 方法
    - 自动回退到中文作为备用语言
    - 导出支持的语言列表供设置页面使用
 
 4. **语言切换机制**：
-
    - 通过 `LocaleStore` 管理当前语言状态
    - 支持手动选择语言或跟随系统语言
    - 语言偏好自动持久化保存
@@ -512,13 +500,11 @@ themeStore.toggleTheme()
 ### 添加新语言项
 
 1. **翻译键命名规则**：
-
    - 使用 `模块.功能.操作` 的层级结构
    - 例如：`proxy.settings.save`
    - 保持命名简洁但有描述性
 
 2. **添加新翻译流程**：
-
    - 在相应模块下添加新的翻译键
    - 确保在所有语言文件中都添加对应的翻译
    - 在添加新功能时，同步更新翻译文件
@@ -546,17 +532,14 @@ themeStore.toggleTheme()
 ### 组件国际化最佳实践
 
 1. **提取所有硬编码文本**：
-
    - 将所有用户可见的文本移至语言文件
    - 包括按钮文本、标题、提示、错误信息等
 
 2. **使用命名空间隔离**：
-
    - 每个主要组件使用独立的命名空间
    - 例如：`settings.theme.title` 而非简单的 `title`
 
 3. **处理动态内容**：
-
    - 对于需要拼接的文本，使用参数化翻译而非字符串拼接
    - 例如：`t('message.greeting', { name: userName })`
 
@@ -685,34 +668,29 @@ fn example() {
 #### 命令分类说明
 
 1. **内核服务命令** (Kernel Service)：
-
    - 内核的生命周期管理（启动、停止、重启）
    - 内核版本检查和下载
    - WebSocket 中继服务管理
    - 内核运行状态检查
 
 2. **代理服务命令** (Proxy Service)：
-
    - 代理模式设置（系统代理、手动代理、TUN模式）
    - 代理节点管理和切换
    - 节点延迟测试
    - 代理规则获取
 
 3. **订阅服务命令** (Subscription Service)：
-
    - 订阅下载和解析
    - 手动添加订阅
    - 配置管理
    - 代理模式切换
 
 4. **系统服务命令** (System Service)：
-
    - 管理员权限检查和提升
    - 开发者工具控制
    - 系统级功能操作
 
 5. **更新服务命令** (Update Service)：
-
    - 应用更新检查
    - 自动下载和安装更新
 
@@ -725,7 +703,6 @@ fn example() {
 项目采用模块化的组织结构，每个模块都有自己的 `mod.rs` 文件作为入口点：
 
 1. **模块入口文件**：
-
    - `app/mod.rs` - 应用模块入口，定义子模块并重导出常用组件
    - `app/core/mod.rs` - 核心服务模块入口
    - `app/network/mod.rs` - 网络服务模块入口
@@ -733,7 +710,6 @@ fn example() {
    - `app/constants/mod.rs` - 常量模块入口
 
 2. **重导出机制**：
-
    - 每个模块的 `mod.rs` 文件会重新导出其子模块中的重要组件
    - 这样可以简化导入路径，例如使用 `crate::app::core::kernel_service` 而不是完整路径
 
@@ -790,6 +766,77 @@ async function callMyFunction() {
 - 处理好权限问题
 - 管理好进程的生命周期
 
+## 代码风格指南
+
+### TypeScript/Vue 命名规范
+
+- **组件文件**: PascalCase, 如 `KernelStatusCard.vue`
+- **视图文件**: `*View.vue`, 如 `HomeView.vue`, `SettingView.vue`
+- **组合式函数**: `useXxx.ts`, 如 `useKernelStatus.ts`
+- **Store 文件**: PascalCase, 如 `AppStore.ts`, `KernelStore.ts`
+- **类型/接口**: PascalCase, 如 `KernelStatus`, `TunSettings`
+- **常量**: PascalCase (export) / camelCase (internal)
+- **事件类型**: PascalCase, 如 `APP_EVENTS`
+
+### 导入规范
+
+- 使用路径别名: `@/*` → `src/*`
+- 导入顺序: Vue API → 外部库 → 内部模块 → 类型/常量
+- 示例:
+
+```typescript
+import { ref, computed } from 'vue'
+import { useKernelStore } from '@/stores/kernel'
+import { kernelService } from '@/services/kernel-service'
+import type { KernelStatus } from '@/services/kernel-service'
+import { APP_EVENTS } from '@/constants/events'
+```
+
+### 类型规范
+
+- **禁止使用**: `as any`, `@ts-ignore`, `// @ts-nocheck`
+- **优先使用**: 显式类型注解 + 类型推导结合
+- **接口 vs 类型**: 接口用于可扩展对象，类型用于联合/别名
+
+### Rust 命名规范
+
+- **模块**: snake_case, 如 `kernel_service`
+- **函数**: snake_case, 如 `start_kernel`
+- **结构体/枚举**: PascalCase, 如 `KernelState`
+- **变量**: snake_case, 如 `kernel_path`
+- **常量**: SCREAMING_SNAKE_CASE
+
+### 错误处理
+
+- 使用 `Result<T, String>` 作为命令返回类型
+- 统一错误信息格式: `Err(error_message.to_string())`
+- 使用 `thiserror` 定义自定义错误类型
+
+### Prettier 配置
+
+```json
+{
+  "semi": false,
+  "singleQuote": true,
+  "printWidth": 100
+}
+```
+
+### EditorConfig
+
+- 缩进: 2 空格
+- 字符编码: UTF-8
+- 行尾: LF
+- 去除尾部空格
+
+### 禁止事项
+
+- ❌ 提交 secrets、logs 或本地覆盖文件
+- ❌ 使用 `as any` 或 `@ts-ignore` 类型压制
+- ❌ 跳过 `pnpm type-check` 和 `pnpm lint`
+- ❌ 忘记首次构建前执行 `pnpm kernel:fetch`
+- ❌ 在 commit 中包含调试日志或临时文件
+
 ## 构建与发布
 
 ### 开发环境
@@ -821,6 +868,17 @@ pnpm run format        # 格式化 src/ 目录代码
 # 清理缓存
 pnpm clean             # 清理前端构建缓存
 cd src-tauri && cargo clean  # 清理 Rust 构建缓存
+
+# 运行单个测试
+# Vitest (如有)
+pnpm vitest run --testNamePattern="xxx"
+
+# Rust 测试
+cd src-tauri && cargo test <test_name>
+cd src-tauri && cargo test -- --test-threads=1 <test_name>
+
+# 完整质量检查
+pnpm lint && pnpm type-check && cd src-tauri && cargo clippy
 ```
 
 ### 生产环境构建
@@ -908,7 +966,6 @@ npm version 1.8.0 --no-git-tag-version
    ```
 
 3. **测试验证**:
-
    - 测试生成的安装包在目标系统上的安装和运行
    - 验证核心功能正常工作
    - 检查内存使用和性能
@@ -1078,13 +1135,11 @@ interface ProxyNode {
 A: 检查以下优化点：
 
 1. **前端优化**：
-
    - 使用懒加载组件 `LazyComponent.vue`
    - 启用虚拟滚动 `VirtualList.vue`
    - 检查 Store 数据恢复逻辑
 
 2. **后端优化**：
-
    - 检查内核启动时间
    - 优化文件IO操作
    - 使用异步操作避免阻塞
