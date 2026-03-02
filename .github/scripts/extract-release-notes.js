@@ -16,8 +16,13 @@ if (!version) {
 }
 
 const cleanVersion = version.startsWith('v') ? version : `v${version}`;
+const escapedVersion = cleanVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const versionRegex = new RegExp(`^## \\[${cleanVersion}\\] - (\\d{4}-\\d{2}-\\d{2})`, 'm');
+// 兼容以下标题格式：
+// - ## [v1.2.3] - 2026-03-02
+// - ## [v1.2.3] - 未发布
+// - ## [v1.2.3]
+const versionRegex = new RegExp(`^## \\[${escapedVersion}\\](?:\\s*-\\s*.+)?$`, 'm');
 const match = changelog.match(versionRegex);
 
 if (!match) {
