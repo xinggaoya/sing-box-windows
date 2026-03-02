@@ -186,32 +186,129 @@ async function fetchKernel(target, version, kernelBaseDir, options = {}) {
 }
 
 async function getLatestVersion() {
-  const urls = [
-    'https://api.github.com/repos/SagerNet/sing-box/releases/latest',
-    'https://v6.gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
-    'https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
-    'https://ghfast.top/https://api.github.com/repos/SagerNet/sing-box/releases/latest'
+  const apiSources = [
+    {
+      url: 'https://api.github.com/repos/SagerNet/sing-box/releases/latest',
+      withAuth: true
+    },
+    {
+      url: 'https://v6.gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
+      withAuth: false
+    },
+    {
+      url: 'https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
+      withAuth: false
+    },
+    {
+      url: 'https://ghfast.top/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
+      withAuth: false
+    }
   ]
 
-  for (const url of urls) {
+  for (const source of apiSources) {
     try {
-      const res = await fetch(url, {
-        headers: { 'User-Agent': 'sing-box-windows' }
+      const res = await fetch(source.url, {
+        headers: buildGithubHeaders(source.withAuth),
+        redirect: 'follow'
       })
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }
       const data = await res.json()
-      const tag = data?.tag_name
-      if (tag) {
-        return tag.startsWith('v') ? tag.slice(1) : tag
+      const version = normalizeVersionTag(data?.tag_name)
+      if (version) {
+        return version
       }
     } catch (error) {
       console.warn(`Latest version fetch failed: ${error?.message ?? error}`)
     }
   }
 
-  throw new Error('Unable to fetch latest version.')
+  const releasePageSources = [
+    'https://github.com/SagerNet/sing-box/releases/latest',
+    'https://v6.gh-proxy.com/https://github.com/SagerNet/sing-box/releases/latest',
+    'https://gh-proxy.com/https://github.com/SagerNet/sing-box/releases/latest',
+    'https://ghfast.top/https://github.com/SagerNet/sing-box/releases/latest'
+  ]
+
+  for (const url of releasePageSources) {
+    try {
+      const res = await fetch(url, {
+        headers: buildGithubHeaders(false),
+        redirect: 'follow'
+      })
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+
+      const fromFinalUrl = parseVersionFromReleaseUrl(res.url)
+      if (fromFinalUrl) {
+        return fromFinalUrl
+      }
+
+      // 部分镜像会返回 HTML，不一定保留重定向 URL，兜底解析页面内容。
+      const html = await res.text()
+      const fromHtml = parseVersionFromReleaseHtml(html)
+      if (fromHtml) {
+        return fromHtml
+      }
+    } catch (error) {
+      console.warn(`Latest release page fetch failed: ${error?.message ?? error}`)
+    }
+  }
+
+  throw new Error(
+    'Unable to fetch latest version. If running in CI, set SING_BOX_GITHUB_TOKEN for higher API rate limits.'
+  )
+}
+
+function normalizeVersionTag(tag) {
+  if (!tag || typeof tag !== 'string') {
+    return null
+  }
+  const trimmed = tag.trim()
+  if (!trimmed) {
+    return null
+  }
+  return trimmed.startsWith('v') ? trimmed.slice(1) : trimmed
+}
+
+function parseVersionFromReleaseUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return null
+  }
+  const match = url.match(/\/releases\/tag\/v?([^/?#]+)$/i)
+  if (!match || !match[1]) {
+    return null
+  }
+  return normalizeVersionTag(match[1])
+}
+
+function parseVersionFromReleaseHtml(html) {
+  if (!html || typeof html !== 'string') {
+    return null
+  }
+  const match = html.match(/\/SagerNet\/sing-box\/releases\/tag\/v?([A-Za-z0-9._-]+)/i)
+  if (!match || !match[1]) {
+    return null
+  }
+  return normalizeVersionTag(match[1])
+}
+
+function buildGithubHeaders(withAuth) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'sing-box-windows'
+  }
+  if (withAuth) {
+    const token =
+      process.env.SING_BOX_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+      headers['X-GitHub-Api-Version'] = '2022-11-28'
+    }
+  }
+  return headers
 }
 
 async function downloadFile(url, destination) {

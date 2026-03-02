@@ -74,6 +74,9 @@ jobs:
 
       - name: Build application
         shell: bash
+        env:
+          # 透传 token 给 fetch-kernel，避免匿名 API 限流导致 latest 拉取失败。
+          SING_BOX_GITHUB_TOKEN: ${{ github.token }}
         run: |
           pnpm run build
           # 显式走 package script（tauri-wrapper），确保只注入当前 target 的内核资源

@@ -37,10 +37,12 @@
 ### 🔧 优化改进
 - **目标内核资源映射** - 构建时改为 `bundle.resources` 对象映射，只注入当前 `--target` 对应的 `sing-box(.exe)` 与 `version.txt`
 - **CI 构建入口统一** - Release 工作流显式使用 `pnpm run tauri build`（wrapper 脚本），确保多平台构建遵循同一内核资源注入策略
+- **Latest 拉取稳健性增强** - `fetch-kernel` 新增 release 页面兜底解析；当 GitHub API 波动时仍可自动解析最新版本
+- **CI 鉴权拉取最新内核** - Release 工作流透传 `SING_BOX_GITHUB_TOKEN` 给内核下载脚本，降低匿名请求触发限流的概率
 - **脚本回归测试补齐** - 新增 `scripts/kernel-targets.test.mjs`，覆盖目标资源映射与不支持目标兜底行为
 
 ### 📚 文档更新
-- **开发文档补充** - 明确“仅当前目标平台内核随包分发”的资源注入机制，避免多平台内核误打包
+- **开发文档补充** - 明确“仅当前目标平台内核随包分发”的资源注入机制，以及 CI 自动拉取 latest 的执行链路
 
 ## [v2.2.4] - 2026-02-12
 

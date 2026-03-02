@@ -280,6 +280,12 @@ pnpm kernel:fetch -- --skip-existing
 pnpm kernel:fetch -- --force
 ```
 
+说明：
+
+- `pnpm tauri dev` / `pnpm tauri build` 会自动走 `scripts/tauri-wrapper.mjs`，并为当前目标平台触发 `fetch-kernel`。
+- 默认策略是 `--skip-existing`（缺失才下载），可用 `SING_BOX_KERNEL_FETCH_MODE=force` 强制重拉。
+- CI 中会透传 `SING_BOX_GITHUB_TOKEN`，在“自动拉取最新版本”时优先使用 GitHub API 鉴权请求，降低限流失败概率。
+
 ## 核心功能模块
 
 ### 常量组织 (constants/)
@@ -837,7 +843,7 @@ import { APP_EVENTS } from '@/constants/events'
 - ❌ 提交 secrets、logs 或本地覆盖文件
 - ❌ 使用 `as any` 或 `@ts-ignore` 类型压制
 - ❌ 跳过 `pnpm type-check` 和 `pnpm lint`
-- ❌ 忘记首次构建前执行 `pnpm kernel:fetch`
+- ❌ 绕过 wrapper 直接改打包资源；应统一使用 `pnpm tauri dev/build` 或 `pnpm kernel:fetch`
 - ❌ 在 commit 中包含调试日志或临时文件
 
 ## 构建与发布
@@ -953,19 +959,21 @@ npm version 1.8.0 --no-git-tag-version
    # 确保所有更改已提交
    git status
 
-   # 更新版本号
-   npm version patch --no-git-tag-version  # 或 minor/major
+   # 更新版本号（示例）
+   npm version patch --no-git-tag-version
+   # 同步更新 src-tauri/Cargo.toml 与 src-tauri/tauri.conf.json
    ```
 
 2. **质量检查**:
 
    ```bash
    # 运行所有检查
-   pnpm run type-check
-   pnpm run lint
+   pnpm type-check
+   pnpm lint
+   cd src-tauri && cargo clippy && cargo test
 
-   # 测试构建
-   pnpm tauri build
+   # 本地抽样构建（可选）
+   pnpm tauri build --target x86_64-pc-windows-msvc
    ```
 
 3. **测试验证**:
@@ -976,26 +984,28 @@ npm version 1.8.0 --no-git-tag-version
 4. **创建发布**:
 
    ```bash
-   # 创建 git tag
+   # 提交版本改动并创建 tag
    git add -A
    git commit -m "chore: bump version to v1.8.0"
    git tag -a v1.8.0 -m "Release v1.8.0"
-   git push origin main --tags
+   git push origin master
+   git push origin v1.8.0
    ```
 
-5. **GitHub Release**:
-   - 在 GitHub 上创建新的 Release
-   - 上传构建产物 (.msi 安装包)
-   - 编写 Release Notes，说明新功能和修复
+5. **等待自动发布**:
+   - 推送 tag 后自动触发 `.github/workflows/release.yml`
+   - CI 自动构建 Windows/Linux/macOS 产物并更新同名 GitHub Release 资产
+   - Release Notes 自动从 `docs/CHANGELOG.md` 中提取对应版本条目
 
 #### 自动化发布 (CI/CD)
 
 项目支持 GitHub Actions 自动化构建：
 
 - 在推送 tag 时自动触发构建
-- 自动运行测试和质量检查
-- 自动构建多平台安装包
-- 自动创建 GitHub Release
+- 构建步骤统一走 `pnpm run tauri build --target <triple>`（wrapper 脚本）
+- wrapper 会根据 `--target` 仅拉取并打包对应平台内核，不会把多平台内核一并塞进安装包
+- 内核版本默认自动拉取上游 latest；CI 透传 `SING_BOX_GITHUB_TOKEN`，降低 GitHub API 限流导致的失败
+- 自动创建/更新 GitHub 预发布（pre-release）并上传多平台产物
 
 ### 部署注意事项
 
