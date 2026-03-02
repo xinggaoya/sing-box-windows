@@ -139,7 +139,7 @@ fn normalize_version_str(raw: &str) -> String {
     cleaned.trim_start_matches('v').to_string()
 }
 
-fn extract_clean_version(output: &str) -> String {
+pub(crate) fn extract_clean_version(output: &str) -> String {
     let trimmed = output.trim();
     if trimmed.is_empty() {
         return String::new();

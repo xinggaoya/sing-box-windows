@@ -1,6 +1,19 @@
 import { invokeWithAppContext } from './invoke-client'
 
 export const systemService = {
+    pickKernelImportFile() {
+        return invokeWithAppContext<string | null>('pick_kernel_import_file', undefined, { skipDataRestore: true })
+    },
+
+    importKernelExecutable(filePath: string) {
+        return invokeWithAppContext<{
+            imported_version: string
+            restarted: boolean
+            backup_path?: string | null
+            message: string
+        }>('import_kernel_executable', { filePath, file_path: filePath }, { skipDataRestore: true })
+    },
+
     checkAdmin() {
         return invokeWithAppContext<boolean>('check_admin', undefined, { skipDataRestore: true })
     },

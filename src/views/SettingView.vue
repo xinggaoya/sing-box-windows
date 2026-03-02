@@ -534,11 +534,50 @@
         </n-space>
       </template>
     </n-modal>
+
+    <!-- Manual Kernel Import Modal -->
+    <n-modal
+      v-model:show="showManualImportModal"
+      preset="dialog"
+      :title="t('setting.kernel.manualImportTitle')"
+      class="modern-modal"
+      :style="{ width: '520px' }"
+    >
+      <div class="manual-import-body">
+        <div class="manual-import-desc">{{ t('setting.kernel.manualImportDesc') }}</div>
+        <div class="manual-drop-zone" :class="{ active: manualDropActive }">
+          <n-icon size="24"><DownloadOutline /></n-icon>
+          <div>{{ t('setting.kernel.dropHint') }}</div>
+          <div class="manual-drop-sub">{{ t('setting.kernel.dropSubHint') }}</div>
+        </div>
+
+        <div v-if="manualKernelPath" class="manual-selected">
+          <div class="manual-selected-label">{{ t('setting.kernel.selectedFile') }}</div>
+          <div class="manual-selected-path">{{ manualKernelPath }}</div>
+        </div>
+      </div>
+      <template #action>
+        <n-space justify="space-between" style="width: 100%">
+          <n-button @click="pickManualKernelFile" :disabled="manualImporting">
+            {{ t('setting.kernel.chooseFile') }}
+          </n-button>
+          <n-space>
+            <n-button @click="showManualImportModal = false" :disabled="manualImporting">
+              {{ t('common.cancel') }}
+            </n-button>
+            <n-button type="primary" @click="importManualKernel" :loading="manualImporting">
+              {{ t('setting.kernel.importNow') }}
+            </n-button>
+          </n-space>
+        </n-space>
+      </template>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
+import { Window } from '@tauri-apps/api/window'
 import { useMessage } from 'naive-ui'
 import {
   SettingsOutline,
@@ -591,6 +630,11 @@ const showPortModal = ref(false)
 const tempProxyPort = ref(12080)
 const tempApiPort = ref(12081)
 const portSettingsLoading = ref(false)
+const showManualImportModal = ref(false)
+const manualImporting = ref(false)
+const manualKernelPath = ref('')
+const manualDropActive = ref(false)
+let manualDropUnlisten: (() => void) | null = null
 
 // Options
 const languageOptions = computed<{ label: string; value: Locale }[]>(() => [
@@ -674,6 +718,12 @@ watch(
   { immediate: true },
 )
 
+watch(showManualImportModal, (visible) => {
+  if (!visible) {
+    manualDropActive.value = false
+  }
+})
+
 const onAutoStartChange = async (value: boolean) => {
   try {
     await appStore.toggleAutoStart(value)
@@ -729,8 +779,76 @@ const onCompactModeChange = async (value: boolean) => {
   await themeStore.setCompactMode(value)
 }
 
+const setupManualDropListener = async () => {
+  if (manualDropUnlisten) return
+
+  const appWindow = Window.getCurrent()
+  manualDropUnlisten = await appWindow.onDragDropEvent((event) => {
+    if (!showManualImportModal.value || manualImporting.value) return
+
+    if (event.payload.type === 'enter' || event.payload.type === 'over') {
+      manualDropActive.value = true
+      return
+    }
+
+    if (event.payload.type === 'leave') {
+      manualDropActive.value = false
+      return
+    }
+
+    if (event.payload.type === 'drop') {
+      manualDropActive.value = false
+      if (event.payload.paths.length > 0) {
+        manualKernelPath.value = event.payload.paths[0]
+      }
+    }
+  })
+}
+
+const cleanupManualDropListener = () => {
+  if (manualDropUnlisten) {
+    manualDropUnlisten()
+    manualDropUnlisten = null
+  }
+}
+
 const showManualDownloadModal = () => {
-  message.info('Manual download not implemented yet')
+  manualKernelPath.value = ''
+  showManualImportModal.value = true
+}
+
+const pickManualKernelFile = async () => {
+  try {
+    const selected = await systemService.pickKernelImportFile()
+    if (selected) {
+      manualKernelPath.value = selected
+    }
+  } catch (error) {
+    console.error('选择内核文件失败:', error)
+    message.error(t('setting.kernel.pickFailed'))
+  }
+}
+
+const importManualKernel = async () => {
+  if (!manualKernelPath.value) {
+    message.warning(t('setting.kernel.noFileSelected'))
+    return
+  }
+
+  manualImporting.value = true
+  try {
+    const result = await systemService.importKernelExecutable(manualKernelPath.value)
+    message.success(result.message || t('common.saveSuccess'))
+    showManualImportModal.value = false
+    manualKernelPath.value = ''
+    await kernelStore.checkKernelInstallation()
+  } catch (error) {
+    console.error('导入内核失败:', error)
+    const errMsg = error instanceof Error ? error.message : t('setting.kernel.importFailed')
+    message.error(errMsg)
+  } finally {
+    manualImporting.value = false
+  }
 }
 
 const checkManualInstall = async () => {
@@ -795,6 +913,12 @@ const savePortSettings = async () => {
 }
 
 onMounted(async () => {
+  try {
+    await setupManualDropListener()
+  } catch (error) {
+    console.error('初始化手动导入拖放监听失败:', error)
+  }
+
   await appStore.waitForDataRestore()
   await appStore.syncAutoStartWithSystem()
   autoStart.value = appStore.autoStartApp
@@ -825,6 +949,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  cleanupManualDropListener()
   cleanupDownloadListener()
   cleanupUpdateProgressListener()
 })
@@ -1158,6 +1283,62 @@ onUnmounted(() => {
 .update-error {
   font-size: 13px;
   color: #ef4444;
+}
+
+.manual-import-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.manual-import-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.manual-drop-zone {
+  border: 1px dashed var(--panel-border);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  padding: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.manual-drop-zone.active {
+  border-color: var(--primary-color);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.manual-drop-sub {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.manual-selected {
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+}
+
+.manual-selected-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+
+.manual-selected-path {
+  font-size: 12px;
+  color: var(--text-primary);
+  word-break: break-all;
+  line-height: 1.45;
 }
 
 @media (max-width: 768px) {

@@ -50,6 +50,7 @@ sqlx = { version = "0.8.6", features = ["runtime-tokio-native-tls", "sqlite", "c
 chrono = { version = "0.4.42", features = ["serde"] }
 thiserror = "2.0"
 tauri-plugin-os = "2.3"
+rfd = "0.15"
 aes-gcm = "0.10"
 rand = "0.8"
 

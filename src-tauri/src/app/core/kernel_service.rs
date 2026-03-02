@@ -10,6 +10,7 @@ pub mod download;
 pub mod embedded;
 pub mod event;
 pub mod guard;
+pub mod import;
 pub mod orchestrator;
 pub mod runtime;
 pub mod state;
@@ -18,6 +19,7 @@ pub mod utils;
 pub mod versioning;
 
 pub use download::download_kernel;
+pub use import::{import_kernel_executable, pick_kernel_import_file};
 pub use runtime::{
     apply_proxy_settings, kernel_restart_fast, kernel_start_enhanced, kernel_stop_enhanced,
     orchestrated_restart_kernel, orchestrated_start_kernel, orchestrated_stop_kernel,

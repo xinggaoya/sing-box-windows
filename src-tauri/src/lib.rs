@@ -126,6 +126,8 @@ pub fn run() {
             // Core - Kernel service commands (legacy)
             // Core - Kernel service commands (legacy)
             crate::app::core::kernel_service::download::download_kernel,
+            crate::app::core::kernel_service::import::pick_kernel_import_file,
+            crate::app::core::kernel_service::import::import_kernel_executable,
             crate::app::core::kernel_service::versioning::get_latest_kernel_version_cmd,
             crate::app::core::kernel_service::versioning::get_kernel_releases_cmd,
             crate::app::core::kernel_service::versioning::check_kernel_version,
