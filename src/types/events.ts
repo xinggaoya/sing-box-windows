@@ -62,3 +62,11 @@ export interface UpdateAvailablePayload {
   file_size?: number
   is_prerelease?: boolean
 }
+
+export interface UpgradeSubscriptionRefreshFailedPayload {
+  message: string
+  version: string
+  active_config_path: string
+  attempts: number
+  last_error: string
+}

@@ -6,6 +6,7 @@ import type {
   MemoryStatsPayload,
   KernelHealthPayload,
   UpdateAvailablePayload,
+  UpgradeSubscriptionRefreshFailedPayload,
 } from '@/types/events'
 
 export const APP_EVENTS = {
@@ -27,6 +28,7 @@ export const APP_EVENTS = {
   updateProgress: 'update-progress',
   updateAvailable: 'update-available',
   subscriptionUpdated: 'subscription-updated',
+  upgradeSubscriptionRefreshFailed: 'upgrade-subscription-refresh-failed',
 } as const
 
 export type AppEventName = typeof APP_EVENTS[keyof typeof APP_EVENTS]
@@ -54,4 +56,5 @@ export type AppEventPayloads = {
   }
   [APP_EVENTS.updateAvailable]: UpdateAvailablePayload
   [APP_EVENTS.subscriptionUpdated]: unknown
+  [APP_EVENTS.upgradeSubscriptionRefreshFailed]: UpgradeSubscriptionRefreshFailedPayload
 }

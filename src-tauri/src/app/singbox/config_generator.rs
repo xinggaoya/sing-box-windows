@@ -1,8 +1,8 @@
 use crate::app::singbox::settings_patch::apply_app_settings_to_config;
 use crate::app::storage::state_model::AppConfig;
 use super::common::{
-    dns_strategy, node_domain_resolver_strategy, normalize_default_outbound, normalize_download_detour,
-    PRIVATE_IP_CIDRS, DNS_BLOCK, DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOIP_CN,
+    build_dns_server_config, dns_strategy, node_domain_resolver_strategy, normalize_default_outbound,
+    normalize_download_detour, PRIVATE_IP_CIDRS, DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOIP_CN,
     RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_NETFLIX,
     RS_GEOSITE_GOOGLE, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE,
     RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
@@ -94,7 +94,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     ];
 
     if app_config.singbox_block_ads {
-        dns_rules.insert(2, json!({ "rule_set": RS_GEOSITE_ADS, "server": DNS_BLOCK }));
+        dns_rules.insert(2, json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
     }
 
     let mut rule_sets: Vec<Value> = Vec::new();
@@ -235,37 +235,30 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         },
         dns: DnsConfig {
             servers: vec![
-                DnsServerConfig {
-                    tag: DNS_PROXY.to_string(),
-                    address: app_config.singbox_dns_proxy.clone(),
-                    address_resolver: Some(DNS_RESOLVER.to_string()),
-                    strategy: Some(dns_strategy.to_string()),
-                    // DNS_PROXY 默认走代理（更符合“防污染/可解析被墙域名”的预期），
-                    // 但为了避免形成“DNS 走代理 -> 代理节点域名又需要 DNS”的循环依赖，
-                    // 我们会在注入节点时为每个节点设置 `domain_resolver=dns_resolver`（直连解析节点域名）。
-                    detour: Some(default_outbound.to_string()),
-                },
-                DnsServerConfig {
-                    tag: DNS_CN.to_string(),
-                    address: app_config.singbox_dns_cn.clone(),
-                    address_resolver: Some(DNS_RESOLVER.to_string()),
-                    strategy: Some(dns_strategy.to_string()),
-                    detour: Some(TAG_DIRECT.to_string()),
-                },
-                DnsServerConfig {
-                    tag: DNS_RESOLVER.to_string(),
-                    address: app_config.singbox_dns_resolver.clone(),
-                    address_resolver: None,
-                    strategy: Some(dns_strategy.to_string()),
-                    detour: Some(TAG_DIRECT.to_string()),
-                },
-                DnsServerConfig {
-                    tag: DNS_BLOCK.to_string(),
-                    address: "rcode://success".to_string(),
-                    address_resolver: None,
-                    strategy: None,
-                    detour: None,
-                },
+                build_dns_server_with_fallback(
+                    DNS_PROXY,
+                    &app_config.singbox_dns_proxy,
+                    Some(dns_strategy),
+                    Some(default_outbound),
+                    Some(DNS_RESOLVER),
+                    "https://1.1.1.1/dns-query",
+                ),
+                build_dns_server_with_fallback(
+                    DNS_CN,
+                    &app_config.singbox_dns_cn,
+                    Some(dns_strategy),
+                    Some(TAG_DIRECT),
+                    Some(DNS_RESOLVER),
+                    "h3://dns.alidns.com/dns-query",
+                ),
+                build_dns_server_with_fallback(
+                    DNS_RESOLVER,
+                    &app_config.singbox_dns_resolver,
+                    Some(dns_strategy),
+                    Some(TAG_DIRECT),
+                    None,
+                    "114.114.114.114",
+                ),
             ],
             rules: dns_rules,
             independent_cache: true,
@@ -278,7 +271,10 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             rules: route_rules,
             final_outbound: default_outbound.to_string(),
             auto_detect_interface: true,
-            default_domain_resolver: Some(DNS_RESOLVER.to_string()),
+            default_domain_resolver: Some(json!({
+                "server": DNS_RESOLVER,
+                "strategy": dns_strategy
+            })),
         },
     };
 
@@ -287,6 +283,20 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     // 统一由 settings_patch 负责把端口/TUN/IPv6 偏好写入配置，确保行为一致。
     apply_app_settings_to_config(&mut config, app_config);
     config
+}
+
+fn build_dns_server_with_fallback(
+    tag: &str,
+    raw_address: &str,
+    strategy: Option<&str>,
+    detour: Option<&str>,
+    resolver_tag: Option<&str>,
+    fallback_address: &str,
+) -> DnsServerConfig {
+    build_dns_server_config(tag, raw_address, strategy, detour, resolver_tag).unwrap_or_else(|_| {
+        build_dns_server_config(tag, fallback_address, strategy, detour, resolver_tag)
+            .expect("内置 DNS fallback 地址必须可解析")
+    })
 }
 
 fn remote_rule_set_value(tag: &str, url: &str, download_detour: &str, update_interval: &str) -> Value {
@@ -541,4 +551,86 @@ where
 
     outbounds.push(create());
     Ok(outbounds.len().saturating_sub(1))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::storage::state_model::AppConfig;
+
+    #[test]
+    fn generated_dns_servers_should_use_new_format() {
+        let config = generate_base_config(&AppConfig::default());
+        let servers = config
+            .get("dns")
+            .and_then(|v| v.get("servers"))
+            .and_then(|v| v.as_array())
+            .expect("dns.servers 应存在");
+
+        for server in servers {
+            assert!(
+                server.get("type").and_then(|v| v.as_str()).is_some(),
+                "dns server 应包含 type 字段: {:?}",
+                server
+            );
+            assert!(
+                server.get("address").is_none(),
+                "dns server 不应再输出 legacy address 字段: {:?}",
+                server
+            );
+            assert!(
+                server.get("address_resolver").is_none(),
+                "dns server 不应再输出 legacy address_resolver 字段: {:?}",
+                server
+            );
+            assert!(
+                server.get("strategy").is_none(),
+                "dns server 不应包含 strategy 字段（该字段属于 dns 根配置而非 server）: {:?}",
+                server
+            );
+            assert!(
+                server.get("domain_strategy").is_none(),
+                "dns server 不应包含已弃用的 domain_strategy 字段: {:?}",
+                server
+            );
+            assert!(
+                server.get("detour").and_then(|v| v.as_str()) != Some("direct"),
+                "dns server 不应显式设置 detour=direct: {:?}",
+                server
+            );
+        }
+
+        let route_default_resolver = config
+            .get("route")
+            .and_then(|v| v.get("default_domain_resolver"))
+            .expect("route.default_domain_resolver 应存在");
+        assert_eq!(
+            route_default_resolver
+                .get("server")
+                .and_then(|v| v.as_str()),
+            Some(DNS_RESOLVER)
+        );
+        assert!(route_default_resolver.get("strategy").is_some());
+    }
+
+    #[test]
+    fn ads_dns_rule_should_use_reject_action() {
+        let mut app_config = AppConfig::default();
+        app_config.singbox_block_ads = true;
+
+        let config = generate_base_config(&app_config);
+        let rules = config
+            .get("dns")
+            .and_then(|v| v.get("rules"))
+            .and_then(|v| v.as_array())
+            .expect("dns.rules 应存在");
+
+        let ads_rule = rules
+            .iter()
+            .find(|rule| rule.get("rule_set").and_then(|v| v.as_str()) == Some(RS_GEOSITE_ADS))
+            .expect("启用广告拦截时应包含 geosite ads DNS 规则");
+
+        assert_eq!(ads_rule.get("action").and_then(|v| v.as_str()), Some("reject"));
+        assert!(ads_rule.get("server").is_none());
+    }
 }

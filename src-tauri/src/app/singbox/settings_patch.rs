@@ -1,10 +1,10 @@
 use crate::app::core::tun_profile::TUN_ROUTE_EXCLUDES;
 use crate::app::storage::state_model::AppConfig;
 use super::common::{
-    dns_strategy, normalize_default_outbound, normalize_download_detour, DNS_BLOCK, DNS_CN, DNS_PROXY,
-    DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE,
+    build_dns_server_config, dns_strategy, normalize_default_outbound, normalize_download_detour, DNS_CN,
+    DNS_PROXY, DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE,
     RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
-    TAG_AUTO, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
+    TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
 };
 use serde_json::{json, Map, Value};
 
@@ -40,10 +40,10 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
             }
         }
 
-        // dns.strategy 用于切换“仅 IPv4 / IPv6 优先”等行为。
+        // `dns.strategy` 已在 sing-box 1.12 废弃；迁移到 domain_resolver 对象策略。
         let dns = config_obj.entry("dns".to_string()).or_insert(json!({}));
         if let Some(dns_obj) = dns.as_object_mut() {
-            dns_obj.insert("strategy".to_string(), json!(dns_strategy(app_config)));
+            dns_obj.remove("strategy");
         }
     }
 }
@@ -113,21 +113,49 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                 if let Some(obj) = server.as_object_mut() {
                     match tag {
                         t if t == DNS_PROXY => {
-                            obj.insert("address".to_string(), json!(app_config.singbox_dns_proxy));
-                            // DNS_PROXY 默认走代理（防污染/更接近 Clash 的体验）。
-                            // 循环依赖问题由 config_generator 在“注入节点”时给节点补 `domain_resolver=dns_resolver` 来解决：
-                            // - 节点域名用 dns_resolver（直连）解析
-                            // - DNS_PROXY 的 DoH/DoH3 请求可以走代理出站
-                            obj.insert("detour".to_string(), json!(default_outbound));
+                            if let Ok(cfg) = build_dns_server_config(
+                                DNS_PROXY,
+                                &app_config.singbox_dns_proxy,
+                                Some(dns_strategy(app_config)),
+                                Some(default_outbound),
+                                Some(DNS_RESOLVER),
+                            ) {
+                                if let Ok(new_server) = serde_json::to_value(cfg) {
+                                    if let Some(new_obj) = new_server.as_object() {
+                                        *obj = new_obj.clone();
+                                    }
+                                }
+                            }
                         }
                         t if t == DNS_CN => {
-                            obj.insert("address".to_string(), json!(app_config.singbox_dns_cn));
+                            if let Ok(cfg) = build_dns_server_config(
+                                DNS_CN,
+                                &app_config.singbox_dns_cn,
+                                Some(dns_strategy(app_config)),
+                                Some(TAG_DIRECT),
+                                Some(DNS_RESOLVER),
+                            ) {
+                                if let Ok(new_server) = serde_json::to_value(cfg) {
+                                    if let Some(new_obj) = new_server.as_object() {
+                                        *obj = new_obj.clone();
+                                    }
+                                }
+                            }
                         }
                         t if t == DNS_RESOLVER => {
-                            obj.insert(
-                                "address".to_string(),
-                                json!(app_config.singbox_dns_resolver),
-                            );
+                            if let Ok(cfg) = build_dns_server_config(
+                                DNS_RESOLVER,
+                                &app_config.singbox_dns_resolver,
+                                Some(dns_strategy(app_config)),
+                                Some(TAG_DIRECT),
+                                None,
+                            ) {
+                                if let Ok(new_server) = serde_json::to_value(cfg) {
+                                    if let Some(new_obj) = new_server.as_object() {
+                                        *obj = new_obj.clone();
+                                    }
+                                }
+                            }
                         }
                         _ => {}
                     }
@@ -148,10 +176,11 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
             if app_config.singbox_block_ads {
                 if ads_rule_index.is_none() {
                     // 尽量插入在前面：优先拦截广告域名的解析
-                    rules.insert(0, json!({ "rule_set": RS_GEOSITE_ADS, "server": DNS_BLOCK }));
+                    rules.insert(0, json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
                 } else if let Some(i) = ads_rule_index {
                     if let Some(obj) = rules.get_mut(i).and_then(|v| v.as_object_mut()) {
-                        obj.insert("server".to_string(), json!(DNS_BLOCK));
+                        obj.insert("action".to_string(), json!("reject"));
+                        obj.remove("server");
                     }
                 }
             } else if let Some(i) = ads_rule_index {
@@ -163,7 +192,15 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
     // 4) route：同步 final / hijack-dns / ads reject / rule_set download_detour
     if let Some(route_obj) = config_obj.get_mut("route").and_then(|v| v.as_object_mut()) {
         route_obj.insert("final".to_string(), json!(default_outbound));
-        route_obj.insert("default_domain_resolver".to_string(), json!(DNS_RESOLVER));
+        route_obj.insert(
+            "default_domain_resolver".to_string(),
+            json!({
+                "server": DNS_RESOLVER,
+                "strategy": dns_strategy(app_config)
+            }),
+        );
+        // 兼容旧配置残留字段，避免触发 1.14 前置报错。
+        route_obj.remove("default_domain_strategy");
 
         if let Some(rule_sets) = route_obj.get_mut("rule_set").and_then(|v| v.as_array_mut()) {
             // 仅对 remote 规则集更新 download_detour，避免影响本地文件规则集

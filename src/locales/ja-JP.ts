@@ -456,7 +456,9 @@ export default {
     // 内核管理
     kernel: {
       title: 'カーネル管理',
+      advancedTag: '上級者向け',
       description: 'Sing-Boxカーネルバージョンとダウンロードを管理',
+      embeddedHint: '推奨カーネルはアプリに内蔵されています。手動更新は検証やトラブルシュート時のみ利用してください。',
       download: 'カーネルをダウンロード',
       redownload: '再ダウンロード',
       update: 'カーネルを更新',

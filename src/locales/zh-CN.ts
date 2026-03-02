@@ -407,7 +407,9 @@ export default {
     },
     kernel: {
       title: '内核管理',
+      advancedTag: '高级维护',
       description: '管理 Sing-Box 内核版本和下载',
+      embeddedHint: '应用已内嵌推荐内核版本，通常无需手动更新。仅在排障或测试时使用下方手动更新功能。',
       version: '内核版本',
       download: '下载内核',
       redownload: '重新下载',

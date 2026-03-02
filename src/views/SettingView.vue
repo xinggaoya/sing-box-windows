@@ -8,9 +8,14 @@
       <div class="settings-section">
         <div class="section-header">
           <n-icon size="20"><SettingsOutline /></n-icon>
-          <h3>{{ t('setting.kernel.title') }}</h3>
+          <h3>{{ t('setting.kernel.title') }} · {{ t('setting.kernel.advancedTag') }}</h3>
         </div>
         <div class="section-card">
+          <div class="alert-box info">
+            <n-icon size="18"><InformationCircleOutline /></n-icon>
+            <span>{{ t('setting.kernel.embeddedHint') }}</span>
+          </div>
+
           <div class="setting-row">
             <div class="setting-info">
               <div class="setting-label">{{ t('setting.kernel.version') }}</div>
@@ -65,7 +70,7 @@
 
           <div class="actions-row">
             <n-button
-              type="primary"
+              type="default"
               @click="downloadTheKernel"
               :loading="loading"
               :disabled="downloading"

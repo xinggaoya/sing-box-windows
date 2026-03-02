@@ -565,6 +565,54 @@ impl ProcessManager {
             )));
         }
 
+        // 启动前执行一次显式配置检查，避免内核启动后才暴露语法/迁移错误。
+        let kernel_path = paths::get_kernel_path();
+        if kernel_path.exists() {
+            let config_str = config_path
+                .to_str()
+                .ok_or_else(|| ProcessError::ConfigError("配置路径包含无效字符".to_string()))?;
+
+            let mut check_cmd = Command::new(&kernel_path);
+            check_cmd.args(["check", "--config", config_str]);
+
+            #[cfg(target_os = "windows")]
+            check_cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
+
+            let output = check_cmd.output().map_err(|e| {
+                ProcessError::ConfigError(format!("执行配置校验命令失败: {}", e))
+            })?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let detail = if !stderr.is_empty() { stderr } else { stdout };
+
+                if detail.contains("legacy DNS servers is deprecated")
+                    || detail.contains("ENABLE_DEPRECATED_LEGACY_DNS_SERVERS")
+                {
+                    return Err(ProcessError::ConfigError(
+                        "当前配置仍使用已弃用的 legacy DNS servers。请在订阅页刷新当前订阅配置，或关闭“按原始配置运行”后重新生成。".to_string(),
+                    ));
+                }
+                if detail.contains("legacy domain strategy options is deprecated")
+                    || detail.contains("ENABLE_DEPRECATED_LEGACY_DOMAIN_STRATEGY_OPTIONS")
+                {
+                    return Err(ProcessError::ConfigError(
+                        "当前配置仍使用已弃用的 legacy domain strategy 选项。请在订阅页刷新当前订阅配置（或重新导入）后重试。".to_string(),
+                    ));
+                }
+                if detail.contains("dns.servers")
+                    && detail.contains("unknown field \"strategy\"")
+                {
+                    return Err(ProcessError::ConfigError(
+                        "当前配置包含已弃用字段 dns.servers[].strategy。请在订阅页手动刷新当前订阅配置后重试。".to_string(),
+                    ));
+                }
+
+                return Err(ProcessError::ConfigError(format!("配置校验失败: {}", detail)));
+            }
+        }
+
         Ok(())
     }
 

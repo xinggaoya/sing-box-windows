@@ -407,7 +407,9 @@ export default {
     },
     kernel: {
       title: 'Kernel Management',
+      advancedTag: 'Advanced',
       description: 'Manage Sing-Box kernel version and download',
+      embeddedHint: 'The app ships with a recommended embedded kernel version. Manual kernel updates are only for troubleshooting or testing.',
       version: 'Kernel Version',
       download: 'Download Kernel',
       redownload: 'Redownload',

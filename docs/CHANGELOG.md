@@ -6,6 +6,7 @@
 - **内核操作编排器** - 新增生命周期编排队列，统一串行处理 `start/stop/restart/auto_manage`，减少并发竞态
 - **状态快照接口** - 新增 `kernel_get_snapshot` 命令，前端初始化可先拉取快照再订阅增量事件
 - **操作事件通道** - 新增 `kernel-operation-started` / `kernel-operation-finished` / `kernel-operation-failed` 事件，便于追踪内核操作链路
+- **升级后订阅自动刷新** - 应用版本升级时自动尝试刷新当前激活订阅，失败后后台重试并通知前端手动处理
 
 ### 🔧 优化改进
 - **生命周期一致性** - 自动托管逻辑改为复用统一编排路径，不再绕过生命周期入口直接启停
@@ -14,11 +15,16 @@
 - **设置保存策略调整** - 前端自动保存配置默认仅持久化到数据库，不再自动触发运行态重配，避免编辑设置时频繁触发内核重启/配置覆盖
 - **订阅切换即时生效** - 切换活动配置路径时显式触发运行态应用，确保 `active_config_path` 与内核实际使用配置保持一致
 - **下载出站默认值统一** - `singbox_download_detour` 默认值统一为 `direct`，与当前下载链路策略保持一致
+- **内核更新入口降级** - 设置页保留手动内核更新能力，但标记为“高级维护”并弱化主操作入口，默认引导使用内嵌推荐内核
 
 ### 🐛 问题修复
 - **事件中继清理** - 中继任务清理从仅 `abort` 调整为 `abort + await`，降低重启窗口残留任务风险
 - **启停并发冲突** - 修复手动启停、快速重启、自动托管可能并发触发导致状态漂移的问题
 - **更新安装包匹配修复** - 修复安装包优先级提前退出条件，避免部分平台/架构场景下选择到错误安装包
+- **sing-box 1.13 DNS 配置迁移** - 配置生成全面切换至新 DNS server 格式，移除 legacy `address/address_resolver` 与 `dns.servers[].strategy`
+- **Domain Strategy 迁移修复** - 移除 `dns.strategy`/`default_domain_strategy` 等 legacy 选项，统一迁移到 `domain_resolver/default_domain_resolver` 对象格式
+- **DNS detour 兼容修复** - 避免输出 `dns.servers[].detour=direct`，修复新内核报错 `detour to an empty direct outbound makes no sense`
+- **启动前配置预检增强** - 启动前执行 `sing-box check --config`，对常见迁移错误输出可操作中文提示（legacy DNS / legacy domain strategy）
 
 ## [v2.2.4] - 2026-02-12
 

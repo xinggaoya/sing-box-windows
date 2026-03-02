@@ -82,6 +82,12 @@ pub fn run() {
                     tracing::warn!("启动时清理内核进程失败: {}", e);
                 }
 
+                // 应用升级后：尝试刷新当前活动订阅一次，尽量在首次拉起内核前完成配置迁移。
+                crate::app::system::startup_refresh_service::start_upgrade_subscription_refresh(
+                    &app_handle,
+                )
+                .await;
+
                 // 后端启动后立即尝试自动管理内核（尊重 auto_start_kernel 设置）
                 crate::app::core::kernel_auto_manage::auto_manage_with_saved_config(
                     &app_handle,

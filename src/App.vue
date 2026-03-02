@@ -166,6 +166,20 @@ onMounted(async () => {
       }
     })
     cleanupFunctions.push(unlistenKernelError)
+
+    const unlistenUpgradeRefreshFailed = await eventService.on(
+      APP_EVENTS.upgradeSubscriptionRefreshFailed,
+      (payload: unknown) => {
+        const messageText =
+          payload && typeof payload === 'object' && 'message' in payload
+            ? String((payload as { message?: unknown }).message ?? '')
+            : ''
+        const fallback =
+          '应用升级后自动刷新当前订阅失败，请在订阅页手动点击“立即更新配置”。'
+        appStore.showWarningMessage?.(messageText || fallback)
+      },
+    )
+    cleanupFunctions.push(unlistenUpgradeRefreshFailed)
   } catch (error) {
     console.error('应用初始化失败:', error)
   }

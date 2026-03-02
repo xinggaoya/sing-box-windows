@@ -56,11 +56,18 @@ pub(crate) struct DnsConfig {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct DnsServerConfig {
     pub tag: String,
-    pub address: String,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub server_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub address_resolver: Option<String>,
+    pub server: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub strategy: Option<String>,
+    pub server_port: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interface: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain_resolver: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detour: Option<String>,
 }
@@ -74,7 +81,7 @@ pub(crate) struct RouteConfig {
     pub final_outbound: String,
     pub auto_detect_interface: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_domain_resolver: Option<String>,
+    pub default_domain_resolver: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize)]
