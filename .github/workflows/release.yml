@@ -76,7 +76,8 @@ jobs:
         shell: bash
         run: |
           pnpm run build
-          pnpm tauri build --target ${{ matrix.target }}
+          # 显式走 package script（tauri-wrapper），确保只注入当前 target 的内核资源
+          pnpm run tauri build --target ${{ matrix.target }}
 
       - name: Verify Linux glibc compatibility
         if: matrix.target == 'x86_64-unknown-linux-gnu'

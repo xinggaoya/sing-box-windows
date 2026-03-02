@@ -1,3 +1,5 @@
+import path from 'node:path'
+
 const KERNEL_TARGETS = Object.freeze([
   {
     platform: 'windows',
@@ -79,6 +81,24 @@ export function getKernelResourcePaths(platformRaw, archRaw) {
 
   const base = `resources/kernel/${target.platform}/${target.arch}`
   return [`${base}/${target.executable}`, `${base}/version.txt`]
+}
+
+export function getKernelResourceMap(platformRaw, archRaw, kernelBaseDir) {
+  const target = resolveKernelTarget(platformRaw, archRaw)
+  if (!target) {
+    return {}
+  }
+
+  const baseDir = path.resolve(
+    kernelBaseDir ?? path.resolve('src-tauri', 'resources', 'kernel')
+  )
+  const sourceBase = path.join(baseDir, target.platform, target.arch)
+  const destinationBase = `kernel/${target.platform}/${target.arch}`
+
+  return {
+    [path.join(sourceBase, target.executable)]: `${destinationBase}/${target.executable}`,
+    [path.join(sourceBase, 'version.txt')]: `${destinationBase}/version.txt`
+  }
 }
 
 export function getAllKernelTargets() {

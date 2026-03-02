@@ -4,7 +4,7 @@ import fsPromises from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import {
-  getKernelResourcePaths,
+  getKernelResourceMap,
   resolveKernelTarget,
   resolveKernelTargetForHost,
   resolveKernelTargetFromRustTarget
@@ -115,7 +115,12 @@ async function generateBuildConfig(target) {
   )
   const config = {
     bundle: {
-      resources: getKernelResourcePaths(target.platform, target.arch)
+      // 仅注入当前 target 的内核资源，避免多平台资源被一并打包。
+      resources: getKernelResourceMap(
+        target.platform,
+        target.arch,
+        path.resolve('src-tauri', 'resources', 'kernel')
+      )
     }
   }
   await fsPromises.writeFile(generatedConfigPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
