@@ -46,6 +46,10 @@ pub fn run() {
                 window.hide().unwrap();
             }
 
+            if let Err(err) = crate::app::tray::init_tray(app.handle()) {
+                tracing::error!("初始化托盘失败: {}", err);
+            }
+
             // 启动日志目录定时清理
             if let Some(dir) = log_dir.clone() {
                 // 后台清理日志，不阻塞应用启动
@@ -181,6 +185,12 @@ pub fn run() {
             crate::app::core::proxy_service::test_group_delay,
             crate::app::core::proxy_service::test_nodes_delay,
             crate::app::core::proxy_service::get_rules,
+            // Tray commands
+            crate::app::tray::commands::tray_sync_state,
+            crate::app::tray::commands::tray_set_last_visible_route,
+            crate::app::tray::commands::tray_show_main_window,
+            crate::app::tray::commands::tray_hide_main_window,
+            crate::app::tray::commands::tray_request_app_exit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -188,12 +198,12 @@ pub fn run() {
 
 #[allow(dead_code)]
 fn show_window(app: &AppHandle) {
-    let windows = app.webview_windows();
-
-    windows
-        .values()
-        .next()
-        .expect("Sorry, no window found")
-        .set_focus()
-        .expect("Can't Bring Window to Focus");
+    if let Err(err) = crate::app::tray::show_main_window(app, true) {
+        tracing::warn!("通过托盘服务恢复窗口失败，回退为旧逻辑: {}", err);
+        let windows = app.webview_windows();
+        if let Some(window) = windows.values().next() {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
 }
