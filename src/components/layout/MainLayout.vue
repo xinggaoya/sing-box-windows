@@ -189,6 +189,10 @@ const appStatusLabel = computed(() => {
       return t('status.running')
     case 'disconnected':
       return t('status.disconnected')
+    case 'failed':
+      return t('status.failed')
+    case 'crashed':
+      return t('status.crashed')
     default:
       return t('status.stopped')
   }
@@ -411,6 +415,24 @@ onUnmounted(() => {
 .app-status.stopped .status-dot {
   background-color: var(--error-color, #ef4444);
   box-shadow: 0 0 6px var(--error-color, #ef4444);
+}
+
+.app-status.failed {
+  color: var(--error-color, #ef4444);
+}
+
+.app-status.failed .status-dot {
+  background-color: var(--error-color, #ef4444);
+  box-shadow: 0 0 6px var(--error-color, #ef4444);
+}
+
+.app-status.crashed {
+  color: #f97316;
+}
+
+.app-status.crashed .status-dot {
+  background-color: #f97316;
+  box-shadow: 0 0 6px #f97316;
 }
 
 /* Window Controls */

@@ -3,7 +3,8 @@ use crate::app::core::kernel_service::event::start_websocket_relay;
 use crate::app::core::kernel_service::state::KERNEL_STATE;
 use crate::app::core::kernel_service::status::is_kernel_running;
 use crate::app::core::kernel_service::utils::{
-    emit_kernel_error, emit_kernel_started, emit_kernel_stopped, resolve_config_path_or_default,
+    emit_kernel_error, emit_kernel_error_with_context, emit_kernel_started, emit_kernel_stopped,
+    resolve_config_path_or_default,
 };
 use crate::app::core::kernel_service::PROCESS_MANAGER;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
@@ -155,6 +156,15 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                                             GUARDED_TUN_ENABLED.store(false, Ordering::Relaxed);
                                             break;
                                         }
+
+                                        emit_kernel_error_with_context(
+                                            &app_handle,
+                                            "KERNEL_GUARD_SELF_HEAL_FAILED",
+                                            "内核自愈重启失败",
+                                            Some(&err_str),
+                                            Some("kernel.guard.self_heal"),
+                                            true,
+                                        );
                                     }
                                 }
                             }
@@ -179,6 +189,14 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                     if !kernel_path.exists() {
                         warn!("守护跳过重启：内核文件不存在 {:?}", kernel_path);
                         KERNEL_STATE.mark_failed();
+                        emit_kernel_error_with_context(
+                            &app_handle,
+                            "KERNEL_BINARY_MISSING",
+                            "自动重启失败：内核文件不存在",
+                            Some(&format!("{:?}", kernel_path)),
+                            Some("kernel.guard.restart"),
+                            false,
+                        );
                         KEEP_ALIVE_ENABLED.store(false, Ordering::Relaxed);
                         GUARDED_API_PORT.store(0, Ordering::Relaxed);
                         break;
@@ -186,6 +204,14 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                     if !config_path.exists() {
                         warn!("守护跳过重启：配置不存在 {:?}", config_path);
                         KERNEL_STATE.mark_failed();
+                        emit_kernel_error_with_context(
+                            &app_handle,
+                            "KERNEL_CONFIG_MISSING",
+                            "自动重启失败：配置文件不存在",
+                            Some(&format!("{:?}", config_path)),
+                            Some("kernel.guard.restart"),
+                            false,
+                        );
                         KEEP_ALIVE_ENABLED.store(false, Ordering::Relaxed);
                         GUARDED_API_PORT.store(0, Ordering::Relaxed);
                         break;
@@ -213,6 +239,15 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                             GUARDED_TUN_ENABLED.store(false, Ordering::Relaxed);
                             break;
                         }
+
+                        emit_kernel_error_with_context(
+                            &app_handle,
+                            "KERNEL_GUARD_RESTART_FAILED",
+                            "守护自动重启失败",
+                            Some(&err_str),
+                            Some("kernel.guard.restart"),
+                            true,
+                        );
 
                         continue;
                     }

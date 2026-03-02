@@ -5,6 +5,7 @@
 import { APP_EVENTS } from '@/constants/events'
 import { eventService } from './event-service'
 import { invokeWithAppContext, withAppStore } from './invoke-client'
+import type { KernelFailurePayload, KernelOperationFailedPayload } from '@/types/events'
 
 export interface KernelStatus {
   process_running: boolean
@@ -373,7 +374,7 @@ class KernelService {
     return eventService.on(APP_EVENTS.kernelReady, callback)
   }
 
-  async onKernelError(callback: (error: unknown) => void): Promise<() => void> {
+  async onKernelError(callback: (error: KernelFailurePayload) => void): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelError, callback)
   }
 
@@ -397,7 +398,9 @@ class KernelService {
     return eventService.on(APP_EVENTS.kernelOperationFinished, callback)
   }
 
-  async onKernelOperationFailed(callback: (data: unknown) => void): Promise<() => void> {
+  async onKernelOperationFailed(
+    callback: (data: KernelOperationFailedPayload) => void,
+  ): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelOperationFailed, callback)
   }
 

@@ -53,6 +53,25 @@ export interface KernelHealthPayload {
   issues: string[]
 }
 
+export interface KernelFailurePayload {
+  code?: string
+  message?: string
+  details?: string
+  source?: string
+  recoverable?: boolean
+  timestamp?: number
+  // 兼容旧后端/旧前端
+  error?: string
+}
+
+export interface KernelOperationFailedPayload {
+  op_id?: string
+  operation?: string
+  state_version?: number
+  timestamp?: number
+  error?: string
+}
+
 export interface UpdateAvailablePayload {
   latest_version: string
   download_url: string

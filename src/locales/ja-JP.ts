@@ -37,6 +37,8 @@ export default {
     starting: '起動中',
     stopping: '停止中',
     stopped: '停止中',
+    failed: '失敗',
+    crashed: 'クラッシュ',
   },
 
   // 首页

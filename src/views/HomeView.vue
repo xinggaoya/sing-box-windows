@@ -230,6 +230,10 @@ const statusTitle = computed(() => {
       return t('status.running')
     case 'disconnected':
       return t('status.disconnected')
+    case 'failed':
+      return t('status.failed')
+    case 'crashed':
+      return t('status.crashed')
     default:
       return t('status.stopped')
   }
@@ -581,6 +585,16 @@ onMounted(async () => {
 .status-badge.disconnected {
   background: rgba(245, 158, 11, 0.1);
   color: #f59e0b;
+}
+
+.status-badge.failed {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.status-badge.crashed {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
 }
 
 .status-badge.stopped {

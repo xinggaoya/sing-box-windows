@@ -37,6 +37,8 @@ export default {
     starting: 'Запуск',
     stopping: 'Остановка',
     stopped: 'Остановлено',
+    failed: 'Сбой',
+    crashed: 'Авария',
   },
 
   // 首页

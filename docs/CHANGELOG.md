@@ -11,11 +11,14 @@
 ### 🔧 优化改进
 - **生命周期一致性** - 自动托管逻辑改为复用统一编排路径，不再绕过生命周期入口直接启停
 - **状态语义增强** - 内核状态事件与状态查询返回补充 `kernel_state`、`state_version`（以及操作返回中的 `op_id` 元信息）
+- **启动稳定性校验** - 内核启动后增加短窗口稳定性检查，减少“返回启动成功但立即退出”的假成功体验
 - **前端状态同步** - `KernelStore` 初始化改为“先快照后订阅”，并基于 `state_version` 忽略过期状态覆盖
 - **设置保存策略调整** - 前端自动保存配置默认仅持久化到数据库，不再自动触发运行态重配，避免编辑设置时频繁触发内核重启/配置覆盖
 - **订阅切换即时生效** - 切换活动配置路径时显式触发运行态应用，确保 `active_config_path` 与内核实际使用配置保持一致
 - **下载出站默认值统一** - `singbox_download_detour` 默认值统一为 `direct`，与当前下载链路策略保持一致
 - **内核更新入口降级** - 设置页保留手动内核更新能力，但标记为“高级维护”并弱化主操作入口，默认引导使用内嵌推荐内核
+- **错误事件结构化** - `kernel-error` 事件补充 `code/message/details/source/recoverable/timestamp` 字段，并保留兼容 `error` 字段
+- **全局错误提示与去重** - 前端新增内核失败全局提示中心，统一消费 `kernel-error` 与 `kernel-operation-failed`，同文案 10 秒内去重
 
 ### 🐛 问题修复
 - **事件中继清理** - 中继任务清理从仅 `abort` 调整为 `abort + await`，降低重启窗口残留任务风险
@@ -25,6 +28,9 @@
 - **Domain Strategy 迁移修复** - 移除 `dns.strategy`/`default_domain_strategy` 等 legacy 选项，统一迁移到 `domain_resolver/default_domain_resolver` 对象格式
 - **DNS detour 兼容修复** - 避免输出 `dns.servers[].detour=direct`，修复新内核报错 `detour to an empty direct outbound makes no sense`
 - **启动前配置预检增强** - 启动前执行 `sing-box check --config`，对常见迁移错误输出可操作中文提示（legacy DNS / legacy domain strategy）
+- **失败状态可见性修复** - 前端状态展示新增 `failed/crashed`，不再将内核失败统一折叠为 `stopped`
+- **守护失败漏报修复** - 修复守护重启失败（非 sudo 场景）仅日志不通知前端的问题
+- **自动拉起失败提示修复** - 应用启动自动管理内核失败时，前端可立即收到错误提示
 
 ## [v2.2.4] - 2026-02-12
 

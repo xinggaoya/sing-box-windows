@@ -4,6 +4,7 @@ use crate::app::core::kernel_service::{
     orchestrated_start_kernel, KernelRuntimeConfig, ProxyOverrides,
 };
 use crate::app::core::kernel_service::embedded::ensure_embedded_kernel;
+use crate::app::core::kernel_service::utils::emit_kernel_error_with_context;
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use crate::app::storage::state_model::AppConfig;
@@ -194,9 +195,51 @@ pub async fn auto_manage_with_saved_config(
                         "自动管理({})完成，状态: {}, 信息: {}",
                         reason, result.state, result.message
                     );
+
+                    match result.state.as_str() {
+                        "invalid_config" => {
+                            emit_kernel_error_with_context(
+                                app_handle,
+                                "KERNEL_CONFIG_INVALID",
+                                "内核启动失败：配置校验未通过",
+                                Some(&result.message),
+                                Some("kernel.auto_manage"),
+                                true,
+                            );
+                        }
+                        "error" => {
+                            emit_kernel_error_with_context(
+                                app_handle,
+                                "KERNEL_AUTO_MANAGE_FAILED",
+                                "内核自动管理失败",
+                                Some(&result.message),
+                                Some("kernel.auto_manage"),
+                                true,
+                            );
+                        }
+                        "missing_kernel" => {
+                            emit_kernel_error_with_context(
+                                app_handle,
+                                "KERNEL_BINARY_MISSING",
+                                "未检测到内核文件，请先安装内核",
+                                Some(&result.message),
+                                Some("kernel.auto_manage"),
+                                false,
+                            );
+                        }
+                        _ => {}
+                    }
                 }
                 Err(err) => {
                     warn!("自动管理({})失败: {}", reason, err);
+                    emit_kernel_error_with_context(
+                        app_handle,
+                        "KERNEL_AUTO_MANAGE_FAILED",
+                        "内核自动管理异常中断",
+                        Some(&err),
+                        Some("kernel.auto_manage"),
+                        true,
+                    );
                 }
             }
         }

@@ -8,6 +8,7 @@ use crate::app::core::kernel_service::state::KERNEL_STATE;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use serde_json::json;
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 
 /// 解析配置文件路径
@@ -163,8 +164,56 @@ pub fn emit_kernel_starting(
 /// 发送内核错误事件
 /// 
 /// 发送 `kernel-error` 事件，通知前端发生错误。
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+pub fn build_kernel_error_payload(
+    code: &str,
+    message: &str,
+    details: Option<&str>,
+    source: Option<&str>,
+    recoverable: bool,
+) -> serde_json::Value {
+    let details = details.unwrap_or(message);
+    let source = source.unwrap_or("kernel");
+
+    json!({
+        "code": code,
+        "message": message,
+        "details": details,
+        "source": source,
+        "recoverable": recoverable,
+        "timestamp": now_millis(),
+        // 兼容旧前端：仍保留 error 字段
+        "error": message
+    })
+}
+
+pub fn emit_kernel_error_with_context(
+    app_handle: &AppHandle,
+    code: &str,
+    message: &str,
+    details: Option<&str>,
+    source: Option<&str>,
+    recoverable: bool,
+) {
+    let payload = build_kernel_error_payload(code, message, details, source, recoverable);
+    let _ = app_handle.emit("kernel-error", payload);
+}
+
 pub fn emit_kernel_error(app_handle: &AppHandle, error: &str) {
-    let _ = app_handle.emit("kernel-error", json!({ "error": error }));
+    emit_kernel_error_with_context(
+        app_handle,
+        "KERNEL_RUNTIME_ERROR",
+        error,
+        None,
+        None,
+        true,
+    );
 }
 
 #[cfg(test)]
@@ -194,5 +243,25 @@ mod tests {
         assert_eq!(json["process_running"], true);
         assert_eq!(json["api_ready"], false);
         assert_eq!(json["websocket_ready"], true);
+    }
+
+    #[test]
+    fn test_kernel_error_payload_contains_compat_and_structured_fields() {
+        let payload = build_kernel_error_payload(
+            "KERNEL_START_FAILED",
+            "内核启动失败",
+            Some("配置校验失败"),
+            Some("kernel.runtime.start"),
+            true,
+        );
+
+        assert_eq!(payload["code"], "KERNEL_START_FAILED");
+        assert_eq!(payload["message"], "内核启动失败");
+        assert_eq!(payload["details"], "配置校验失败");
+        assert_eq!(payload["source"], "kernel.runtime.start");
+        assert_eq!(payload["recoverable"], true);
+        // 兼容老前端字段
+        assert_eq!(payload["error"], "内核启动失败");
+        assert!(payload["timestamp"].as_u64().is_some());
     }
 }

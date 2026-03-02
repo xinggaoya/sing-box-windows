@@ -30,6 +30,8 @@ export default {
     starting: 'Starting',
     stopping: 'Stopping',
     stopped: 'Stopped',
+    failed: 'Failed',
+    crashed: 'Crashed',
     connecting: 'Connecting',
     disconnected: 'Disconnected',
   },

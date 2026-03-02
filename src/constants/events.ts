@@ -7,6 +7,8 @@ import type {
   KernelHealthPayload,
   UpdateAvailablePayload,
   UpgradeSubscriptionRefreshFailedPayload,
+  KernelFailurePayload,
+  KernelOperationFailedPayload,
 } from '@/types/events'
 
 export const APP_EVENTS = {
@@ -41,13 +43,13 @@ export type AppEventPayloads = {
   [APP_EVENTS.kernelHealth]: KernelHealthPayload
   [APP_EVENTS.kernelStatusChanged]: KernelStatus
   [APP_EVENTS.kernelReady]: void
-  [APP_EVENTS.kernelError]: unknown
+  [APP_EVENTS.kernelError]: KernelFailurePayload
   [APP_EVENTS.kernelStarting]: unknown
   [APP_EVENTS.kernelStarted]: unknown
   [APP_EVENTS.kernelStopped]: unknown
   [APP_EVENTS.kernelOperationStarted]: unknown
   [APP_EVENTS.kernelOperationFinished]: unknown
-  [APP_EVENTS.kernelOperationFailed]: unknown
+  [APP_EVENTS.kernelOperationFailed]: KernelOperationFailedPayload
   [APP_EVENTS.kernelDownloadProgress]: KernelDownloadPayload
   [APP_EVENTS.updateProgress]: {
     status: 'downloading' | 'completed' | 'error' | 'installing'

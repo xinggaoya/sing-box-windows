@@ -30,6 +30,8 @@ export default {
     starting: '启动中',
     stopping: '停止中',
     stopped: '已停止',
+    failed: '启动失败',
+    crashed: '已崩溃',
     connecting: '连接中',
     disconnected: '已断开',
   },

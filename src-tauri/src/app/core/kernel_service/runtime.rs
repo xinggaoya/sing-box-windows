@@ -7,7 +7,7 @@ use crate::app::core::kernel_service::orchestrator::execute_kernel_operation;
 use crate::app::core::kernel_service::state::{KernelState, KERNEL_STATE};
 use crate::app::core::kernel_service::status::is_kernel_running;
 use crate::app::core::kernel_service::utils::{
-    emit_kernel_error, emit_kernel_started, emit_kernel_starting, emit_kernel_stopped,
+    emit_kernel_error_with_context, emit_kernel_started, emit_kernel_starting, emit_kernel_stopped,
     resolve_config_path,
 };
 use crate::app::core::kernel_service::PROCESS_MANAGER;
@@ -23,6 +23,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Notify;
 use tracing::{error, info, warn};
+use crate::utils::http_client;
 
 lazy_static::lazy_static! {
     pub(super) static ref KERNEL_READY_NOTIFY: Arc<Notify> = Arc::new(Notify::new());
@@ -52,6 +53,46 @@ impl ResolvedProxyState {
     fn derived_mode(&self) -> String {
         self.proxy.derived_mode()
     }
+}
+
+async fn verify_kernel_startup_stability(api_port: u16) -> Result<(), String> {
+    // 稳定性窗口：尽早识别“启动成功后立刻崩溃”的假成功场景。
+    const MAX_CHECKS: u8 = 4;
+    const RETRY_INTERVAL_MS: u64 = 450;
+    const API_TIMEOUT_MS: u64 = 500;
+
+    let client = http_client::get_client();
+    let api_url = format!("http://127.0.0.1:{}/version", api_port);
+    let mut last_error = String::new();
+
+    for attempt in 1..=MAX_CHECKS {
+        if !is_kernel_running().await.unwrap_or(false) {
+            return Err("内核进程启动后立即退出".to_string());
+        }
+
+        match client
+            .get(&api_url)
+            .timeout(Duration::from_millis(API_TIMEOUT_MS))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => return Ok(()),
+            Ok(response) => {
+                last_error = format!("稳定性检查第{}次失败：API状态码 {}", attempt, response.status());
+            }
+            Err(e) => {
+                last_error = format!("稳定性检查第{}次失败：API连接异常 {}", attempt, e);
+            }
+        }
+
+        tokio::time::sleep(Duration::from_millis(RETRY_INTERVAL_MS)).await;
+    }
+
+    if last_error.is_empty() {
+        last_error = "稳定性窗口内 API 未就绪".to_string();
+    }
+
+    Err(last_error)
 }
 
 pub async fn resolve_proxy_runtime_state(
@@ -180,9 +221,8 @@ pub async fn start_kernel_with_state(
         }));
     }
 
-    let config_path = resolve_config_path(&app_handle).await.map_err(|e| {
+    let config_path = resolve_config_path(&app_handle).await.inspect_err(|_e| {
         KERNEL_STATE.mark_failed();
-        e
     })?;
 
     match PROCESS_MANAGER
@@ -190,7 +230,28 @@ pub async fn start_kernel_with_state(
         .await
     {
         Ok(_) => {
-            info!("? 内核进程启动成功");
+            info!("? 内核进程启动成功，开始稳定性校验");
+
+            if let Err(e) = verify_kernel_startup_stability(resolved.api_port).await {
+                error!("? 内核稳定性校验失败: {}", e);
+                KERNEL_STATE.mark_failed();
+                if let Err(stop_err) = PROCESS_MANAGER.stop().await {
+                    warn!("稳定性校验失败后的进程清理失败: {}", stop_err);
+                }
+                emit_kernel_error_with_context(
+                    &app_handle,
+                    "KERNEL_START_UNSTABLE",
+                    "内核启动后快速退出，请检查配置或端口占用",
+                    Some(&e),
+                    Some("kernel.runtime.startup_stability"),
+                    true,
+                );
+                return Ok(serde_json::json!({
+                    "success": false,
+                    "message": format!("内核启动失败: {}", e)
+                }));
+            }
+
             KERNEL_STATE.mark_running(resolved.api_port);
 
             info!("?? 启动事件中继服务，端口: {}", resolved.api_port);
@@ -231,7 +292,24 @@ pub async fn start_kernel_with_state(
             error!("? 内核启动失败: {}", e);
             KERNEL_STATE.mark_failed();
 
-            emit_kernel_error(&app_handle, &format!("启动失败: {}", e));
+            let detail = e.to_string();
+            let code = if detail.contains("配置校验失败")
+                || detail.contains("legacy DNS servers")
+                || detail.contains("配置文件")
+            {
+                "KERNEL_CONFIG_INVALID"
+            } else {
+                "KERNEL_START_FAILED"
+            };
+
+            emit_kernel_error_with_context(
+                &app_handle,
+                code,
+                &format!("启动失败: {}", detail),
+                Some(&detail),
+                Some("kernel.runtime.start"),
+                true,
+            );
 
             Ok(serde_json::json!({
                 "success": false,
@@ -253,7 +331,15 @@ async fn stop_kernel_command_impl(app_handle: AppHandle) -> Result<serde_json::V
             }))
         }
         Err(e) => {
-            emit_kernel_error(&app_handle, &format!("停止失败: {}", e));
+            let detail = e.to_string();
+            emit_kernel_error_with_context(
+                &app_handle,
+                "KERNEL_STOP_FAILED",
+                &format!("停止失败: {}", detail),
+                Some(&detail),
+                Some("kernel.runtime.stop"),
+                true,
+            );
             Ok(serde_json::json!({
                 "success": false,
                 "message": format!("内核停止失败: {}", e)
