@@ -89,3 +89,11 @@ export interface UpgradeSubscriptionRefreshFailedPayload {
   attempts: number
   last_error: string
 }
+
+export interface TrayNavigatePayload {
+  path: string
+}
+
+export interface TraySwitchProxyModePayload {
+  mode: 'system' | 'tun' | 'manual'
+}

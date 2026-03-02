@@ -29,6 +29,9 @@ pub mod system {
     pub mod update_service;
 }
 
+// Tray services
+pub mod tray;
+
 // Re-exports for backward compatibility
 pub use core::kernel_auto_manage;
 pub use core::kernel_service;
@@ -39,6 +42,7 @@ pub use system::background_tasks;
 pub use system::startup_refresh_service;
 pub use system::system_service;
 pub use system::update_service;
+pub use tray as tray_service;
 
 // Re-export storage service
 pub use storage::*; // 重新启用存储模块

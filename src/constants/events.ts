@@ -9,6 +9,8 @@ import type {
   UpgradeSubscriptionRefreshFailedPayload,
   KernelFailurePayload,
   KernelOperationFailedPayload,
+  TrayNavigatePayload,
+  TraySwitchProxyModePayload,
 } from '@/types/events'
 
 export const APP_EVENTS = {
@@ -31,6 +33,12 @@ export const APP_EVENTS = {
   updateAvailable: 'update-available',
   subscriptionUpdated: 'subscription-updated',
   upgradeSubscriptionRefreshFailed: 'upgrade-subscription-refresh-failed',
+  trayActionShowWindow: 'tray-action-show-window',
+  trayActionHideWindow: 'tray-action-hide-window',
+  trayActionNavigateLastRoute: 'tray-action-navigate-last-route',
+  trayActionExitRequested: 'tray-action-exit-requested',
+  trayActionRestartKernel: 'tray-action-restart-kernel',
+  trayActionSwitchProxyMode: 'tray-action-switch-proxy-mode',
 } as const
 
 export type AppEventName = typeof APP_EVENTS[keyof typeof APP_EVENTS]
@@ -59,4 +67,10 @@ export type AppEventPayloads = {
   [APP_EVENTS.updateAvailable]: UpdateAvailablePayload
   [APP_EVENTS.subscriptionUpdated]: unknown
   [APP_EVENTS.upgradeSubscriptionRefreshFailed]: UpgradeSubscriptionRefreshFailedPayload
+  [APP_EVENTS.trayActionShowWindow]: unknown
+  [APP_EVENTS.trayActionHideWindow]: unknown
+  [APP_EVENTS.trayActionNavigateLastRoute]: TrayNavigatePayload
+  [APP_EVENTS.trayActionExitRequested]: unknown
+  [APP_EVENTS.trayActionRestartKernel]: unknown
+  [APP_EVENTS.trayActionSwitchProxyMode]: TraySwitchProxyModePayload
 }
