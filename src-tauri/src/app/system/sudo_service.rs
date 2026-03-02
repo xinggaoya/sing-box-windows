@@ -1,5 +1,7 @@
 use serde::Serialize;
 use tauri::AppHandle;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use tauri::Manager;
 
 /// 统一给前端/调用方识别的错误码前缀（避免依赖具体文案）。
 /// 约定：Rust 端返回 `SUDO_PASSWORD_REQUIRED` / `SUDO_PASSWORD_INVALID` 等，
