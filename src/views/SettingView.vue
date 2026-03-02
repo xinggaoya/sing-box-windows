@@ -902,7 +902,7 @@ const savePortSettings = async () => {
   try {
     appStore.proxyPort = tempProxyPort.value
     appStore.apiPort = tempApiPort.value
-    await appStore.saveToBackend()
+    await appStore.saveToBackend({ applyRuntime: true })
     message.success(t('common.saveSuccess'))
     showPortModal.value = false
   } catch (e) {

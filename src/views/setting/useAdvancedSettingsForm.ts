@@ -22,7 +22,7 @@ interface AppStoreLike {
   singboxDnsCn: string
   singboxDnsResolver: string
   singboxUrltestUrl: string
-  saveToBackend: () => Promise<void>
+  saveToBackend: (options?: { applyRuntime?: boolean }) => Promise<void>
 }
 
 interface UseAdvancedSettingsFormOptions {
@@ -103,7 +103,7 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
       options.appStore.tunStack = proxyAdvancedForm.tunStack
       options.appStore.tunEnableIpv6 = proxyAdvancedForm.tunEnableIpv6
 
-      await options.appStore.saveToBackend()
+      await options.appStore.saveToBackend({ applyRuntime: true })
       options.message.success(options.t('common.saveSuccess'))
     } catch {
       options.message.error(options.t('common.saveFailed'))
@@ -130,7 +130,7 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
       options.appStore.singboxUrltestUrl =
         singboxProfileForm.urltestUrl.trim() || options.appStore.singboxUrltestUrl
 
-      await options.appStore.saveToBackend()
+      await options.appStore.saveToBackend({ applyRuntime: true })
       options.message.success(options.t('common.saveSuccess'))
     } catch (error) {
       console.error('保存 sing-box 配置生成高级选项失败:', error)

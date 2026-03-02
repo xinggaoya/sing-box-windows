@@ -141,7 +141,7 @@ export function createAppPersistence(state: PersistenceState) {
     }
   }
 
-  const saveToBackend = async () => {
+  const saveToBackend = async (options?: { applyRuntime?: boolean }) => {
     try {
       // Derive proxyMode from independent toggles for backward compatibility
       let proxyMode = 'manual'
@@ -183,7 +183,9 @@ export function createAppPersistence(state: PersistenceState) {
       }
       // 前端自动保存仅负责持久化，不直接触发后端运行态重配。
       // 运行态变更统一由显式业务动作触发（如切换代理模式、重启内核、切换订阅）。
-      await DatabaseService.saveAppConfig(config, { applyRuntime: false })
+      await DatabaseService.saveAppConfig(config, {
+        applyRuntime: options?.applyRuntime ?? false,
+      })
     } catch {
       // 保存失败时静默处理
     }
