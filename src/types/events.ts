@@ -53,6 +53,18 @@ export interface KernelHealthPayload {
   issues: string[]
 }
 
+export interface KernelLifecyclePayload {
+  process_running: boolean
+  api_ready: boolean
+  websocket_ready: boolean
+  kernel_state?: 'stopped' | 'starting' | 'running' | 'stopping' | 'failed' | 'crashed'
+  state_version?: number
+  proxy_mode?: 'system' | 'tun' | 'manual'
+  api_port?: number
+  proxy_port?: number
+  auto_restarted?: boolean
+}
+
 export interface KernelFailurePayload {
   code?: string
   message?: string
@@ -64,13 +76,15 @@ export interface KernelFailurePayload {
   error?: string
 }
 
-export interface KernelOperationFailedPayload {
+export interface KernelOperationEventPayload {
   op_id?: string
   operation?: string
   state_version?: number
   timestamp?: number
-  error?: string
+  error?: string | null
 }
+
+export type KernelOperationFailedPayload = KernelOperationEventPayload
 
 export interface UpdateAvailablePayload {
   latest_version: string

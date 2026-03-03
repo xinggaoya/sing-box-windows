@@ -38,9 +38,7 @@ export const useAppStore = defineStore(
 
     // 应用运行状态
     const isRunning = ref(false)
-    // WebSocket连接状态
-    const wsConnected = ref(false)
-    // 连接中状态（正在启动内核但尚未完成连接）
+    // 连接中状态（正在启动内核但尚未完成事件流就绪）
     const isConnecting = ref(false)
 
     // 托盘实例ID - 由TrayStore使用
@@ -64,9 +62,6 @@ export const useAppStore = defineStore(
 
     // IP版本设置
     const preferIpv6 = ref(false)
-
-    // 连接检查超时处理
-    let connectionCheckTimeout: number | null = null
 
     // 端口配置
     const proxyPort = ref(12080) // 代理端口
@@ -195,11 +190,6 @@ export const useAppStore = defineStore(
 
     // Store清理方法
     const cleanupStore = () => {
-      if (connectionCheckTimeout) {
-        clearTimeout(connectionCheckTimeout)
-        connectionCheckTimeout = null
-      }
-
       stopAutoSave()
     }
 
@@ -208,18 +198,8 @@ export const useAppStore = defineStore(
       if (isRunning.value !== state) {
         isRunning.value = state
 
-        if (state) {
-          // 现在使用Tauri事件系统，无需手动检查WebSocket连接
-          console.log('内核运行状态已设置，事件系统会自动处理连接')
-
-          // 移除WebSocket连接检查，因为Tauri事件系统会自动处理
-          setTimeout(async () => {
-            console.log('📡 Tauri事件系统已激活，等待后端推送数据')
-          }, 2000)
-        } else {
-          // 如果设置为停止，清除连接状态
-          wsConnected.value = false
-          // 同时确保连接中状态也被清除
+        if (!state) {
+          // 运行停止时同步清理连接中的状态
           isConnecting.value = false
         }
 
@@ -233,27 +213,6 @@ export const useAppStore = defineStore(
       isConnecting.value = state
       // 连接状态变更现在通过Pinia响应式系统处理
       console.log('连接状态已变更:', state)
-    }
-
-    // 启动WebSocket连接检查 - 简化版本，主要依赖事件系统
-    const startWebSocketCheck = async (): Promise<boolean> => {
-      try {
-        // 新的WebSocket服务是事件驱动的，由后端自动管理
-        // 这里只需要记录日志，实际连接状态通过事件更新
-        console.log('🔌 WebSocket 连接检查 - 依赖后端自动管理')
-
-        // 如果当前状态是运行中，假设WebSocket会自动连接
-        if (isRunning.value) {
-          console.log('内核运行中，WebSocket 应该会自动连接')
-          return true
-        }
-
-        return false
-      } catch (error) {
-        console.error('WebSocket连接检查出错:', error)
-        wsConnected.value = false
-        return false
-      }
     }
 
     // 切换系统开机自启
@@ -420,7 +379,6 @@ export const useAppStore = defineStore(
 
     return {
       isRunning,
-      wsConnected,
       isConnecting,
       isDataRestored,
       trayInstanceId,
@@ -458,7 +416,6 @@ export const useAppStore = defineStore(
       toggleSystemProxy,
       toggleTun,
       switchProxyMode,
-      startWebSocketCheck,
       setProxyMode,
       setMessageInstance,
       showSuccessMessage,

@@ -4,4 +4,5 @@ export interface UpdateConfig {
   last_version: string | null
   skip_version: string | null
   accept_prerelease: boolean
+  update_channel: string | null
 }

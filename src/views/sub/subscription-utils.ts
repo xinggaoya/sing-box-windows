@@ -77,3 +77,37 @@ export const formatExpireTime = (timestamp: number | undefined, t: TranslateFn) 
 export const formatLocalTime = (timestamp: number) => {
   return new Date(timestamp).toLocaleString()
 }
+
+const formatDurationMinutes = (totalMinutes: number) => {
+  if (totalMinutes <= 0) return '0m'
+  if (totalMinutes < 60) return `${totalMinutes}m`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (minutes === 0) return `${hours}h`
+  return `${hours}h ${minutes}m`
+}
+
+export const formatAutoUpdateHealth = (item: FrontendSubscription, t: TranslateFn) => {
+  const failCount = item.autoUpdateFailCount ?? 0
+  if (failCount <= 0) {
+    return ''
+  }
+
+  const errType = item.lastAutoUpdateErrorType || 'unknown'
+  const errorHint = item.lastAutoUpdateError || errType
+  const backoffUntil = item.lastAutoUpdateBackoffUntil
+  if (!backoffUntil) {
+    return t('sub.autoUpdateHealthFailed', {
+      count: failCount,
+      reason: errorHint,
+    })
+  }
+
+  const now = Date.now()
+  const remainingMinutes = Math.max(Math.ceil((backoffUntil - now) / (60 * 1000)), 0)
+  return t('sub.autoUpdateHealthBackoff', {
+    count: failCount,
+    reason: errorHint,
+    remaining: formatDurationMinutes(remainingMinutes),
+  })
+}

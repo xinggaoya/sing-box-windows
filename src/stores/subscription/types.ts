@@ -16,4 +16,9 @@ export interface FrontendSubscription {
   subscriptionDownload?: number
   subscriptionTotal?: number
   subscriptionExpire?: number
+  autoUpdateFailCount?: number
+  lastAutoUpdateAttempt?: number
+  lastAutoUpdateError?: string
+  lastAutoUpdateErrorType?: string
+  lastAutoUpdateBackoffUntil?: number
 }

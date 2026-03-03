@@ -84,6 +84,10 @@
               <n-icon size="14"><CalendarOutline /></n-icon>
               <span class="info-text">{{ formatExpireTime(item.subscriptionExpire) }}</span>
             </div>
+            <div v-if="item.autoUpdateFailCount && item.autoUpdateFailCount > 0" class="info-row warn">
+              <n-icon size="14"><AlertCircleOutline /></n-icon>
+              <span class="info-text">{{ formatAutoUpdateHealth(item) }}</span>
+            </div>
           </div>
 
           <div class="sub-card-footer">
@@ -252,6 +256,7 @@ import { DEFAULT_AUTO_UPDATE_MINUTES, type FrontendSubscription } from '@/stores
 import {
   formatExpireTime as formatExpireTimeText,
   formatIntervalLabel as formatIntervalLabelText,
+  formatAutoUpdateHealth as formatAutoUpdateHealthText,
   formatLocalTime,
   formatTrafficSummary as formatTrafficSummaryText,
   generateConfigFileName,
@@ -273,6 +278,7 @@ import {
   TimeOutline,
   StatsChartOutline,
   CalendarOutline,
+  AlertCircleOutline,
   RefreshOutline,
   ArrowUndoOutline,
   TimerOutline,
@@ -721,6 +727,7 @@ const applySubscriptionUserinfo = (
 const formatTrafficSummary = (item: Subscription) => formatTrafficSummaryText(item, t)
 const formatExpireTime = (timestamp?: number) => formatExpireTimeText(timestamp, t)
 const formatTime = (timestamp: number): string => formatLocalTime(timestamp)
+const formatAutoUpdateHealth = (item: Subscription) => formatAutoUpdateHealthText(item, t)
 
 const regenerateConfigFor = async (item: Subscription) => {
   const persistOptions = { fileName: generateConfigFileName(item.name || 'sub'), applyRuntime: false }
@@ -920,6 +927,10 @@ onUnmounted(() => {
   gap: 8px;
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+.info-row.warn {
+  color: #f59e0b;
 }
 
 .info-text {

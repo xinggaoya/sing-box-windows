@@ -50,7 +50,13 @@ async fn start_update_loop(app: AppHandle) -> Result<(), String> {
                     if !config.auto_check {
                         warn!("自动更新检查已关闭，跳过本轮后台检查");
                     } else {
-                        match check_update(version.clone(), Some(config.accept_prerelease)).await {
+                        match check_update(
+                            version.clone(),
+                            Some(config.accept_prerelease),
+                            config.update_channel.clone(),
+                        )
+                        .await
+                        {
                             Ok(info) => handle_update_result(&app, &config.skip_version, info).await,
                             Err(e) => warn!("后台检查更新失败: {}", e),
                         }

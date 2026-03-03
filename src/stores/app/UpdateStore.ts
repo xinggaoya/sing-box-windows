@@ -5,6 +5,8 @@ import { getVersion } from '@tauri-apps/api/app'
 import { DatabaseService } from '@/services/database-service'
 import type { UpdateConfig } from '@/types/database'
 
+export type UpdateChannel = 'stable' | 'prerelease' | 'autobuild'
+
 // 定义更新信息类型
 interface UpdateInfo {
   latest_version: string
@@ -24,6 +26,13 @@ interface UpdateState {
   status: 'idle' | 'checking' | 'downloading' | 'completed' | 'error' | 'installing'
   message: string
   error: string | null
+}
+
+const normalizeUpdateChannel = (value: string | null | undefined): UpdateChannel | null => {
+  if (value === 'stable' || value === 'prerelease' || value === 'autobuild') {
+    return value
+  }
+  return null
 }
 
 export const useUpdateStore = defineStore(
@@ -53,6 +62,7 @@ export const useUpdateStore = defineStore(
     // 用户设置
     const autoCheckUpdate = ref(true)
     const skipVersion = ref('')
+    const updateChannel = ref<UpdateChannel>('stable')
     const acceptPrerelease = ref(false) // 是否接收预发布版本，持久化到数据库
     const lastCheck = ref(0)
 
@@ -68,7 +78,9 @@ export const useUpdateStore = defineStore(
         // 更新响应式状态
         autoCheckUpdate.value = updateConfig.auto_check
         skipVersion.value = updateConfig.skip_version || ''
-        acceptPrerelease.value = updateConfig.accept_prerelease ?? false
+        const persistedChannel = normalizeUpdateChannel(updateConfig.update_channel)
+        updateChannel.value = persistedChannel || (updateConfig.accept_prerelease ? 'prerelease' : 'stable')
+        acceptPrerelease.value = updateChannel.value !== 'stable'
         lastCheck.value = updateConfig.last_check ?? 0
 
         // 获取当前版本（不触发写入）
@@ -100,6 +112,7 @@ export const useUpdateStore = defineStore(
           last_version: appVersion.value || null,
           skip_version: skipVersion.value || null,
           accept_prerelease: acceptPrerelease.value,
+          update_channel: updateChannel.value,
         }
         await DatabaseService.saveUpdateConfig(config)
         console.log('? 更新配置已保存到数据库')
@@ -177,7 +190,8 @@ export const useUpdateStore = defineStore(
 
         const updateInfo = await systemService.checkUpdate(
           appVersion.value,
-          acceptPrerelease.value
+          acceptPrerelease.value,
+          updateChannel.value,
         ) as UpdateInfo | null
 
         if (updateInfo && updateInfo.has_update) {
@@ -307,7 +321,15 @@ export const useUpdateStore = defineStore(
     // 设置接受预发布版本
     const setAcceptPrerelease = async (accept: boolean) => {
       acceptPrerelease.value = accept
+      updateChannel.value = accept ? 'prerelease' : 'stable'
       // 直接持久化，避免依赖 watch 触发时机导致遗漏
+      await saveToBackend({ touchLastCheck: false })
+    }
+
+    // 设置更新通道
+    const setUpdateChannel = async (channel: UpdateChannel) => {
+      updateChannel.value = channel
+      acceptPrerelease.value = channel !== 'stable'
       await saveToBackend({ touchLastCheck: false })
     }
 
@@ -316,7 +338,7 @@ export const useUpdateStore = defineStore(
 
     // 监听更新配置变化并自动保存到数据库
     watch(
-      [autoCheckUpdate, skipVersion, acceptPrerelease],
+      [autoCheckUpdate, skipVersion, acceptPrerelease, updateChannel],
       async () => {
         // 初始化期间不保存
         if (isInitializing) return
@@ -346,6 +368,7 @@ export const useUpdateStore = defineStore(
       updateState,
       autoCheckUpdate,
       skipVersion,
+      updateChannel,
       acceptPrerelease,
       isPrerelease,
 
@@ -359,6 +382,7 @@ export const useUpdateStore = defineStore(
       updateProgress,
       setAutoCheckUpdate,
       setAcceptPrerelease,
+      setUpdateChannel,
 
       // 计算属性
       formattedFileSize: computed(() => formatFileSize(fileSize.value)),

@@ -15,7 +15,6 @@ export class DatabaseService {
     return await invoke('db_save_app_config', {
       config,
       applyRuntime: options.applyRuntime ?? false,
-      apply_runtime: options.applyRuntime ?? false,
     })
   }
 

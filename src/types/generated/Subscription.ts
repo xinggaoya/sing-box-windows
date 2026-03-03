@@ -13,4 +13,9 @@ export interface Subscription {
   subscription_download?: number | null
   subscription_total?: number | null
   subscription_expire?: number | null
+  auto_update_fail_count?: number | null
+  last_auto_update_attempt?: number | null
+  last_auto_update_error?: string | null
+  last_auto_update_error_type?: string | null
+  last_auto_update_backoff_until?: number | null
 }

@@ -6,7 +6,9 @@
     "main"
   ],
   "permissions": [
-    "core:default",
+    "core:event:default",
+    "core:window:default",
+    "core:app:default",
     "core:window:allow-start-dragging",
     "core:window:allow-hide",
     "core:window:allow-minimize",

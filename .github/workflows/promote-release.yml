@@ -1,0 +1,80 @@
+name: Promote Pre-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要转正的版本标签，例如 v2.2.6'
+        required: true
+        type: string
+      make_latest:
+        description: '是否将该版本设为 Latest'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  promote:
+    name: Promote To Stable
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Normalize tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW_TAG="${{ inputs.tag }}"
+          RAW_TAG="$(echo "$RAW_TAG" | xargs)"
+          if [ -z "$RAW_TAG" ]; then
+            echo "tag input is empty"
+            exit 1
+          fi
+
+          if [[ "$RAW_TAG" != v* ]]; then
+            RAW_TAG="v${RAW_TAG}"
+          fi
+
+          echo "tag=$RAW_TAG" >> "$GITHUB_OUTPUT"
+          echo "normalized tag: $RAW_TAG"
+
+      - name: Ensure release exists for tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ steps.tag.outputs.tag }}'
+            try {
+              await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag
+              })
+              core.info(`release exists for ${tag}`)
+            } catch (error) {
+              core.setFailed(`release not found for tag ${tag}: ${error.message}`)
+            }
+
+      - name: Extract Release Notes from CHANGELOG
+        id: extract_notes
+        run: node .github/scripts/extract-release-notes.js "${{ steps.tag.outputs.tag }}"
+
+      - name: Promote release to stable
+        uses: softprops/action-gh-release@v1
+        with:
+          prerelease: false
+          make_latest: ${{ inputs.make_latest && 'true' || 'false' }}
+          generate_release_notes: false
+          name: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          body: ${{ steps.extract_notes.outputs.release_notes }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -4,6 +4,8 @@ import type {
   ConnectionsDataPayload,
   LogEventPayload,
   MemoryStatsPayload,
+  KernelLifecyclePayload,
+  KernelOperationEventPayload,
   KernelHealthPayload,
   UpdateAvailablePayload,
   UpgradeSubscriptionRefreshFailedPayload,
@@ -52,11 +54,11 @@ export type AppEventPayloads = {
   [APP_EVENTS.kernelStatusChanged]: KernelStatus
   [APP_EVENTS.kernelReady]: void
   [APP_EVENTS.kernelError]: KernelFailurePayload
-  [APP_EVENTS.kernelStarting]: unknown
-  [APP_EVENTS.kernelStarted]: unknown
-  [APP_EVENTS.kernelStopped]: unknown
-  [APP_EVENTS.kernelOperationStarted]: unknown
-  [APP_EVENTS.kernelOperationFinished]: unknown
+  [APP_EVENTS.kernelStarting]: KernelLifecyclePayload
+  [APP_EVENTS.kernelStarted]: KernelLifecyclePayload
+  [APP_EVENTS.kernelStopped]: KernelLifecyclePayload
+  [APP_EVENTS.kernelOperationStarted]: KernelOperationEventPayload
+  [APP_EVENTS.kernelOperationFinished]: KernelOperationEventPayload
   [APP_EVENTS.kernelOperationFailed]: KernelOperationFailedPayload
   [APP_EVENTS.kernelDownloadProgress]: KernelDownloadPayload
   [APP_EVENTS.updateProgress]: {
@@ -65,7 +67,7 @@ export type AppEventPayloads = {
     message?: string
   }
   [APP_EVENTS.updateAvailable]: UpdateAvailablePayload
-  [APP_EVENTS.subscriptionUpdated]: unknown
+  [APP_EVENTS.subscriptionUpdated]: string
   [APP_EVENTS.upgradeSubscriptionRefreshFailed]: UpgradeSubscriptionRefreshFailedPayload
   [APP_EVENTS.trayActionShowWindow]: unknown
   [APP_EVENTS.trayActionHideWindow]: unknown

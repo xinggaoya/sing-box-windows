@@ -5,7 +5,12 @@
 import { APP_EVENTS } from '@/constants/events'
 import { eventService } from './event-service'
 import { invokeWithAppContext, withAppStore } from './invoke-client'
-import type { KernelFailurePayload, KernelOperationFailedPayload } from '@/types/events'
+import type {
+  KernelFailurePayload,
+  KernelLifecyclePayload,
+  KernelOperationEventPayload,
+  KernelOperationFailedPayload,
+} from '@/types/events'
 
 export interface KernelStatus {
   process_running: boolean
@@ -93,17 +98,14 @@ class KernelService {
 
     if (options.config?.proxy_mode) {
       args.proxy_mode = options.config.proxy_mode
-      args.proxyMode = options.config.proxy_mode
     }
 
     if (options.config?.api_port) {
       args.api_port = options.config.api_port
-      args.apiPort = options.config.api_port
     }
 
     if (options.config?.proxy_port) {
       args.proxy_port = options.config.proxy_port
-      args.proxyPort = options.config.proxy_port
     }
 
     if (typeof options.config?.system_proxy_enabled === 'boolean') {
@@ -116,7 +118,6 @@ class KernelService {
 
     if (options.keepAlive !== undefined) {
       args.keep_alive = options.keepAlive
-      args.keepAlive = options.keepAlive
     }
 
     return args
@@ -341,7 +342,6 @@ class KernelService {
 
       if (options.forceRestart !== undefined) {
         args.force_restart = options.forceRestart
-        args.forceRestart = options.forceRestart
       }
 
       if (options.config) {
@@ -378,23 +378,27 @@ class KernelService {
     return eventService.on(APP_EVENTS.kernelError, callback)
   }
 
-  async onKernelStarting(callback: (data: unknown) => void): Promise<() => void> {
+  async onKernelStarting(callback: (data: KernelLifecyclePayload) => void): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelStarting, callback)
   }
 
-  async onKernelStarted(callback: (data: unknown) => void): Promise<() => void> {
+  async onKernelStarted(callback: (data: KernelLifecyclePayload) => void): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelStarted, callback)
   }
 
-  async onKernelStopped(callback: (data: unknown) => void): Promise<() => void> {
+  async onKernelStopped(callback: (data: KernelLifecyclePayload) => void): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelStopped, callback)
   }
 
-  async onKernelOperationStarted(callback: (data: unknown) => void): Promise<() => void> {
+  async onKernelOperationStarted(
+    callback: (data: KernelOperationEventPayload) => void,
+  ): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelOperationStarted, callback)
   }
 
-  async onKernelOperationFinished(callback: (data: unknown) => void): Promise<() => void> {
+  async onKernelOperationFinished(
+    callback: (data: KernelOperationEventPayload) => void,
+  ): Promise<() => void> {
     return eventService.on(APP_EVENTS.kernelOperationFinished, callback)
   }
 

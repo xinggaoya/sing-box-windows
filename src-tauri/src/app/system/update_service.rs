@@ -148,6 +148,68 @@ pub struct UpdateInfo {
     pub is_prerelease: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UpdateChannel {
+    Stable,
+    Prerelease,
+    Autobuild,
+}
+
+impl UpdateChannel {
+    fn from_inputs(channel: Option<&str>, include_prerelease: bool) -> Self {
+        match channel.map(|c| c.trim().to_ascii_lowercase()) {
+            Some(ref c) if c == "stable" => Self::Stable,
+            Some(ref c) if c == "prerelease" => Self::Prerelease,
+            Some(ref c) if c == "autobuild" => Self::Autobuild,
+            _ => {
+                if include_prerelease {
+                    Self::Prerelease
+                } else {
+                    Self::Stable
+                }
+            }
+        }
+    }
+
+    fn uses_release_list(&self) -> bool {
+        !matches!(self, Self::Stable)
+    }
+}
+
+fn select_release_by_channel(
+    releases: &[serde_json::Value],
+    channel: UpdateChannel,
+) -> Option<serde_json::Value> {
+    match channel {
+        UpdateChannel::Stable => releases
+            .iter()
+            .find(|release| !release["prerelease"].as_bool().unwrap_or(false))
+            .cloned(),
+        UpdateChannel::Prerelease => releases.first().cloned(),
+        UpdateChannel::Autobuild => releases
+            .iter()
+            .find(|release| {
+                let tag_name = release["tag_name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_ascii_lowercase();
+                let release_name = release["name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_ascii_lowercase();
+                tag_name.contains("autobuild") || release_name.contains("autobuild")
+            })
+            .cloned()
+            .or_else(|| {
+                releases
+                    .iter()
+                    .find(|release| release["prerelease"].as_bool().unwrap_or(false))
+                    .cloned()
+            })
+            .or_else(|| releases.first().cloned()),
+    }
+}
+
 // 版本比较函数
 fn compare_versions(current: &str, latest: &str) -> bool {
     // 清理版本号，移除 'v' 前缀和其他非版本信息
@@ -177,6 +239,7 @@ fn compare_versions(current: &str, latest: &str) -> bool {
 pub async fn check_update(
     current_version: String,
     include_prerelease: Option<bool>,
+    update_channel: Option<String>,
 ) -> Result<UpdateInfo, String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(
@@ -187,13 +250,12 @@ pub async fn check_update(
         .map_err(|e| format!("{}: {}", messages::ERR_HTTP_CLIENT_FAILED, e))?;
 
     let include_prerelease = include_prerelease.unwrap_or(false);
+    let channel = UpdateChannel::from_inputs(update_channel.as_deref(), include_prerelease);
 
-    // 根据是否包含预发布版本选择不同的API端点
-    let api_url = if include_prerelease {
-        // 获取所有版本（包括预发布版本），然后筛选最新的
+    // 稳定通道读取 latest，其他通道读取 releases 列表后由本地策略筛选。
+    let api_url = if channel.uses_release_list() {
         "https://api.github.com/repos/xinggaoya/sing-box-windows/releases"
     } else {
-        // 只获取最新的正式版本
         api::GITHUB_API_URL
     };
 
@@ -205,8 +267,7 @@ pub async fn check_update(
         .await
         .map_err(|e| format!("{}: {}", messages::ERR_GET_VERSION_FAILED, e))?;
 
-    let release: serde_json::Value = if include_prerelease {
-        // 获取所有版本，取第一个（最新的）
+    let release: serde_json::Value = if channel.uses_release_list() {
         let releases: Vec<serde_json::Value> = response
             .json()
             .await
@@ -219,7 +280,8 @@ pub async fn check_update(
             ));
         }
 
-        releases[0].clone()
+        select_release_by_channel(&releases, channel)
+            .ok_or_else(|| format!("{}: 未找到匹配通道的版本", messages::ERR_GET_VERSION_FAILED))?
     } else {
         response
             .json()

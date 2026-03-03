@@ -467,9 +467,83 @@
           </div>
           <div class="setting-row">
             <div class="setting-info">
-              <div class="setting-label">{{ t('setting.update.acceptPrerelease') }}</div>
+              <div class="setting-label">{{ t('setting.update.channel') }}</div>
             </div>
-            <n-switch v-model:value="updateStore.acceptPrerelease" @update:value="onPrereleaseSettingChange" />
+            <n-select
+              v-model:value="updateStore.updateChannel"
+              :options="updateChannelOptions"
+              size="small"
+              class="setting-input"
+              @update:value="onUpdateChannelChange"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Backup Settings -->
+      <div class="settings-section">
+        <div class="section-header">
+          <n-icon size="20"><ArchiveOutline /></n-icon>
+          <h3>{{ t('setting.backup.title') }}</h3>
+        </div>
+        <div class="section-card">
+          <div class="setting-row align-start">
+            <div class="setting-info">
+              <div class="setting-label">{{ t('setting.backup.description') }}</div>
+              <div class="setting-desc">{{ t('setting.backup.restoreHint') }}</div>
+            </div>
+            <div class="backup-actions">
+              <n-button
+                size="small"
+                secondary
+                :loading="backupExporting"
+                :disabled="backupBusy"
+                @click="handleExportBackup"
+              >
+                {{ t('setting.backup.exportAction') }}
+              </n-button>
+              <n-button
+                size="small"
+                secondary
+                :loading="backupValidating"
+                :disabled="backupBusy"
+                @click="handleValidateBackup"
+              >
+                {{ t('setting.backup.validateAction') }}
+              </n-button>
+              <n-button
+                size="small"
+                type="warning"
+                :loading="backupRestoring"
+                :disabled="backupBusy"
+                @click="handleRestoreBackup"
+              >
+                {{ t('setting.backup.restoreAction') }}
+              </n-button>
+            </div>
+          </div>
+
+          <div v-if="backupPreview" class="backup-preview">
+            <div class="backup-preview-row">
+              <span class="meta-label">{{ t('setting.backup.selectedFile') }}</span>
+              <span class="backup-path">{{ backupPreview.file_path }}</span>
+            </div>
+            <div class="backup-preview-row">
+              <span class="meta-label">{{ t('setting.backup.subscriptionCount') }}</span>
+              <span class="meta-value">{{ backupPreview.subscriptions_count }}</span>
+            </div>
+            <div class="backup-preview-row" :class="{ warning: backupPreview.warnings.length > 0 }">
+              <span class="meta-label">{{ t('setting.backup.warningCount') }}</span>
+              <span class="meta-value">{{ backupPreview.warnings.length }}</span>
+            </div>
+            <div v-if="backupPreview.warnings.length > 0" class="backup-warning-list">
+              <div v-for="(warning, idx) in backupPreview.warnings" :key="idx" class="backup-warning-item">
+                {{ warning }}
+              </div>
+            </div>
+          </div>
+          <div v-else class="setting-desc">
+            {{ t('setting.backup.noPreview') }}
           </div>
         </div>
       </div>
@@ -590,13 +664,15 @@ import {
   InformationCircleOutline,
   LogoGithub,
   ColorPaletteOutline,
+  ArchiveOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore, useThemeStore } from '@/stores'
 import { useSubStore } from '@/stores/subscription/SubStore'
 import type { Locale } from '@/stores/app/LocaleStore'
 import type { ThemeMode } from '@/stores/app/ThemeStore'
-import { systemService } from '@/services/system-service'
+import type { UpdateChannel } from '@/stores/app/UpdateStore'
+import { systemService, type BackupImportResult } from '@/services/system-service'
 import { supportedLocales } from '@/locales'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { ACCENT_PRESETS, TUN_STACK_OPTIONS } from '@/views/setting/setting-options'
@@ -619,6 +695,10 @@ const platformInfo = ref<{ os: string; arch: string; display_name: string } | nu
 
 const autoStart = ref(false)
 const checkingUpdate = ref(false)
+const backupExporting = ref(false)
+const backupValidating = ref(false)
+const backupRestoring = ref(false)
+const backupPreview = ref<BackupImportResult | null>(null)
 const themeForm = reactive({
   mode: 'system' as ThemeMode,
   accentColor: '#6366f1',
@@ -644,6 +724,11 @@ const languageOptions = computed<{ label: string; value: Locale }[]>(() => [
     value: item.code as Locale,
   })),
 ])
+const updateChannelOptions = computed<{ label: string; value: UpdateChannel }[]>(() => [
+  { label: t('setting.update.channelStable'), value: 'stable' },
+  { label: t('setting.update.channelPrerelease'), value: 'prerelease' },
+  { label: t('setting.update.channelAutobuild'), value: 'autobuild' },
+])
 
 const tunStackOptions = TUN_STACK_OPTIONS
 
@@ -665,6 +750,9 @@ const updateMessage = computed(() => updateStore.updateState.message)
 const isUpdating = computed(() => ['downloading', 'installing'].includes(updateStatus.value))
 const showUpdateProgress = computed(() =>
   ['downloading', 'installing', 'completed'].includes(updateStatus.value) || updateProgress.value > 0
+)
+const backupBusy = computed(
+  () => backupExporting.value || backupValidating.value || backupRestoring.value,
 )
 
 const {
@@ -880,14 +968,86 @@ const handleCheckUpdate = async () => {
   }
 }
 
-const onPrereleaseSettingChange = async (value: boolean) => {
+const onUpdateChannelChange = async (value: UpdateChannel) => {
+  const previous = updateStore.updateChannel
   try {
-    await updateStore.setAcceptPrerelease(value)
+    await updateStore.setUpdateChannel(value)
   } catch (error) {
-    console.error('保存接收测试版本设置失败:', error)
+    console.error('保存更新通道设置失败:', error)
     message.error(t('common.saveFailed'))
-    // 回滚切换状态，避免 UI 与实际状态不一致
-    updateStore.acceptPrerelease = !value
+    updateStore.updateChannel = previous
+  }
+}
+
+const reloadStoresAfterBackupRestore = async () => {
+  await Promise.all([
+    appStore.loadFromBackend(),
+    themeStore.loadFromBackend(),
+    localeStore.loadFromBackend(),
+    updateStore.loadFromBackend(),
+    subStore.loadFromBackend(),
+  ])
+  autoStart.value = appStore.autoStartApp
+}
+
+const handleExportBackup = async () => {
+  backupExporting.value = true
+  try {
+    const result = await systemService.backupExportSnapshot()
+    message.success(t('setting.backup.exportSuccess', { path: result.file_path }))
+  } catch (error) {
+    console.error('导出备份失败:', error)
+    const errMsg = error instanceof Error ? error.message : t('setting.backup.operationFailed')
+    message.error(errMsg)
+  } finally {
+    backupExporting.value = false
+  }
+}
+
+const handleValidateBackup = async () => {
+  backupValidating.value = true
+  try {
+    const result = await systemService.backupImportSnapshot({ dryRun: true })
+    backupPreview.value = result
+    if (result.warnings.length > 0) {
+      message.warning(t('setting.backup.validateWithWarnings', { count: result.warnings.length }))
+    } else {
+      message.success(t('setting.backup.validateSuccess', { count: result.subscriptions_count }))
+    }
+  } catch (error) {
+    console.error('预检备份失败:', error)
+    const errMsg = error instanceof Error ? error.message : t('setting.backup.operationFailed')
+    message.error(errMsg)
+  } finally {
+    backupValidating.value = false
+  }
+}
+
+const handleRestoreBackup = async () => {
+  const confirmed = window.confirm(t('setting.backup.restoreConfirm'))
+  if (!confirmed) {
+    return
+  }
+
+  backupRestoring.value = true
+  try {
+    const result = await systemService.backupImportSnapshot({
+      filePath: backupPreview.value?.file_path,
+      dryRun: false,
+    })
+    backupPreview.value = result
+    await reloadStoresAfterBackupRestore()
+    if (result.warnings.length > 0) {
+      message.warning(t('setting.backup.restoreWithWarnings', { count: result.warnings.length }))
+    } else {
+      message.success(t('setting.backup.restoreSuccess', { count: result.subscriptions_count }))
+    }
+  } catch (error) {
+    console.error('恢复备份失败:', error)
+    const errMsg = error instanceof Error ? error.message : t('setting.backup.operationFailed')
+    message.error(errMsg)
+  } finally {
+    backupRestoring.value = false
   }
 }
 
@@ -1283,6 +1443,55 @@ onUnmounted(() => {
 .update-error {
   font-size: 13px;
   color: #ef4444;
+}
+
+.backup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 160px;
+}
+
+.backup-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+}
+
+.backup-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.backup-preview-row.warning .meta-value {
+  color: #f59e0b;
+}
+
+.backup-path {
+  flex: 1;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.backup-warning-list {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.backup-warning-item {
+  font-size: 12px;
+  color: #f59e0b;
+  line-height: 1.5;
 }
 
 .manual-import-body {

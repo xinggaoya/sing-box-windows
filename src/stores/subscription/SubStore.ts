@@ -28,6 +28,11 @@ export const useSubStore = defineStore(
         subscriptionDownload: sub.subscription_download ?? undefined,
         subscriptionTotal: sub.subscription_total ?? undefined,
         subscriptionExpire: sub.subscription_expire ?? undefined,
+        autoUpdateFailCount: sub.auto_update_fail_count ?? undefined,
+        lastAutoUpdateAttempt: sub.last_auto_update_attempt ?? undefined,
+        lastAutoUpdateError: sub.last_auto_update_error ?? undefined,
+        lastAutoUpdateErrorType: sub.last_auto_update_error_type ?? undefined,
+        lastAutoUpdateBackoffUntil: sub.last_auto_update_backoff_until ?? undefined,
       }))
     }
 
@@ -48,6 +53,11 @@ export const useSubStore = defineStore(
         subscription_download: sub.subscriptionDownload ?? null,
         subscription_total: sub.subscriptionTotal ?? null,
         subscription_expire: sub.subscriptionExpire ?? null,
+        auto_update_fail_count: sub.autoUpdateFailCount ?? null,
+        last_auto_update_attempt: sub.lastAutoUpdateAttempt ?? null,
+        last_auto_update_error: sub.lastAutoUpdateError ?? null,
+        last_auto_update_error_type: sub.lastAutoUpdateErrorType ?? null,
+        last_auto_update_backoff_until: sub.lastAutoUpdateBackoffUntil ?? null,
       }))
     }
 

@@ -981,31 +981,37 @@ npm version 1.8.0 --no-git-tag-version
    - 验证核心功能正常工作
    - 检查内存使用和性能
 
-4. **创建发布**:
+4. **创建预发布**:
 
    ```bash
-   # 提交版本改动并创建 tag
+   # 提交版本改动并创建 tag（tag 会触发预发布构建）
    git add -A
    git commit -m "chore: bump version to v1.8.0"
-   git tag -a v1.8.0 -m "Release v1.8.0"
+   git tag -a v1.8.0 -m "Pre-release v1.8.0"
    git push origin master
    git push origin v1.8.0
    ```
 
-5. **等待自动发布**:
+5. **等待自动预发布**:
    - 推送 tag 后自动触发 `.github/workflows/release.yml`
-   - CI 自动构建 Windows/Linux/macOS 产物并更新同名 GitHub Release 资产
+   - CI 自动构建 Windows/Linux/macOS 产物并更新同名 GitHub Pre-release 资产
    - Release Notes 自动从 `docs/CHANGELOG.md` 中提取对应版本条目
+
+6. **观察期转正式（手动触发）**:
+   - 进入 GitHub Actions，手动运行 `.github/workflows/promote-release.yml`
+   - 输入同一版本 tag（如 `v1.8.0`），将预发布转为正式发布
+   - 正式发布内容同样自动使用 `docs/CHANGELOG.md` 对应版本条目
 
 #### 自动化发布 (CI/CD)
 
 项目支持 GitHub Actions 自动化构建：
 
-- 在推送 tag 时自动触发构建
+- 在推送 tag 时自动触发预发布构建
 - 构建步骤统一走 `pnpm run tauri build --target <triple>`（wrapper 脚本）
 - wrapper 会根据 `--target` 仅拉取并打包对应平台内核，不会把多平台内核一并塞进安装包
 - 内核版本默认自动拉取上游 latest；CI 透传 `SING_BOX_GITHUB_TOKEN`，降低 GitHub API 限流导致的失败
 - 自动创建/更新 GitHub 预发布（pre-release）并上传多平台产物
+- 观察期结束后，手动触发 `promote-release.yml` 将同一 tag 转为正式版（不重复构建）
 
 ### 部署注意事项
 

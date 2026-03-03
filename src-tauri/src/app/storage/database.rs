@@ -184,6 +184,7 @@ impl DatabaseService {
                 last_version TEXT,
                 skip_version TEXT,
                 accept_prerelease BOOLEAN DEFAULT FALSE,
+                update_channel TEXT DEFAULT 'stable',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -192,9 +193,11 @@ impl DatabaseService {
         .execute(pool)
         .await?;
 
-        // 更新配置兼容字段补充（确保旧表增加接收预发布字段）
-        let alter_update_statements =
-            ["ALTER TABLE update_config ADD COLUMN accept_prerelease BOOLEAN DEFAULT FALSE"];
+        // 更新配置兼容字段补充（确保旧表增加新增字段）
+        let alter_update_statements = [
+            "ALTER TABLE update_config ADD COLUMN accept_prerelease BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE update_config ADD COLUMN update_channel TEXT DEFAULT 'stable'",
+        ];
         for statement in alter_update_statements {
             sqlx::query(statement).execute(pool).await.ok();
         }
@@ -467,6 +470,9 @@ impl DatabaseService {
                 accept_prerelease: row
                     .try_get("accept_prerelease")
                     .unwrap_or(default_config.accept_prerelease),
+                update_channel: row
+                    .try_get("update_channel")
+                    .unwrap_or(default_config.update_channel),
             }))
         } else {
             Ok(None)
@@ -477,8 +483,8 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO update_config 
-            (id, auto_check, last_check, last_version, skip_version, accept_prerelease, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, ?)
+            (id, auto_check, last_check, last_version, skip_version, accept_prerelease, update_channel, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_check)
@@ -486,6 +492,7 @@ impl DatabaseService {
         .bind(&config.last_version)
         .bind(&config.skip_version)
         .bind(config.accept_prerelease)
+        .bind(&config.update_channel)
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;

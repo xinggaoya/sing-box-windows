@@ -18,7 +18,6 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_websocket::init())
-        .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_os::init()) // 添加 OS 信息插件
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -42,8 +41,13 @@ pub fn run() {
             // 判断参数
             let args: Vec<String> = std::env::args().collect();
             if args.len() > 1 && args[1] == "--hide" {
-                let window = app.get_window("main").unwrap();
-                window.hide().unwrap();
+                if let Some(window) = app.get_window("main") {
+                    if let Err(err) = window.hide() {
+                        tracing::warn!("启动参数 --hide 隐藏窗口失败: {}", err);
+                    }
+                } else {
+                    tracing::warn!("启动参数 --hide 生效时未找到 main 窗口");
+                }
             }
 
             if let Err(err) = crate::app::tray::init_tray(app.handle()) {
@@ -161,6 +165,8 @@ pub fn run() {
             crate::app::system::system_service::check_network_connectivity,
             crate::app::system::system_service::wait_for_network_ready,
             crate::app::system::system_service::open_devtools,
+            crate::app::system::backup_service::backup_export_snapshot,
+            crate::app::system::backup_service::backup_import_snapshot,
             // System - Sudo service commands (Linux/macOS TUN 提权)
             crate::app::system::sudo_service::sudo_password_status,
             crate::app::system::sudo_service::sudo_set_password,

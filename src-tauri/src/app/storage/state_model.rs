@@ -143,6 +143,7 @@ pub struct UpdateConfig {
     pub last_version: Option<String>,
     pub skip_version: Option<String>,
     pub accept_prerelease: bool,
+    pub update_channel: Option<String>,
 }
 
 impl Default for UpdateConfig {
@@ -153,6 +154,7 @@ impl Default for UpdateConfig {
             last_version: None,
             skip_version: None,
             accept_prerelease: false,
+            update_channel: Some("stable".to_string()),
         }
     }
 }
@@ -174,4 +176,10 @@ pub struct Subscription {
     pub subscription_download: Option<u64>,
     pub subscription_total: Option<u64>,
     pub subscription_expire: Option<u64>,
+    // 自动更新健康状态（用于失败退避与可观测性）
+    pub auto_update_fail_count: Option<u32>,
+    pub last_auto_update_attempt: Option<u64>,
+    pub last_auto_update_error: Option<String>,
+    pub last_auto_update_error_type: Option<String>,
+    pub last_auto_update_backoff_until: Option<u64>,
 }

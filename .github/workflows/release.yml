@@ -1,15 +1,22 @@
-name: Release
+name: Release (Pre-release)
+
 on:
   push:
     tags:
       - 'v*'
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
-    name: Build (${{ matrix.os }})
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
     permissions:
-      contents: write
+      contents: read
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -23,7 +30,6 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             name: macos
-    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,24 +38,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 8
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -68,9 +62,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install dependencies
-        run: |
-          pnpm install --no-frozen-lockfile
-          pnpm store prune
+        run: pnpm install --frozen-lockfile
 
       - name: Build application
         shell: bash
@@ -116,17 +108,6 @@ jobs:
           $zipPath = Join-Path $portableDir "sing-box-windows-portable.zip"
           Compress-Archive -Path $exePath -DestinationPath $zipPath -Force
 
-      - name: List build artifacts
-        shell: bash
-        run: |
-          echo "Target: ${{ matrix.target }}"
-          echo "Build directory contents:"
-          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
-            ls -la src-tauri/target/${{ matrix.target }}/release/bundle/ || true
-          else
-            ls -la src-tauri/target/${{ matrix.target }}/release/bundle/ || true
-          fi
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -136,14 +117,19 @@ jobs:
           retention-days: 1
 
   release:
-    name: Create Release
-    permissions:
-      contents: write
+    name: Publish Pre-release
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
@@ -165,7 +151,12 @@ jobs:
 
       - name: Extract tag name
         id: tag
-        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        shell: bash
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract Release Notes from CHANGELOG
+        id: extract_notes
+        run: node .github/scripts/extract-release-notes.js "${{ steps.tag.outputs.tag }}"
 
       - name: Summarize artifacts
         shell: bash
@@ -176,15 +167,12 @@ jobs:
           find linux-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
           find macos-artifacts -type f 2>/dev/null | sed 's/^/ - /' || true
 
-      - name: Extract Release Notes
-        id: extract_notes
-        run: node .github/scripts/extract-release-notes.js
-
-      - name: Update Release Assets
+      - name: Create / Update Pre-release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           prerelease: true
+          make_latest: false
           generate_release_notes: false
           name: "[Pre-release] ${{ steps.tag.outputs.tag }}"
           tag_name: ${{ steps.tag.outputs.tag }}
@@ -192,10 +180,10 @@ jobs:
           files: |
             windows-artifacts/msi/*.msi
             windows-artifacts/nsis/*.exe
+            windows-artifacts/portable/sing-box-windows-portable.zip
             linux-artifacts/appimage/sing-box-windows_*.AppImage*
             linux-artifacts/deb/sing-box-windows_*.deb*
             macos-artifacts/dmg/sing-box-windows_*.dmg*
             macos-artifacts/macos/sing-box-windows.app.tar.gz*
-            windows-artifacts/portable/sing-box-windows-portable.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
