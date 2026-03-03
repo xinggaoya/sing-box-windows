@@ -652,7 +652,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
 import { Window } from '@tauri-apps/api/window'
-import { useMessage } from 'naive-ui'
+import { useDialog, useMessage } from 'naive-ui'
 import {
   SettingsOutline,
   WarningOutline,
@@ -681,6 +681,7 @@ import { useUpdateProgressListener } from '@/views/setting/useUpdateProgressList
 import { useAdvancedSettingsForm } from '@/views/setting/useAdvancedSettingsForm'
 
 const message = useMessage()
+const dialog = useDialog()
 const { t } = useI18n()
 const appStore = useAppStore()
 const kernelStore = useKernelStore()
@@ -1023,8 +1024,31 @@ const handleValidateBackup = async () => {
   }
 }
 
+const confirmRestoreBackup = () => {
+  let resolved = false
+
+  return new Promise<boolean>((resolve) => {
+    const finish = (result: boolean) => {
+      if (resolved) return
+      resolved = true
+      resolve(result)
+    }
+
+    dialog.warning({
+      title: t('setting.backup.restoreAction'),
+      content: t('setting.backup.restoreConfirm'),
+      positiveText: t('common.confirm'),
+      negativeText: t('common.cancel'),
+      maskClosable: false,
+      onPositiveClick: () => finish(true),
+      onNegativeClick: () => finish(false),
+      onClose: () => finish(false),
+    })
+  })
+}
+
 const handleRestoreBackup = async () => {
-  const confirmed = window.confirm(t('setting.backup.restoreConfirm'))
+  const confirmed = await confirmRestoreBackup()
   if (!confirmed) {
     return
   }

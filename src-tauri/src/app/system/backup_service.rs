@@ -118,16 +118,13 @@ fn resolve_import_path(file_path: Option<String>) -> Result<PathBuf, String> {
         .ok_or_else(|| "已取消导入备份".to_string())
 }
 
-fn resolve_active_config_path(snapshot: &BackupSnapshot) -> PathBuf {
-    if let Some(path) = snapshot
-        .app_config
-        .active_config_path
-        .clone()
-        .or(snapshot.active_config_path.clone())
-    {
-        return PathBuf::from(path);
-    }
+fn default_active_config_path() -> PathBuf {
     paths::get_config_dir().join("config.json")
+}
+
+fn write_config_content(path: &Path, content: &str) -> Result<(), String> {
+    ensure_parent_dir(path)?;
+    std::fs::write(path, content).map_err(|e| format!("恢复活动配置文件失败: {}", e))
 }
 
 async fn build_snapshot(app: &tauri::AppHandle) -> Result<BackupSnapshot, String> {
@@ -202,8 +199,7 @@ async fn apply_snapshot(
     }
     if app_config.active_config_path.is_none() {
         app_config.active_config_path = Some(
-            paths::get_config_dir()
-                .join("config.json")
+            default_active_config_path()
                 .to_string_lossy()
                 .to_string(),
         );
@@ -214,6 +210,35 @@ async fn apply_snapshot(
     if update_config.update_channel.is_none() {
         update_config.update_channel = Some("stable".to_string());
         warnings.push("备份中缺少 update_channel，已回退为 stable".to_string());
+    }
+
+    let mut config_path = app_config
+        .active_config_path
+        .clone()
+        .map(PathBuf::from)
+        .unwrap_or_else(default_active_config_path);
+    if let Some(content) = snapshot.active_config_content.clone() {
+        if let Err(primary_err) = write_config_content(&config_path, &content) {
+            let fallback_path = default_active_config_path();
+            if fallback_path != config_path {
+                warnings.push(format!(
+                    "备份中的 active_config_path 不可写，已回退默认 config.json: {}",
+                    primary_err
+                ));
+                warn!(
+                    "备份恢复时写入活动配置失败，尝试回退到默认路径 {:?}: {}",
+                    fallback_path, primary_err
+                );
+                write_config_content(&fallback_path, &content)?;
+                config_path = fallback_path;
+            } else {
+                return Err(primary_err);
+            }
+        }
+        // 恢复后确保 app_config 与最终可写入的活动配置路径一致。
+        app_config.active_config_path = Some(config_path.to_string_lossy().to_string());
+    } else {
+        warnings.push("备份中不包含 active_config_content，跳过配置文件回写".to_string());
     }
 
     storage
@@ -244,15 +269,6 @@ async fn apply_snapshot(
         .save_active_subscription_index(snapshot.active_subscription_index)
         .await
         .map_err(|e| format!("恢复激活订阅索引失败: {}", e))?;
-
-    let config_path = resolve_active_config_path(snapshot);
-    if let Some(content) = snapshot.active_config_content.clone() {
-        ensure_parent_dir(&config_path)?;
-        std::fs::write(&config_path, content)
-            .map_err(|e| format!("恢复活动配置文件失败: {}", e))?;
-    } else {
-        warnings.push("备份中不包含 active_config_content，跳过配置文件回写".to_string());
-    }
 
     // 恢复后按最新配置尝试同步运行态（不会强制重启内核）。
     auto_manage_with_saved_config(app, false, "backup-restore").await;
