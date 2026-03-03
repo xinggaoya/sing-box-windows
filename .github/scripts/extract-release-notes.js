@@ -8,7 +8,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const changelogPath = path.join(__dirname, '../../docs/CHANGELOG.md');
 const changelog = fs.readFileSync(changelogPath, 'utf8');
 
-const version = process.env.GITHUB_REF_NAME || process.argv[2];
+// 优先使用显式传入参数，避免 workflow_dispatch 时被分支名（如 master）覆盖。
+const cliVersion = process.argv[2]?.trim();
+const envVersion = process.env.GITHUB_REF_NAME?.trim();
+const version = cliVersion || envVersion;
 
 if (!version) {
   console.error('Error: No version provided. Use GITHUB_REF_NAME env var or pass as argument.');
