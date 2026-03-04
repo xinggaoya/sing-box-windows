@@ -13,6 +13,7 @@ export default {
     import: 'インポート',
     export: 'エクスポート',
     refresh: '更新',
+    loading: '読み込み中...',
   },
 
   // 导航菜单
@@ -583,6 +584,13 @@ export default {
   notification: {
     proxyModeChanged: 'プロキシモードが変更されました',
     proxyModeChangeFailed: 'プロキシモードの変更に失敗しました',
+    applyProxyFailed: 'プロキシ設定の適用に失敗しました',
+    systemProxyEnabled: 'システムプロキシが有効になりました',
+    tunEnabled: 'TUNモードが有効になりました',
+    manualProxyEnabled: '手動プロキシモードが有効です。システムプロキシを手動で設定してください',
+    kernelRestartFailed: 'カーネルの再起動に失敗しました',
+    proxySwitchFailed: 'プロキシモードの切り替えに失敗しました',
+    ipVersionChangeFailed: 'IPバージョンの切り替えに失敗しました',
     updateAvailable: '新しいバージョンが利用可能です',
     prereleaseAvailable: '新しいプレリリースバージョンが利用可能です',
     updateDownloaded: '更新がダウンロードされました、まもなくインストールされます',
