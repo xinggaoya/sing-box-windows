@@ -1,5 +1,5 @@
-use crate::app::storage::state_model::AppConfig;
 use super::config_schema::DnsServerConfig;
+use crate::app::storage::state_model::AppConfig;
 use serde_json::json;
 use std::net::IpAddr;
 use url::Url;

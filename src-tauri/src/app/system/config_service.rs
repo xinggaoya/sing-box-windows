@@ -1,14 +1,16 @@
 use crate::app::constants::paths;
-use crate::app::singbox::common::{PRIVATE_IP_CIDRS, RS_GEOIP_PRIVATE, RS_GEOSITE_PRIVATE, TAG_DIRECT};
+use crate::app::singbox::common::{
+    PRIVATE_IP_CIDRS, RS_GEOIP_PRIVATE, RS_GEOSITE_PRIVATE, TAG_DIRECT,
+};
 use crate::app::singbox::config_generator;
 use crate::app::storage::state_model::AppConfig;
 use serde_json::json;
+use serde_json::Map;
 use serde_json::Value;
 use std::error::Error;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tracing::{error, info, warn};
-use serde_json::Map;
 
 fn backup_corrupted_config(path: &Path) {
     if !path.exists() {
@@ -28,8 +30,72 @@ fn backup_corrupted_config(path: &Path) {
     }
 }
 
-use crate::app::storage::enhanced_storage_service::{db_get_app_config, db_save_app_config_internal};
+use crate::app::storage::enhanced_storage_service::{
+    db_get_app_config, db_save_app_config_internal,
+};
 use tauri::AppHandle;
+
+fn sanitize_file_name(raw: &str, default_name: &str) -> String {
+    let mut sanitized: String = raw
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+
+    if sanitized.is_empty() || sanitized == "." || sanitized == ".." {
+        sanitized = default_name.to_string();
+    }
+
+    sanitized
+}
+
+fn normalize_active_config_local_path(raw_path: Option<&str>) -> (PathBuf, bool) {
+    let root = paths::get_config_dir();
+    let default_path = root.join("config.json");
+    let configs_dir = root.join("configs");
+
+    let Some(raw) = raw_path else {
+        return (default_path, false);
+    };
+
+    let candidate = PathBuf::from(raw);
+    if candidate.is_absolute() {
+        if candidate.starts_with(&root) {
+            return (candidate, false);
+        }
+
+        let file_name = candidate
+            .file_name()
+            .map(|v| v.to_string_lossy().to_string())
+            .unwrap_or_else(|| "config.json".to_string());
+        let safe_name = sanitize_file_name(&file_name, "config.json");
+        if safe_name.eq_ignore_ascii_case("config.json") {
+            return (default_path, true);
+        }
+        return (configs_dir.join(safe_name), true);
+    }
+
+    let local_candidate = root.join(&candidate);
+    if local_candidate.starts_with(&root) {
+        return (local_candidate, true);
+    }
+
+    let file_name = candidate
+        .file_name()
+        .map(|v| v.to_string_lossy().to_string())
+        .unwrap_or_else(|| "config.json".to_string());
+    let safe_name = sanitize_file_name(&file_name, "config.json");
+    if safe_name.eq_ignore_ascii_case("config.json") {
+        (default_path, true)
+    } else {
+        (configs_dir.join(safe_name), true)
+    }
+}
 
 fn write_default_config(path: &Path, app_config: &AppConfig) -> Result<(), String> {
     if let Some(parent) = path.parent() {
@@ -54,8 +120,7 @@ fn try_restore_from_bak(path: &Path) -> Result<bool, String> {
         return Ok(false);
     }
 
-    let content =
-        fs::read_to_string(&backup).map_err(|e| format!("读取备份配置失败: {}", e))?;
+    let content = fs::read_to_string(&backup).map_err(|e| format!("读取备份配置失败: {}", e))?;
     if serde_json::from_str::<Value>(&content).is_err() {
         warn!("发现备份配置也不是有效 JSON，跳过恢复: {:?}", backup);
         return Ok(false);
@@ -86,15 +151,23 @@ async fn persist_active_config_path_if_missing(
 
 pub async fn ensure_singbox_config(app_handle: &AppHandle) -> Result<(), String> {
     // 从数据库获取配置路径
-    let app_config = db_get_app_config(app_handle.clone())
+    let mut app_config = db_get_app_config(app_handle.clone())
         .await
         .map_err(|e| format!("获取应用配置失败: {}", e))?;
 
-    let active_config_path = app_config.active_config_path.clone();
-    let config_path = active_config_path
-        .as_deref()
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| paths::get_config_dir().join("config.json"));
+    let (config_path, path_rewritten) =
+        normalize_active_config_local_path(app_config.active_config_path.as_deref());
+    if path_rewritten {
+        let rewritten = config_path.to_string_lossy().to_string();
+        warn!(
+            "检测到跨机器或非托管配置路径，已重定位 active_config_path 到本机目录: {:?} -> {}",
+            app_config.active_config_path, rewritten
+        );
+        app_config.active_config_path = Some(rewritten.clone());
+        db_save_app_config_internal(app_config.clone(), app_handle.clone())
+            .await
+            .map_err(|e| format!("保存重定位后的 active_config_path 失败: {}", e))?;
+    }
 
     if !config_path.exists() {
         info!("sing-box 配置文件不存在，尝试从备份恢复: {:?}", config_path);
@@ -325,8 +398,7 @@ fn sanitize_geoip_private_rule_sets(config_obj: &mut Map<String, Value>) {
 
 fn ensure_private_ip_rule(rules: &mut Vec<Value>) {
     let has_private_rule = rules.iter().any(|rule| {
-        rule
-            .get("ip_cidr")
+        rule.get("ip_cidr")
             .and_then(|v| v.as_array())
             .is_some_and(|cidrs| {
                 // 只要已有规则包含了所有私网段，就视为已存在

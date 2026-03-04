@@ -1,10 +1,10 @@
 use crate::app::constants::paths;
+use crate::app::core::kernel_service::embedded::ensure_embedded_kernel;
+use crate::app::core::kernel_service::utils::emit_kernel_error_with_context;
 use crate::app::core::kernel_service::{
     check_config_validity, is_kernel_running, orchestrated_restart_kernel,
     orchestrated_start_kernel, KernelRuntimeConfig, ProxyOverrides,
 };
-use crate::app::core::kernel_service::embedded::ensure_embedded_kernel;
-use crate::app::core::kernel_service::utils::emit_kernel_error_with_context;
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use crate::app::storage::state_model::AppConfig;
@@ -134,7 +134,8 @@ async fn auto_manage_kernel_internal(
 
     if options.config.force_restart && was_running {
         info!("自动管理请求触发内核重启");
-        let restart_response = orchestrated_restart_kernel(app_handle.clone(), overrides.clone()).await?;
+        let restart_response =
+            orchestrated_restart_kernel(app_handle.clone(), overrides.clone()).await?;
         let success = restart_response
             .get("success")
             .and_then(|value| value.as_bool())

@@ -3,7 +3,10 @@ use super::service;
 use tauri::AppHandle;
 
 #[tauri::command]
-pub fn tray_sync_state(app_handle: AppHandle, payload: TrayRuntimeStateInput) -> Result<(), String> {
+pub fn tray_sync_state(
+    app_handle: AppHandle,
+    payload: TrayRuntimeStateInput,
+) -> Result<(), String> {
     service::sync_tray_state(&app_handle, payload)
 }
 

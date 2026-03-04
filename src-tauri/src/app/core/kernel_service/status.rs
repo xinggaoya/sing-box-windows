@@ -112,7 +112,9 @@ pub async fn kernel_get_status_enhanced(
 
     // 如果运行时并未获取到版本（未运行或API超时），回退到检查安装版本（DB/文件）
     if version.is_none() {
-        if let Ok(v) = crate::app::core::kernel_service::versioning::check_kernel_version(app_handle).await {
+        if let Ok(v) =
+            crate::app::core::kernel_service::versioning::check_kernel_version(app_handle).await
+        {
             version = Some(v.trim().to_string());
         }
     }

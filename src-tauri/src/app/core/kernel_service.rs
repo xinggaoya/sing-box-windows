@@ -20,16 +20,16 @@ pub mod versioning;
 
 pub use download::download_kernel;
 pub use import::{import_kernel_executable, pick_kernel_import_file};
+pub use orchestrator::current_state_version;
 pub use runtime::{
     apply_proxy_settings, kernel_restart_fast, kernel_start_enhanced, kernel_stop_enhanced,
     orchestrated_restart_kernel, orchestrated_start_kernel, orchestrated_stop_kernel,
     resolve_proxy_runtime_state, start_kernel_with_state, stop_kernel, ProxyOverrides,
     ResolvedProxyState,
 };
-pub use orchestrator::current_state_version;
+pub use state::{KernelRuntimeConfig, KernelState, KernelStateManager, KERNEL_STATE};
 pub use status::{
     get_system_uptime, is_kernel_running, kernel_check_health, kernel_get_snapshot,
     kernel_get_status_enhanced,
 };
 pub use versioning::{check_config_validity, check_kernel_version, get_latest_kernel_version_cmd};
-pub use state::{KernelRuntimeConfig, KernelState, KernelStateManager, KERNEL_STATE};

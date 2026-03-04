@@ -12,7 +12,8 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tracing::{debug, info, warn};
 
 lazy_static! {
-    static ref TRAY_RUNTIME_STATE: RwLock<TrayRuntimeState> = RwLock::new(TrayRuntimeState::default());
+    static ref TRAY_RUNTIME_STATE: RwLock<TrayRuntimeState> =
+        RwLock::new(TrayRuntimeState::default());
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -180,10 +181,11 @@ fn build_tray_menu<R: Runtime>(
     .build(app)
     .map_err(|e| format!("创建内核状态菜单项失败: {}", e))?;
 
-    let kernel_restart_item = MenuItemBuilder::with_id(menu_ids::KERNEL_RESTART, text.restart_kernel)
-        .enabled(state.kernel_running)
-        .build(app)
-        .map_err(|e| format!("创建重启菜单项失败: {}", e))?;
+    let kernel_restart_item =
+        MenuItemBuilder::with_id(menu_ids::KERNEL_RESTART, text.restart_kernel)
+            .enabled(state.kernel_running)
+            .build(app)
+            .map_err(|e| format!("创建重启菜单项失败: {}", e))?;
 
     let kernel_submenu = SubmenuBuilder::with_id(app, menu_ids::KERNEL_SUBMENU, text.kernel_menu)
         .item(&kernel_status_item)
@@ -193,7 +195,11 @@ fn build_tray_menu<R: Runtime>(
 
     let current_mode_item = MenuItemBuilder::with_id(
         menu_ids::PROXY_CURRENT,
-        format!("{} {}", text.current_mode, mode_text(state.proxy_mode, text)),
+        format!(
+            "{} {}",
+            text.current_mode,
+            mode_text(state.proxy_mode, text)
+        ),
     )
     .enabled(false)
     .build(app)
@@ -217,21 +223,27 @@ fn build_tray_menu<R: Runtime>(
         .build(app)
         .map_err(|e| format!("创建手动代理菜单项失败: {}", e))?;
 
-    let proxy_submenu = SubmenuBuilder::with_id(app, menu_ids::PROXY_SUBMENU, text.switch_proxy_mode)
-        .item(&current_mode_item)
-        .separator()
-        .item(&proxy_system_item)
-        .item(&proxy_tun_item)
-        .item(&proxy_manual_item)
-        .build()
-        .map_err(|e| format!("创建代理模式子菜单失败: {}", e))?;
+    let proxy_submenu =
+        SubmenuBuilder::with_id(app, menu_ids::PROXY_SUBMENU, text.switch_proxy_mode)
+            .item(&current_mode_item)
+            .separator()
+            .item(&proxy_system_item)
+            .item(&proxy_tun_item)
+            .item(&proxy_manual_item)
+            .build()
+            .map_err(|e| format!("创建代理模式子菜单失败: {}", e))?;
 
     let quit_item = MenuItemBuilder::with_id(menu_ids::QUIT, text.quit)
         .build(app)
         .map_err(|e| format!("创建退出菜单项失败: {}", e))?;
 
     MenuBuilder::new(app)
-        .items(&[&show_window_item, &kernel_submenu, &proxy_submenu, &quit_item])
+        .items(&[
+            &show_window_item,
+            &kernel_submenu,
+            &proxy_submenu,
+            &quit_item,
+        ])
         .build()
         .map_err(|e| format!("创建托盘菜单失败: {}", e))
 }
@@ -421,7 +433,12 @@ pub fn request_app_exit<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
 
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        match tokio::time::timeout(Duration::from_secs(4), crate::app::core::kernel_service::runtime::stop_kernel()).await {
+        match tokio::time::timeout(
+            Duration::from_secs(4),
+            crate::app::core::kernel_service::runtime::stop_kernel(),
+        )
+        .await
+        {
             Ok(Ok(message)) => info!("退出前停止内核成功: {}", message),
             Ok(Err(err)) => warn!("退出前停止内核失败，继续退出: {}", err),
             Err(_) => warn!("退出前停止内核超时，继续退出"),

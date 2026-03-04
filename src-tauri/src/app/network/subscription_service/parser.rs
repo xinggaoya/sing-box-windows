@@ -57,7 +57,9 @@ pub fn extract_nodes_from_subscription(
                         {
                             for sub_outbound in sub_outbounds {
                                 if let Some(sub_tag) = sub_outbound.as_str() {
-                                    if let Some(actual_node) = find_outbound_by_tag(outbounds, sub_tag) {
+                                    if let Some(actual_node) =
+                                        find_outbound_by_tag(outbounds, sub_tag)
+                                    {
                                         let node_type =
                                             actual_node.get("type").and_then(|t| t.as_str());
                                         if let Some(type_str) = node_type {
@@ -580,7 +582,11 @@ fn parse_vless_uri(uri: &str) -> Option<Value> {
     });
 
     // flow（如 xtls-rprx-vision）对部分节点是必要字段
-    if let Some(flow) = query.get("flow").map(|s| s.trim()).filter(|s| !s.is_empty()) {
+    if let Some(flow) = query
+        .get("flow")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
         node["flow"] = json!(flow);
     }
 
@@ -611,10 +617,18 @@ fn parse_vless_uri(uri: &str) -> Option<Value> {
         let mut transport = json!({
             "type": "ws"
         });
-        if let Some(path) = query.get("path").map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if let Some(path) = query
+            .get("path")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
             transport["path"] = json!(path);
         }
-        if let Some(host) = query.get("host").map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if let Some(host) = query
+            .get("host")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
             transport["headers"] = json!({ "Host": host });
         }
         node["transport"] = transport;
@@ -684,10 +698,18 @@ fn parse_trojan_uri(uri: &str) -> Option<Value> {
         let mut transport = json!({
             "type": "ws"
         });
-        if let Some(path) = query.get("path").map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if let Some(path) = query
+            .get("path")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
             transport["path"] = json!(path);
         }
-        if let Some(host) = query.get("host").map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if let Some(host) = query
+            .get("host")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
             transport["headers"] = json!({ "Host": host });
         }
         node["transport"] = transport;
@@ -825,10 +847,20 @@ fn parse_vmess_uri(uri: &str) -> Option<Value> {
         let mut transport = json!({
             "type": "ws"
         });
-        if let Some(path) = v.get("path").and_then(|s| s.as_str()).map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if let Some(path) = v
+            .get("path")
+            .and_then(|s| s.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
             transport["path"] = json!(path);
         }
-        if let Some(host) = v.get("host").and_then(|s| s.as_str()).map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if let Some(host) = v
+            .get("host")
+            .and_then(|s| s.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
             transport["headers"] = json!({ "Host": host });
         }
         node["transport"] = transport;
@@ -855,8 +887,11 @@ fn parse_ss_uri(uri: &str) -> Option<Value> {
     // 忽略 plugin 等参数（目前只生成基础 SS 节点）
     let before_query = before_fragment.split('?').next().unwrap_or(before_fragment);
     let tag = {
-        let decoded = fragment.and_then(|s| urlencoding::decode(s).ok()).map(|s| s.to_string());
-        decoded.filter(|s| !s.trim().is_empty())
+        let decoded = fragment
+            .and_then(|s| urlencoding::decode(s).ok())
+            .map(|s| s.to_string());
+        decoded
+            .filter(|s| !s.trim().is_empty())
             .unwrap_or_else(|| "shadowsocks".to_string())
     };
 
@@ -980,7 +1015,8 @@ proxies:
 
     #[test]
     fn parse_uri_list_hysteria2() {
-        let content = "hysteria2://password@example.com:443?peer=example.com&insecure=1&alpn=h3#Hysteria2";
+        let content =
+            "hysteria2://password@example.com:443?peer=example.com&insecure=1&alpn=h3#Hysteria2";
         let nodes = extract_nodes_from_subscription(content).expect("should parse");
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0]["type"].as_str().unwrap(), "hysteria2");

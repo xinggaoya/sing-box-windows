@@ -1,11 +1,12 @@
+use super::common::{
+    build_dns_server_config, dns_strategy, normalize_default_outbound, normalize_download_detour,
+    DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN,
+    RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM,
+    RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM,
+    TAG_YOUTUBE,
+};
 use crate::app::core::tun_profile::TUN_ROUTE_EXCLUDES;
 use crate::app::storage::state_model::AppConfig;
-use super::common::{
-    build_dns_server_config, dns_strategy, normalize_default_outbound, normalize_download_detour, DNS_CN,
-    DNS_PROXY, DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE,
-    RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
-    TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
-};
 use serde_json::{json, Map, Value};
 
 /// 将应用设置（端口 / System Proxy / TUN / IPv6 偏好等）同步到 sing-box 配置。
@@ -50,9 +51,13 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
 
 pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
     if let Some(config_obj) = config.as_object_mut() {
-        if let Some(experimental) = config_obj.get_mut("experimental").and_then(|v| v.as_object_mut())
+        if let Some(experimental) = config_obj
+            .get_mut("experimental")
+            .and_then(|v| v.as_object_mut())
         {
-            if let Some(clash_api) = experimental.get_mut("clash_api").and_then(|v| v.as_object_mut())
+            if let Some(clash_api) = experimental
+                .get_mut("clash_api")
+                .and_then(|v| v.as_object_mut())
             {
                 if clash_api.contains_key("external_controller") {
                     clash_api.insert(
@@ -63,18 +68,22 @@ pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
             }
         }
 
-        if let Some(inbounds) = config_obj.get_mut("inbounds").and_then(|v| v.as_array_mut()) {
+        if let Some(inbounds) = config_obj
+            .get_mut("inbounds")
+            .and_then(|v| v.as_array_mut())
+        {
             for inbound in inbounds.iter_mut() {
                 if let Some(inbound_obj) = inbound.as_object_mut() {
-                    let is_mixed =
-                        matches!(inbound_obj.get("type").and_then(|v| v.as_str()), Some("mixed"));
+                    let is_mixed = matches!(
+                        inbound_obj.get("type").and_then(|v| v.as_str()),
+                        Some("mixed")
+                    );
                     let is_mixed_in = matches!(
                         inbound_obj.get("tag").and_then(|v| v.as_str()),
                         Some("mixed-in")
                     );
                     if (is_mixed || is_mixed_in) && inbound_obj.contains_key("listen_port") {
-                        inbound_obj
-                            .insert("listen_port".to_string(), json!(app_config.proxy_port));
+                        inbound_obj.insert("listen_port".to_string(), json!(app_config.proxy_port));
                     }
                 }
             }
@@ -87,7 +96,10 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
     let download_detour = normalize_download_detour(app_config);
 
     // 1) 更新 urltest 的 URL
-    if let Some(outbounds) = config_obj.get_mut("outbounds").and_then(|v| v.as_array_mut()) {
+    if let Some(outbounds) = config_obj
+        .get_mut("outbounds")
+        .and_then(|v| v.as_array_mut())
+    {
         for outbound in outbounds.iter_mut() {
             if outbound.get("tag").and_then(|t| t.as_str()) == Some(TAG_AUTO) {
                 if let Some(obj) = outbound.as_object_mut() {
@@ -214,9 +226,8 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
 
             // 按开关移除不再需要的规则集，避免后台持续下载无用文件
             if !app_config.singbox_block_ads {
-                rule_sets.retain(|rs| {
-                    rs.get("tag").and_then(|v| v.as_str()) != Some(RS_GEOSITE_ADS)
-                });
+                rule_sets
+                    .retain(|rs| rs.get("tag").and_then(|v| v.as_str()) != Some(RS_GEOSITE_ADS));
             }
             if !app_config.singbox_enable_app_groups {
                 rule_sets.retain(|rs| {
@@ -240,7 +251,9 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     if obj.get("clash_mode").and_then(|v| v.as_str()) == Some("global") {
                         obj.insert("outbound".to_string(), json!(default_outbound));
                     }
-                    if obj.get("rule_set").and_then(|v| v.as_str()) == Some(RS_GEOSITE_GEOLOCATION_NOT_CN) {
+                    if obj.get("rule_set").and_then(|v| v.as_str())
+                        == Some(RS_GEOSITE_GEOLOCATION_NOT_CN)
+                    {
                         obj.insert("outbound".to_string(), json!(default_outbound));
                     }
                 }
@@ -301,11 +314,17 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
     }
 
     // 5) outbounds：按开关移除业务分流组（如果存在）
-    if let Some(outbounds) = config_obj.get_mut("outbounds").and_then(|v| v.as_array_mut()) {
+    if let Some(outbounds) = config_obj
+        .get_mut("outbounds")
+        .and_then(|v| v.as_array_mut())
+    {
         if !app_config.singbox_enable_app_groups {
             outbounds.retain(|ob| {
                 let tag = ob.get("tag").and_then(|v| v.as_str()).unwrap_or("");
-                !matches!(tag, TAG_TELEGRAM | TAG_YOUTUBE | TAG_NETFLIX | TAG_OPENAI | TAG_GOOGLE)
+                !matches!(
+                    tag,
+                    TAG_TELEGRAM | TAG_YOUTUBE | TAG_NETFLIX | TAG_OPENAI | TAG_GOOGLE
+                )
             });
         }
     }

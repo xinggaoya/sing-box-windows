@@ -1,20 +1,21 @@
-use crate::app::singbox::settings_patch::apply_app_settings_to_config;
-use crate::app::storage::state_model::AppConfig;
 use super::common::{
-    build_dns_server_config, dns_strategy, node_domain_resolver_strategy, normalize_default_outbound,
-    normalize_download_detour, PRIVATE_IP_CIDRS, DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOIP_CN,
-    RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_NETFLIX,
-    RS_GEOSITE_GOOGLE, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE,
+    build_dns_server_config, dns_strategy, node_domain_resolver_strategy,
+    normalize_default_outbound, normalize_download_detour, DNS_CN, DNS_PROXY, DNS_RESOLVER,
+    PRIVATE_IP_CIDRS, RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN,
+    RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE,
     RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
 };
 use super::config_schema::{
     CacheFileConfig, ClashApiConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, LogConfig,
     RemoteRuleSetConfig, RouteConfig, SingBoxConfig,
 };
+use crate::app::singbox::settings_patch::apply_app_settings_to_config;
+use crate::app::storage::state_model::AppConfig;
 use serde_json::{json, Value};
 // 兼容旧引用：这些 tag 之前是 `config_generator` 的 `pub const`，保留同名导出以降低未来重构的破坏性。
 pub use super::common::{
-    TAG_AUTO, TAG_BLOCK, TAG_DIRECT, TAG_MANUAL, TAG_NETFLIX, TAG_OPENAI, TAG_GOOGLE, TAG_TELEGRAM, TAG_YOUTUBE,
+    TAG_AUTO, TAG_BLOCK, TAG_DIRECT, TAG_GOOGLE, TAG_MANUAL, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM,
+    TAG_YOUTUBE,
 };
 
 /// 生成一份“通用且更适合国内环境”的 sing-box 配置骨架（不依赖模板文件）。
@@ -172,9 +173,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         ),
     ]);
 
-    let mut route_rules: Vec<Value> = vec![
-        json!({ "action": "sniff" }),
-    ];
+    let mut route_rules: Vec<Value> = vec![json!({ "action": "sniff" })];
 
     if app_config.singbox_dns_hijack {
         route_rules.push(json!({ "protocol": "dns", "action": "hijack-dns" }));
@@ -299,7 +298,12 @@ fn build_dns_server_with_fallback(
     })
 }
 
-fn remote_rule_set_value(tag: &str, url: &str, download_detour: &str, update_interval: &str) -> Value {
+fn remote_rule_set_value(
+    tag: &str,
+    url: &str,
+    download_detour: &str,
+    update_interval: &str,
+) -> Value {
     let rs = RemoteRuleSetConfig {
         tag: tag.to_string(),
         kind: "remote".to_string(),
@@ -312,13 +316,20 @@ fn remote_rule_set_value(tag: &str, url: &str, download_detour: &str, update_int
 }
 
 /// 基于骨架配置注入节点，并更新“自动选择/手动切换”等组的候选列表。
-pub fn generate_config_with_nodes(app_config: &AppConfig, nodes: &[Value]) -> Result<Value, String> {
+pub fn generate_config_with_nodes(
+    app_config: &AppConfig,
+    nodes: &[Value],
+) -> Result<Value, String> {
     let mut config = generate_base_config(app_config);
     inject_nodes(&mut config, app_config, nodes)?;
     Ok(config)
 }
 
-pub fn inject_nodes(config: &mut Value, app_config: &AppConfig, nodes: &[Value]) -> Result<(), String> {
+pub fn inject_nodes(
+    config: &mut Value,
+    app_config: &AppConfig,
+    nodes: &[Value],
+) -> Result<(), String> {
     let outbounds = ensure_outbounds_array(config)?;
 
     // 预先收集已有 tag，避免节点 tag 与内置出站/分组冲突。
@@ -351,7 +362,13 @@ pub fn inject_nodes(config: &mut Value, app_config: &AppConfig, nodes: &[Value])
         if raw_tag.is_empty() {
             return Err(format!("节点缺少 tag: index={}", idx));
         }
-        if node_obj.get("type").and_then(|v| v.as_str()).unwrap_or("").trim().is_empty() {
+        if node_obj
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .is_empty()
+        {
             return Err(format!("节点缺少 type: tag={}, index={}", raw_tag, idx));
         }
 
@@ -452,7 +469,10 @@ fn ensure_outbounds_array(config: &mut Value) -> Result<&mut Vec<Value>, String>
         .ok_or_else(|| "outbounds 不是数组".to_string())
 }
 
-fn ensure_urltest_and_selector(outbounds: &mut Vec<Value>, node_tags: &[String]) -> Result<(), String> {
+fn ensure_urltest_and_selector(
+    outbounds: &mut Vec<Value>,
+    node_tags: &[String],
+) -> Result<(), String> {
     let auto_idx = ensure_outbound_index(outbounds, TAG_AUTO, || {
         json!({
             "type": "urltest",
@@ -505,8 +525,17 @@ fn ensure_urltest_and_selector(outbounds: &mut Vec<Value>, node_tags: &[String])
     Ok(())
 }
 
-fn ensure_app_group_selectors(outbounds: &mut Vec<Value>, node_tags: &[String]) -> Result<(), String> {
-    let group_tags = [TAG_TELEGRAM, TAG_YOUTUBE, TAG_NETFLIX, TAG_OPENAI, TAG_GOOGLE];
+fn ensure_app_group_selectors(
+    outbounds: &mut Vec<Value>,
+    node_tags: &[String],
+) -> Result<(), String> {
+    let group_tags = [
+        TAG_TELEGRAM,
+        TAG_YOUTUBE,
+        TAG_NETFLIX,
+        TAG_OPENAI,
+        TAG_GOOGLE,
+    ];
 
     for group_tag in group_tags {
         let Some(idx) = outbounds
@@ -630,7 +659,10 @@ mod tests {
             .find(|rule| rule.get("rule_set").and_then(|v| v.as_str()) == Some(RS_GEOSITE_ADS))
             .expect("启用广告拦截时应包含 geosite ads DNS 规则");
 
-        assert_eq!(ads_rule.get("action").and_then(|v| v.as_str()), Some("reject"));
+        assert_eq!(
+            ads_rule.get("action").and_then(|v| v.as_str()),
+            Some("reject")
+        );
         assert!(ads_rule.get("server").is_none());
     }
 }

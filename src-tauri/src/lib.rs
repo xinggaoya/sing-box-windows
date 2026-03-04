@@ -1,5 +1,5 @@
-use app::storage::EnhancedStorageService;
 use crate::utils::log_util;
+use app::storage::EnhancedStorageService;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;

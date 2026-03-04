@@ -70,10 +70,7 @@ async fn run_upgrade_subscription_refresh(app: &AppHandle) -> Result<(), String>
             spawn_retry_task(app.clone(), current_version, active_config_path, e);
         }
         Err(_) => {
-            let timeout_error = format!(
-                "升级后首次订阅刷新超时（{}s）",
-                IMMEDIATE_TIMEOUT_SECONDS
-            );
+            let timeout_error = format!("升级后首次订阅刷新超时（{}s）", IMMEDIATE_TIMEOUT_SECONDS);
             warn!("{}", timeout_error);
             spawn_retry_task(
                 app.clone(),
@@ -142,7 +139,8 @@ fn spawn_retry_task(
             }
         }
 
-        let message = "应用升级后已多次尝试刷新当前订阅但仍失败，请手动在订阅页执行“立即更新配置”。";
+        let message =
+            "应用升级后已多次尝试刷新当前订阅但仍失败，请手动在订阅页执行“立即更新配置”。";
         let payload = UpgradeRefreshFailedPayload {
             message: message.to_string(),
             version: current_version,
@@ -157,7 +155,9 @@ fn spawn_retry_task(
     });
 }
 
-async fn resolve_active_subscription_config_path(app: &AppHandle) -> Result<Option<String>, String> {
+async fn resolve_active_subscription_config_path(
+    app: &AppHandle,
+) -> Result<Option<String>, String> {
     let app_config = db_get_app_config(app.clone()).await?;
     let Some(active_path) = app_config.active_config_path else {
         return Ok(None);

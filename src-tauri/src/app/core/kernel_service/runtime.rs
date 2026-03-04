@@ -16,6 +16,7 @@ use crate::app::core::proxy_service::{
 };
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
+use crate::utils::http_client;
 use futures::FutureExt;
 use serde_json::json;
 use std::sync::Arc;
@@ -23,7 +24,6 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Notify;
 use tracing::{error, info, warn};
-use crate::utils::http_client;
 
 lazy_static::lazy_static! {
     pub(super) static ref KERNEL_READY_NOTIFY: Arc<Notify> = Arc::new(Notify::new());
@@ -78,7 +78,11 @@ async fn verify_kernel_startup_stability(api_port: u16) -> Result<(), String> {
         {
             Ok(response) if response.status().is_success() => return Ok(()),
             Ok(response) => {
-                last_error = format!("稳定性检查第{}次失败：API状态码 {}", attempt, response.status());
+                last_error = format!(
+                    "稳定性检查第{}次失败：API状态码 {}",
+                    attempt,
+                    response.status()
+                );
             }
             Err(e) => {
                 last_error = format!("稳定性检查第{}次失败：API连接异常 {}", attempt, e);
@@ -213,7 +217,12 @@ pub async fn start_kernel_with_state(
 
     if is_kernel_running().await.unwrap_or(false) {
         KERNEL_STATE.mark_running(resolved.api_port);
-        enable_kernel_guard(app_handle.clone(), resolved.api_port, resolved.proxy.tun_enabled).await;
+        enable_kernel_guard(
+            app_handle.clone(),
+            resolved.api_port,
+            resolved.proxy.tun_enabled,
+        )
+        .await;
         info!("内核已在运行中");
         return Ok(serde_json::json!({
             "success": true,
@@ -259,7 +268,12 @@ pub async fn start_kernel_with_state(
                 Ok(_) => {
                     info!("? 事件中继启动成功");
 
-                    enable_kernel_guard(app_handle.clone(), resolved.api_port, resolved.proxy.tun_enabled).await;
+                    enable_kernel_guard(
+                        app_handle.clone(),
+                        resolved.api_port,
+                        resolved.proxy.tun_enabled,
+                    )
+                    .await;
 
                     emit_kernel_started(
                         &app_handle,
@@ -277,7 +291,12 @@ pub async fn start_kernel_with_state(
                 Err(e) => {
                     warn!("?? 事件中继启动失败: {}, 但内核进程已启动", e);
 
-                    enable_kernel_guard(app_handle.clone(), resolved.api_port, resolved.proxy.tun_enabled).await;
+                    enable_kernel_guard(
+                        app_handle.clone(),
+                        resolved.api_port,
+                        resolved.proxy.tun_enabled,
+                    )
+                    .await;
 
                     let _ = app_handle.emit("kernel-ready", ());
 

@@ -1,5 +1,5 @@
 //! 内核服务通用工具模块
-//! 
+//!
 //! 提供内核服务各模块共用的工具函数，避免代码重复。
 
 use crate::app::constants::paths;
@@ -12,12 +12,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 
 /// 解析配置文件路径
-/// 
+///
 /// 从数据库读取 `active_config_path`，若未设置则回退到默认配置路径。
-/// 
+///
 /// # Arguments
 /// * `app_handle` - Tauri AppHandle 引用
-/// 
+///
 /// # Returns
 /// * `Ok(PathBuf)` - 解析后的配置文件路径
 /// * `Err(String)` - 读取配置失败时的错误信息
@@ -25,7 +25,7 @@ pub async fn resolve_config_path(app_handle: &AppHandle) -> Result<PathBuf, Stri
     let app_config = db_get_app_config(app_handle.clone())
         .await
         .map_err(|e| format!("获取应用配置失败: {}", e))?;
-    
+
     Ok(app_config
         .active_config_path
         .map(PathBuf::from)
@@ -33,7 +33,7 @@ pub async fn resolve_config_path(app_handle: &AppHandle) -> Result<PathBuf, Stri
 }
 
 /// 解析配置文件路径（带默认值回退）
-/// 
+///
 /// 与 `resolve_config_path` 类似，但在读取失败时使用默认配置路径而非返回错误。
 /// 适用于守护进程等不能中断的场景。
 pub async fn resolve_config_path_or_default(app_handle: &AppHandle) -> PathBuf {
@@ -91,9 +91,9 @@ impl KernelStatusPayload {
 }
 
 /// 发送内核状态变更事件
-/// 
+///
 /// 统一发送 `kernel-status-changed` 事件，确保所有状态变更通知格式一致。
-/// 
+///
 /// # Arguments
 /// * `app_handle` - Tauri AppHandle 引用
 /// * `status` - 内核状态 payload
@@ -102,9 +102,9 @@ pub fn emit_kernel_status(app_handle: &AppHandle, status: &KernelStatusPayload) 
 }
 
 /// 发送内核已启动事件
-/// 
+///
 /// 同时发送 `kernel-started`、`kernel-status-changed` 和 `kernel-ready` 事件。
-/// 
+///
 /// # Arguments
 /// * `app_handle` - Tauri AppHandle 引用
 /// * `proxy_mode` - 当前代理模式
@@ -129,14 +129,14 @@ pub fn emit_kernel_started(
         "kernel_state": KERNEL_STATE.get_state().as_str(),
         "state_version": current_state_version()
     });
-    
+
     let _ = app_handle.emit("kernel-started", started_payload);
     emit_kernel_status(app_handle, &KernelStatusPayload::running());
     let _ = app_handle.emit("kernel-ready", ());
 }
 
 /// 发送内核已停止事件
-/// 
+///
 /// 同时发送 `kernel-stopped` 和 `kernel-status-changed` 事件。
 pub fn emit_kernel_stopped(app_handle: &AppHandle) {
     let stopped_payload = KernelStatusPayload::stopped();
@@ -145,7 +145,7 @@ pub fn emit_kernel_stopped(app_handle: &AppHandle) {
 }
 
 /// 发送内核启动中事件
-/// 
+///
 /// 发送 `kernel-starting` 事件，通知前端内核正在启动。
 pub fn emit_kernel_starting(
     app_handle: &AppHandle,
@@ -162,7 +162,7 @@ pub fn emit_kernel_starting(
 }
 
 /// 发送内核错误事件
-/// 
+///
 /// 发送 `kernel-error` 事件，通知前端发生错误。
 fn now_millis() -> u64 {
     SystemTime::now()
@@ -206,14 +206,7 @@ pub fn emit_kernel_error_with_context(
 }
 
 pub fn emit_kernel_error(app_handle: &AppHandle, error: &str) {
-    emit_kernel_error_with_context(
-        app_handle,
-        "KERNEL_RUNTIME_ERROR",
-        error,
-        None,
-        None,
-        true,
-    );
+    emit_kernel_error_with_context(app_handle, "KERNEL_RUNTIME_ERROR", error, None, None, true);
 }
 
 #[cfg(test)]

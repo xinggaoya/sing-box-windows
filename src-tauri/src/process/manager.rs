@@ -100,13 +100,7 @@ impl ProcessManager {
         #[cfg(target_os = "windows")]
         {
             let output = std::process::Command::new("tasklist")
-                .args([
-                    "/FI",
-                    &format!("PID eq {}", pid),
-                    "/FO",
-                    "CSV",
-                    "/NH",
-                ])
+                .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
                 .output();
 
             if let Ok(output) = output {
@@ -578,9 +572,9 @@ impl ProcessManager {
             #[cfg(target_os = "windows")]
             check_cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
 
-            let output = check_cmd.output().map_err(|e| {
-                ProcessError::ConfigError(format!("执行配置校验命令失败: {}", e))
-            })?;
+            let output = check_cmd
+                .output()
+                .map_err(|e| ProcessError::ConfigError(format!("执行配置校验命令失败: {}", e)))?;
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -601,15 +595,16 @@ impl ProcessManager {
                         "当前配置仍使用已弃用的 legacy domain strategy 选项。请在订阅页刷新当前订阅配置（或重新导入）后重试。".to_string(),
                     ));
                 }
-                if detail.contains("dns.servers")
-                    && detail.contains("unknown field \"strategy\"")
-                {
+                if detail.contains("dns.servers") && detail.contains("unknown field \"strategy\"") {
                     return Err(ProcessError::ConfigError(
                         "当前配置包含已弃用字段 dns.servers[].strategy。请在订阅页手动刷新当前订阅配置后重试。".to_string(),
                     ));
                 }
 
-                return Err(ProcessError::ConfigError(format!("配置校验失败: {}", detail)));
+                return Err(ProcessError::ConfigError(format!(
+                    "配置校验失败: {}",
+                    detail
+                )));
             }
         }
 
@@ -654,6 +649,5 @@ impl ProcessManager {
 
 // 使用PID强制终止进程
 fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
-    crate::platform::kill_process_by_pid(pid)
-        .map_err(std::io::Error::other)
+    crate::platform::kill_process_by_pid(pid).map_err(std::io::Error::other)
 }

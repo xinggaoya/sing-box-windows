@@ -94,4 +94,3 @@ pub(crate) struct RemoteRuleSetConfig {
     pub download_detour: String,
     pub update_interval: String,
 }
-

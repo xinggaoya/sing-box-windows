@@ -57,7 +57,9 @@ async fn start_update_loop(app: AppHandle) -> Result<(), String> {
                         )
                         .await
                         {
-                            Ok(info) => handle_update_result(&app, &config.skip_version, info).await,
+                            Ok(info) => {
+                                handle_update_result(&app, &config.skip_version, info).await
+                            }
                             Err(e) => warn!("后台检查更新失败: {}", e),
                         }
                     }
@@ -70,11 +72,7 @@ async fn start_update_loop(app: AppHandle) -> Result<(), String> {
     }
 }
 
-async fn handle_update_result(
-    app: &AppHandle,
-    skip_version: &Option<String>,
-    info: UpdateInfo,
-) {
+async fn handle_update_result(app: &AppHandle, skip_version: &Option<String>, info: UpdateInfo) {
     if info.has_update {
         if skip_version
             .as_ref()
@@ -88,10 +86,7 @@ async fn handle_update_result(
         if let Err(e) = app.emit("update-available", &info) {
             error!("发送 update-available 事件失败: {}", e);
         } else {
-            info!(
-                "后台检测到新版本 {}，已推送事件",
-                info.latest_version
-            );
+            info!("后台检测到新版本 {}，已推送事件", info.latest_version);
         }
     } else {
         info!("后台检查：当前已是最新版本");

@@ -123,7 +123,11 @@ async fn import_kernel_executable_inner(
         message: format!(
             "内核导入成功，版本 {}{}",
             imported_version,
-            if restarted { "，已自动重启内核" } else { "" }
+            if restarted {
+                "，已自动重启内核"
+            } else {
+                ""
+            }
         ),
     })
 }
@@ -151,7 +155,10 @@ fn is_archive_file(path: &Path) -> bool {
         || lower.ends_with(".tar")
 }
 
-async fn resolve_kernel_binary_source(selected_path: &Path, temp_dir: &Path) -> Result<PathBuf, String> {
+async fn resolve_kernel_binary_source(
+    selected_path: &Path,
+    temp_dir: &Path,
+) -> Result<PathBuf, String> {
     if !is_archive_file(selected_path) {
         return Ok(selected_path.to_path_buf());
     }
@@ -162,7 +169,10 @@ async fn resolve_kernel_binary_source(selected_path: &Path, temp_dir: &Path) -> 
     find_executable_file(&extract_dir, kernel_executable_name())
 }
 
-async fn stage_kernel_binary(source_binary_path: &Path, temp_dir: &Path) -> Result<PathBuf, String> {
+async fn stage_kernel_binary(
+    source_binary_path: &Path,
+    temp_dir: &Path,
+) -> Result<PathBuf, String> {
     let staged_path = temp_dir.join(kernel_executable_name());
     tokio::fs::copy(source_binary_path, &staged_path)
         .await
@@ -237,7 +247,10 @@ async fn stop_running_kernel_for_replace() -> Result<(), String> {
     Ok(())
 }
 
-async fn replace_installed_kernel(staged_binary_path: &Path, kernel_path: &Path) -> Result<Option<String>, String> {
+async fn replace_installed_kernel(
+    staged_binary_path: &Path,
+    kernel_path: &Path,
+) -> Result<Option<String>, String> {
     if let Some(parent) = kernel_path.parent() {
         tokio::fs::create_dir_all(parent)
             .await
@@ -277,11 +290,7 @@ fn build_backup_path(kernel_path: &Path) -> Result<PathBuf, String> {
     let parent = kernel_path
         .parent()
         .ok_or_else(|| "目标内核目录无效".to_string())?;
-    Ok(parent.join(format!(
-        "{}.bak-import-{}",
-        file_name,
-        now_timestamp_secs()
-    )))
+    Ok(parent.join(format!("{}.bak-import-{}", file_name, now_timestamp_secs())))
 }
 
 async fn move_file_with_fallback(from: &Path, to: &Path) -> Result<(), String> {

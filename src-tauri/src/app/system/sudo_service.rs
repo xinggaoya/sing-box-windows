@@ -73,12 +73,12 @@ pub async fn sudo_clear_password(_app: AppHandle) -> Result<(), String> {
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use {
-    base64::engine::general_purpose::STANDARD as BASE64_ENGINE,
-    base64::Engine,
     aes_gcm::{
         aead::{Aead, KeyInit},
         Aes256Gcm, Nonce,
     },
+    base64::engine::general_purpose::STANDARD as BASE64_ENGINE,
+    base64::Engine,
     rand::RngCore,
     sha2::{Digest, Sha256},
     tracing::warn,
@@ -109,8 +109,7 @@ fn derive_crypto_key(app: &AppHandle) -> Result<[u8; 32], String> {
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn encrypt_password(app: &AppHandle, password: &str) -> Result<String, String> {
     let key = derive_crypto_key(app)?;
-    let cipher =
-        Aes256Gcm::new_from_slice(&key).map_err(|e| format!("初始化加密器失败: {}", e))?;
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| format!("初始化加密器失败: {}", e))?;
 
     let mut nonce_bytes = [0u8; NONCE_LEN];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
@@ -138,8 +137,7 @@ fn decrypt_password(app: &AppHandle, encoded: &str) -> Result<String, String> {
 
     let (nonce_bytes, cipher_bytes) = raw.split_at(NONCE_LEN);
     let key = derive_crypto_key(app)?;
-    let cipher =
-        Aes256Gcm::new_from_slice(&key).map_err(|e| format!("初始化解密器失败: {}", e))?;
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| format!("初始化解密器失败: {}", e))?;
 
     let plaintext = cipher
         .decrypt(Nonce::from_slice(nonce_bytes), cipher_bytes)
@@ -294,23 +292,42 @@ pub async fn spawn_kernel_with_saved_password(
     // 首选：非交互 sudo（更安全，避免密码进入内核 stdin）
     if can_run_sudo_non_interactive() {
         let mut cmd = Command::new("sudo");
-        cmd.args(["-n", "--", kernel_path, "run", "-D", work_dir, "-c", config_path])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
+        cmd.args([
+            "-n",
+            "--",
+            kernel_path,
+            "run",
+            "-D",
+            work_dir,
+            "-c",
+            config_path,
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
 
-        return cmd
-            .spawn()
-            .map_err(|e| format!("sudo 启动内核失败: {}", e));
+        return cmd.spawn().map_err(|e| format!("sudo 启动内核失败: {}", e));
     }
 
     // 回退：策略要求每次都输入密码（例如 timestamp_timeout=0）
     // 这里用 `-S -k` 强制 sudo 读取密码，因此密码不会泄露给内核 stdin。
     let mut cmd = Command::new("sudo");
-    cmd.args(["-S", "-k", "-p", "", "--", kernel_path, "run", "-D", work_dir, "-c", config_path])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+    cmd.args([
+        "-S",
+        "-k",
+        "-p",
+        "",
+        "--",
+        kernel_path,
+        "run",
+        "-D",
+        work_dir,
+        "-c",
+        config_path,
+    ])
+    .stdin(Stdio::piped())
+    .stdout(Stdio::null())
+    .stderr(Stdio::null());
 
     let mut child = cmd
         .spawn()

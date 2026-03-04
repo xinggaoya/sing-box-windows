@@ -264,7 +264,6 @@ pub async fn toggle_ip_version(app_handle: AppHandle, prefer_ipv6: bool) -> Resu
     Ok(())
 }
 
-
 // 获取API令牌
 #[tauri::command]
 pub fn get_api_token() -> String {
@@ -445,7 +444,12 @@ async fn resolve_delay_test_url(app_handle: &AppHandle, override_url: Option<Str
     }
 }
 
-fn build_clash_delay_url(port: u16, proxy: &str, timeout_ms: u64, test_url: &str) -> Result<Url, String> {
+fn build_clash_delay_url(
+    port: u16,
+    proxy: &str,
+    timeout_ms: u64,
+    test_url: &str,
+) -> Result<Url, String> {
     let mut url = Url::parse(&format!("http://127.0.0.1:{}/", port))
         .map_err(|e| format!("构造 Clash API 地址失败: {}", e))?;
 
@@ -461,7 +465,12 @@ fn build_clash_delay_url(port: u16, proxy: &str, timeout_ms: u64, test_url: &str
     Ok(url)
 }
 
-async fn fetch_single_delay(port: u16, proxy: &str, timeout_ms: u64, test_url: &str) -> Result<u64, String> {
+async fn fetch_single_delay(
+    port: u16,
+    proxy: &str,
+    timeout_ms: u64,
+    test_url: &str,
+) -> Result<u64, String> {
     let url = build_clash_delay_url(port, proxy, timeout_ms, test_url)?;
 
     // 使用专用短超时客户端，外层请求超时要略大于 Clash API 的 timeout，避免“核心还在测，HTTP 已被我们断开”。
@@ -555,7 +564,10 @@ pub async fn test_nodes_delay(
 
     let timeout_ms = options.timeout_ms.unwrap_or(DEFAULT_DELAY_TEST_TIMEOUT_MS);
     let samples = options.samples.unwrap_or(DEFAULT_DELAY_TEST_SAMPLES);
-    let concurrency = options.concurrency.unwrap_or(DEFAULT_DELAY_TEST_CONCURRENCY).max(1);
+    let concurrency = options
+        .concurrency
+        .unwrap_or(DEFAULT_DELAY_TEST_CONCURRENCY)
+        .max(1);
     let test_url = resolve_delay_test_url(&app_handle, options.url).await;
 
     // 去重，避免重复节点浪费测试资源；保留原顺序。

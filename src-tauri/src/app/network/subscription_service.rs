@@ -1,7 +1,7 @@
+pub mod auto_update;
 pub mod helpers;
 mod mode;
 mod parser;
-pub mod auto_update;
 
 use crate::app::constants::{messages, paths};
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
@@ -13,10 +13,8 @@ use crate::app::storage::enhanced_storage_service::{
 };
 use crate::app::storage::state_model::AppConfig;
 use crate::utils::http_client;
-use base64::{Engine as _, engine::general_purpose};
-use helpers::{
-    backup_existing_config, resolve_target_config_path, runtime_state_from_config,
-};
+use base64::{engine::general_purpose, Engine as _};
+use helpers::{backup_existing_config, resolve_target_config_path, runtime_state_from_config};
 use parser::extract_nodes_from_subscription;
 use reqwest::header::HeaderMap;
 use serde::Serialize;
@@ -108,7 +106,11 @@ fn parse_subscription_userinfo(raw: &str) -> Option<SubscriptionUserInfo> {
         }
     }
 
-    if has_value { Some(info) } else { None }
+    if has_value {
+        Some(info)
+    } else {
+        None
+    }
 }
 
 fn extract_subscription_userinfo(headers: &HeaderMap) -> Option<SubscriptionUserInfo> {
@@ -237,13 +239,8 @@ pub async fn download_subscription(
         auto_manage_with_saved_config(app_handle, true, "subscription-download").await;
     }
 
-    if let Err(e) = update_subscription_userinfo(
-        &app_handle,
-        &target_path,
-        trimmed_url,
-        userinfo.clone(),
-    )
-    .await
+    if let Err(e) =
+        update_subscription_userinfo(&app_handle, &target_path, trimmed_url, userinfo.clone()).await
     {
         warn!("同步订阅信息失败: {}", e);
     }
@@ -605,7 +602,7 @@ fn process_original_config(
 
 #[cfg(test)]
 mod tests {
-    use super::{try_decode_base64_to_text, extract_nodes_from_subscription};
+    use super::{extract_nodes_from_subscription, try_decode_base64_to_text};
     use base64::{engine::general_purpose, Engine as _};
 
     #[test]

@@ -87,8 +87,9 @@ pub fn platform_kill_process_by_pid(pid: u32) -> Result<(), String> {
     let mut cmd = std::process::Command::new("taskkill");
     cmd.args(&["/F", "/PID", &pid.to_string()]);
     platform_configure_std_command(&mut cmd);
-    
-    let output = cmd.output()
+
+    let output = cmd
+        .output()
         .map_err(|e| format!("执行taskkill失败: {}", e))?;
 
     if output.status.success() {

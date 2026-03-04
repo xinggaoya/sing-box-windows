@@ -3,9 +3,9 @@ use crate::app::network_config;
 use crate::utils::app_util::get_work_dir_sync;
 use semver::Version;
 use serde_json::json;
+use std::env;
 use std::path::Path;
 use tauri::{Emitter, Manager};
-use std::env;
 
 // 获取当前平台标识符 - 使用 Rust 标准库，更准确
 fn get_platform_identifier() -> &'static str {
@@ -45,33 +45,32 @@ fn check_arch_compatibility(filename: &str, current_arch: &str) -> bool {
     match current_arch {
         "x86_64" => {
             // x64 架构优先选择 x64 包，也接受通用包
-            filename_lower.contains("x64") ||
-            filename_lower.contains("x86_64") ||
-            filename_lower.contains("amd64") ||
-            !filename_lower.contains("arm") // 没有架构标识时默认兼容
+            filename_lower.contains("x64")
+                || filename_lower.contains("x86_64")
+                || filename_lower.contains("amd64")
+                || !filename_lower.contains("arm") // 没有架构标识时默认兼容
         }
         "aarch64" => {
             // ARM64 Mac 优先选择 ARM64 或 Universal 包
-            filename_lower.contains("arm64") ||
-            filename_lower.contains("aarch64") ||
-            filename_lower.contains("universal")
+            filename_lower.contains("arm64")
+                || filename_lower.contains("aarch64")
+                || filename_lower.contains("universal")
         }
         "arm" | "armv7" => {
             // ARM32
-            filename_lower.contains("arm32") ||
-            filename_lower.contains("armv7") ||
-            (filename_lower.contains("arm") && !filename_lower.contains("64"))
+            filename_lower.contains("arm32")
+                || filename_lower.contains("armv7")
+                || (filename_lower.contains("arm") && !filename_lower.contains("64"))
         }
         "x86" => {
             // 32位 x86
-            filename_lower.contains("i386") ||
-            filename_lower.contains("386") ||
-            (filename_lower.contains("x86") && !filename_lower.contains("64"))
+            filename_lower.contains("i386")
+                || filename_lower.contains("386")
+                || (filename_lower.contains("x86") && !filename_lower.contains("64"))
         }
         _ => true, // 其他架构保守处理
     }
 }
-
 
 // 获取平台优先级分数（用于选择最合适的安装包）
 fn get_platform_priority(filename: &str) -> i32 {
@@ -82,19 +81,31 @@ fn get_platform_priority(filename: &str) -> i32 {
     // 基础优先级（桌面平台）
     let base_priority = match platform {
         "windows" => {
-            if filename.ends_with(".exe") { 20 }
-            else if filename.ends_with(".msi") { 10 }
-            else { 0 }
+            if filename.ends_with(".exe") {
+                20
+            } else if filename.ends_with(".msi") {
+                10
+            } else {
+                0
+            }
         }
         "linux" => {
-            if filename.ends_with(".deb") { 20 }
-            else if filename.ends_with(".AppImage") { 10 }
-            else { 0 }
+            if filename.ends_with(".deb") {
+                20
+            } else if filename.ends_with(".AppImage") {
+                10
+            } else {
+                0
+            }
         }
         "macos" => {
-            if filename.ends_with(".dmg") { 20 }
-            else if filename.ends_with(".app.tar.gz") { 10 }
-            else { 0 }
+            if filename.ends_with(".dmg") {
+                20
+            } else if filename.ends_with(".app.tar.gz") {
+                10
+            } else {
+                0
+            }
         }
         _ => 0,
     };
@@ -106,7 +117,10 @@ fn get_platform_priority(filename: &str) -> i32 {
     // 架构匹配加分
     let arch_bonus = match arch {
         "x86_64" => {
-            if filename_lower.contains("x64") || filename_lower.contains("x86_64") || filename_lower.contains("amd64") {
+            if filename_lower.contains("x64")
+                || filename_lower.contains("x86_64")
+                || filename_lower.contains("amd64")
+            {
                 5
             } else {
                 0
@@ -116,7 +130,7 @@ fn get_platform_priority(filename: &str) -> i32 {
             if filename_lower.contains("arm64") || filename_lower.contains("aarch64") {
                 5
             } else if filename_lower.contains("universal") {
-                4  // macOS Universal 包
+                4 // macOS Universal 包
             } else {
                 0
             }
@@ -381,7 +395,6 @@ pub async fn download_update(app_handle: tauri::AppHandle) -> Result<(), String>
 
     Ok(())
 }
-
 
 // 获取当前平台信息（简化版，兼容旧接口）
 #[tauri::command]

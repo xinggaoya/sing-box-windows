@@ -104,7 +104,10 @@ fn apply_health_patch(sub: &mut Subscription, patch: &SubscriptionHealthPatch) {
     sub.last_auto_update_backoff_until = patch.backoff_until_ms;
 }
 
-async fn save_health_patches(app: &AppHandle, patches: &[SubscriptionHealthPatch]) -> Result<(), String> {
+async fn save_health_patches(
+    app: &AppHandle,
+    patches: &[SubscriptionHealthPatch],
+) -> Result<(), String> {
     if patches.is_empty() {
         return Ok(());
     }
@@ -135,7 +138,9 @@ pub async fn start_subscription_auto_update(app: &AppHandle) {
                 warn!("自动订阅刷新失败: {}", e);
             }
 
-            let interval = get_min_interval_minutes(&handle).await.unwrap_or(DEFAULT_INTERVAL_MINUTES);
+            let interval = get_min_interval_minutes(&handle)
+                .await
+                .unwrap_or(DEFAULT_INTERVAL_MINUTES);
             tokio::time::sleep(Duration::from_secs(interval * 60)).await;
         }
     });

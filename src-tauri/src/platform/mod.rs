@@ -1,22 +1,22 @@
 //! 平台抽象层
-//! 
+//!
 //! 提供跨平台的统一接口，封装各平台特定实现（进程检测、杀进程、系统架构等）。
 //! 使用条件编译实现静态分发，避免运行时开销。
 
-#[cfg(target_os = "windows")]
-mod windows;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(target_os = "windows")]
+mod windows;
 
 // 重导出当前平台的实现
-#[cfg(target_os = "windows")]
-pub use windows::*;
 #[cfg(target_os = "linux")]
 pub use linux::*;
 #[cfg(target_os = "macos")]
 pub use macos::*;
+#[cfg(target_os = "windows")]
+pub use windows::*;
 
 /// 检测指定名称的进程是否正在运行
 pub async fn is_process_running(process_name: &str) -> Result<bool, String> {

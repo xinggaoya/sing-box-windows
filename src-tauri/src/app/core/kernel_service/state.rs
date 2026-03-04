@@ -46,7 +46,10 @@ impl From<u8> for KernelState {
 impl KernelState {
     /// 是否处于可启动状态
     pub fn can_start(&self) -> bool {
-        matches!(self, KernelState::Stopped | KernelState::Failed | KernelState::Crashed)
+        matches!(
+            self,
+            KernelState::Stopped | KernelState::Failed | KernelState::Crashed
+        )
     }
 
     /// 是否处于可停止状态
@@ -78,7 +81,7 @@ impl KernelState {
 }
 
 /// 全局内核状态管理器
-/// 
+///
 /// 线程安全的状态追踪，供所有模块共享访问。
 /// 使用无锁原子类型确保高性能和无死锁风险。
 pub struct KernelStateManager {
@@ -166,7 +169,7 @@ lazy_static::lazy_static! {
 }
 
 /// 统一的内核运行时配置
-/// 
+///
 /// 替代分散的 ProxyOverrides 和 AutoManageOptions。
 /// 所有字段为 Option，便于覆盖式合并。
 #[derive(Debug, Clone, Default)]
@@ -261,21 +264,21 @@ mod tests {
     #[test]
     fn test_kernel_state_transitions() {
         let manager = KernelStateManager::new();
-        
+
         assert_eq!(manager.get_state(), KernelState::Stopped);
         assert!(manager.get_state().can_start());
-        
+
         assert!(manager.try_transition_to_starting());
         assert_eq!(manager.get_state(), KernelState::Starting);
         assert!(!manager.get_state().can_start());
-        
+
         manager.mark_running(12081);
         assert_eq!(manager.get_state(), KernelState::Running);
         assert!(manager.get_state().is_running());
-        
+
         assert!(manager.try_transition_to_stopping());
         assert_eq!(manager.get_state(), KernelState::Stopping);
-        
+
         manager.mark_stopped();
         assert_eq!(manager.get_state(), KernelState::Stopped);
     }
@@ -287,15 +290,15 @@ mod tests {
             proxy_port: Some(12080),
             ..Default::default()
         };
-        
+
         let overrides = KernelRuntimeConfig {
             api_port: Some(9090),
             prefer_ipv6: Some(true),
             ..Default::default()
         };
-        
+
         base.merge(&overrides);
-        
+
         assert_eq!(base.api_port, Some(9090));
         assert_eq!(base.proxy_port, Some(12080)); // 未被覆盖
         assert_eq!(base.prefer_ipv6, Some(true));

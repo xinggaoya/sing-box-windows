@@ -198,7 +198,6 @@ fn find_terminal_emulator() -> Option<String> {
     None
 }
 
-
 #[cfg(target_os = "macos")]
 fn restart_as_admin_macos(app_handle: tauri::AppHandle) -> Result<(), String> {
     // 检查当前是否已经有管理员权限
@@ -273,7 +272,6 @@ fn restart_as_admin_macos(app_handle: tauri::AppHandle) -> Result<(), String> {
         }
     }
 }
-
 
 // 检查是否有管理员权限 - 跨平台实现
 #[tauri::command]

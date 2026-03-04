@@ -14,9 +14,7 @@ enum ConfigPatchMode {
     PortsOnly,
 }
 
-fn resolve_patch_mode_for_subscription(
-    subscription: Option<&Subscription>,
-) -> ConfigPatchMode {
+fn resolve_patch_mode_for_subscription(subscription: Option<&Subscription>) -> ConfigPatchMode {
     match subscription {
         Some(sub) if sub.use_original_config => ConfigPatchMode::PortsOnly,
         _ => ConfigPatchMode::Full,
@@ -31,27 +29,26 @@ fn sync_settings_to_config_file(
     use crate::app::singbox::settings_patch::{
         apply_app_settings_to_config, apply_port_settings_only,
     };
-     
+
     // 读取现有配置
-    let content = std::fs::read_to_string(config_path)
-        .map_err(|e| format!("读取配置文件失败: {}", e))?;
-    
+    let content =
+        std::fs::read_to_string(config_path).map_err(|e| format!("读取配置文件失败: {}", e))?;
+
     // 解析 JSON
-    let mut config: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("解析配置文件失败: {}", e))?;
-    
+    let mut config: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("解析配置文件失败: {}", e))?;
+
     // 应用全局设置
     match patch_mode {
         ConfigPatchMode::Full => apply_app_settings_to_config(&mut config, app_config),
         ConfigPatchMode::PortsOnly => apply_port_settings_only(&mut config, app_config),
     }
-    
+
     // 写回文件
-    let updated = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("序列化配置失败: {}", e))?;
-    std::fs::write(config_path, updated)
-        .map_err(|e| format!("写入配置文件失败: {}", e))?;
-    
+    let updated =
+        serde_json::to_string_pretty(&config).map_err(|e| format!("序列化配置失败: {}", e))?;
+    std::fs::write(config_path, updated).map_err(|e| format!("写入配置文件失败: {}", e))?;
+
     Ok(())
 }
 
@@ -396,7 +393,7 @@ pub async fn db_save_active_subscription_index(
     app: AppHandle,
 ) -> Result<(), String> {
     let storage = get_enhanced_storage(&app).await?;
-    
+
     // Save the subscription index
     storage
         .save_active_subscription_index(index)
@@ -412,7 +409,10 @@ pub async fn db_save_active_subscription_index(
     let app_config = storage.get_app_config().await.map_err(|e| e.to_string())?;
 
     let (target_config_path, patch_mode) = if let Some(idx) = index {
-        let subscriptions = storage.get_subscriptions().await.map_err(|e| e.to_string())?;
+        let subscriptions = storage
+            .get_subscriptions()
+            .await
+            .map_err(|e| e.to_string())?;
         let subscription = subscriptions.get(idx as usize);
         (
             subscription
@@ -441,6 +441,6 @@ pub async fn db_save_active_subscription_index(
             );
         }
     }
-    
+
     Ok(())
 }

@@ -114,17 +114,17 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
     if let Err(e) = std::fs::create_dir_all(&temp_update_dir) {
         return Err(format!("创建临时更新目录失败: {}", e));
     }
-    
+
     // 清理旧的临时目录内容（如果有）
     if let Ok(entries) = std::fs::read_dir(&temp_update_dir) {
         for entry in entries.flatten() {
-           if let Err(e) = if entry.path().is_dir() { 
-               std::fs::remove_dir_all(entry.path()) 
-           } else { 
-               std::fs::remove_file(entry.path()) 
-           } {
-               warn!("清理临时目录失败: {}", e);
-           }
+            if let Err(e) = if entry.path().is_dir() {
+                std::fs::remove_dir_all(entry.path())
+            } else {
+                std::fs::remove_file(entry.path())
+            } {
+                warn!("清理临时目录失败: {}", e);
+            }
         }
     }
 
@@ -199,7 +199,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
                         "message": final_error
                     }),
                 );
-                
+
                 // 失败时清理
                 let _ = std::fs::remove_dir_all(&temp_update_dir);
                 return Err(final_error);
@@ -215,11 +215,11 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
     let was_running_before_update = is_kernel_running().await.unwrap_or(false);
     if was_running_before_update {
         info!("内核更新前检测到正在运行，先尝试停止以便替换");
-        
+
         // 尝试多次停止内核
         for i in 0..5 {
             let _ = stop_kernel().await; // stop_kernel 内部已有 guard disable 和 2s 等待
-            
+
             if !is_kernel_running().await.unwrap_or(true) {
                 info!("内核已成功停止");
                 break;
@@ -227,14 +227,14 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
             warn!("停止内核尝试 {} 失败，等待重试...", i + 1);
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
-        
+
         // 最后再次确认
         if is_kernel_running().await.unwrap_or(false) {
-             warn!("几次尝试后内核仍在运行，尝试强制终止进程...");
-             if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
-                 warn!("强制终止内核进程失败: {}", e);
-             }
-             tokio::time::sleep(Duration::from_millis(500)).await;
+            warn!("几次尝试后内核仍在运行，尝试强制终止进程...");
+            if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+                warn!("强制终止内核进程失败: {}", e);
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
     }
 
@@ -274,14 +274,15 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
     info!("开始在临时目录中查找新内核: {}", executable_name);
 
     // 在临时目录中查找
-    let found_executable_path = match find_executable_file(&temp_update_dir, executable_name).await {
+    let found_executable_path = match find_executable_file(&temp_update_dir, executable_name).await
+    {
         Ok(p) => p,
         Err(e) => {
             let _ = std::fs::remove_dir_all(&temp_update_dir);
             return Err(e);
         }
     };
-    
+
     let target_executable_path = kernel_dir.join(executable_name);
 
     info!(
@@ -327,12 +328,15 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
             return Err(format!("复制新内核文件失败: {}", copy_err));
         }
     }
-    
+
     info!("成功部署新内核文件");
 
     // 清理临时目录
     if let Err(e) = std::fs::remove_dir_all(&temp_update_dir) {
-        warn!("清理临时更新目录失败: {}, 请手动清理 {:?}", e, temp_update_dir);
+        warn!(
+            "清理临时更新目录失败: {}, 请手动清理 {:?}",
+            e, temp_update_dir
+        );
     }
 
     // 尝试清理残留的旧版本目录 (可选)
@@ -341,11 +345,14 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
         for entry in entries.flatten() {
             let path = entry.path();
             // 如果是目录，且名字看起来像 version 目录，且不是我们刚部署的文件
-            if path.is_dir() && path.file_name().unwrap_or_default() != "logs" && path.file_name().unwrap_or_default() != "update_temp" {
-                 let name = path.file_name().unwrap().to_string_lossy();
-                 if name.starts_with("sing-box-") {
-                     let _ = std::fs::remove_dir_all(&path);
-                 }
+            if path.is_dir()
+                && path.file_name().unwrap_or_default() != "logs"
+                && path.file_name().unwrap_or_default() != "update_temp"
+            {
+                let name = path.file_name().unwrap().to_string_lossy();
+                if name.starts_with("sing-box-") {
+                    let _ = std::fs::remove_dir_all(&path);
+                }
             }
         }
     }
@@ -374,7 +381,9 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
     }
 
     // 更新安装版本信息到数据库
-    use crate::app::storage::enhanced_storage_service::{db_save_app_config_internal, db_get_app_config};
+    use crate::app::storage::enhanced_storage_service::{
+        db_get_app_config, db_save_app_config_internal,
+    };
     if let Ok(mut config) = db_get_app_config(app_handle.clone()).await {
         config.installed_kernel_version = Some(version);
         if let Err(e) = db_save_app_config_internal(config, app_handle).await {
@@ -608,4 +617,3 @@ fn set_executable_permission(file_path: &Path) -> Result<(), std::io::Error> {
 fn set_executable_permission(_file_path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
-

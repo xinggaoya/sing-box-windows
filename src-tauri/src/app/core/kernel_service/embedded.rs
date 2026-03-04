@@ -215,8 +215,8 @@ async fn read_kernel_version_from_binary(kernel_path: &Path) -> Option<String> {
 
 fn extract_version_from_output(output: &str) -> Option<String> {
     for token in output.split_whitespace() {
-        let cleaned = token
-            .trim_matches(|c: char| c == ':' || c == ',' || c == ';' || c == ')' || c == '(');
+        let cleaned =
+            token.trim_matches(|c: char| c == ':' || c == ',' || c == ';' || c == ')' || c == '(');
         let normalized = normalize_version_string(cleaned);
         if normalized.is_empty() {
             continue;

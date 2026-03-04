@@ -21,9 +21,7 @@ const CLEANUP_INTERVAL_HOURS: u64 = 24;
 pub fn init_logging() -> Option<PathBuf> {
     let env_filter = build_env_filter();
 
-    match prepare_log_dir()
-        .and_then(|dir| create_file_writer(&dir).map(|writer| (dir, writer)))
-    {
+    match prepare_log_dir().and_then(|dir| create_file_writer(&dir).map(|writer| (dir, writer))) {
         Ok((log_dir, (writer, guard))) => {
             let combined_writer = writer.and(io::stdout);
 
@@ -61,7 +59,8 @@ pub fn spawn_log_cleanup_task(log_dir: PathBuf) -> JoinHandle<()> {
             warn!("初始化日志清理任务失败: {}", e);
         }
 
-        let mut interval = tokio::time::interval(Duration::from_secs(CLEANUP_INTERVAL_HOURS * 3600));
+        let mut interval =
+            tokio::time::interval(Duration::from_secs(CLEANUP_INTERVAL_HOURS * 3600));
         loop {
             interval.tick().await;
             if let Err(e) = cleanup_once(log_dir.clone()).await {
@@ -75,7 +74,10 @@ fn build_env_filter() -> EnvFilter {
     EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         // 缺省时启用调试日志，兼顾 sing-box 与 tauri
         // 关闭或降级部分第三方库日志，避免噪音（如 sqlx）
-        std::env::set_var("RUST_LOG", "debug,sing_box_windows=debug,tauri=info,sqlx=warn");
+        std::env::set_var(
+            "RUST_LOG",
+            "debug,sing_box_windows=debug,tauri=info,sqlx=warn",
+        );
         EnvFilter::from_default_env()
     })
 }
@@ -87,9 +89,7 @@ fn prepare_log_dir() -> io::Result<PathBuf> {
     Ok(log_dir)
 }
 
-fn create_file_writer(
-    log_dir: &Path,
-) -> io::Result<(non_blocking::NonBlocking, WorkerGuard)> {
+fn create_file_writer(log_dir: &Path) -> io::Result<(non_blocking::NonBlocking, WorkerGuard)> {
     let file_name = format!("{}.log", log_constants::DEFAULT_FILE_PREFIX);
 
     // 只支持 hourly/daily/never，其他值回退为 daily，避免新增枚举导致非穷尽匹配

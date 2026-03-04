@@ -124,8 +124,7 @@ pub async fn platform_get_system_uptime_ms() -> Result<u64, String> {
                                 .unwrap_or_default()
                                 .as_secs();
 
-                            let uptime_seconds =
-                                current_timestamp.saturating_sub(boot_timestamp);
+                            let uptime_seconds = current_timestamp.saturating_sub(boot_timestamp);
                             return Ok(uptime_seconds * 1000);
                         }
                     }
