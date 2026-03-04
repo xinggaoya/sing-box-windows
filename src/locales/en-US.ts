@@ -12,6 +12,7 @@ export default {
     import: 'Import',
     export: 'Export',
     refresh: 'Refresh',
+    loading: 'Loading...',
   },
   nav: {
     home: 'Home',
@@ -543,6 +544,13 @@ export default {
   notification: {
     proxyModeChanged: 'Proxy mode changed',
     proxyModeChangeFailed: 'Proxy mode change failed',
+    applyProxyFailed: 'Failed to apply proxy settings',
+    systemProxyEnabled: 'System proxy enabled',
+    tunEnabled: 'TUN mode enabled',
+    manualProxyEnabled: 'Manual proxy mode. Please configure system proxy manually',
+    kernelRestartFailed: 'Kernel restart failed',
+    proxySwitchFailed: 'Failed to switch proxy mode',
+    ipVersionChangeFailed: 'Failed to switch IP version',
     updateAvailable: 'New version available',
     prereleaseAvailable: 'New pre-release version available',
     updateDownloaded: 'Update downloaded, installing soon',

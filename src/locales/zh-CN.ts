@@ -12,6 +12,7 @@ export default {
     import: '导入',
     export: '导出',
     refresh: '刷新',
+    loading: '加载中...',
   },
   nav: {
     home: '首页',
@@ -543,6 +544,13 @@ export default {
   notification: {
     proxyModeChanged: '代理模式已更改',
     proxyModeChangeFailed: '代理模式更改失败',
+    applyProxyFailed: '应用代理配置失败',
+    systemProxyEnabled: '系统代理模式已启用',
+    tunEnabled: 'TUN 模式已启用',
+    manualProxyEnabled: '手动代理模式已启用，请手动设置系统代理',
+    kernelRestartFailed: '内核重启失败',
+    proxySwitchFailed: '切换代理模式失败',
+    ipVersionChangeFailed: '切换 IP 版本失败',
     updateAvailable: '有新版本可用',
     prereleaseAvailable: '有新测试版本可用',
     updateDownloaded: '更新已下载，即将安装',

@@ -192,11 +192,11 @@ export const useTrayStore = defineStore('tray', () => {
             await appStore.toggleSystemProxy(false)
 
             const applied = await kernelStore.applyProxySettings()
-            if (!applied) throw new Error(kernelStore.lastError || '应用代理配置失败')
+            if (!applied) throw new Error(kernelStore.lastError || i18n.global.t('notification.applyProxyFailed'))
 
             const success = await kernelStore.restartKernel()
             if (!success) {
-              throw new Error(kernelStore.lastError || '内核重启失败')
+              throw new Error(kernelStore.lastError || i18n.global.t('notification.kernelRestartFailed'))
             }
           } catch (error) {
             console.error('启用TUN模式失败:', error)
@@ -237,7 +237,7 @@ export const useTrayStore = defineStore('tray', () => {
           await appStore.toggleSystemProxy(false)
 
           const applied = await kernelStore.applyProxySettings()
-          if (!applied) throw new Error(kernelStore.lastError || '应用代理配置失败')
+          if (!applied) throw new Error(kernelStore.lastError || i18n.global.t('notification.applyProxyFailed'))
 
           let success = await kernelStore.restartKernel()
           if (!success) {
@@ -254,14 +254,14 @@ export const useTrayStore = defineStore('tray', () => {
               const ok = await useSudoStore().requestPassword()
               if (ok) {
                 const appliedRetry = await kernelStore.applyProxySettings()
-                if (!appliedRetry) throw new Error(kernelStore.lastError || '应用代理配置失败')
+                if (!appliedRetry) throw new Error(kernelStore.lastError || i18n.global.t('notification.applyProxyFailed'))
                 success = await kernelStore.restartKernel()
               }
             }
           }
 
           if (!success) {
-            throw new Error(kernelStore.lastError || '内核重启失败')
+            throw new Error(kernelStore.lastError || i18n.global.t('notification.kernelRestartFailed'))
           }
         } catch (error) {
           console.error('启用TUN模式失败:', error)
@@ -287,7 +287,7 @@ export const useTrayStore = defineStore('tray', () => {
 
       const success = await kernelStore.switchProxyMode(targetMode)
       if (!success) {
-        throw new Error(kernelStore.lastError || '代理模式切换失败')
+        throw new Error(kernelStore.lastError || i18n.global.t('notification.proxySwitchFailed'))
       }
     } catch (error) {
       console.error('托盘切换代理模式失败:', error)

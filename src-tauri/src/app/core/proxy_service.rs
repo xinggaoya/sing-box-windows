@@ -379,8 +379,8 @@ pub async fn get_rules(port: u16) -> Result<Value, String> {
     match http_client::get_json::<Value>(&url).await {
         Ok(data) => Ok(data),
         Err(e) => {
-            error!("获取规则信息失败: {}", e);
-            Err(format!("获取规则信息失败: {}", e))
+            error!("Failed to fetch rules: {}", e);
+            Err(format!("Failed to fetch rules: {}", e))
         }
     }
 }

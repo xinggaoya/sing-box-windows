@@ -214,7 +214,7 @@ export const useKernelStore = defineStore('kernel', () => {
       latestAvailableVersion.value = normalizeKernelVersion(latest)
       return latestAvailableVersion.value
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '获取最新内核版本失败'
+      lastError.value = error instanceof Error ? error.message : 'Failed to fetch latest kernel version'
       return ''
     }
   }
@@ -225,7 +225,7 @@ export const useKernelStore = defineStore('kernel', () => {
       availableVersions.value = versions.map((v) => normalizeKernelVersion(v))
       return availableVersions.value
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '获取内核版本列表失败'
+      lastError.value = error instanceof Error ? error.message : 'Failed to fetch kernel version list'
       return []
     }
   }
