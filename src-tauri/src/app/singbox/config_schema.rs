@@ -33,6 +33,8 @@ pub(crate) struct ExperimentalConfig {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct CacheFileConfig {
     pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub store_rdrc: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -49,6 +51,8 @@ pub(crate) struct DnsConfig {
     pub servers: Vec<DnsServerConfig>,
     pub rules: Vec<Value>,
     pub independent_cache: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reverse_mapping: Option<bool>,
     #[serde(rename = "final")]
     pub final_server: String,
 }
@@ -66,6 +70,10 @@ pub(crate) struct DnsServerConfig {
     pub path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interface: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inet4_range: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inet6_range: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_resolver: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]

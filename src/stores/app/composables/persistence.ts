@@ -29,7 +29,13 @@ export interface PersistenceState {
   singboxBlockAds: Ref<boolean>
   singboxDownloadDetour: Ref<string>
   singboxDnsHijack: Ref<boolean>
+  singboxFakeDnsEnabled: Ref<boolean>
+  singboxFakeDnsIpv4Range: Ref<string>
+  singboxFakeDnsIpv6Range: Ref<string>
+  singboxFakeDnsFilterMode: Ref<string>
   singboxEnableAppGroups: Ref<boolean>
+  tunSelfHealEnabled: Ref<boolean>
+  tunSelfHealCooldownSecs: Ref<number>
 }
 
 export function createAppPersistence(state: PersistenceState) {
@@ -132,8 +138,20 @@ export function createAppPersistence(state: PersistenceState) {
       state.singboxDownloadDetour.value =
         appConfig.singbox_download_detour || state.singboxDownloadDetour.value
       state.singboxDnsHijack.value = appConfig.singbox_dns_hijack ?? state.singboxDnsHijack.value
+      state.singboxFakeDnsEnabled.value =
+        appConfig.singbox_fake_dns_enabled ?? state.singboxFakeDnsEnabled.value
+      state.singboxFakeDnsIpv4Range.value =
+        appConfig.singbox_fake_dns_ipv4_range || state.singboxFakeDnsIpv4Range.value
+      state.singboxFakeDnsIpv6Range.value =
+        appConfig.singbox_fake_dns_ipv6_range || state.singboxFakeDnsIpv6Range.value
+      state.singboxFakeDnsFilterMode.value =
+        appConfig.singbox_fake_dns_filter_mode || state.singboxFakeDnsFilterMode.value
       state.singboxEnableAppGroups.value =
         appConfig.singbox_enable_app_groups ?? state.singboxEnableAppGroups.value
+      state.tunSelfHealEnabled.value =
+        appConfig.tun_self_heal_enabled ?? state.tunSelfHealEnabled.value
+      state.tunSelfHealCooldownSecs.value =
+        appConfig.tun_self_heal_cooldown_secs ?? state.tunSelfHealCooldownSecs.value
     } catch {
       // 加载失败时静默处理
     } finally {
@@ -179,7 +197,13 @@ export function createAppPersistence(state: PersistenceState) {
         singbox_block_ads: state.singboxBlockAds.value,
         singbox_download_detour: state.singboxDownloadDetour.value,
         singbox_dns_hijack: state.singboxDnsHijack.value,
+        singbox_fake_dns_enabled: state.singboxFakeDnsEnabled.value,
+        singbox_fake_dns_ipv4_range: state.singboxFakeDnsIpv4Range.value,
+        singbox_fake_dns_ipv6_range: state.singboxFakeDnsIpv6Range.value,
+        singbox_fake_dns_filter_mode: state.singboxFakeDnsFilterMode.value,
         singbox_enable_app_groups: state.singboxEnableAppGroups.value,
+        tun_self_heal_enabled: state.tunSelfHealEnabled.value,
+        tun_self_heal_cooldown_secs: state.tunSelfHealCooldownSecs.value,
       }
       // 前端自动保存仅负责持久化，不直接触发后端运行态重配。
       // 运行态变更统一由显式业务动作触发（如切换代理模式、重启内核、切换订阅）。
@@ -231,7 +255,13 @@ export function createAppPersistence(state: PersistenceState) {
       state.singboxBlockAds,
       state.singboxDownloadDetour,
       state.singboxDnsHijack,
+      state.singboxFakeDnsEnabled,
+      state.singboxFakeDnsIpv4Range,
+      state.singboxFakeDnsIpv6Range,
+      state.singboxFakeDnsFilterMode,
       state.singboxEnableAppGroups,
+      state.tunSelfHealEnabled,
+      state.tunSelfHealCooldownSecs,
     ],
     scheduleSave,
     { deep: true },

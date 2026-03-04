@@ -39,8 +39,20 @@ pub struct AppConfig {
     pub singbox_download_detour: String,
     /// 是否启用 DNS 劫持（hijack-dns）
     pub singbox_dns_hijack: bool,
+    /// 是否启用 Fake DNS（fakeip）
+    pub singbox_fake_dns_enabled: bool,
+    /// Fake DNS IPv4 地址池（CIDR）
+    pub singbox_fake_dns_ipv4_range: String,
+    /// Fake DNS IPv6 地址池（CIDR）
+    pub singbox_fake_dns_ipv6_range: String,
+    /// Fake DNS 生效范围：proxy_only/global_non_cn
+    pub singbox_fake_dns_filter_mode: String,
     /// 是否启用 Telegram/YouTube/Netflix/OpenAI 分流组
     pub singbox_enable_app_groups: bool,
+    /// 是否启用 TUN 连通性自愈
+    pub tun_self_heal_enabled: bool,
+    /// TUN 自愈冷却时间（秒）
+    pub tun_self_heal_cooldown_secs: u16,
 }
 
 impl Default for AppConfig {
@@ -78,7 +90,13 @@ impl Default for AppConfig {
             // gh-proxy 已经做加速，默认走直连下载，避免额外经过代理
             singbox_download_detour: "direct".to_string(),
             singbox_dns_hijack: true,
+            singbox_fake_dns_enabled: false,
+            singbox_fake_dns_ipv4_range: "198.18.0.0/15".to_string(),
+            singbox_fake_dns_ipv6_range: "fc00::/18".to_string(),
+            singbox_fake_dns_filter_mode: "proxy_only".to_string(),
             singbox_enable_app_groups: true,
+            tun_self_heal_enabled: true,
+            tun_self_heal_cooldown_secs: 90,
         }
     }
 }

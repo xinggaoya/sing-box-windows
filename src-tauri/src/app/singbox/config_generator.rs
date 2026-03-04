@@ -1,9 +1,10 @@
 use super::common::{
     build_dns_server_config, dns_strategy, node_domain_resolver_strategy,
-    normalize_default_outbound, normalize_download_detour, DNS_CN, DNS_PROXY, DNS_RESOLVER,
-    PRIVATE_IP_CIDRS, RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN,
-    RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE,
-    RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
+    normalize_default_outbound, normalize_download_detour, normalize_fake_dns_filter_mode, DNS_CN,
+    DNS_FAKEIP, DNS_PROXY, DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, PRIVATE_IP_CIDRS,
+    RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE,
+    RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE, RS_GEOSITE_TELEGRAM,
+    RS_GEOSITE_YOUTUBE,
 };
 use super::config_schema::{
     CacheFileConfig, ClashApiConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, LogConfig,
@@ -97,6 +98,8 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     if app_config.singbox_block_ads {
         dns_rules.insert(2, json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
     }
+
+    apply_fake_dns_rules(&mut dns_rules, app_config);
 
     let mut rule_sets: Vec<Value> = Vec::new();
     if app_config.singbox_block_ads {
@@ -207,6 +210,17 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         json!({ "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN, "outbound": default_outbound }),
     ]);
 
+    if app_config.singbox_fake_dns_enabled {
+        // fakeip 生成的地址段需要显式直连，确保连接能够回到内核并完成域名逆向映射。
+        route_rules.push(json!({
+            "ip_cidr": [
+                normalize_fakeip_range(&app_config.singbox_fake_dns_ipv4_range, "198.18.0.0/15"),
+                normalize_fakeip_range(&app_config.singbox_fake_dns_ipv6_range, "fc00::/18")
+            ],
+            "outbound": TAG_DIRECT
+        }));
+    }
+
     // 注意：这里的 outbounds 只是骨架，订阅节点注入后会补齐 TAG_AUTO/TAG_MANUAL
     // 以及各业务分流组的候选列表。
     //
@@ -220,7 +234,11 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             timestamp: true,
         },
         experimental: ExperimentalConfig {
-            cache_file: CacheFileConfig { enabled: true },
+            cache_file: CacheFileConfig {
+                enabled: true,
+                // Fake DNS 依赖反向域名映射缓存，开启持久化可降低切换网络后的映射丢失。
+                store_rdrc: app_config.singbox_fake_dns_enabled.then_some(true),
+            },
             clash_api: ClashApiConfig {
                 external_controller: format!("127.0.0.1:{}", app_config.api_port),
                 external_ui: "metacubexd".to_string(),
@@ -233,34 +251,10 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             },
         },
         dns: DnsConfig {
-            servers: vec![
-                build_dns_server_with_fallback(
-                    DNS_PROXY,
-                    &app_config.singbox_dns_proxy,
-                    Some(dns_strategy),
-                    Some(default_outbound),
-                    Some(DNS_RESOLVER),
-                    "https://1.1.1.1/dns-query",
-                ),
-                build_dns_server_with_fallback(
-                    DNS_CN,
-                    &app_config.singbox_dns_cn,
-                    Some(dns_strategy),
-                    Some(TAG_DIRECT),
-                    Some(DNS_RESOLVER),
-                    "h3://dns.alidns.com/dns-query",
-                ),
-                build_dns_server_with_fallback(
-                    DNS_RESOLVER,
-                    &app_config.singbox_dns_resolver,
-                    Some(dns_strategy),
-                    Some(TAG_DIRECT),
-                    None,
-                    "114.114.114.114",
-                ),
-            ],
+            servers: build_dns_servers(app_config, dns_strategy, default_outbound),
             rules: dns_rules,
             independent_cache: true,
+            reverse_mapping: app_config.singbox_fake_dns_enabled.then_some(true),
             final_server: DNS_PROXY.to_string(),
         },
         inbounds: Vec::new(),
@@ -284,6 +278,45 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     config
 }
 
+fn build_dns_servers(
+    app_config: &AppConfig,
+    dns_strategy: &str,
+    default_outbound: &str,
+) -> Vec<DnsServerConfig> {
+    let mut servers = vec![
+        build_dns_server_with_fallback(
+            DNS_PROXY,
+            &app_config.singbox_dns_proxy,
+            Some(dns_strategy),
+            Some(default_outbound),
+            Some(DNS_RESOLVER),
+            "https://1.1.1.1/dns-query",
+        ),
+        build_dns_server_with_fallback(
+            DNS_CN,
+            &app_config.singbox_dns_cn,
+            Some(dns_strategy),
+            Some(TAG_DIRECT),
+            Some(DNS_RESOLVER),
+            "h3://dns.alidns.com/dns-query",
+        ),
+        build_dns_server_with_fallback(
+            DNS_RESOLVER,
+            &app_config.singbox_dns_resolver,
+            Some(dns_strategy),
+            Some(TAG_DIRECT),
+            None,
+            "114.114.114.114",
+        ),
+    ];
+
+    if app_config.singbox_fake_dns_enabled {
+        servers.push(build_fakeip_dns_server(app_config));
+    }
+
+    servers
+}
+
 fn build_dns_server_with_fallback(
     tag: &str,
     raw_address: &str,
@@ -296,6 +329,72 @@ fn build_dns_server_with_fallback(
         build_dns_server_config(tag, fallback_address, strategy, detour, resolver_tag)
             .expect("内置 DNS fallback 地址必须可解析")
     })
+}
+
+fn build_fakeip_dns_server(app_config: &AppConfig) -> DnsServerConfig {
+    DnsServerConfig {
+        tag: DNS_FAKEIP.to_string(),
+        server_type: Some("fakeip".to_string()),
+        server: None,
+        server_port: None,
+        path: None,
+        interface: None,
+        inet4_range: Some(normalize_fakeip_range(
+            &app_config.singbox_fake_dns_ipv4_range,
+            "198.18.0.0/15",
+        )),
+        inet6_range: Some(normalize_fakeip_range(
+            &app_config.singbox_fake_dns_ipv6_range,
+            "fc00::/18",
+        )),
+        domain_resolver: None,
+        detour: None,
+    }
+}
+
+fn normalize_fakeip_range(raw: &str, fallback: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn apply_fake_dns_rules(dns_rules: &mut Vec<Value>, app_config: &AppConfig) {
+    // 先清理所有历史 fakeip 规则，再按当前开关重建，避免重复叠加。
+    dns_rules.retain(|rule| rule.get("server").and_then(|v| v.as_str()) != Some(DNS_FAKEIP));
+
+    if !app_config.singbox_fake_dns_enabled {
+        return;
+    }
+
+    match normalize_fake_dns_filter_mode(app_config) {
+        FAKE_DNS_FILTER_GLOBAL_NON_CN => {
+            // 全局非 CN：保留前面的 CN 规则，其他 A/AAAA 查询统一落到 fakeip。
+            dns_rules.push(json!({
+                "query_type": ["A", "AAAA"],
+                "server": DNS_FAKEIP
+            }));
+        }
+        _ => {
+            // 仅代理流量：非 CN 域名走 fakeip，国内域名仍按原逻辑直连解析。
+            let rule = json!({
+                "query_type": ["A", "AAAA"],
+                "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN,
+                "server": DNS_FAKEIP
+            });
+
+            let insert_idx = dns_rules
+                .iter()
+                .position(|item| {
+                    item.get("rule_set").and_then(|v| v.as_str())
+                        == Some(RS_GEOSITE_GEOLOCATION_NOT_CN)
+                })
+                .unwrap_or(dns_rules.len());
+            dns_rules.insert(insert_idx, rule);
+        }
+    }
 }
 
 fn remote_rule_set_value(
@@ -664,5 +763,76 @@ mod tests {
             Some("reject")
         );
         assert!(ads_rule.get("server").is_none());
+    }
+
+    #[test]
+    fn fake_dns_should_append_fakeip_server_and_enable_reverse_mapping() {
+        let mut app_config = AppConfig::default();
+        app_config.singbox_fake_dns_enabled = true;
+
+        let config = generate_base_config(&app_config);
+        let servers = config
+            .get("dns")
+            .and_then(|v| v.get("servers"))
+            .and_then(|v| v.as_array())
+            .expect("dns.servers 应存在");
+
+        let fakeip_server = servers
+            .iter()
+            .find(|server| server.get("tag").and_then(|v| v.as_str()) == Some(DNS_FAKEIP))
+            .expect("启用 fake dns 后应包含 fakeip dns server");
+
+        assert_eq!(
+            fakeip_server.get("type").and_then(|v| v.as_str()),
+            Some("fakeip")
+        );
+        assert_eq!(
+            fakeip_server.get("inet4_range").and_then(|v| v.as_str()),
+            Some("198.18.0.0/15")
+        );
+        assert_eq!(
+            fakeip_server.get("inet6_range").and_then(|v| v.as_str()),
+            Some("fc00::/18")
+        );
+
+        assert_eq!(
+            config
+                .get("dns")
+                .and_then(|v| v.get("reverse_mapping"))
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            config
+                .get("experimental")
+                .and_then(|v| v.get("cache_file"))
+                .and_then(|v| v.get("store_rdrc"))
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn fake_dns_global_non_cn_should_add_catch_all_query_rule() {
+        let mut app_config = AppConfig::default();
+        app_config.singbox_fake_dns_enabled = true;
+        app_config.singbox_fake_dns_filter_mode = "global_non_cn".to_string();
+
+        let config = generate_base_config(&app_config);
+        let rules = config
+            .get("dns")
+            .and_then(|v| v.get("rules"))
+            .and_then(|v| v.as_array())
+            .expect("dns.rules 应存在");
+
+        let catch_all = rules.iter().find(|rule| {
+            rule.get("server").and_then(|v| v.as_str()) == Some(DNS_FAKEIP)
+                && rule.get("rule_set").is_none()
+                && rule.get("query_type").is_some()
+        });
+        assert!(
+            catch_all.is_some(),
+            "global_non_cn 模式应生成 A/AAAA catch-all fakeip 规则"
+        );
     }
 }

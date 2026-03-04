@@ -1,6 +1,7 @@
 use super::common::{
     build_dns_server_config, dns_strategy, normalize_default_outbound, normalize_download_detour,
-    DNS_CN, DNS_PROXY, DNS_RESOLVER, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN,
+    normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_PROXY, DNS_RESOLVER,
+    FAKE_DNS_FILTER_GLOBAL_NON_CN, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN,
     RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM,
     RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM,
     TAG_YOUTUBE,
@@ -39,12 +40,27 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
                     json!(normalize_download_detour(app_config)),
                 );
             }
+
+            let cache_file = exp_obj.entry("cache_file".to_string()).or_insert(json!({}));
+            if let Some(cache_obj) = cache_file.as_object_mut() {
+                cache_obj.insert("enabled".to_string(), json!(true));
+                if app_config.singbox_fake_dns_enabled {
+                    cache_obj.insert("store_rdrc".to_string(), json!(true));
+                } else {
+                    cache_obj.remove("store_rdrc");
+                }
+            }
         }
 
         // `dns.strategy` 已在 sing-box 1.12 废弃；迁移到 domain_resolver 对象策略。
         let dns = config_obj.entry("dns".to_string()).or_insert(json!({}));
         if let Some(dns_obj) = dns.as_object_mut() {
             dns_obj.remove("strategy");
+            if app_config.singbox_fake_dns_enabled {
+                dns_obj.insert("reverse_mapping".to_string(), json!(true));
+            } else {
+                dns_obj.remove("reverse_mapping");
+            }
         }
     }
 }
@@ -94,6 +110,13 @@ pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
 fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_config: &AppConfig) {
     let default_outbound = normalize_default_outbound(app_config);
     let download_detour = normalize_download_detour(app_config);
+    let mut fake_dns_route_cleanup_pairs = vec![
+        (
+            normalize_fakeip_range(&app_config.singbox_fake_dns_ipv4_range, "198.18.0.0/15"),
+            normalize_fakeip_range(&app_config.singbox_fake_dns_ipv6_range, "fc00::/18"),
+        ),
+        ("198.18.0.0/15".to_string(), "fc00::/18".to_string()),
+    ];
 
     // 1) 更新 urltest 的 URL
     if let Some(outbounds) = config_obj
@@ -116,6 +139,12 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
     // 2) 更新 DNS servers（按 tag 定位）
     if let Some(dns_obj) = config_obj.get_mut("dns").and_then(|v| v.as_object_mut()) {
         if let Some(servers) = dns_obj.get_mut("servers").and_then(|v| v.as_array_mut()) {
+            for server in servers.iter() {
+                if let Some(range_pair) = extract_fake_dns_server_range_pair(server) {
+                    fake_dns_route_cleanup_pairs.push(range_pair);
+                }
+            }
+
             for server in servers.iter_mut() {
                 let tag = server
                     .get("tag")
@@ -173,6 +202,8 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     }
                 }
             }
+
+            sync_fake_dns_server(servers, app_config);
         }
 
         // 3) 广告拦截：同步 dns.rules（如果存在/可定位）
@@ -198,6 +229,8 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
             } else if let Some(i) = ads_rule_index {
                 rules.remove(i);
             }
+
+            sync_fake_dns_rules(rules, app_config);
         }
     }
 
@@ -310,6 +343,8 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     )
                 });
             }
+
+            sync_fake_dns_route_rules(rules, app_config, &fake_dns_route_cleanup_pairs);
         }
     }
 
@@ -328,6 +363,118 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
             });
         }
     }
+}
+
+fn normalize_fakeip_range(raw: &str, fallback: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn build_fake_dns_server_value(app_config: &AppConfig) -> Value {
+    json!({
+        "tag": DNS_FAKEIP,
+        "type": "fakeip",
+        "inet4_range": normalize_fakeip_range(&app_config.singbox_fake_dns_ipv4_range, "198.18.0.0/15"),
+        "inet6_range": normalize_fakeip_range(&app_config.singbox_fake_dns_ipv6_range, "fc00::/18")
+    })
+}
+
+fn extract_fake_dns_server_range_pair(server: &Value) -> Option<(String, String)> {
+    if server.get("tag").and_then(|v| v.as_str()) != Some(DNS_FAKEIP) {
+        return None;
+    }
+
+    let inet4_range = server.get("inet4_range").and_then(|v| v.as_str())?.trim();
+    let inet6_range = server.get("inet6_range").and_then(|v| v.as_str())?.trim();
+    if inet4_range.is_empty() || inet6_range.is_empty() {
+        return None;
+    }
+
+    Some((inet4_range.to_string(), inet6_range.to_string()))
+}
+
+fn sync_fake_dns_server(servers: &mut Vec<Value>, app_config: &AppConfig) {
+    servers.retain(|server| server.get("tag").and_then(|v| v.as_str()) != Some(DNS_FAKEIP));
+    if app_config.singbox_fake_dns_enabled {
+        servers.push(build_fake_dns_server_value(app_config));
+    }
+}
+
+fn sync_fake_dns_rules(rules: &mut Vec<Value>, app_config: &AppConfig) {
+    rules.retain(|rule| rule.get("server").and_then(|v| v.as_str()) != Some(DNS_FAKEIP));
+
+    if !app_config.singbox_fake_dns_enabled {
+        return;
+    }
+
+    match normalize_fake_dns_filter_mode(app_config) {
+        FAKE_DNS_FILTER_GLOBAL_NON_CN => {
+            rules.push(json!({
+                "query_type": ["A", "AAAA"],
+                "server": DNS_FAKEIP
+            }));
+        }
+        _ => {
+            let rule = json!({
+                "query_type": ["A", "AAAA"],
+                "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN,
+                "server": DNS_FAKEIP
+            });
+
+            let insert_idx = rules
+                .iter()
+                .position(|item| {
+                    item.get("rule_set").and_then(|v| v.as_str())
+                        == Some(RS_GEOSITE_GEOLOCATION_NOT_CN)
+                })
+                .unwrap_or(rules.len());
+            rules.insert(insert_idx, rule);
+        }
+    }
+}
+
+fn sync_fake_dns_route_rules(
+    rules: &mut Vec<Value>,
+    app_config: &AppConfig,
+    cleanup_pairs: &[(String, String)],
+) {
+    rules.retain(|rule| !is_fake_dns_route_rule(rule, cleanup_pairs));
+
+    if !app_config.singbox_fake_dns_enabled {
+        return;
+    }
+
+    rules.push(json!({
+        "ip_cidr": [
+            normalize_fakeip_range(&app_config.singbox_fake_dns_ipv4_range, "198.18.0.0/15"),
+            normalize_fakeip_range(&app_config.singbox_fake_dns_ipv6_range, "fc00::/18")
+        ],
+        "outbound": TAG_DIRECT
+    }));
+}
+
+fn is_fake_dns_route_rule(rule: &Value, cleanup_pairs: &[(String, String)]) -> bool {
+    let Some(ip_cidr) = rule.get("ip_cidr").and_then(|v| v.as_array()) else {
+        return false;
+    };
+    let outbound = rule.get("outbound").and_then(|v| v.as_str()).unwrap_or("");
+    if outbound != TAG_DIRECT {
+        return false;
+    }
+
+    if ip_cidr.len() != 2 {
+        return false;
+    }
+
+    cleanup_pairs.iter().any(|(inet4, inet6)| {
+        [inet4.as_str(), inet6.as_str()]
+            .iter()
+            .all(|cidr| ip_cidr.iter().any(|v| v.as_str() == Some(*cidr)))
+    })
 }
 
 fn apply_inbounds_settings(config_obj: &mut Map<String, Value>, app_config: &AppConfig) {

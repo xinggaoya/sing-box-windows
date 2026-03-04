@@ -18,6 +18,8 @@ const DEFAULT_SINGBOX_DNS_PROXY = 'https://1.1.1.1/dns-query'
 const DEFAULT_SINGBOX_DNS_CN = 'h3://dns.alidns.com/dns-query'
 const DEFAULT_SINGBOX_DNS_RESOLVER = '114.114.114.114'
 const DEFAULT_SINGBOX_URLTEST_URL = 'http://cp.cloudflare.com/generate_204'
+const DEFAULT_SINGBOX_FAKE_DNS_IPV4_RANGE = '198.18.0.0/15'
+const DEFAULT_SINGBOX_FAKE_DNS_IPV6_RANGE = 'fc00::/18'
 
 export const useAppStore = defineStore(
   'app',
@@ -86,7 +88,13 @@ export const useAppStore = defineStore(
     const singboxBlockAds = ref(true)
     const singboxDownloadDetour = ref<'manual' | 'direct'>('manual')
     const singboxDnsHijack = ref(true)
+    const singboxFakeDnsEnabled = ref(false)
+    const singboxFakeDnsIpv4Range = ref(DEFAULT_SINGBOX_FAKE_DNS_IPV4_RANGE)
+    const singboxFakeDnsIpv6Range = ref(DEFAULT_SINGBOX_FAKE_DNS_IPV6_RANGE)
+    const singboxFakeDnsFilterMode = ref<'proxy_only' | 'global_non_cn'>('proxy_only')
     const singboxEnableAppGroups = ref(true)
+    const tunSelfHealEnabled = ref(true)
+    const tunSelfHealCooldownSecs = ref(90)
 
     const {
       isDataRestored,
@@ -125,7 +133,13 @@ export const useAppStore = defineStore(
       singboxBlockAds,
       singboxDownloadDetour,
       singboxDnsHijack,
+      singboxFakeDnsEnabled,
+      singboxFakeDnsIpv4Range,
+      singboxFakeDnsIpv6Range,
+      singboxFakeDnsFilterMode,
       singboxEnableAppGroups,
+      tunSelfHealEnabled,
+      tunSelfHealCooldownSecs,
     })
 
     // 同步开机自启设置与系统状态
@@ -318,6 +332,8 @@ export const useAppStore = defineStore(
       tunStrictRoute?: boolean
       tunStack?: 'system' | 'gvisor' | 'mixed'
       tunEnableIpv6?: boolean
+      tunSelfHealEnabled?: boolean
+      tunSelfHealCooldownSecs?: number
     }) => {
       if (typeof settings.systemProxyBypass === 'string') {
         systemProxyBypass.value = settings.systemProxyBypass
@@ -342,6 +358,12 @@ export const useAppStore = defineStore(
       }
       if (typeof settings.tunEnableIpv6 === 'boolean') {
         tunEnableIpv6.value = settings.tunEnableIpv6
+      }
+      if (typeof settings.tunSelfHealEnabled === 'boolean') {
+        tunSelfHealEnabled.value = settings.tunSelfHealEnabled
+      }
+      if (typeof settings.tunSelfHealCooldownSecs === 'number') {
+        tunSelfHealCooldownSecs.value = settings.tunSelfHealCooldownSecs
       }
 
       await waitForSaveCompletion()
@@ -408,7 +430,13 @@ export const useAppStore = defineStore(
       singboxBlockAds,
       singboxDownloadDetour,
       singboxDnsHijack,
+      singboxFakeDnsEnabled,
+      singboxFakeDnsIpv4Range,
+      singboxFakeDnsIpv6Range,
+      singboxFakeDnsFilterMode,
       singboxEnableAppGroups,
+      tunSelfHealEnabled,
+      tunSelfHealCooldownSecs,
       setRunningState,
       setConnectingState,
       toggleAutoStart,

@@ -259,7 +259,22 @@
                     <span>{{ t('setting.proxyAdvanced.strictRoute') }}</span>
                     <n-switch v-model:value="proxyAdvancedForm.tunStrictRoute" />
                   </div>
+                  <div class="toggle-item">
+                    <span>{{ t('setting.proxyAdvanced.tunSelfHeal') }}</span>
+                    <n-switch v-model:value="proxyAdvancedForm.tunSelfHealEnabled" />
+                  </div>
                 </div>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.proxyAdvanced.tunSelfHealCooldown')">
+                  <n-input-number
+                    v-model:value="proxyAdvancedForm.tunSelfHealCooldownSecs"
+                    :min="15"
+                    :max="600"
+                    :disabled="!proxyAdvancedForm.tunSelfHealEnabled"
+                  />
+                </n-form-item>
               </n-grid-item>
 
               <n-grid-item :span="24">
@@ -320,7 +335,45 @@
                     <span>{{ t('setting.singboxProfile.enableAppGroups') }}</span>
                     <n-switch v-model:value="singboxProfileForm.enableAppGroups" />
                   </div>
+                  <div class="toggle-item">
+                    <span>{{ t('setting.singboxProfile.fakeDnsEnabled') }}</span>
+                    <n-switch v-model:value="singboxProfileForm.fakeDnsEnabled" />
+                  </div>
                 </div>
+              </n-grid-item>
+
+              <n-grid-item :span="24">
+                <div class="subsection-title">{{ t('setting.singboxProfile.fakeDnsTitle') }}</div>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.singboxProfile.fakeDnsFilterMode')">
+                  <n-select
+                    v-model:value="singboxProfileForm.fakeDnsFilterMode"
+                    :options="fakeDnsFilterOptions"
+                    :disabled="!singboxProfileForm.fakeDnsEnabled"
+                  />
+                </n-form-item>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.singboxProfile.fakeDnsIpv4Range')">
+                  <n-input
+                    v-model:value="singboxProfileForm.fakeDnsIpv4Range"
+                    placeholder="198.18.0.0/15"
+                    :disabled="!singboxProfileForm.fakeDnsEnabled"
+                  />
+                </n-form-item>
+              </n-grid-item>
+
+              <n-grid-item :span="12" :s="24" :m="12">
+                <n-form-item :label="t('setting.singboxProfile.fakeDnsIpv6Range')">
+                  <n-input
+                    v-model:value="singboxProfileForm.fakeDnsIpv6Range"
+                    placeholder="fc00::/18"
+                    :disabled="!singboxProfileForm.fakeDnsEnabled"
+                  />
+                </n-form-item>
               </n-grid-item>
 
               <n-grid-item :span="24">
@@ -783,6 +836,7 @@ const {
   singboxProfileForm,
   defaultOutboundOptions,
   downloadDetourOptions,
+  fakeDnsFilterOptions,
   saveProxyAdvancedSettings,
   saveSingboxProfileSettings,
 } = useAdvancedSettingsForm({

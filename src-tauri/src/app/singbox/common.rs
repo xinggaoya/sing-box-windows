@@ -21,6 +21,10 @@ pub const TAG_GOOGLE: &str = "Google";
 pub const DNS_PROXY: &str = "dns_proxy";
 pub const DNS_CN: &str = "dns_cn";
 pub const DNS_RESOLVER: &str = "dns_resolver";
+pub const DNS_FAKEIP: &str = "dns_fakeip";
+
+pub const FAKE_DNS_FILTER_PROXY_ONLY: &str = "proxy_only";
+pub const FAKE_DNS_FILTER_GLOBAL_NON_CN: &str = "global_non_cn";
 
 // Rule-set tags (官方 SagerNet 规则集)
 pub const RS_GEOSITE_CN: &str = "geosite-cn";
@@ -75,6 +79,13 @@ pub fn node_domain_resolver_strategy(app_config: &AppConfig) -> &'static str {
     } else {
         // 节点域名解析默认走 IPv4，能显著降低“有 AAAA 但本机 IPv6 不可用”导致的连接失败。
         "ipv4_only"
+    }
+}
+
+pub fn normalize_fake_dns_filter_mode(app_config: &AppConfig) -> &'static str {
+    match app_config.singbox_fake_dns_filter_mode.as_str() {
+        FAKE_DNS_FILTER_GLOBAL_NON_CN => FAKE_DNS_FILTER_GLOBAL_NON_CN,
+        _ => FAKE_DNS_FILTER_PROXY_ONLY,
     }
 }
 
@@ -176,6 +187,8 @@ pub(crate) fn build_dns_server_config(
             server_port: None,
             path: None,
             interface: None,
+            inet4_range: None,
+            inet6_range: None,
             domain_resolver: None,
             detour: None,
         });
@@ -253,6 +266,8 @@ pub(crate) fn build_dns_server_config(
         server_port,
         path,
         interface,
+        inet4_range: None,
+        inet6_range: None,
         domain_resolver,
         detour: normalized_detour,
     })

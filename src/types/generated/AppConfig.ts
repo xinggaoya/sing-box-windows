@@ -26,5 +26,11 @@ export interface AppConfig {
   singbox_block_ads: boolean
   singbox_download_detour: string
   singbox_dns_hijack: boolean
+  singbox_fake_dns_enabled: boolean
+  singbox_fake_dns_ipv4_range: string
+  singbox_fake_dns_ipv6_range: string
+  singbox_fake_dns_filter_mode: string
   singbox_enable_app_groups: boolean
+  tun_self_heal_enabled: boolean
+  tun_self_heal_cooldown_secs: number
 }

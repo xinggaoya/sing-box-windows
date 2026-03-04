@@ -77,7 +77,13 @@ impl DatabaseService {
                 singbox_block_ads BOOLEAN DEFAULT TRUE,
                 singbox_download_detour TEXT DEFAULT 'direct',
                 singbox_dns_hijack BOOLEAN DEFAULT TRUE,
+                singbox_fake_dns_enabled BOOLEAN DEFAULT FALSE,
+                singbox_fake_dns_ipv4_range TEXT DEFAULT '198.18.0.0/15',
+                singbox_fake_dns_ipv6_range TEXT DEFAULT 'fc00::/18',
+                singbox_fake_dns_filter_mode TEXT DEFAULT 'proxy_only',
                 singbox_enable_app_groups BOOLEAN DEFAULT TRUE,
+                tun_self_heal_enabled BOOLEAN DEFAULT TRUE,
+                tun_self_heal_cooldown_secs INTEGER DEFAULT 90,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -109,7 +115,13 @@ impl DatabaseService {
             "ALTER TABLE app_config ADD COLUMN singbox_block_ads BOOLEAN DEFAULT TRUE",
             "ALTER TABLE app_config ADD COLUMN singbox_download_detour TEXT DEFAULT 'direct'",
             "ALTER TABLE app_config ADD COLUMN singbox_dns_hijack BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN singbox_fake_dns_enabled BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE app_config ADD COLUMN singbox_fake_dns_ipv4_range TEXT DEFAULT '198.18.0.0/15'",
+            "ALTER TABLE app_config ADD COLUMN singbox_fake_dns_ipv6_range TEXT DEFAULT 'fc00::/18'",
+            "ALTER TABLE app_config ADD COLUMN singbox_fake_dns_filter_mode TEXT DEFAULT 'proxy_only'",
             "ALTER TABLE app_config ADD COLUMN singbox_enable_app_groups BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN tun_self_heal_enabled BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN tun_self_heal_cooldown_secs INTEGER DEFAULT 90",
         ];
 
         for statement in alter_statements {
@@ -289,9 +301,27 @@ impl DatabaseService {
                 singbox_dns_hijack: row
                     .try_get("singbox_dns_hijack")
                     .unwrap_or(default_config.singbox_dns_hijack),
+                singbox_fake_dns_enabled: row
+                    .try_get("singbox_fake_dns_enabled")
+                    .unwrap_or(default_config.singbox_fake_dns_enabled),
+                singbox_fake_dns_ipv4_range: row
+                    .try_get("singbox_fake_dns_ipv4_range")
+                    .unwrap_or_else(|_| default_config.singbox_fake_dns_ipv4_range.clone()),
+                singbox_fake_dns_ipv6_range: row
+                    .try_get("singbox_fake_dns_ipv6_range")
+                    .unwrap_or_else(|_| default_config.singbox_fake_dns_ipv6_range.clone()),
+                singbox_fake_dns_filter_mode: row
+                    .try_get("singbox_fake_dns_filter_mode")
+                    .unwrap_or_else(|_| default_config.singbox_fake_dns_filter_mode.clone()),
                 singbox_enable_app_groups: row
                     .try_get("singbox_enable_app_groups")
                     .unwrap_or(default_config.singbox_enable_app_groups),
+                tun_self_heal_enabled: row
+                    .try_get("tun_self_heal_enabled")
+                    .unwrap_or(default_config.tun_self_heal_enabled),
+                tun_self_heal_cooldown_secs: row
+                    .try_get("tun_self_heal_cooldown_secs")
+                    .unwrap_or(default_config.tun_self_heal_cooldown_secs),
             }))
         } else {
             Ok(None)
@@ -302,8 +332,8 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO app_config
-            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, active_config_path, installed_kernel_version, singbox_dns_proxy, singbox_dns_cn, singbox_dns_resolver, singbox_urltest_url, singbox_default_proxy_outbound, singbox_block_ads, singbox_download_detour, singbox_dns_hijack, singbox_enable_app_groups, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, auto_start_kernel, auto_start_app, prefer_ipv6, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, active_config_path, installed_kernel_version, singbox_dns_proxy, singbox_dns_cn, singbox_dns_resolver, singbox_urltest_url, singbox_default_proxy_outbound, singbox_block_ads, singbox_download_detour, singbox_dns_hijack, singbox_fake_dns_enabled, singbox_fake_dns_ipv4_range, singbox_fake_dns_ipv6_range, singbox_fake_dns_filter_mode, singbox_enable_app_groups, tun_self_heal_enabled, tun_self_heal_cooldown_secs, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_start_kernel)
@@ -333,7 +363,13 @@ impl DatabaseService {
         .bind(config.singbox_block_ads)
         .bind(&config.singbox_download_detour)
         .bind(config.singbox_dns_hijack)
+        .bind(config.singbox_fake_dns_enabled)
+        .bind(&config.singbox_fake_dns_ipv4_range)
+        .bind(&config.singbox_fake_dns_ipv6_range)
+        .bind(&config.singbox_fake_dns_filter_mode)
         .bind(config.singbox_enable_app_groups)
+        .bind(config.tun_self_heal_enabled)
+        .bind(config.tun_self_heal_cooldown_secs)
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;
