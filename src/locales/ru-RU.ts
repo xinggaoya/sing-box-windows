@@ -13,6 +13,7 @@ export default {
     import: 'Импорт',
     export: 'Экспорт',
     refresh: 'Обновить',
+    loading: 'Загрузка...',
   },
 
   // 导航菜单
@@ -568,8 +569,15 @@ export default {
 
   // Уведомления
   notification: {
-    proxyModeChanged: 'Режим прокси изменен',
+    proxyModeChanged: 'Режим прокси изменён',
     proxyModeChangeFailed: 'Ошибка изменения режима прокси',
+    applyProxyFailed: 'Ошибка применения настроек прокси',
+    systemProxyEnabled: 'Системный прокси включён',
+    tunEnabled: 'Режим TUN включён',
+    manualProxyEnabled: 'Ручной режим прокси. Настройте системный прокси вручную',
+    kernelRestartFailed: 'Ошибка перезапуска ядра',
+    proxySwitchFailed: 'Ошибка переключения режима прокси',
+    ipVersionChangeFailed: 'Ошибка переключения версии IP',
     updateAvailable: 'Доступна новая версия',
     prereleaseAvailable: 'Доступна новая предварительная версия',
     updateDownloaded: 'Обновление загружено, скоро будет установлено',

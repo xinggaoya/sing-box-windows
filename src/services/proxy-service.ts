@@ -96,7 +96,7 @@ export class ProxyService {
 
       const applied = await this.kernelStore.applyProxySettings()
       if (!applied) {
-        const errorText = '应用代理配置失败'
+        const errorText = this.t('notification.applyProxyFailed')
         if (messageCallback) messageCallback('error', errorText)
         return false
       }
@@ -104,10 +104,10 @@ export class ProxyService {
       if (messageCallback) {
         const content =
           mode === 'system'
-            ? '系统代理模式已启用'
+            ? this.t('notification.systemProxyEnabled')
             : mode === 'tun'
-              ? 'TUN模式已启用'
-              : '手动代理模式已启用，请手动设置系统代理'
+              ? this.t('notification.tunEnabled')
+              : this.t('notification.manualProxyEnabled')
         messageCallback(mode === 'manual' ? 'info' : 'success', content)
       }
 
@@ -131,9 +131,9 @@ export class ProxyService {
       return false // 不需要关闭应用
     } catch (error) {
       if (messageCallback) {
-        messageCallback('error', `切换代理模式失败: ${error}`)
+        messageCallback('error', `${this.t('notification.proxySwitchFailed')}: ${error}`)
       }
-      console.error('切换代理模式失败:', error)
+      console.error('proxySwitchFailed:', error)
       return false
     }
   }

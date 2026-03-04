@@ -565,8 +565,8 @@
               <span class="value">{{ kernelStore.hasVersionInfo() ? formatVersion(kernelStore.getVersionString()) : t('setting.notInstalled') }}</span>
             </div>
             <div class="about-item">
-              <span class="label">平台</span>
-              <span class="value">{{ platformInfo?.display_name || '加载中...' }}</span>
+              <span class="label">{{ t('setting.about.system') }}</span>
+              <span class="value">{{ platformInfo?.display_name || t('common.loading') }}</span>
             </div>
             <div class="about-item">
               <span class="label">{{ t('setting.about.license') }}</span>
@@ -841,7 +841,7 @@ const onIpVersionChange = async (value: boolean) => {
 
     const toggled = await kernelStore.toggleIpVersion(value)
     if (!toggled) {
-      throw new Error(kernelStore.lastError || '切换IP版本失败')
+      throw new Error(kernelStore.lastError || t('notification.ipVersionChangeFailed'))
     }
 
     message.success(t('common.saveSuccess'))
