@@ -72,20 +72,3 @@ which = "7.0"
 # macOS特定依赖
 core-foundation = "0.9"
 security-framework = "2.9"
-
-# 性能优化配置
-[profile.dev]
-# 开发模式优化：保持编译速度的同时提升运行性能
-opt-level = 1
-debug = true
-lto = false
-
-[profile.release]
-# 发布模式优化：最大化运行时性能
-opt-level = 3
-debug = false
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
-overflow-checks = false
