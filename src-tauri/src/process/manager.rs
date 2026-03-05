@@ -2,8 +2,6 @@ use super::{ProcessError, Result};
 use crate::app::constants::{messages, paths};
 use crate::utils::proxy_util::disable_system_proxy;
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 #[cfg(target_os = "macos")]
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
@@ -99,9 +97,11 @@ impl ProcessManager {
 
         #[cfg(target_os = "windows")]
         {
-            let output = std::process::Command::new("tasklist")
-                .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
-                .output();
+            let mut cmd = std::process::Command::new("tasklist");
+            cmd.args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"]);
+            // 统一走平台封装，确保 Windows 下不会弹出瞬时控制台窗口。
+            crate::platform::configure_std_command(&mut cmd);
+            let output = cmd.output();
 
             if let Ok(output) = output {
                 if output.status.success() {
@@ -322,7 +322,7 @@ impl ProcessManager {
             let mut cmd = Command::new(kernel_path);
             cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
             cmd.stdout(Stdio::null()).stderr(Stdio::null());
-            cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
+            crate::platform::configure_std_command(&mut cmd);
 
             let child = cmd
                 .spawn()
@@ -602,7 +602,7 @@ impl ProcessManager {
             check_cmd.args(["check", "--config", config_str]);
 
             #[cfg(target_os = "windows")]
-            check_cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
+            crate::platform::configure_std_command(&mut check_cmd);
 
             let output = check_cmd
                 .output()
