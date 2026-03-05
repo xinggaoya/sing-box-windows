@@ -464,6 +464,38 @@ impl ProcessManager {
         Ok(())
     }
 
+    // 按进程名强制清理所有内核进程。
+    // 用于“检测到旧内核残留导致启动冲突”场景，优先保证新启动流程可恢复。
+    pub async fn force_kill_kernel_processes_by_name(&self) -> std::result::Result<(), String> {
+        let kernel_name = crate::platform::get_kernel_executable_name();
+        info!("按进程名强制清理内核进程: {}", kernel_name);
+
+        crate::platform::kill_processes_by_name(kernel_name)
+            .await
+            .map_err(|e| format!("按进程名终止内核进程失败: {}", e))?;
+
+        // 清理本地句柄与 PID 记录，避免后续状态仍指向被外部终止的旧进程。
+        {
+            let mut process_guard = self.process.write().await;
+            *process_guard = None;
+        }
+        self.clear_managed_pid();
+
+        sleep(Duration::from_millis(350)).await;
+        match crate::platform::is_process_running(kernel_name).await {
+            Ok(true) => Err(format!(
+                "强制清理后仍检测到 {} 进程在运行，可能存在权限不足",
+                kernel_name
+            )),
+            Ok(false) => Ok(()),
+            Err(e) => {
+                // 检测失败时不直接阻断：终止命令已成功执行，交由上层启动稳定性校验兜底。
+                warn!("强制清理后状态复核失败，继续后续流程: {}", e);
+                Ok(())
+            }
+        }
+    }
+
     // 停止进程
     pub async fn stop(&self) -> Result<()> {
         // 尝试关闭系统代理

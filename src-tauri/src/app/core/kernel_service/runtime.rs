@@ -99,6 +99,28 @@ async fn verify_kernel_startup_stability(api_port: u16) -> Result<(), String> {
     Err(last_error)
 }
 
+async fn try_cleanup_conflicting_kernel(app_handle: &AppHandle) -> Result<(), String> {
+    let kernel_name = crate::platform::get_kernel_executable_name();
+    let details = format!(
+        "检测到非托管内核进程 {} 正在运行，尝试强制停止后继续启动",
+        kernel_name
+    );
+
+    warn!("{}", details);
+    emit_kernel_error_with_context(
+        app_handle,
+        "KERNEL_CONFLICT_DETECTED",
+        "检测到旧内核正在运行，正在尝试强制停止后继续",
+        Some(&details),
+        Some("kernel.runtime.conflict"),
+        true,
+    );
+
+    PROCESS_MANAGER
+        .force_kill_kernel_processes_by_name()
+        .await
+}
+
 pub async fn resolve_proxy_runtime_state(
     app_handle: &AppHandle,
     overrides: ProxyOverrides,
@@ -215,7 +237,7 @@ pub async fn start_kernel_with_state(
         warn!("更新DNS策略失败: {}", e);
     }
 
-    if is_kernel_running().await.unwrap_or(false) {
+    if PROCESS_MANAGER.is_running().await {
         KERNEL_STATE.mark_running(resolved.api_port);
         enable_kernel_guard(
             app_handle.clone(),
@@ -228,6 +250,54 @@ pub async fn start_kernel_with_state(
             "success": true,
             "message": "内核已在运行中".to_string()
         }));
+    }
+
+    if is_kernel_running().await.unwrap_or(false) {
+        if let Err(err) = try_cleanup_conflicting_kernel(&app_handle).await {
+            KERNEL_STATE.mark_failed();
+            let kernel_name = crate::platform::get_kernel_executable_name();
+            let user_message = format!(
+                "检测到旧内核进程且强制停止失败，请手动结束 {} 进程后重试（必要时以管理员权限运行）",
+                kernel_name
+            );
+            emit_kernel_error_with_context(
+                &app_handle,
+                "KERNEL_CONFLICT_FORCE_STOP_FAILED",
+                &user_message,
+                Some(&err),
+                Some("kernel.runtime.conflict"),
+                false,
+            );
+            return Ok(json!({
+                "success": false,
+                "message": format!("内核启动失败: {}", user_message)
+            }));
+        }
+
+        // 再次复核，避免平台命令执行成功但仍有残留进程占用端口。
+        if is_kernel_running().await.unwrap_or(false) {
+            KERNEL_STATE.mark_failed();
+            let kernel_name = crate::platform::get_kernel_executable_name();
+            let details = format!("强制清理后仍检测到 {} 进程在运行", kernel_name);
+            let user_message = format!(
+                "检测到旧内核进程未完全退出，请手动结束 {} 进程后重试",
+                kernel_name
+            );
+            emit_kernel_error_with_context(
+                &app_handle,
+                "KERNEL_CONFLICT_FORCE_STOP_FAILED",
+                &user_message,
+                Some(&details),
+                Some("kernel.runtime.conflict"),
+                false,
+            );
+            return Ok(json!({
+                "success": false,
+                "message": format!("内核启动失败: {}", user_message)
+            }));
+        }
+
+        info!("旧内核残留进程清理完成，继续启动新内核");
     }
 
     let config_path = resolve_config_path(&app_handle).await.inspect_err(|_e| {
@@ -381,13 +451,13 @@ async fn restart_kernel_internal(
         Ok(Ok(_)) => info!("? 快速重启：停止阶段完成"),
         Ok(Err(e)) => {
             warn!("? 快速重启：停止失败，继续强杀: {}", e);
-            if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+            if let Err(e) = PROCESS_MANAGER.force_kill_kernel_processes_by_name().await {
                 error!("强制清理内核进程失败: {}", e);
             }
         }
         Err(_) => {
             warn!("? 快速重启：停止超时，强制清理");
-            if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+            if let Err(e) = PROCESS_MANAGER.force_kill_kernel_processes_by_name().await {
                 error!("强制清理内核进程失败: {}", e);
             }
         }

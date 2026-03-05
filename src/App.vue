@@ -96,6 +96,7 @@ interface NormalizedKernelFailure {
   userMessage: string
   details: string
   source: string
+  recoverable: boolean
 }
 
 const extractKernelErrorMessage = (raw: unknown) => {
@@ -147,6 +148,10 @@ const mapKernelFailureCodeToMessage = (code: string, fallback: string) => {
       return '内核停止失败'
     case 'KERNEL_AUTO_MANAGE_FAILED':
       return '内核自动管理失败'
+    case 'KERNEL_CONFLICT_DETECTED':
+      return '检测到旧内核正在运行，正在尝试强制停止后继续'
+    case 'KERNEL_CONFLICT_FORCE_STOP_FAILED':
+      return '旧内核进程强制停止失败，请手动结束进程后重试'
     default:
       return fallback
   }
@@ -160,8 +165,9 @@ const normalizeKernelFailurePayload = (payload: KernelFailurePayload | unknown):
   const baseMessage = typed.message || rawMessage || '内核运行异常'
   const userMessage = mapKernelFailureCodeToMessage(code, baseMessage)
   const source = typed.source || 'kernel'
+  const recoverable = typed.recoverable === true
 
-  return { code, userMessage, details, source }
+  return { code, userMessage, details, source, recoverable }
 }
 
 const normalizeKernelOperationFailedPayload = (
@@ -176,6 +182,7 @@ const normalizeKernelOperationFailedPayload = (
     userMessage,
     details,
     source: operation,
+    recoverable: false,
   }
 }
 
@@ -183,7 +190,11 @@ const notifyKernelFailure = (failure: NormalizedKernelFailure) => {
   const dedupKey = `${failure.code}|${failure.userMessage}`
   if (!shouldNotifyKernelFailure(dedupKey)) return
 
-  appStore.showErrorMessage?.(failure.userMessage)
+  if (failure.recoverable) {
+    appStore.showWarningMessage?.(failure.userMessage)
+  } else {
+    appStore.showErrorMessage?.(failure.userMessage)
+  }
   if (failure.details && failure.details !== failure.userMessage) {
     appStore.showInfoMessage?.(`详情：${failure.details}`)
   }
