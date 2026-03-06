@@ -1,19 +1,18 @@
 <div align="center">
-  <img src="src/assets/icon.png" alt="Sing-Box GUI 客户端" width="120" height="120">
+  <img src="src/assets/icon.png" alt="Sing-Box GUI Client" width="120" height="120">
 
   <h1>Sing-Box Windows</h1>
 
   <p>
-    <strong>基于 Tauri 2.0 + Vue 3 构建的现代化 Sing-Box 跨平台 GUI 客户端 (Windows + Linux + macOS)</strong>
+    <strong>基于 Tauri 2 + Vue 3 构建的 sing-box 跨平台图形客户端，支持 Windows、Linux 和 macOS</strong>
   </p>
 
   <p>
     <a href="#功能特性">✨ 功能特性</a> •
-    <a href="#安装指南">🚀 安装指南</a> •
-    <a href="#快速开始">🎯 快速开始</a> •
-    <a href="#界面截图">📸 界面截图</a> •
-    <a href="#开发指南">🛠️ 开发指南</a> •
-    <a href="#贡献指南">💡 贡献指南</a>
+    <a href="#架构概览">🏗️ 架构概览</a> •
+    <a href="#快速开始">🚀 快速开始</a> •
+    <a href="#开发">🛠️ 开发</a> •
+    <a href="#文档">📚 文档</a>
   </p>
 
   <p>
@@ -25,168 +24,123 @@
     <a href="https://github.com/xinggaoya/sing-box-windows/releases">
       <img src="https://img.shields.io/github/v/release/xinggaoya/sing-box-windows?style=for-the-badge&logo=github" alt="GitHub release">
     </a>
-    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue?style=for-the-badge&logo=apple" alt="平台支持">
-    <img src="https://img.shields.io/badge/version-1.8.2-informational?style=for-the-badge" alt="版本">
-    <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="许可证">
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue?style=for-the-badge&logo=tauri" alt="Platform">
+    <img src="https://img.shields.io/badge/stack-Tauri%202%20%2B%20Vue%203-purple?style=for-the-badge" alt="Stack">
+    <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
   </p>
 </div>
 
 ---
 
-## 🌟 项目介绍
+## 项目介绍
 
-Sing-Box GUI 客户端是一款尖端的跨平台应用程序（支持 Windows、Linux 和 macOS），为管理 Sing-Box 代理配置提供了现代化、直观的界面。基于强大的 Tauri 2.0 和 Vue 3 技术栈构建，提供卓越的性能、安全性和用户体验。
+Sing-Box Windows 是一个围绕 sing-box 内核构建的现代桌面客户端，目标是把订阅导入、代理模式切换、运行状态查看和桌面集成整合成一套更顺手的跨平台体验。
 
-> **📱 Android 用户**：本项目也有 Android 版本，欢迎访问 [sing-box-windows-android](https://github.com/xinggaoya/sing-box-windows-android) 体验！
+> Android 用户也可以查看 [sing-box-windows-android](https://github.com/xinggaoya/sing-box-windows-android)。
 
-### 🎯 核心亮点
+## 功能特性
 
-- **🚀 极速性能**: Rust 后端 + 优化的 Vue 3 前端
-- **💎 现代界面**: 基于 Naive UI 的美观响应式设计
-- **🔒 安全可靠**: Rust 后端确保内存安全和性能
-- **🌐 实时通信**: WebSocket 实现实时数据更新
-- **🎨 高度可定制**: 明暗主题切换，丰富的个性化选项
+- **订阅导入**：支持 sing-box JSON、Clash/Mihomo YAML、URI 列表三类输入。
+- **代理模式**：支持系统代理、TUN 模式、手动模式切换。
+- **运行态可视化**：实时查看流量、活跃连接、规则和日志。
+- **内核管理**：支持内嵌内核资源、版本下载以及手动导入内核。
+- **桌面集成**：支持托盘、开机启动、更新检查、窗口状态记忆。
+- **可靠性能力**：提供备份恢复、订阅回滚、更新通道与内核自愈重启能力。
+- **多语言**：内置 `zh-CN`、`en-US`、`ja-JP`、`ru-RU`。
 
----
+## 架构概览
 
-## ✨ 功能特性
+- **前端**：Vue 3 + TypeScript + Pinia + Vue Router + Vue I18n + Naive UI。
+- **桥接层**：通过 Tauri `invoke` 执行命令，通过 Tauri event 推送运行时事件。
+- **后端**：Rust + Tauri 2，按 `core`、`network`、`storage`、`system`、`tray` 分层。
+- **存储**：基于 SQLite 的本地持久化，保存应用设置、订阅、语言、主题、更新偏好等数据。
+- **构建链路**：`scripts/tauri-wrapper.mjs` 会在 `tauri dev/build` 前注入目标平台对应的内核资源。
 
-### 🎯 核心功能
-- **代理管理**: 轻松配置和切换不同代理模式
-- **订阅管理**: 自动订阅更新和管理
-- **连接监控**: 实时连接统计和监控
-- **日志管理**: 完整的日志记录，支持过滤和搜索
-- **规则管理**: 可视化路由规则配置和管理
-- **系统集成**: 系统托盘支持，快速访问控制
+## 支持的订阅格式
 
-### 🎨 用户体验
-- **现代界面**: 基于 Naive UI 组件的简洁直观设计
-- **多语言支持**: 简体中文、英文、日语、俄语
-- **主题系统**: 明亮、暗黑、自动主题，支持自定义颜色
-- **响应式设计**: 适配各种屏幕尺寸和 DPI 设置
+| 格式 | 输入方式 | 说明 |
+| --- | --- | --- |
+| sing-box JSON | 原始 JSON 配置 | 解析顶层 `outbounds` |
+| Clash / Mihomo YAML | YAML 订阅 | 解析 `proxies` 并转换支持的节点 |
+| URI 列表 | `vmess://`、`vless://`、`trojan://`、`ss://`、`hysteria2://` | 支持单条或多条节点 |
 
-### 🔧 高级特性
-- **实时统计**: 通过 WebSocket 实现实时带宽和连接监控
-- **自动启动**: 系统开机自动启动，支持延迟启动
-- **更新管理**: 自动检查和安装更新
-- **内存优化**: 遵循标准的 Vue.js 和 Pinia 实践，实现高效的资源管理。
+当前支持的节点类型包括 `vless`、`vmess`、`trojan`、`shadowsocks`、`shadowsocksr`、`socks`、`http`、`hysteria2`。
 
----
+## 快速开始
 
-## 🚀 安装
+1. 从 [GitHub Releases](https://github.com/xinggaoya/sing-box-windows/releases) 下载最新安装包。
+2. 在 **订阅** 页面导入订阅内容。
+3. 在 **代理** 页面选择节点并设置代理模式。
+4. 回到 **首页** 启动内核，并在相关页面检查流量或连接状态。
 
-从 [GitHub Releases](https://github.com/xinggaoya/sing-box-windows/releases) 下载对应平台的安装包：
-
-- **Windows**: `.exe` 安装程序
-- **Linux**: `.deb` 包或 `.AppImage` 便携版
-- **macOS**: `.dmg` 镜像文件或 `.app` 压缩包
-
-详细安装说明请参考项目文档。
-
----
-
-## 🎯 快速开始
-
-1. **安装应用**：下载并安装 sing-box-windows
-2. **安装内核**：首次启动时，进入设置页面下载并安装 Sing-Box 内核
-3. **添加订阅**：在订阅页面添加您的订阅链接
-4. **选择代理**：在代理页面选择节点并设置代理模式
-5. **开始使用**：启用代理，享受网络访问
-
-⚠️ **重要提示**：必须先安装内核才能添加和使用订阅，内核是运行代理服务的核心组件。
-
-详细使用教程请参考项目文档。
-
----
-
-## 📦 支持的订阅格式
-
-- **sing-box JSON 配置**（顶层 `outbounds`）：`vless`、`vmess`、`trojan`、`shadowsocks`、`shadowsocksr`、`socks`、`http`、`hysteria2`
-- **Clash/Mihomo YAML**（`proxies`）：`vmess`、`vless`、`trojan`、`ss`（shadowsocks）
-- **URI 列表**（每行一个节点）：`vmess://`、`vless://`、`trojan://`、`ss://`、`hysteria2://`
-- **说明**：YAML 的 `hysteria2` 暂未解析
-
----
-
-## 📸 界面截图
+## 界面截图
 
 <div align="center">
-  <img src="docs/image.png" alt="Sing-Box GUI 客户端界面" width="800">
-
-  <p><em>应用主界面，展示代理管理和系统状态</em></p>
+  <img src="docs/image.png" alt="Sing-Box GUI Client Interface" width="880">
+  <p><em>主界面包含代理控制、运行状态与多页面导航</em></p>
 </div>
 
----
-
-## 🛠️ 开发
+## 开发
 
 ```bash
-# 克隆仓库
-git clone https://github.com/xinggaoya/sing-box-windows.git
-cd sing-box-windows
-
 # 安装依赖
 pnpm install
 
-# 启动开发模式
+# 首次环境建议执行；dev/build 在缺失时也会自动拉取
+pnpm kernel:fetch
+
+# 启动桌面开发环境
 pnpm tauri dev
 
-# 构建发布版本
+# 前端检查
+pnpm type-check
+pnpm lint
+
+# 后端检查
+cd src-tauri && cargo clippy && cargo test
+
+# 构建发布产物
 pnpm tauri build
 ```
 
-详细开发文档请参考项目说明。
+## 本地数据目录
 
----
+所有数据默认都保存在本机，不上传云端。
 
-## 🔧 存储
+- **Windows**：`%LOCALAPPDATA%\sing-box-windows\`
+- **Linux**：`~/.local/share/sing-box-windows/`
+- **macOS**：`~/Library/Application Support/sing-box-windows/`
 
-应用采用 **本地存储** 方案，所有配置和订阅数据都保存在本地：
+目录中通常包含 SQLite 数据库、生成后的配置文件、日志、备份文件以及已下载的内核元数据。
 
-- **Windows**: `%APPDATA%\sing-box-windows\`
-- **Linux**: `~/.local/share/sing-box-windows/`
-- **macOS**: `~/Library/Application Support/sing-box-windows/`
+## 文档
 
-数据包括应用设置、订阅信息、主题配置等，确保用户隐私和数据安全。
+- [English README](README.md)
+- [开发文档](docs/development.md)
+- [多语言文档](docs/i18n.md)
+- [更新日志](docs/CHANGELOG.md)
 
----
+## 贡献
 
-## 🤝 贡献
+欢迎提交 Issue 和 Pull Request。
 
-欢迎提交 Issue 和 Pull Request！
+1. 在 [Issues](https://github.com/xinggaoya/sing-box-windows/issues) 报告问题
+2. 在 [Discussions](https://github.com/xinggaoya/sing-box-windows/discussions) 讨论需求
+3. 提交改动时尽量保持与现有架构和质量门禁一致
 
-1. **报告问题**: [提交 Issue](https://github.com/xinggaoya/sing-box-windows/issues)
-2. **功能建议**: [参与讨论](https://github.com/xinggaoya/sing-box-windows/discussions)
-3. **代码贡献**: Fork 并提交 PR
+## 致谢
 
----
-
-## 🙏 致谢
-
-- [Sing-Box](https://github.com/SagerNet/sing-box) - 强大的代理核心
-- [Tauri](https://tauri.app/) - 优秀的 Rust 应用框架
-- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
-- [Naive UI](https://www.naiveui.com/) - 美观的 Vue 3 组件库
-- [Vite](https://vitejs.dev/) - 快速的构建工具和开发服务器
-
----
+- [Sing-Box](https://github.com/SagerNet/sing-box)
+- [Tauri](https://tauri.app/)
+- [Vue.js](https://vuejs.org/)
+- [Naive UI](https://www.naiveui.com/)
+- [Vite](https://vitejs.dev/)
 
 ---
 
 <div align="center">
+  <p><strong>由 XingGao 用 ❤️ 构建</strong></p>
   <p>
-    <strong>由 XingGao 用 ❤️ 构建</strong>
-  </p>
-  <p>
-    <a href="https://github.com/xinggaoya/sing-box-windows">
-      <img src="https://img.shields.io/github/stars/xinggaoya/sing-box-windows?style=social" alt="GitHub stars">
-    </a>
-    <a href="https://github.com/xinggaoya/sing-box-windows/fork">
-      <img src="https://img.shields.io/github/forks/xinggaoya/sing-box-windows?style=social" alt="GitHub forks">
-    </a>
-  </p>
-  <p style="font-size: 0.85em; color: #666;">
-    <strong>📝 声明：</strong>本项目仅用于学习和交流目的，所有数据均采用本地存储，不会上传到云端。<br>
-    请遵守当地法律法规，合理使用本软件。
+    <strong>声明：</strong>本项目仅用于学习与交流，请遵守当地法律法规并合理使用。
   </p>
 </div>

@@ -1,1499 +1,421 @@
 # Sing-Box Windows 开发文档
 
-## 目录
+## 项目概览
 
-- [项目概述](#项目概述)
-- [技术栈](#技术栈)
-- [项目结构](#项目结构)
-- [开发环境搭建](#开发环境搭建)
-- [核心功能模块](#核心功能模块)
-- [前端开发指南](#前端开发指南)
-- [后端开发指南](#后端开发指南)
-- [代码风格指南](#代码风格指南)
-- [多语言开发指南](#多语言开发指南)
-- [构建与发布](#构建与发布)
-- [常见问题](#常见问题)
+Sing-Box Windows 是一个跨平台桌面客户端，前端使用 Vue 3 + TypeScript，后端使用 Rust + Tauri 2，围绕 sing-box 内核提供订阅管理、代理模式切换、运行状态查看、托盘控制、备份恢复与应用更新等能力。
 
-## 项目概述
+这份文档聚焦“当前仓库真实实现”，优先说明：
 
-Sing-Box Windows 是一个基于 [Sing-Box](https://github.com/SagerNet/sing-box) 代理内核的 Windows GUI 客户端，使用 Tauri 2.0 框架开发，旨在提供优雅、高效、易用的代理管理体验。
+- 启动链路在哪里
+- 前后端如何通信
+- 关键模块如何分层
+- 开发和发布应该走哪些命令
+- 哪些地方最容易改坏
 
-项目主要特点：
+## 快速索引
 
-- 现代化用户界面，支持亮暗主题
-- 多种代理模式（系统代理/TUN模式）
-- 多种订阅格式支持
-- 实时流量监控与统计
-- 丰富的日志系统
-- 规则分流功能
+- 前端入口：`src/main.ts`
+- 前端业务引导：`src/App.vue`、`src/boot/useAppBootstrap.ts`
+- Tauri 命令调用统一入口：`src/services/invoke-client.ts`
+- Tauri 事件监听入口：`src/services/event-service.ts`
+- 路由与托盘空白页：`src/router/index.ts`、`src/views/BlankView.vue`
+- 后端入口与命令注册：`src-tauri/src/lib.rs`
+- 订阅下载/解析/自动更新：`src-tauri/src/app/network/subscription_service/`
+- 内核生命周期：`src-tauri/src/app/core/kernel_service/`
+- 本地存储：`src-tauri/src/app/storage/`
+- 后端托盘能力：`src-tauri/src/app/tray/`
+- 内核拉取与打包包装：`scripts/fetch-kernel.mjs`、`scripts/tauri-wrapper.mjs`
+- 发布流程：`.github/workflows/release.yml`、`.github/workflows/promote-release.yml`
 
 ## 技术栈
 
-### 前端技术
+### 前端
 
-- **Vue 3 (v3.5.25)**：核心前端框架，使用 Composition API
-- **TypeScript (v5.6.3)**：类型安全的 JavaScript 超集
-- **Naive UI (v2.43.2)**：高质量 Vue 3 组件库，支持亮暗主题
-- **Pinia (v2.3.1)**：Vue 状态管理库，支持持久化存储
-- **Vue Router (v4.5.1)**：Vue 路由管理，支持Hash路由
-- **Vue I18n (v9.14.5)**：国际化支持，多语言切换
-- **VueUse (v14.1.0)**：Vue 实用工具集合
-- **Vite (v7.3.0)**：快速构建工具
+- Vue 3
+- TypeScript
+- Pinia
+- Vue Router
+- Vue I18n
+- Naive UI
+- Vite
 
-### 后端技术
+### 后端
 
-- **Rust (1.77.2+)**：高性能系统编程语言
-- **Tauri 2.0 (v2.10.2)**：构建跨平台应用的框架
-- **tokio (v1.48)**：异步运行时
-- **serde & serde_json**：序列化和反序列化
-- **reqwest (v0.12)**：HTTP 客户端，支持TLS
-- **tracing & tracing-subscriber**：结构化日志记录
-- **tauri-plugin-websocket**：WebSocket 支持
+- Rust 1.77.2+
+- Tauri 2
+- tokio
+- reqwest
+- sqlx + SQLite
+- tracing
 
-### 开发工具
+## 架构总览
 
-- **pnpm**：快速、节省磁盘空间的包管理器
-- **ESLint + Prettier**：代码质量和格式化
-- **oxlint**：高性能 JavaScript/TypeScript linter
-- **unplugin-auto-import**：自动导入 API
-- **unplugin-vue-components**：组件自动导入
+### 前端启动链
+
+当前启动链是“两阶段”：
+
+1. `src/main.ts`
+   - 创建 Vue 应用
+   - 注册 Pinia、Router、I18n
+   - 调用 `initializationService.initializeApp()`
+   - 初始化完成后再挂载应用
+2. `src/App.vue`
+   - 挂载 Naive UI 全局 Provider
+   - 建立全局通知、消息、弹窗容器
+   - 调用 `useAppBootstrap()` 进入业务初始化
+3. `src/boot/useAppBootstrap.ts`
+   - 初始化各类 Store
+   - 同步语言、主题、窗口状态
+   - 绑定 Tauri event 监听
+   - 初始化托盘状态与消息总线
+   - 在窗口隐藏时切到 `/blank`，降低托盘驻留开销
+
+### 前后端通信
+
+当前项目是典型的“双通道通信”：
+
+- **命令通道**：前端通过 `invoke` 调后端命令
+- **事件通道**：后端通过 Tauri event 向前端推送运行态数据
+
+对应落点如下：
+
+- `src/services/invoke-client.ts`
+  - 统一封装 Tauri `invoke`
+  - 注入前端上下文
+  - 控制是否跳过数据恢复等选项
+- `src/services/event-service.ts`
+  - 统一注册/清理事件监听
+  - 给流量、日志、连接、更新、托盘动作等事件提供稳定入口
+- `src/constants/events.ts`
+  - 维护前后端共享的事件名常量
+
+### 后端模块分层
+
+`src-tauri/src/app/` 是后端主业务目录，当前可以按职责理解为：
+
+- `core/`
+  - 内核启停
+  - 代理模式切换
+  - 运行健康检查
+  - 流量、规则、连接等运行态能力
+- `network/`
+  - 订阅下载
+  - 订阅解析
+  - 自动更新
+  - 配置切换与回滚
+- `storage/`
+  - SQLite 初始化与迁移
+  - 应用配置、主题、语言、窗口、更新设置持久化
+  - 与配置文件同步
+- `system/`
+  - 平台能力
+  - 应用更新
+  - sudo / 提权
+  - 备份恢复
+- `tray/`
+  - 后端主导的托盘菜单与窗口控制
+
+### 关键页面
+
+当前主要页面和职责如下：
+
+- `src/views/HomeView.vue`：内核状态、启动/停止、流量概览
+- `src/views/SubView.vue`：订阅管理、导入、更新、回滚
+- `src/views/ProxyView.vue`：节点与代理模式切换
+- `src/views/ConnectionsView.vue`：活跃连接查看与筛选
+- `src/views/RulesView.vue`：规则命中与路由规则查看
+- `src/views/LogView.vue`：日志查看与过滤
+- `src/views/SettingView.vue`：应用设置、更新、内核、备份恢复
+- `src/views/BlankView.vue`：托盘驻留时的空白路由
 
 ## 项目结构
 
-项目采用模块化的目录结构，按功能划分不同的模块：
-
-```
+```text
 sing-box-windows/
-├── src/                         # 前端（Vue 3 + TypeScript）
-│   ├── assets/                  # 全局样式、图标、主题覆盖
-│   ├── boot/                    # 启动编排（App bootstrap）
-│   ├── components/              # 通用组件与布局组件
-│   ├── composables/             # 组合式逻辑
-│   ├── constants/               # 前端事件与常量
-│   ├── locales/                 # 多语言文案
-│   ├── router/                  # 路由配置
-│   ├── services/                # Tauri 命令调用与业务服务
-│   ├── stores/                  # Pinia 状态管理
-│   │   ├── app/                 # 应用级状态（主题/窗口/更新/权限）
-│   │   ├── kernel/              # 内核实时状态（连接/流量/日志/代理）
-│   │   ├── subscription/        # 订阅状态
-│   │   └── tray/                # 托盘交互状态
-│   ├── types/                   # TypeScript 类型
-│   │   └── generated/           # 前端实际使用的共享模型类型
-│   ├── utils/                   # 工具函数
-│   ├── views/                   # 页面（Home/Sub/Proxy/Log/Setting/...）
-│   ├── App.vue                  # 根组件
-│   └── main.ts                  # 前端入口
-├── src-tauri/                   # 后端（Rust + Tauri）
+├── src/
+│   ├── boot/               # 前端业务引导
+│   ├── components/         # 组件与布局
+│   ├── constants/          # 常量与事件名
+│   ├── locales/            # 多语言文案
+│   ├── router/             # 路由定义
+│   ├── services/           # 前端服务层
+│   ├── stores/             # Pinia store
+│   ├── types/              # 类型定义
+│   ├── views/              # 页面
+│   ├── App.vue             # 根组件
+│   └── main.ts             # 前端入口
+├── src-tauri/
 │   ├── src/
-│   │   ├── app/
-│   │   │   ├── constants/       # 常量定义
-│   │   │   ├── core/            # 内核生命周期/代理/事件中继
-│   │   │   ├── network/         # 订阅下载、解析、自动更新
-│   │   │   ├── singbox/         # 配置生成与补丁
-│   │   │   ├── storage/         # SQLite 与配置持久化
-│   │   │   └── system/          # 平台能力、更新、后台任务、sudo
-│   │   ├── entity/              # 数据模型
-│   │   ├── platform/            # 跨平台系统能力抽象
-│   │   ├── process/             # 进程管理
-│   │   ├── utils/               # 工具模块
-│   │   ├── lib.rs               # Tauri 命令注册与应用 setup
-│   │   └── main.rs              # 程序入口
-│   ├── Cargo.toml               # Rust 依赖
-│   ├── tauri.conf.json          # Tauri 配置
-│   └── capabilities/            # Tauri capabilities
-├── scripts/                     # 构建与内核下载脚本
-├── docs/                        # 开发文档与更新日志
-├── package.json                 # 前端脚本与依赖
-└── README.zh.md                 # 项目说明
+│   │   ├── app/            # 后端业务主目录
+│   │   ├── entity/         # 数据模型
+│   │   ├── platform/       # 平台抽象
+│   │   ├── process/        # 进程管理
+│   │   ├── utils/          # 工具模块
+│   │   └── lib.rs          # Tauri 注册入口
+│   ├── tauri.conf.json     # Tauri 配置
+│   └── Cargo.toml          # Rust 依赖与版本
+├── scripts/                # 内核拉取与 tauri wrapper
+├── docs/                   # 项目文档
+└── .github/workflows/      # 发布工作流
 ```
 
-这种模块化的结构有以下优点：
+## 开发环境与常用命令
 
-1. **功能划分清晰**：按功能将代码划分为核心、网络、系统等模块
-2. **易于维护**：相关功能集中在一起，便于定位和修改
-3. **降低耦合度**：每个模块都有明确的职责和边界
-4. **方便扩展**：添加新功能时可以在相应模块中扩展，不影响其他模块
+### 推荐环境
 
-## 开发环境搭建
+- Node.js 20+
+- pnpm 10+
+- Rust 1.77.2+
+- 能通过 Tauri 2 桌面环境依赖检查
 
-### 系统要求
-
-- **操作系统**：Windows 10 1809+ (Build 17763+) 或更高版本
-- **架构**：x64 (64位)
-- **Rust**：1.77.2 或更高版本 (最新稳定版)
-- **Node.js**：18.0+ (推荐使用 LTS 版本)
-- **包管理器**：pnpm (推荐) 或 npm/yarn
-- **Visual Studio**：2019+ 或 Visual Studio Build Tools (含C++开发工具)
-- **Git**：最新版本
-- **内存**：至少 4GB RAM (开发环境推荐 8GB+)
-- **磁盘空间**：至少 5GB 可用空间
-
-### 环境安装
-
-1. **安装 Rust 工具链**
-
-   ```bash
-   # 方法1：使用 rustup 安装 (推荐)
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-   # Windows 用户可直接访问 https://rustup.rs 下载安装器
-   # 或使用 winget (Windows 10/11)
-   winget install Rustlang.Rustup
-
-   # 安装完成后重启终端并验证
-   rustc --version
-   cargo --version
-   ```
-
-2. **安装 Node.js 和包管理器**
-
-   ```bash
-   # 访问 https://nodejs.org/ 下载 LTS 版本
-   # 或使用 winget 安装
-   winget install OpenJS.NodeJS
-
-   # 安装 pnpm (推荐，速度更快，占用空间更少)
-   npm install -g pnpm
-
-   # 验证安装
-   node --version
-   pnpm --version
-   ```
-
-3. **安装 Visual Studio 或 Build Tools**
-
-   ```bash
-   # 方法1：使用 winget 安装 Build Tools (仅C++开发工具)
-   winget install Microsoft.VisualStudio.2022.BuildTools
-
-   # 方法2：下载完整 Visual Studio Community (推荐新手)
-   # 访问 https://visualstudio.microsoft.com/downloads/
-   ```
-
-   确保安装以下工作负载：
-   - **C++ build tools** (C++构建工具)
-   - **Windows 10/11 SDK** (最新版本)
-   - **CMake tools** (可选，但推荐)
-
-4. **配置 Tauri 环境**
-
-   ```bash
-   # 安装 Tauri CLI (项目依赖中已包含，也可全局安装)
-   cargo install tauri-cli
-
-   # 或使用项目本地版本 (推荐)
-   # 项目中已配置，无需额外安装
-   ```
-
-5. **克隆并设置项目**
-
-   ```bash
-   # 克隆仓库
-   git clone https://github.com/xinggaoya/sing-box-windows.git
-   cd sing-box-windows
-
-   # 检查环境要求
-   pnpm tauri info
-   ```
-
-6. **安装项目依赖**
-
-   ```bash
-   # 安装前端依赖
-   pnpm install
-
-   # Rust 依赖会在首次构建时自动下载
-   ```
-
-7. **首次构建与启动**
-
-   ```bash
-   # 开发模式启动 (支持热重载)
-   pnpm tauri dev
-
-   # 如果遇到错误，可以尝试清理缓存后重试
-   pnpm clean        # 清理前端构建缓存
-   cargo clean       # 清理 Rust 构建缓存（在 src-tauri 目录下执行）
-   ```
-
-### 开发工具推荐
-
-1. **代码编辑器**：
-   - **Visual Studio Code** (推荐) + 以下扩展：
-     - `rust-analyzer` - Rust 语言支持
-     - `Tauri` - Tauri 项目支持
-     - `Vue - Official` - Vue 3 支持
-     - `TypeScript Vue Plugin (Volar)` - Vue TypeScript 支持
-     - `ESLint` - 代码质量检查
-     - `Prettier` - 代码格式化
-
-2. **调试工具**：
-   - **Rust**: 内置 `println!` 和 `tracing` 日志
-   - **前端**: Vue DevTools 浏览器扩展
-   - **Tauri**: 内置开发者工具 (开发模式自动启用)
-
-3. **性能分析**：
-   - **前端**: Chrome DevTools 性能面板
-   - **Rust**: `cargo flamegraph` (需要额外安装)
-
-### 验证安装
-
-运行以下命令验证环境是否正确配置：
+### 首次安装
 
 ```bash
-# 检查 Tauri 环境
-pnpm tauri info
-
-# 只需记住两个命令（会自动拉取当前平台内核，缺失才下载）
-pnpm tauri dev
-pnpm tauri build
-
-# 运行健康检查
-pnpm run type-check  # TypeScript 类型检查
-pnpm run lint        # 代码质量检查
-
-# 尝试构建 (第一次可能较慢)
-pnpm tauri dev
-```
-
-成功启动后，应该能看到应用程序窗口并且控制台没有致命错误。
-
-### 内嵌内核资源拉取
-
-开发或打包前可执行脚本，将对应平台的 sing-box 内核下载到 `src-tauri/resources`：
-
-```bash
-# 默认使用当前平台/架构，自动获取最新版本
-pnpm kernel:fetch
-
-# 一次拉取全平台（Windows/Linux/macOS）
-pnpm kernel:fetch:all
-
-# 指定平台/架构/版本
-pnpm kernel:fetch -- --platform windows --arch amd64 --version 1.12.10
-
-# 只在缺失时拉取（适合自动化）
-pnpm kernel:fetch -- --skip-existing
-
-# 强制重新下载
-pnpm kernel:fetch -- --force
-```
-
-说明：
-
-- `pnpm tauri dev` / `pnpm tauri build` 会自动走 `scripts/tauri-wrapper.mjs`，并为当前目标平台触发 `fetch-kernel`。
-- 默认策略是 `--skip-existing`（缺失才下载），可用 `SING_BOX_KERNEL_FETCH_MODE=force` 强制重拉。
-- CI 中会透传 `SING_BOX_GITHUB_TOKEN`，在“自动拉取最新版本”时优先使用 GitHub API 鉴权请求，降低限流失败概率。
-
-## 核心功能模块
-
-### 常量组织 (constants/)
-
-应用常量按功能模块分类组织，便于维护和扩展：
-
-- `constants/core.rs` - 核心相关常量
-  - `process` - 进程管理相关常量
-  - `paths` - 文件路径相关常量
-  - `config` - 配置相关常量
-
-- `constants/network.rs` - 网络相关常量
-  - `network_config` - 网络配置常量
-  - `api` - API相关常量
-  - `server` - 服务器相关常量
-  - `rate_limit` - 速率限制常量
-
-- `constants/system.rs` - 系统相关常量
-  - `registry` - 注册表相关常量
-  - `database` - 数据库相关常量
-  - `jwt` - JWT认证相关常量
-
-- `constants/common.rs` - 通用常量
-  - `messages` - 提示消息常量
-- `log` - 日志相关常量
-
-### 内核管理 (core/kernel_service.rs)
-
-负责 Sing-Box 内核的下载、启动、停止和版本管理：
-
-- `download_latest_kernel` / `install_kernel`：下载并安装最新版内核
-- `kernel_start_enhanced`：基于当前/传入配置启动内核并开启守护
-- `kernel_stop_enhanced` / `kernel_stop_background`：停止内核（含后台快速停止）
-- `kernel_get_status_enhanced` / `kernel_check_health`：查询状态与健康检查
-- `kernel_auto_manage`：按保存的配置自动管理启动流程
-- `check_kernel_version` / `get_latest_kernel_version_cmd`：检查与获取内核版本
-
-#### 内嵌内核资源
-
-项目支持将 sing-box 内核作为打包资源随应用发布，首次启动时会自动复制到工作目录。
-
-- 资源路径：`src-tauri/resources/kernel/<platform>/<arch>/sing-box(.exe)`
-- 构建时由 `scripts/tauri-wrapper.mjs` 动态生成平台资源配置（`src-tauri/.generated/`），并通过 `bundle.resources` 对象映射只注入当前 `--target` 对应的两个文件：
-  - `sing-box(.exe)`
-  - `version.txt`
-  这样可避免把其他平台/架构内核一并打进安装包
-- 可选版本文件：在同目录放置 `version.txt`，用于写入 `installed_kernel_version`
-- 开发模式下也会从 `src-tauri/resources` 读取内嵌内核
-
-示例（Windows x64）：
-
-```
-src-tauri/resources/kernel/windows/amd64/sing-box.exe
-```
-
-### 代理服务 (core/proxy_service.rs)
-
-管理代理设置和节点选择：
-
-- `set_system_proxy`：设置系统代理
-- `set_tun_proxy`：设置TUN模式代理
-- `toggle_proxy_mode`：切换代理模式
-- `get_proxies`：获取代理节点列表
-- `change_proxy`：切换使用的代理节点
-- `test_node_delay`：测试节点延迟
-
-### 订阅服务 (network/subscription_service.rs)
-
-处理代理订阅的添加、更新和管理：
-
-- `download_subscription`：下载订阅内容
-- `add_manual_subscription`：手动添加订阅
-- `get_current_config`：获取当前配置
-
-### 系统服务 (system/system_service.rs)
-
-处理与操作系统相关的功能：
-
-- `check_admin`：检查管理员权限
-- `restart_as_admin`：以管理员身份重启
-- `install_service`：安装系统服务
-- `uninstall_service`：卸载系统服务
-- `check_service_status`：检查服务状态
-
-### 更新服务 (system/update_service.rs)
-
-处理应用程序的更新：
-
-- `check_update`：检查更新
-- `download_and_install_update`：下载并安装更新
-
-## 前端开发指南
-
-### 状态管理
-
-项目使用 **Pinia 2.3.1** 进行状态管理，并采用模块化的目录结构组织各个 Store：
-
-```
-src/stores/
-├── index.ts                # Store 主入口
-├── app/                    # 应用相关 store
-│   ├── AppStore.ts         # 核心应用状态
-│   ├── ThemeStore.ts       # 主题管理
-│   ├── LocaleStore.ts      # 国际化状态
-│   ├── WindowStore.ts      # 窗口管理
-│   └── UpdateStore.ts      # 应用更新
-├── kernel/                 # 内核相关 store
-│   ├── KernelStore.ts         # 内核状态和操作
-│   ├── KernelRuntimeStore.ts  # 内核运行时状态
-│   ├── ProxyStore.ts          # 代理设置
-│   ├── ConnectionStore.ts     # 连接管理
-│   ├── TrafficStore.ts        # 流量监控
-│   └── LogStore.ts            # 日志管理
-├── subscription/           # 订阅相关 store
-│   └── SubStore.ts         # 订阅管理
-└── tray/                   # 系统托盘相关 store
-    └── TrayStore.ts        # 系统托盘管理
-```
-
-#### 使用 Store
-
-在组件中，可以直接导入并使用需要的 Store：
-
-```typescript
-// 导入需要的 store
-import { useAppStore } from '@/stores'
-import { useThemeStore } from '@/stores'
-
-// 在组件的 setup 函数中使用
-const appStore = useAppStore()
-const themeStore = useThemeStore()
-
-// 访问 state
-const isRunning = appStore.isRunning
-
-// 调用 actions
-themeStore.toggleTheme()
-```
-
-#### Store 之间的交互
-
-各个 Store 可以通过直接导入并使用其他 Store 的方式进行交互，或者通过 `watch` 监听其他 Store 的状态变化。
-
-### 组件开发规范
-
-1. **组件命名**：
-   - 页面组件使用 `XxxView.vue` 格式
-   - 通用组件使用 `XxxComponent.vue` 格式
-   - 布局组件使用 `XxxLayout.vue` 格式
-
-2. **样式规范**：
-   - 使用 scoped CSS
-   - 遵循 BEM 命名规范
-   - 颜色和尺寸使用变量管理
-
-3. **事件处理**：
-   - 使用 mitt 事件总线处理跨组件通信
-   - 组件内部事件使用 emits 选项声明
-
-### 路由管理
-
-所有路由在 `src/router/index.ts` 中定义，新增页面需要在此处添加路由配置。
-
-## 多语言开发指南
-
-### 国际化架构
-
-项目使用 [vue-i18n v9.14.4](https://vue-i18n.intlify.dev/) 实现完整的多语言支持，支持 4 种语言，主要包含以下部分：
-
-1. **支持的语言**：
-   - **中文 (zh-CN)**：简体中文，默认语言
-   - **英语 (en-US)**：英文
-   - **日语 (ja-JP)**：日本語
-   - **俄语 (ru-RU)**：Русский
-
-2. **语言文件结构**：
-   - 位于 `src/locales/` 目录
-   - 每个语言文件约 500+ 行翻译条目
-   - 按功能模块分类：`common`、`nav`、`home`、`proxy`、`settings`、`logs` 等
-   - 使用嵌套对象结构组织翻译项，便于维护
-
-3. **i18n 配置** (`src/locales/index.ts`)：
-   - 使用 Vue 3 Composition API 模式 (`legacy: false`)
-   - 支持全局注入 `$t` 方法
-   - 自动回退到中文作为备用语言
-   - 导出支持的语言列表供设置页面使用
-
-4. **语言切换机制**：
-   - 通过 `LocaleStore` 管理当前语言状态
-   - 支持手动选择语言或跟随系统语言
-   - 语言偏好自动持久化保存
-   - 实时切换不需要重启应用
-
-### 使用多语言
-
-1. **在组件中引入**：
-
-   ```typescript
-   import { useI18n } from 'vue-i18n'
-
-   // 在setup中
-   const { t } = useI18n()
-   ```
-
-2. **翻译文本**：
-
-   ```vue
-   <!-- 在模板中 -->
-   <div>{{ t('home.title') }}</div>
-
-   <!-- 在JS中 -->
-   const message = t('common.success')
-   ```
-
-3. **带参数的翻译**：
-   ```vue
-   <!-- 使用命名参数 -->
-   {{ t('rules.fetchSuccess', { count: 10 }) }}
-   ```
-
-### 添加新语言项
-
-1. **翻译键命名规则**：
-   - 使用 `模块.功能.操作` 的层级结构
-   - 例如：`proxy.settings.save`
-   - 保持命名简洁但有描述性
-
-2. **添加新翻译流程**：
-   - 在相应模块下添加新的翻译键
-   - 确保在所有语言文件中都添加对应的翻译
-   - 在添加新功能时，同步更新翻译文件
-
-3. **示例**：
-
-   ```typescript
-   // 在zh-CN.ts中
-   export default {
-     myModule: {
-       newFeature: '新功能名称',
-       description: '这是功能描述',
-     },
-   }
-
-   // 在en-US.ts中
-   export default {
-     myModule: {
-       newFeature: 'New Feature Name',
-       description: 'This is feature description',
-     },
-   }
-   ```
-
-### 组件国际化最佳实践
-
-1. **提取所有硬编码文本**：
-   - 将所有用户可见的文本移至语言文件
-   - 包括按钮文本、标题、提示、错误信息等
-
-2. **使用命名空间隔离**：
-   - 每个主要组件使用独立的命名空间
-   - 例如：`settings.theme.title` 而非简单的 `title`
-
-3. **处理动态内容**：
-   - 对于需要拼接的文本，使用参数化翻译而非字符串拼接
-   - 例如：`t('message.greeting', { name: userName })`
-
-4. **处理复数和日期**：
-   - 使用 vue-i18n 的 pluralization 功能处理复数形式
-   - 使用本地化的日期格式化
-
-### 语言切换
-
-在设置页面中，用户可以选择界面语言：
-
-- 系统会记住用户的语言选择
-- 也提供了跟随系统语言的选项
-
-### 扩展新语言支持
-
-要添加新的语言支持：
-
-1. 在 `src/locales/` 目录下创建新的语言文件，如 `ja-JP.ts`
-2. 复制现有语言文件并翻译所有内容
-3. 在 `src/plugins/i18n.ts` 中导入并注册新语言
-4. 在语言选择器中添加新语言选项
-
-## 后端开发指南
-
-### 使用常量
-
-项目中的常量已经按功能模块分类组织，使用时需要注意导入正确的模块：
-
-```rust
-// 导入常量模块
-use crate::app::constants::{messages, network_config, paths, process};
-
-// 使用常量
-fn example() {
-    // 使用进程相关常量
-    let flags = process::CREATE_NO_WINDOW;
-
-    // 使用路径相关常量
-    let config_path = paths::get_config_path();
-
-    // 使用网络相关常量
-    let api_port = network_config::DEFAULT_CLASH_API_PORT;
-
-    // 使用消息常量
-    println!("{}", messages::INFO_PROCESS_STARTED);
-}
-```
-
-添加新常量时，应该将其添加到相应的模块中，而不是直接在代码中使用硬编码值。
-
-### 命令注册
-
-所有前端可调用的后端命令在 `src-tauri/src/lib.rs` 的 `run()` 函数中通过 `invoke_handler` 注册。当前注册的命令按功能模块分类：
-
-```rust
-.invoke_handler(tauri::generate_handler![
-    // Enhanced Storage service commands (数据库)
-    crate::app::storage::enhanced_storage_service::db_get_app_config,
-    crate::app::storage::enhanced_storage_service::db_save_app_config,
-    crate::app::storage::enhanced_storage_service::db_get_theme_config,
-    crate::app::storage::enhanced_storage_service::db_save_theme_config,
-    crate::app::storage::enhanced_storage_service::db_get_locale_config,
-    crate::app::storage::enhanced_storage_service::db_save_locale_config,
-    crate::app::storage::enhanced_storage_service::db_get_window_config,
-    crate::app::storage::enhanced_storage_service::db_save_window_config,
-    crate::app::storage::enhanced_storage_service::db_get_update_config,
-    crate::app::storage::enhanced_storage_service::db_save_update_config,
-    crate::app::storage::enhanced_storage_service::db_get_subscriptions,
-    crate::app::storage::enhanced_storage_service::db_save_subscriptions,
-    crate::app::storage::enhanced_storage_service::db_get_active_subscription_index,
-    crate::app::storage::enhanced_storage_service::db_save_active_subscription_index,
-    // Core - Kernel service commands (legacy)
-    crate::app::core::kernel_service::download_latest_kernel,
-    crate::app::core::kernel_service::install_kernel,
-    crate::app::core::kernel_service::get_latest_kernel_version_cmd,
-    crate::app::core::kernel_service::check_kernel_version,
-    crate::app::core::kernel_service::is_kernel_running,
-    crate::app::core::kernel_service::get_system_uptime,
-    // Core - Kernel service commands (enhanced)
-    crate::app::core::kernel_service::kernel_start_enhanced,
-    crate::app::core::kernel_service::kernel_stop_enhanced,
-    crate::app::core::kernel_service::kernel_stop_background,
-    crate::app::core::kernel_service::force_stop_and_exit,
-    crate::app::core::kernel_service::kernel_get_status_enhanced,
-    crate::app::core::kernel_service::kernel_check_health,
-    crate::app::core::kernel_auto_manage::kernel_auto_manage,
-    crate::app::core::kernel_service::apply_proxy_settings,
-    // Network - Subscription service commands (订阅服务)
-    crate::app::network::subscription_service::download_subscription,
-    crate::app::network::subscription_service::add_manual_subscription,
-    crate::app::network::subscription_service::get_current_config,
-    crate::app::network::subscription_service::set_active_config_path,
-    crate::app::network::subscription_service::delete_subscription_config,
-    crate::app::network::subscription_service::rollback_subscription_config,
-    crate::app::network::subscription_service::toggle_proxy_mode,
-    crate::app::network::subscription_service::get_current_proxy_mode,
-    // System - System service commands (系统服务)
-    crate::app::system::system_service::check_admin,
-    crate::app::system::system_service::restart_as_admin,
-    crate::app::system::system_service::check_network_connectivity,
-    crate::app::system::system_service::wait_for_network_ready,
-    crate::app::system::system_service::open_devtools,
-    // System - Update service commands (更新服务)
-    crate::app::system::update_service::check_update,
-    crate::app::system::update_service::download_update,
-    crate::app::system::update_service::install_update,
-    crate::app::system::update_service::download_and_install_update,
-    crate::app::system::update_service::get_platform_info,
-    // System - Config service commands (配置服务)
-    crate::app::system::config_service::update_singbox_ports,
-    // Core - Proxy service commands (代理服务)
-    crate::app::core::proxy_service::set_system_proxy,
-    crate::app::core::proxy_service::set_manual_proxy,
-    crate::app::core::proxy_service::set_tun_proxy,
-    crate::app::core::proxy_service::toggle_ip_version,
-    crate::app::core::proxy_service::get_api_token,
-    crate::app::core::proxy_service::get_proxies,
-    crate::app::core::proxy_service::change_proxy,
-    crate::app::core::proxy_service::test_node_delay,
-    crate::app::core::proxy_service::test_group_delay,
-    crate::app::core::proxy_service::get_rules,
-])
-```
-
-#### 命令分类说明
-
-1. **内核服务命令** (Kernel Service)：
-   - 内核的生命周期管理（启动、停止、重启）
-   - 内核版本检查和下载
-   - WebSocket 中继服务管理
-   - 内核运行状态检查
-
-2. **代理服务命令** (Proxy Service)：
-   - 代理模式设置（系统代理、手动代理、TUN模式）
-   - 代理节点管理和切换
-   - 节点延迟测试
-   - 代理规则获取
-
-3. **订阅服务命令** (Subscription Service)：
-   - 订阅下载和解析
-   - 手动添加订阅
-   - 配置管理
-   - 代理模式切换
-
-4. **系统服务命令** (System Service)：
-   - 管理员权限检查和提升
-   - 开发者工具控制
-   - 系统级功能操作
-
-5. **更新服务命令** (Update Service)：
-   - 应用更新检查
-   - 自动下载和安装更新
-
-6. **配置服务命令** (Config Service)：
-   - Sing-box 端口配置更新
-   - 配置文件管理
-
-### 模块组织
-
-项目采用模块化的组织结构，每个模块都有自己的 `mod.rs` 文件作为入口点：
-
-1. **模块入口文件**：
-   - `app/mod.rs` - 应用模块入口，定义子模块并重导出常用组件
-   - `app/core/mod.rs` - 核心服务模块入口
-   - `app/network/mod.rs` - 网络服务模块入口
-   - `app/system/mod.rs` - 系统服务模块入口
-   - `app/constants/mod.rs` - 常量模块入口
-
-2. **重导出机制**：
-   - 每个模块的 `mod.rs` 文件会重新导出其子模块中的重要组件
-   - 这样可以简化导入路径，例如使用 `crate::app::core::kernel_service` 而不是完整路径
-
-3. **向后兼容性**：
-   - `app/mod.rs` 中的重导出确保了代码重构不会破坏现有的导入路径
-   - 例如：`pub use core::kernel_service;` 允许使用 `crate::app::kernel_service` 而不是新路径
-
-### 新增功能开发流程
-
-1. 在相应的服务模块中定义函数
-2. 在模块的 `mod.rs` 中重导出该函数（如果需要在其他模块中使用）
-3. 在 `lib.rs` 中导入并注册该函数
-4. 在前端通过 `invoke` 调用该函数
-
-示例：
-
-```rust
-// 在 app/core/kernel_service.rs 中
-#[tauri::command]
-pub async fn my_new_function(param: String) -> Result<String, String> {
-    // 实现逻辑
-    Ok("成功".to_string())
-}
-
-// 在 app/core/mod.rs 中确保导出该函数
-pub use kernel_service::my_new_function;
-
-// 在 lib.rs 中注册
-.invoke_handler(tauri::generate_handler![
-    // 其他命令...
-    my_new_function,
-])
-```
-
-```typescript
-// 在前端调用
-import { invoke } from '@tauri-apps/api/tauri'
-
-async function callMyFunction() {
-  try {
-    const result = await invoke('my_new_function', { param: 'test' })
-    console.log(result)
-  } catch (error) {
-    console.error(error)
-  }
-}
-```
-
-### 进程管理
-
-内核进程管理位于 `process` 模块，在修改相关代码时需特别注意：
-
-- 确保进程正确启动和终止
-- 处理好权限问题
-- 管理好进程的生命周期
-
-## 代码风格指南
-
-### TypeScript/Vue 命名规范
-
-- **组件文件**: PascalCase, 如 `KernelStatusCard.vue`
-- **视图文件**: `*View.vue`, 如 `HomeView.vue`, `SettingView.vue`
-- **组合式函数**: `useXxx.ts`, 如 `useKernelStatus.ts`
-- **Store 文件**: PascalCase, 如 `AppStore.ts`, `KernelStore.ts`
-- **类型/接口**: PascalCase, 如 `KernelStatus`, `TunSettings`
-- **常量**: PascalCase (export) / camelCase (internal)
-- **事件类型**: PascalCase, 如 `APP_EVENTS`
-
-### 导入规范
-
-- 使用路径别名: `@/*` → `src/*`
-- 导入顺序: Vue API → 外部库 → 内部模块 → 类型/常量
-- 示例:
-
-```typescript
-import { ref, computed } from 'vue'
-import { useKernelStore } from '@/stores/kernel'
-import { kernelService } from '@/services/kernel-service'
-import type { KernelStatus } from '@/services/kernel-service'
-import { APP_EVENTS } from '@/constants/events'
-```
-
-### 类型规范
-
-- **禁止使用**: `as any`, `@ts-ignore`, `// @ts-nocheck`
-- **优先使用**: 显式类型注解 + 类型推导结合
-- **接口 vs 类型**: 接口用于可扩展对象，类型用于联合/别名
-
-### Rust 命名规范
-
-- **模块**: snake_case, 如 `kernel_service`
-- **函数**: snake_case, 如 `start_kernel`
-- **结构体/枚举**: PascalCase, 如 `KernelState`
-- **变量**: snake_case, 如 `kernel_path`
-- **常量**: SCREAMING_SNAKE_CASE
-
-### 错误处理
-
-- 使用 `Result<T, String>` 作为命令返回类型
-- 统一错误信息格式: `Err(error_message.to_string())`
-- 使用 `thiserror` 定义自定义错误类型
-
-### Prettier 配置
-
-```json
-{
-  "semi": false,
-  "singleQuote": true,
-  "printWidth": 100
-}
-```
-
-### EditorConfig
-
-- 缩进: 2 空格
-- 字符编码: UTF-8
-- 行尾: LF
-- 去除尾部空格
-
-### 禁止事项
-
-- ❌ 提交 secrets、logs 或本地覆盖文件
-- ❌ 使用 `as any` 或 `@ts-ignore` 类型压制
-- ❌ 跳过 `pnpm type-check` 和 `pnpm lint`
-- ❌ 绕过 wrapper 直接改打包资源；应统一使用 `pnpm tauri dev/build` 或 `pnpm kernel:fetch`
-- ❌ 在 commit 中包含调试日志或临时文件
-
-## 构建与发布
-
-### 开发环境
-
-#### 开发服务器启动
-
-```bash
-# 启动开发服务器 (支持热重载)
-pnpm tauri dev
-
-# 或者使用 npm scripts
-pnpm run tauri dev
-```
-
-#### 开发工具和调试
-
-```bash
-# 前端类型检查
-pnpm run type-check
-
-# 代码质量检查
-pnpm run lint          # 运行所有 lint 检查
-pnpm run lint:eslint   # 仅运行 ESLint
-pnpm run lint:oxlint   # 仅运行 oxlint
-
-# 代码格式化
-pnpm run format        # 格式化 src/ 目录代码
-
-# 清理缓存
-pnpm clean             # 清理前端构建缓存
-cd src-tauri && cargo clean  # 清理 Rust 构建缓存
-
-# 运行单个测试
-# Vitest (如有)
-pnpm vitest run --testNamePattern="xxx"
-
-# Rust 测试
-cd src-tauri && cargo test <test_name>
-cd src-tauri && cargo test -- --test-threads=1 <test_name>
-
-# 完整质量检查
-pnpm lint && pnpm type-check && cd src-tauri && cargo clippy
-```
-
-### 生产环境构建
-
-#### 完整构建流程
-
-```bash
-# 1. 安装依赖 (如果尚未安装)
+# 安装前端依赖
 pnpm install
 
-# 2. 前端构建
-pnpm run build
+# 首次开发建议先拉取当前平台内核
+pnpm kernel:fetch
+```
 
-# 3. 完整应用构建 (包含前端和后端)
+### 日常开发
+
+```bash
+# 启动桌面开发环境
+pnpm tauri dev
+
+# 前端类型检查
+pnpm type-check
+
+# 前端 lint
+pnpm lint
+
+# Rust 静态检查
+cd src-tauri && cargo clippy
+
+# Rust 测试
+cd src-tauri && cargo test
+
+# 脚本测试
+pnpm test:kernel-targets
+```
+
+### 生产构建
+
+```bash
+# 构建桌面产物
 pnpm tauri build
-
-# 构建产物位置：
-# - Windows: src-tauri/target/release/bundle/msi/
-# - 可执行文件: src-tauri/target/release/sing-box-windows.exe
 ```
 
-#### 构建输出
+当前项目统一要求通过 `scripts/tauri-wrapper.mjs` 触发 Tauri 构建，不要绕过 wrapper 直接修改资源打包逻辑。
 
-生产构建会在以下位置生成文件：
+## 内核资源拉取与打包链路
 
-- **安装包**: `src-tauri/target/release/bundle/msi/sing-box-windows_版本号_x64_zh-CN.msi`
-- **可执行文件**: `src-tauri/target/release/sing-box-windows.exe`
-- **前端构建产物**: `dist/` 目录
+这是项目里最容易被文档写过时的一段，当前真实行为如下：
 
-#### 性能优化
+1. `pnpm tauri dev` / `pnpm tauri build`
+2. 实际进入 `scripts/tauri-wrapper.mjs`
+3. wrapper 会根据宿主平台或 `--target` 解析目标平台
+4. 自动调用 `scripts/fetch-kernel.mjs`
+5. 仅拉取目标平台对应的 sing-box 内核资源
+6. 构建时生成 `src-tauri/.generated/tauri.kernel.<platform>.<arch>.conf.json`
+7. 将目标平台资源注入 Tauri bundle，避免把多平台内核一起打进安装包
 
-项目配置了优化的构建选项：
-
-```toml
-# Cargo.toml 中的发布配置
-[profile.release]
-opt-level = 3        # 最高优化级别
-debug = false        # 禁用调试信息
-lto = true          # 链接时优化
-codegen-units = 1   # 单个代码生成单元
-panic = "abort"     # panic 时直接终止
-strip = true        # 移除符号信息
-overflow-checks = false  # 禁用溢出检查
-```
-
-### 发布流程
-
-#### 版本管理
-
-项目使用统一的版本号管理，需要同时更新：
-
-1. **package.json**: 前端版本号
-2. **src-tauri/tauri.conf.json**: Tauri 应用版本
-3. **src-tauri/Cargo.toml**: Rust 包版本
+### 常用命令
 
 ```bash
-# 示例：更新到版本 1.8.0
-# 更新 package.json
-npm version 1.8.0 --no-git-tag-version
+# 拉取当前平台最新内核
+pnpm kernel:fetch
 
-# 手动更新 tauri.conf.json 和 Cargo.toml 中的版本号
+# 拉取所有受支持平台的内核
+pnpm kernel:fetch:all
+
+# 强制重新拉取（通过环境变量让 wrapper 走强制模式）
+# Windows PowerShell:
+$env:SING_BOX_KERNEL_FETCH_MODE='force'; pnpm tauri build
 ```
 
-#### 完整发布流程
+### 相关环境变量
 
-1. **版本准备**:
+- `SING_BOX_KERNEL_FETCH_MODE=force`
+  - 强制重新下载内核，而不是跳过已有资源
+- `SING_BOX_GITHUB_TOKEN`
+  - 给 GitHub API 请求加认证，降低 latest 拉取时被限流的概率
 
-   ```bash
-   # 确保所有更改已提交
-   git status
+## 前端开发约定
 
-   # 更新版本号（示例）
-   npm version patch --no-git-tag-version
-   # 同步更新 src-tauri/Cargo.toml 与 src-tauri/tauri.conf.json
-   ```
+### 命名和组织
 
-2. **质量检查**:
+- 组件使用 PascalCase
+- 页面使用 `*View.vue`
+- 组合式函数使用 `useXxx.ts`
+- Store 文件使用 PascalCase，例如 `AppStore.ts`
+- 不要使用 `as any`、`@ts-ignore`、`@ts-nocheck`
 
-   ```bash
-   # 运行所有检查
-   pnpm type-check
-   pnpm lint
-   cd src-tauri && cargo clippy && cargo test
+### 路由约定
 
-   # 本地抽样构建（可选）
-   pnpm tauri build --target x86_64-pc-windows-msvc
-   ```
+- 路由定义在 `src/router/index.ts`
+- `/blank` 不是普通页面，而是托盘驻留时的重要空白路由
+- 改动托盘相关逻辑时，务必验证最小化、恢复、隐藏启动、退出流程
 
-3. **测试验证**:
-   - 测试生成的安装包在目标系统上的安装和运行
-   - 验证核心功能正常工作
-   - 检查内存使用和性能
+### 服务层约定
 
-4. **创建预发布**:
+- 页面尽量通过 `stores/` 和 `services/` 与后端交互
+- 不要在页面里分散写大量原始 `invoke`
+- 新命令优先补到相应 service，再由页面调用
 
-   ```bash
-   # 提交版本改动并创建 tag（tag 会触发预发布构建）
-   git add -A
-   git commit -m "chore: bump version to v1.8.0"
-   git tag -a v1.8.0 -m "Pre-release v1.8.0"
-   git push origin master
-   git push origin v1.8.0
-   ```
+### 一个推荐写法
 
-5. **等待自动预发布**:
-   - 推送 tag 后自动触发 `.github/workflows/release.yml`
-   - CI 自动构建 Windows/Linux/macOS 产物并更新同名 GitHub Pre-release 资产
-   - Release Notes 自动从 `docs/CHANGELOG.md` 中提取对应版本条目
+```ts
+import { useI18n } from 'vue-i18n'
+import { useMessage } from 'naive-ui'
+import { subscriptionService } from '@/services/subscription-service'
 
-6. **观察期转正式（手动触发）**:
-   - 进入 GitHub Actions，手动运行 `.github/workflows/promote-release.yml`
-   - 输入同一版本 tag（如 `v1.8.0`），将预发布转为正式发布
-   - 正式发布内容同样自动使用 `docs/CHANGELOG.md` 对应版本条目
+const { t } = useI18n()
+const message = useMessage()
 
-#### 自动化发布 (CI/CD)
-
-项目支持 GitHub Actions 自动化构建：
-
-- 在推送 tag 时自动触发预发布构建
-- 构建步骤统一走 `pnpm run tauri build --target <triple>`（wrapper 脚本）
-- wrapper 会根据 `--target` 仅拉取并打包对应平台内核，不会把多平台内核一并塞进安装包
-- 内核版本默认自动拉取上游 latest；CI 透传 `SING_BOX_GITHUB_TOKEN`，降低 GitHub API 限流导致的失败
-- 自动创建/更新 GitHub 预发布（pre-release）并上传多平台产物
-- 观察期结束后，手动触发 `promote-release.yml` 将同一 tag 转为正式版（不重复构建）
-
-### 部署注意事项
-
-1. **代码签名**: 生产环境建议对可执行文件进行代码签名
-2. **安全扫描**: 上传前对构建产物进行安全扫描
-3. **版本兼容性**: 确保新版本与现有配置文件兼容
-4. **回滚计划**: 准备版本回滚方案
-
-## 常见问题
-
-### Q: 如何调试 Rust 后端代码？
-
-A: 项目使用 `tracing` 进行结构化日志记录：
-
-```rust
-// 在代码中添加日志
-tracing::info!("内核启动中...");
-tracing::error!("启动失败: {}", error);
-
-// 在开发模式下，日志会输出到控制台
-// 可以通过环境变量控制日志级别
-RUST_LOG=debug pnpm tauri dev
-```
-
-也可以使用 VS Code 的 Rust Analyzer 扩展和内置调试器，或启用 Tauri 开发者工具。
-
-### Q: 前端和后端之间的通信方式？
-
-A: 使用 Tauri 的 `invoke` API 进行通信：
-
-```typescript
-// 前端调用后端命令
-import { invoke } from '@tauri-apps/api/tauri'
-
-// 调用后端函数
-const result = await invoke('kernel_start_enhanced', {
-  api_port: 9090,
-  proxy_port: 7890,
-  prefer_ipv6: true,
-})
-```
-
-```rust
-// 后端命令定义
-use serde_json::json;
-
-#[tauri::command]
-pub async fn kernel_start_enhanced(
-    _app_handle: tauri::AppHandle,
-    api_port: Option<u16>,
-    proxy_port: Option<u16>,
-) -> Result<serde_json::Value, String> {
-    // 实现逻辑
-    Ok(json!({
-        "success": true,
-        "message": "启动成功",
-        "api_port": api_port,
-        "proxy_port": proxy_port
-    }))
-}
-```
-
-### Q: 如何处理系统权限问题？
-
-A: 使用 `system_service.rs` 中的权限管理函数：
-
-```rust
-// 检查管理员权限
-let is_admin = check_admin().await?;
-
-// 如果需要权限且当前不是管理员，重启为管理员
-if !is_admin && needs_admin_rights {
-    restart_as_admin().await?;
-}
-```
-
-TUN 模式需要管理员权限，应用会自动检测并请求权限提升。
-
-### Q: 如何添加新的依赖？
-
-A:
-
-**前端依赖**:
-
-```bash
-# 添加运行时依赖
-pnpm add vue-router
-
-# 添加开发依赖
-pnpm add -D @types/node
-
-# 更新依赖
-pnpm update
-```
-
-**后端依赖** (编辑 `src-tauri/Cargo.toml`):
-
-```toml
-[dependencies]
-tokio = { version = "1.0", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-```
-
-### Q: 如何添加新的前端页面？
-
-A:
-
-1. 在 `src/views/` 创建新的 Vue 组件
-2. 在 `src/router/index.ts` 添加路由配置
-3. 在对应的导航组件中添加菜单项
-4. 如果需要，创建对应的 Store 管理状态
-
-### Q: 如何处理跨语言的数据类型？
-
-A: 使用 `serde` 进行序列化，确保前后端数据类型一致：
-
-```rust
-// Rust 类型定义
-#[derive(Serialize, Deserialize)]
-pub struct ProxyNode {
-    pub name: String,
-    pub server: String,
-    pub port: u16,
-    pub delay: Option<u32>,
-}
-```
-
-```typescript
-// TypeScript 类型定义
-interface ProxyNode {
-  name: string
-  server: string
-  port: number
-  delay?: number
-}
-```
-
-### Q: 应用启动缓慢怎么办？
-
-A: 检查以下优化点：
-
-1. **前端优化**：
-   - 使用懒加载组件 `LazyComponent.vue`
-   - 启用虚拟滚动 `VirtualList.vue`
-   - 检查 Store 数据恢复逻辑
-
-2. **后端优化**：
-   - 检查内核启动时间
-   - 优化文件IO操作
-   - 使用异步操作避免阻塞
-
-3. **构建优化**：
-   - 使用发布模式构建
-   - 检查依赖大小
-
-### Q: 如何调试WebSocket连接问题？
-
-A:
-
-```typescript
-// 检查WebSocket服务状态
-import { webSocketService } from '@/services/websocket-service'
-
-console.log('WebSocket 状态:', {
-  isConnected: webSocketService.isWebSocketConnected(),
-  connectionCount: webSocketService.getConnectionCount(),
-})
-
-// 启用WebSocket调试日志
-localStorage.setItem('debug-websocket', 'true')
-```
-
-### Q: 如何贡献代码？
-
-A:
-
-1. **Fork 项目**并克隆到本地
-2. **创建功能分支**: `git checkout -b feature/新功能名称`
-3. **遵循代码规范**: 运行 `pnpm run lint` 检查代码质量
-4. **编写测试**并确保现有测试通过
-5. **提交更改**: 使用清晰的提交信息
-6. **发起 Pull Request**并描述更改内容
-
-代码提交前请确保：
-
-- 代码通过所有lint检查
-- TypeScript类型检查无错误
-- 应用能正常构建和运行
-
-## 性能优化与最佳实践
-
-### 前端性能优化
-
-#### 1. 组件层面优化
-
-```vue
-<!-- 使用懒加载组件 -->
-<script setup>
-import LazyComponent from '@/components/LazyComponent.vue'
-</script>
-
-<template>
-  <LazyComponent>
-    <HeavyComponent />
-  </LazyComponent>
-</template>
-```
-
-#### 2. 列表渲染优化
-
-```vue
-<!-- 大列表使用虚拟滚动 -->
-<script setup>
-import VirtualList from '@/components/VirtualList.vue'
-
-const items = ref(largeDataArray) // 大量数据
-</script>
-
-<template>
-  <VirtualList :items="items" :item-height="50" :visible-count="20">
-    <template #item="{ item }">
-      <div>{{ item.name }}</div>
-    </template>
-  </VirtualList>
-</template>
-```
-
-#### 3. Store 优化
-
-```typescript
-// 使用防抖保存避免频繁IO
-export const useTrafficStore = defineStore(
-  'traffic',
-  () => {
-    // 配置防抖保存
-  },
-  {
-    persist: {
-      enabled: true,
-      debounceDelay: 1000, // 1秒防抖
-      excludeHighFrequencyKeys: ['currentSpeed', 'instantData'], // 排除高频数据
-    },
-  },
-)
-```
-
-### 后端性能优化
-
-#### 1. 异步操作
-
-```rust
-// 使用异步避免阻塞
-#[tauri::command]
-pub async fn download_large_file(url: String) -> Result<String, String> {
-    tokio::spawn(async move {
-        // 长时间运行的任务
-        download_file_async(url).await
-    }).await.map_err(|e| e.to_string())?
-}
-```
-
-#### 2. 资源管理
-
-```rust
-// 使用 Arc 和 Mutex 管理共享状态
-use std::sync::{Arc, Mutex};
-use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref KERNEL_STATE: Arc<Mutex<KernelState>> = Arc::new(Mutex::new(KernelState::new()));
-}
-
-// 正确释放资源
-impl Drop for KernelManager {
-    fn drop(&mut self) {
-        self.stop_kernel();
-        self.cleanup_resources();
-    }
-}
-```
-
-#### 3. 错误处理
-
-```rust
-// 使用结构化错误处理
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum AppError {
-    #[error("网络错误: {0}")]
-    Network(#[from] reqwest::Error),
-
-    #[error("IO错误: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("配置错误: {message}")]
-    Config { message: String },
-}
-```
-
-### 构建优化
-
-#### 1. Vite 配置优化
-
-```typescript
-// vite.config.ts
-export default defineConfig({
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['vue', 'vue-router', 'pinia'],
-          ui: ['naive-ui'],
-          utils: ['lodash', 'dayjs'],
-        },
-      },
-    },
-    chunkSizeWarningLimit: 1000,
-  },
-  // 生产环境移除console
-  esbuild: {
-    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
-  },
-})
-```
-
-#### 2. Cargo 优化配置
-
-```toml
-# Cargo.toml
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
-
-[profile.dev]
-opt-level = 1  # 开发时适度优化
-debug = true
-```
-
-### 安全最佳实践
-
-#### 1. 前端安全
-
-```typescript
-// 输入验证
-function validateUrl(url: string): boolean {
+const refreshCurrentSubscription = async () => {
   try {
-    const parsed = new URL(url)
-    return ['http:', 'https:'].includes(parsed.protocol)
-  } catch {
-    return false
+    // 把后端调用收敛到 service，页面只负责交互反馈。
+    await subscriptionService.updateCurrentSubscription()
+    message.success(t('sub.updateSuccess'))
+  } catch (error) {
+    // 错误提示统一走 UI 文案，避免页面散落硬编码字符串。
+    message.error(String(error ?? t('common.operationFailed')))
   }
 }
-
-// XSS 防护
-function sanitizeInput(input: string): string {
-  return input.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-}
 ```
 
-#### 2. 后端安全
+## 后端开发约定
 
-```rust
-// 路径验证
-use std::path::{Path, PathBuf};
+### 命令约定
 
-fn validate_path(path: &str) -> Result<PathBuf, String> {
-    let path = Path::new(path);
+- Tauri 命令尽量返回 `Result<T, String>`
+- 新命令加完后要在 `src-tauri/src/lib.rs` 注册
+- 如果命令会影响运行时状态，考虑是否需要同步发 event 给前端
 
-    // 防止路径遍历攻击
-    if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
-        return Err("不允许父目录访问".to_string());
-    }
+### 模块边界
 
-    Ok(path.to_path_buf())
-}
+- 内核启停与健康相关逻辑放 `core/`
+- 订阅下载与解析放 `network/`
+- 配置持久化放 `storage/`
+- 平台、更新、备份、提权放 `system/`
+- 托盘行为放 `tray/`
 
-// 敏感数据处理
-use zeroize::Zeroize;
+### 日志建议
 
-struct SensitiveData {
-    secret: String,
-}
+- 使用 `tracing` 记录后端关键行为
+- 错误信息尽量保留上下文，方便前端直接展示或定位
+- 不要保留一次性的调试输出
 
-impl Drop for SensitiveData {
-    fn drop(&mut self) {
-        self.secret.zeroize(); // 清零敏感数据
-    }
-}
+### 启动阶段注意点
+
+`src-tauri/src/lib.rs` 的 `setup` 阶段除了注册命令外，还会做异步初始化工作，例如：
+
+- 存储初始化
+- 残留进程清理
+- 自动任务或运行态初始化
+- 托盘与窗口协同
+
+这里是高风险修改点，改动前建议先理解初始化顺序。
+
+## 多语言开发
+
+- 语言文件位于 `src/locales/`
+- 当前内置：`zh-CN`、`en-US`、`ja-JP`、`ru-RU`
+- `src/stores/app/LocaleStore.ts` 负责读取和保存语言偏好
+- `src/locales/index.ts` 维护 `DEFAULT_LOCALE`、`LocaleCode` 和 `supportedLocales`
+
+更详细的国际化说明请直接查看 `docs/i18n.md`。
+
+## 数据存储
+
+当前项目不是简单依赖浏览器 `localStorage`，核心配置由后端 SQLite 持久化。
+
+默认工作目录：
+
+- Windows：`%LOCALAPPDATA%\sing-box-windows\`
+- Linux：`~/.local/share/sing-box-windows/`
+- macOS：`~/Library/Application Support/sing-box-windows/`
+
+这里通常会存放：
+
+- SQLite 数据库
+- 生成后的配置文件
+- 日志文件
+- 备份文件
+- 已下载的内核与版本信息
+
+## 发布流程
+
+### 版本同步
+
+发布前至少同步以下文件：
+
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+- `docs/CHANGELOG.md`
+
+### 质量门禁
+
+```bash
+pnpm lint
+pnpm type-check
+cd src-tauri && cargo clippy && cargo test
+pnpm test:kernel-targets
 ```
 
-### 测试最佳实践
+### 预发布
 
-#### 1. 前端测试
+1. 提交版本变更
+2. 创建并推送 `vX.Y.Z` tag
+3. GitHub Actions 自动触发 `.github/workflows/release.yml`
+4. CI 构建 Windows / Linux / macOS 产物
+5. Release Notes 从 `docs/CHANGELOG.md` 对应版本节自动提取
 
-```typescript
-// 组件测试示例
-import { mount } from '@vue/test-utils'
-import { describe, it, expect } from 'vitest'
+### 正式发布
 
-describe('ProxyCard', () => {
-  it('应该显示代理信息', () => {
-    const wrapper = mount(ProxyCard, {
-      props: {
-        proxy: { name: 'test', server: '1.1.1.1', port: 8080 },
-      },
-    })
+预发布验证通过后，手动触发 `.github/workflows/promote-release.yml`，把同一 tag 转为正式版。
 
-    expect(wrapper.text()).toContain('test')
-  })
-})
-```
+## 常见改动点检查清单
 
-#### 2. 后端测试
+### 改了前端页面
 
-```rust
-// 单元测试
-#[cfg(test)]
-mod tests {
-    use super::*;
+- 是否仍通过 service/store 访问后端
+- 是否补齐多语言文案
+- 是否验证亮暗主题
+- 是否验证托盘隐藏/恢复后的行为
 
-    #[tokio::test]
-    async fn test_proxy_validation() {
-        let result = validate_proxy_config(&valid_config()).await;
-        assert!(result.is_ok());
-    }
+### 改了订阅解析
 
-    #[test]
-    fn test_url_parsing() {
-        let url = "https://example.com/config";
-        assert!(is_valid_subscription_url(url));
-    }
-}
-```
+- 是否补充或更新 Rust 单测
+- 是否验证 sing-box JSON / Clash YAML / URI 列表三类输入
+- 是否确认手动配置与自动更新的边界行为
 
-### 监控与调试
+### 改了内核/代理逻辑
 
-#### 1. 性能监控
+- 是否验证 system proxy / TUN / manual 三种模式
+- 是否检查异常停止后的提示与恢复
+- 是否确认连接、规则、日志页面还能正常刷新
 
-```typescript
-// 前端性能监控
-class PerformanceMonitor {
-  static measureOperation<T>(name: string, operation: () => T): T {
-    const start = performance.now()
-    const result = operation()
-    const end = performance.now()
+### 改了发布与打包逻辑
 
-    console.log(`${name} 耗时: ${end - start}ms`)
-    return result
-  }
-}
+- 是否仍通过 wrapper 注入目标平台内核
+- 是否验证 `--target` 下资源映射正确
+- 是否确认 Linux glibc 兼容性约束未被破坏
 
-// 使用示例
-const data = PerformanceMonitor.measureOperation('数据处理', () => processLargeData(rawData))
-```
+## 容易踩坑的点
 
-#### 2. 内存监控
+- 不要把 `/blank` 当成普通页面删掉或弱化
+- 不要绕过 `scripts/tauri-wrapper.mjs` 直接改资源打包
+- 不要为了过类型检查使用类型压制
+- 不要把多平台内核一起塞进单平台安装包
+- `src-tauri/src/lib.rs` 当前存在重复 websocket plugin 注册风险，修改时先确认影响
 
-```typescript
-// 内存使用监控
-function checkMemoryUsage() {
-  if ('memory' in performance) {
-    const memory = (performance as any).memory
-    console.log(`内存使用: ${Math.round(memory.usedJSHeapSize / 1024 / 1024)}MB`)
-  }
-}
+## 参考文档
 
-setInterval(checkMemoryUsage, 30000) // 每30秒检查一次
-```
-
----
-
-## 贡献指南
-
-我们欢迎各种形式的贡献，包括但不限于：
-
-- 代码贡献
-- 文档改进
-- 问题报告
-- 功能建议
-
-请参考项目根目录的 README.md 中的贡献流程。
+- `README.md`
+- `README.zh.md`
+- `docs/i18n.md`
+- `docs/CHANGELOG.md`

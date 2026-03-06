@@ -1,5 +1,10 @@
 # 更新日志
 
+## [Unreleased]
+
+### 📚 文档更新
+- 重写 `README.md`、`README.zh.md`、`docs/development.md`、`docs/i18n.md`，统一当前跨平台架构、内核拉取流程、本地数据目录与发布说明
+
 ## [v2.2.6] - 2026-03-05
 
 ### ✨ 主要更新
