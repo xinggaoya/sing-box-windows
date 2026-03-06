@@ -12,6 +12,9 @@ fn get_platform_identifier() -> &'static str {
     env::consts::OS
 }
 
+#[cfg(test)]
+#[path = "update_service.tests.rs"]
+mod tests;
 // 获取当前架构
 fn get_current_arch() -> &'static str {
     env::consts::ARCH

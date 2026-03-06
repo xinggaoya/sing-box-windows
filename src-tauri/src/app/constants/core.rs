@@ -50,3 +50,7 @@ pub mod config {
     /// 默认的 Inbound 类型
     pub const DEFAULT_INBOUND_TYPE: &str = "mixed";
 }
+
+#[cfg(test)]
+#[path = "core.tests.rs"]
+mod tests;

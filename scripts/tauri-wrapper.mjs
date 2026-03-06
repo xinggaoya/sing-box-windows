@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import fsPromises from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import {
   getKernelResourceMap,
   resolveKernelTarget,
@@ -15,7 +16,6 @@ const LINUX_TARGET = requireTarget('linux', 'amd64')
 const MACOS_ARM64_TARGET = requireTarget('macos', 'arm64')
 const MACOS_AMD64_TARGET = requireTarget('macos', 'amd64')
 
-let args = process.argv.slice(2)
 const aliasMap = new Map([
   ['build:linux', ['build', '--target', LINUX_TARGET.tauriTarget]],
   [
@@ -39,57 +39,63 @@ const aliasMap = new Map([
   ]
 ])
 
-const initialCommand = args[0] ?? ''
-if (aliasMap.has(initialCommand)) {
+export function applyAliasArgs(rawArgs) {
+  const initialCommand = rawArgs[0] ?? ''
+  if (!aliasMap.has(initialCommand)) {
+    return [...rawArgs]
+  }
   const mapped = aliasMap.get(initialCommand) ?? []
-  args = [...mapped, ...args.slice(1)]
+  return [...mapped, ...rawArgs.slice(1)]
 }
 
-const command = args[0] ?? ''
-const target = resolveTargetFromArgs(args)
-const hasConfig = hasOption(args, '--config', '-c')
-const shouldFetch = command === 'dev' || command === 'build'
+export async function main(rawArgs = process.argv.slice(2)) {
+  let args = applyAliasArgs(rawArgs)
 
-if (shouldFetch && !target) {
-  console.error(
-    'Unsupported kernel target. Please set a supported --target or extend scripts/kernel-targets.mjs.'
-  )
-  process.exit(1)
-}
+  const command = args[0] ?? ''
+  const target = resolveTargetFromArgs(args)
+  const hasConfig = hasOption(args, '--config', '-c')
+  const shouldFetch = command === 'dev' || command === 'build'
 
-if (command === 'build' && !hasConfig && target) {
-  const generatedConfigPath = await generateBuildConfig(target)
-  args = insertBeforeSeparator(args, ['--config', generatedConfigPath])
-}
-
-if (shouldFetch && target) {
-  const fetchMode = String(process.env.SING_BOX_KERNEL_FETCH_MODE ?? 'skip').toLowerCase()
-  const fetchArgs = [
-    path.resolve('scripts', 'fetch-kernel.mjs'),
-    '--platform',
-    target.platform,
-    '--arch',
-    target.arch
-  ]
-  if (fetchMode === 'force') {
-    fetchArgs.push('--force')
-  } else {
-    fetchArgs.push('--skip-existing')
+  if (shouldFetch && !target) {
+    console.error(
+      'Unsupported kernel target. Please set a supported --target or extend scripts/kernel-targets.mjs.'
+    )
+    return 1
   }
 
-  const fetchExitCode = await runCommand(process.execPath, fetchArgs)
-  if (fetchExitCode !== 0) {
-    process.exit(fetchExitCode)
+  if (command === 'build' && !hasConfig && target) {
+    const generatedConfigPath = await generateBuildConfig(target)
+    args = insertBeforeSeparator(args, ['--config', generatedConfigPath])
   }
+
+  if (shouldFetch && target) {
+    const fetchMode = String(process.env.SING_BOX_KERNEL_FETCH_MODE ?? 'skip').toLowerCase()
+    const fetchArgs = [
+      path.resolve('scripts', 'fetch-kernel.mjs'),
+      '--platform',
+      target.platform,
+      '--arch',
+      target.arch
+    ]
+    if (fetchMode === 'force') {
+      fetchArgs.push('--force')
+    } else {
+      fetchArgs.push('--skip-existing')
+    }
+
+    const fetchExitCode = await runCommand(process.execPath, fetchArgs)
+    if (fetchExitCode !== 0) {
+      return fetchExitCode
+    }
+  }
+
+  const tauriCommand = resolveTauriCommand(args)
+  return runCommand(tauriCommand.command, tauriCommand.args, {
+    shell: tauriCommand.shell
+  })
 }
 
-const tauriCommand = resolveTauriCommand(args)
-const exitCode = await runCommand(tauriCommand.command, tauriCommand.args, {
-  shell: tauriCommand.shell
-})
-process.exit(exitCode)
-
-function requireTarget(platform, arch) {
+export function requireTarget(platform, arch) {
   const target = resolveKernelTarget(platform, arch)
   if (!target) {
     throw new Error(`Kernel target not configured: ${platform}/${arch}`)
@@ -97,7 +103,7 @@ function requireTarget(platform, arch) {
   return target
 }
 
-function resolveTargetFromArgs(argv) {
+export function resolveTargetFromArgs(argv) {
   const rustTarget = getOptionValue(argv, '--target', '-t')
   if (rustTarget) {
     return resolveKernelTargetFromRustTarget(rustTarget)
@@ -105,7 +111,7 @@ function resolveTargetFromArgs(argv) {
   return resolveKernelTargetForHost()
 }
 
-async function generateBuildConfig(target) {
+export async function generateBuildConfig(target) {
   const generatedDir = path.resolve('src-tauri', '.generated')
   await fsPromises.mkdir(generatedDir, { recursive: true })
 
@@ -127,11 +133,11 @@ async function generateBuildConfig(target) {
   return toPosixRelativePath(generatedConfigPath)
 }
 
-function toPosixRelativePath(filePath) {
+export function toPosixRelativePath(filePath) {
   return path.relative(process.cwd(), filePath).split(path.sep).join('/')
 }
 
-function hasOption(argv, longFlag, shortFlag) {
+export function hasOption(argv, longFlag, shortFlag) {
   return argv.some(
     (item) =>
       item === longFlag ||
@@ -141,7 +147,7 @@ function hasOption(argv, longFlag, shortFlag) {
   )
 }
 
-function getOptionValue(argv, longFlag, shortFlag) {
+export function getOptionValue(argv, longFlag, shortFlag) {
   for (let i = 0; i < argv.length; i += 1) {
     const item = argv[i]
     if (item === longFlag || item === shortFlag) {
@@ -157,7 +163,7 @@ function getOptionValue(argv, longFlag, shortFlag) {
   return null
 }
 
-function insertBeforeSeparator(argv, toInsert) {
+export function insertBeforeSeparator(argv, toInsert) {
   const separatorIndex = argv.indexOf('--')
   if (separatorIndex === -1) {
     return [...argv, ...toInsert]
@@ -165,7 +171,7 @@ function insertBeforeSeparator(argv, toInsert) {
   return [...argv.slice(0, separatorIndex), ...toInsert, ...argv.slice(separatorIndex)]
 }
 
-function resolveTauriCommand(argv) {
+export function resolveTauriCommand(argv) {
   const binDir = path.resolve('node_modules', '.bin')
   if (process.platform === 'win32') {
     const cmdPath = path.join(binDir, 'tauri.cmd')
@@ -194,7 +200,7 @@ function resolveTauriCommand(argv) {
   }
 }
 
-function runCommand(command, commandArgs, options = {}) {
+export function runCommand(command, commandArgs, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, commandArgs, {
       stdio: 'inherit',
@@ -205,7 +211,7 @@ function runCommand(command, commandArgs, options = {}) {
   })
 }
 
-function wrapWindowsCmd(command, args) {
+export function wrapWindowsCmd(command, args) {
   const commandLine = [quoteWindowsArg(command), ...args.map(quoteWindowsArg)].join(' ')
   return {
     command: 'cmd.exe',
@@ -214,7 +220,7 @@ function wrapWindowsCmd(command, args) {
   }
 }
 
-function quoteWindowsArg(arg) {
+export function quoteWindowsArg(arg) {
   if (arg.length === 0) {
     return '""'
   }
@@ -223,4 +229,9 @@ function quoteWindowsArg(arg) {
   }
   const escaped = arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/g, '$1$1')
   return `"${escaped}"`
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const exitCode = await main()
+  process.exit(exitCode)
 }

@@ -601,17 +601,5 @@ fn process_original_config(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{extract_nodes_from_subscription, try_decode_base64_to_text};
-    use base64::{engine::general_purpose, Engine as _};
-
-    #[test]
-    fn base64_uri_list_should_extract_nodes_after_decode() {
-        let uri_list = "trojan://password@example.com:443#test\nvless://uuid@example.com:443?security=tls&sni=example.com#vless\n";
-        let b64 = general_purpose::STANDARD.encode(uri_list.as_bytes());
-
-        let decoded = try_decode_base64_to_text(&b64).expect("decode should work");
-        let nodes = extract_nodes_from_subscription(&decoded).expect("extract should work");
-        assert_eq!(nodes.len(), 2);
-    }
-}
+#[path = "subscription_service.tests.rs"]
+mod tests;

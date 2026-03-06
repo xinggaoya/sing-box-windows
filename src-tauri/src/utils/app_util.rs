@@ -88,3 +88,7 @@ pub fn get_service_path() -> PathBuf {
         .join("config")
         .join(service_name)
 }
+
+#[cfg(test)]
+#[path = "app_util.tests.rs"]
+mod tests;

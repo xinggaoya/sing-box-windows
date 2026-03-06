@@ -6,6 +6,7 @@ import os from 'node:os'
 import { spawn } from 'node:child_process'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
+import { pathToFileURL } from 'node:url'
 import {
   getAllKernelTargets,
   normalizeArch,
@@ -13,58 +14,53 @@ import {
   resolveKernelTarget
 } from './kernel-targets.mjs'
 
-const args = parseArgs(process.argv.slice(2))
-if (args.help) {
-  printHelp()
-  process.exit(0)
-}
-
-const baseDir = args.out
-  ? path.resolve(args.out)
-  : path.resolve('src-tauri', 'resources', 'kernel')
-let resolvedVersion = args.version ?? null
-const isAll = args.all || args.platform === 'all'
-const skipExisting = Boolean(args['skip-existing'] || args.skipExisting)
-const force = Boolean(args.force)
-
-const targets = isAll
-  ? getAllKernelTargets()
-  : [
-      resolveKernelTarget(
-        normalizePlatform(args.platform ?? process.platform),
-        normalizeArch(args.arch ?? process.arch)
-      )
-    ].filter(Boolean)
-
-if (targets.length === 0) {
-  console.error('Unsupported platform/arch. Use --platform and --arch.')
-  process.exit(1)
-}
-
-const errors = []
-for (const target of targets) {
-  try {
-    await fetchKernel(target, resolvedVersion, baseDir, {
-      skipExisting,
-      force,
-      getVersion: async () => {
-        if (!resolvedVersion) {
-          resolvedVersion = await getLatestVersion()
-        }
-        return resolvedVersion
-      }
-    })
-  } catch (error) {
-    errors.push(error)
+export async function main(rawArgs = process.argv.slice(2)) {
+  const args = parseArgs(rawArgs)
+  if (args.help) {
+    printHelp()
+    return 0
   }
+
+  const baseDir = args.out
+    ? path.resolve(args.out)
+    : path.resolve('src-tauri', 'resources', 'kernel')
+  let resolvedVersion = args.version ?? null
+  const skipExisting = Boolean(args['skip-existing'] || args.skipExisting)
+  const force = Boolean(args.force)
+  const targets = resolveRequestedTargets(args)
+
+  if (targets.length === 0) {
+    console.error('Unsupported platform/arch. Use --platform and --arch.')
+    return 1
+  }
+
+  const errors = []
+  for (const target of targets) {
+    try {
+      await fetchKernel(target, resolvedVersion, baseDir, {
+        skipExisting,
+        force,
+        getVersion: async () => {
+          if (!resolvedVersion) {
+            resolvedVersion = await getLatestVersion()
+          }
+          return resolvedVersion
+        }
+      })
+    } catch (error) {
+      errors.push(error)
+    }
+  }
+
+  if (errors.length > 0) {
+    console.error(`Failed: ${errors.length} target(s).`)
+    return 1
+  }
+
+  return 0
 }
 
-if (errors.length > 0) {
-  console.error(`Failed: ${errors.length} target(s).`)
-  process.exit(1)
-}
-
-function parseArgs(rawArgs) {
+export function parseArgs(rawArgs) {
   const result = {}
   for (let i = 0; i < rawArgs.length; i += 1) {
     const token = rawArgs[i]
@@ -83,7 +79,23 @@ function parseArgs(rawArgs) {
   return result
 }
 
-function printHelp() {
+export function resolveRequestedTargets(
+  args,
+  host = { platform: process.platform, arch: process.arch }
+) {
+  const isAll = args.all || args.platform === 'all'
+  if (isAll) {
+    return getAllKernelTargets()
+  }
+  return [
+    resolveKernelTarget(
+      normalizePlatform(args.platform ?? host.platform),
+      normalizeArch(args.arch ?? host.arch)
+    )
+  ].filter(Boolean)
+}
+
+export function printHelp() {
   console.log(`Usage:
   node scripts/fetch-kernel.mjs [--all] [--platform windows|linux|macos] [--arch amd64|arm64|386|armv5] [--version x.y.z] [--out path] [--skip-existing] [--force]
 
@@ -95,7 +107,7 @@ Examples:
 `)
 }
 
-function buildFilename(platformName, archName, versionName) {
+export function buildFilename(platformName, archName, versionName) {
   if (platformName === 'windows') {
     return `sing-box-${versionName}-windows-${archName}.zip`
   }
@@ -105,7 +117,7 @@ function buildFilename(platformName, archName, versionName) {
   return `sing-box-${versionName}-linux-${archName}.tar.gz`
 }
 
-function buildDownloadUrls(versionName, filenameName) {
+export function buildDownloadUrls(versionName, filenameName) {
   const base = `https://github.com/SagerNet/sing-box/releases/download/v${versionName}/${filenameName}`
   return [
     `https://v6.gh-proxy.com/${base}`,
@@ -118,7 +130,7 @@ function buildDownloadUrls(versionName, filenameName) {
   ]
 }
 
-async function fetchKernel(target, version, kernelBaseDir, options = {}) {
+export async function fetchKernel(target, version, kernelBaseDir, options = {}) {
   const targetDir = path.join(kernelBaseDir, target.platform, target.arch)
   const targetExecutable = path.join(targetDir, target.executable)
   const versionPath = path.join(targetDir, 'version.txt')
@@ -185,7 +197,7 @@ async function fetchKernel(target, version, kernelBaseDir, options = {}) {
   console.log(`[${target.platform}/${target.arch}] Saved: ${targetExecutable}`)
 }
 
-async function getLatestVersion() {
+export async function getLatestVersion() {
   const apiSources = [
     {
       url: 'https://api.github.com/repos/SagerNet/sing-box/releases/latest',
@@ -262,7 +274,7 @@ async function getLatestVersion() {
   )
 }
 
-function normalizeVersionTag(tag) {
+export function normalizeVersionTag(tag) {
   if (!tag || typeof tag !== 'string') {
     return null
   }
@@ -273,7 +285,7 @@ function normalizeVersionTag(tag) {
   return trimmed.startsWith('v') ? trimmed.slice(1) : trimmed
 }
 
-function parseVersionFromReleaseUrl(url) {
+export function parseVersionFromReleaseUrl(url) {
   if (!url || typeof url !== 'string') {
     return null
   }
@@ -284,7 +296,7 @@ function parseVersionFromReleaseUrl(url) {
   return normalizeVersionTag(match[1])
 }
 
-function parseVersionFromReleaseHtml(html) {
+export function parseVersionFromReleaseHtml(html) {
   if (!html || typeof html !== 'string') {
     return null
   }
@@ -295,7 +307,7 @@ function parseVersionFromReleaseHtml(html) {
   return normalizeVersionTag(match[1])
 }
 
-function buildGithubHeaders(withAuth) {
+export function buildGithubHeaders(withAuth) {
   const headers = {
     Accept: 'application/vnd.github+json',
     'User-Agent': 'sing-box-windows'
@@ -311,7 +323,7 @@ function buildGithubHeaders(withAuth) {
   return headers
 }
 
-async function downloadFile(url, destination) {
+export async function downloadFile(url, destination) {
   const res = await fetch(url, {
     headers: { 'User-Agent': 'sing-box-windows' },
     redirect: 'follow'
@@ -329,7 +341,7 @@ async function downloadFile(url, destination) {
   await pipeline(Readable.fromWeb(body), fileStream)
 }
 
-async function extractArchive(archivePath, outputDir) {
+export async function extractArchive(archivePath, outputDir) {
   if (archivePath.endsWith('.zip')) {
     try {
       await runCommand('tar', ['-xf', archivePath, '-C', outputDir])
@@ -359,7 +371,7 @@ async function extractArchive(archivePath, outputDir) {
   throw new Error(`Unsupported archive: ${archivePath}`)
 }
 
-async function runCommand(command, commandArgs) {
+export async function runCommand(command, commandArgs) {
   await new Promise((resolve, reject) => {
     const child = spawn(command, commandArgs, { stdio: 'inherit' })
     child.on('error', reject)
@@ -373,7 +385,7 @@ async function runCommand(command, commandArgs) {
   })
 }
 
-async function findFile(rootDir, fileName) {
+export async function findFile(rootDir, fileName) {
   const entries = await fsPromises.readdir(rootDir, { withFileTypes: true })
   for (const entry of entries) {
     const entryPath = path.join(rootDir, entry.name)
@@ -387,10 +399,15 @@ async function findFile(rootDir, fileName) {
   return null
 }
 
-async function cleanupTemp(dir) {
+export async function cleanupTemp(dir) {
   try {
     await fsPromises.rm(dir, { recursive: true, force: true })
   } catch {
     // best-effort cleanup
   }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const exitCode = await main()
+  process.exit(exitCode)
 }

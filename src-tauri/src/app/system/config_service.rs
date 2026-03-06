@@ -415,3 +415,7 @@ fn ensure_private_ip_rule(rules: &mut Vec<Value>) {
         }));
     }
 }
+
+#[cfg(test)]
+#[path = "config_service.tests.rs"]
+mod tests;
