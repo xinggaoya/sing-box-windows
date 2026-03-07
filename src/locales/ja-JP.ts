@@ -44,10 +44,10 @@ export default {
 
   // 首页
   home: {
-  kernelHealthy: "Kernel healthy",
-  kernelUnhealthy: "Kernel has issues",
-  kernelCheckedAt: "Last checked",
-  noIssues: "No issues",
+    kernelHealthy: 'Kernel healthy',
+    kernelUnhealthy: 'Kernel has issues',
+    kernelCheckedAt: 'Last checked',
+    noIssues: 'No issues',
     // 基础操作
     start: '起動',
     stop: '停止',
@@ -121,7 +121,8 @@ export default {
 
     tunConfirm: {
       title: '管理者権限が必要です',
-      description: 'TUN モードに切り替えるにはアプリを管理者権限で再起動する必要があります。今すぐ管理者として再起動しますか？',
+      description:
+        'TUN モードに切り替えるにはアプリを管理者権限で再起動する必要があります。今すぐ管理者として再起動しますか？',
       confirm: '管理者として再起動',
     },
     sudoPassword: {
@@ -307,13 +308,15 @@ export default {
     useOriginalConfig: '元の設定を使用（ポートのみ置換）',
     useExtractedNodes: 'ノードをローカルテンプレートに抽出',
     originalConfigJsonOnly: '元のサブスクリプションは sing-box JSON 設定のみ対応',
-    originalConfigWarning: '元の設定を使用する場合、DNS/分流/広告ブロックなどの高度な設定は反映されません',
+    originalConfigWarning:
+      '元の設定を使用する場合、DNS/分流/広告ブロックなどの高度な設定は反映されません',
     configPathCollision: '設定パスの重複を検出したため、再生成してから切り替えます',
     urlSubscription: 'サブスクリプション URL',
     manualConfig: 'JSON 設定（原本）',
     uriList: 'ノードリンク / YAML',
     uriContent: 'ノード内容',
-    uriContentPlaceholder: 'vmess://、vless://、trojan://、ss://、hysteria2://（1 行 1 件）または Clash/Mihomo YAML に対応',
+    uriContentPlaceholder:
+      'vmess://、vless://、trojan://、ss://、hysteria2://（1 行 1 件）または Clash/Mihomo YAML に対応',
     uriContentRequired: 'ノードリンクまたは Clash YAML を入力してください',
     manualContent: '手動設定コンテンツ',
     urlHint: 'sing-box JSON / Clash(Mihomo) YAML / URI リストに対応（Base64 可能）',
@@ -422,6 +425,7 @@ export default {
       confirmUpdate: '今すぐ更新しますか？',
       later: '後で',
       updateNow: '今すぐ更新',
+      openReleasePage: 'リリースページを開く',
       downloading: '更新をダウンロード中',
       installing: 'インストール中',
       preparingDownload: 'ダウンロード準備中...',
@@ -432,9 +436,11 @@ export default {
       releaseNotes: 'リリースノート',
       updateNotice: '更新通知',
       skipVersion: 'このバージョンをスキップ',
-      prereleaseWarningDesc: 'テストバージョンには不安定な機能や潜在的な問題が含まれる可能性があります。テスト環境でのみ使用することをお勧めします。',
+      prereleaseWarningDesc:
+        'テストバージョンには不安定な機能や潜在的な問題が含まれる可能性があります。テスト環境でのみ使用することをお勧めします。',
       prereleaseConfirm: 'プレリリースバージョンを有効にする確認',
-      prereleaseConfirmDesc: '有効にすると、プレリリースバージョンの更新通知を受信します。これらのバージョンは不安定な可能性がありますが、続行しますか？',
+      prereleaseConfirmDesc:
+        '有効にすると、プレリリースバージョンの更新通知を受信します。これらのバージョンは不安定な可能性がありますが、続行しますか？',
       prereleaseEnabled: 'プレリリースバージョンが有効になりました',
       prereleaseEnabledDesc: 'プレリリースバージョンの更新通知を受信します',
       prereleaseDisabled: 'プレリリースバージョンが無効になりました',
@@ -442,6 +448,8 @@ export default {
       newVersionFound: '新しいバージョン {version} が見つかりました！',
       downloadStarted: 'アップデートのダウンロードがバックグラウンドで開始されました。',
       installStarted: 'インストーラーが起動しました。案内に従ってインストールを完了してください',
+      externalUpdateHint:
+        'このプラットフォームではアプリ内更新は未対応です。リリースページから対応するパッケージを手動でダウンロードしてください。',
       downloadError: 'アップデートのダウンロードに失敗しました: {error}',
       skipSuccess: 'このバージョンを正常にスキップしました。',
       skipError: 'バージョンのスキップに失敗しました: {error}',
@@ -487,7 +495,8 @@ export default {
       title: 'カーネル管理',
       advancedTag: '上級者向け',
       description: 'Sing-Boxカーネルバージョンとダウンロードを管理',
-      embeddedHint: '推奨カーネルはアプリに内蔵されています。手動更新は検証やトラブルシュート時のみ利用してください。',
+      embeddedHint:
+        '推奨カーネルはアプリに内蔵されています。手動更新は検証やトラブルシュート時のみ利用してください。',
       version: 'カーネルバージョン',
       download: 'カーネルをダウンロード',
       redownload: '再ダウンロード',
@@ -501,7 +510,8 @@ export default {
       downloadingDescription: 'カーネルファイルをダウンロード中です、お待ちください...',
       manualDownload: '手動ダウンロード',
       manualImportTitle: '手動カーネルインポート',
-      manualImportDesc: 'ウィンドウにファイルをドラッグするか、ローカルファイルを選択してください。実行ファイル（Windows exe / macOS・Linux バイナリ）とアーカイブ（zip/tar.gz/tgz/tar）に対応しています。',
+      manualImportDesc:
+        'ウィンドウにファイルをドラッグするか、ローカルファイルを選択してください。実行ファイル（Windows exe / macOS・Linux バイナリ）とアーカイブ（zip/tar.gz/tgz/tar）に対応しています。',
       dropHint: 'カーネルファイルをウィンドウにドラッグ',
       dropSubHint: 'sing-box 実行ファイルと公式アーカイブに対応',
       selectedFile: '選択済みファイル',
@@ -511,7 +521,8 @@ export default {
       pickFailed: 'ファイル選択に失敗しました',
       importFailed: 'カーネルのインポートに失敗しました',
       manualDownloadTitle: '手動ダウンロード説明',
-      manualDownloadGuide: '以下の手順に従ってください：\n1. https://github.com/SagerNet/sing-box/releases/latest にアクセス\n2. 対応するシステムバージョンのsing-boxをダウンロード\n3. 解凍した実行ファイルを以下のディレクトリに配置：\nWindows: ユーザーディレクトリ/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: ユーザーディレクトリ/.local/share/sing-box-windows/sing-box/sing-box\n\n完了後、「インストール確認」ボタンをクリックしてインストールが成功したか確認してください。',
+      manualDownloadGuide:
+        '以下の手順に従ってください：\n1. https://github.com/SagerNet/sing-box/releases/latest にアクセス\n2. 対応するシステムバージョンのsing-boxをダウンロード\n3. 解凍した実行ファイルを以下のディレクトリに配置：\nWindows: ユーザーディレクトリ/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: ユーザーディレクトリ/.local/share/sing-box-windows/sing-box/sing-box\n\n完了後、「インストール確認」ボタンをクリックしてインストールが成功したか確認してください。',
       installPrompt: '使用前にカーネルをダウンロードしてインストールしてください。',
       downloadFailedMessage: 'カーネルのダウンロードに失敗しました: {error}',
       downloadSuccess: 'カーネルのダウンロードが成功しました',
@@ -527,7 +538,8 @@ export default {
       systemBypassPlaceholder: '改行・セミコロン・カンマで複数の値を指定できます',
       systemBypassDesc: '例: localhost;127.*;10.*;192.168.*',
       tunTitle: 'TUN 仮想アダプタ',
-      tunAddressInfo: 'IPv4/IPv6 の CIDR は 172.19.0.1/30 と fdfe:dcba:9876::1/126 に固定されています。',
+      tunAddressInfo:
+        'IPv4/IPv6 の CIDR は 172.19.0.1/30 と fdfe:dcba:9876::1/126 に固定されています。',
       tunMtu: 'MTU',
       tunStack: 'スタックモード',
       enableIpv6: 'IPv6 アドレスを有効化',
@@ -553,7 +565,8 @@ export default {
     },
     singboxProfile: {
       title: 'サブスク設定生成（高度）',
-      originalConfigHint: '現在のサブスクリプションは元の設定を使用しているため、以下の高度な設定は書き込まれません',
+      originalConfigHint:
+        '現在のサブスクリプションは元の設定を使用しているため、以下の高度な設定は書き込まれません',
       routingTitle: 'ルーティング＆ダウンロード',
       dnsTitle: 'DNS',
       defaultOutbound: '非中国向けデフォルト出力',
@@ -586,7 +599,8 @@ export default {
       title: '開発者ツール',
       description: '開発者デバッグツールとオプション',
       openDevtools: '開発者ツールを開く',
-      openDevtoolsDesc: 'フロントエンドコードのデバッグと検査のためのブラウザ開発者ツールを開きます',
+      openDevtoolsDesc:
+        'フロントエンドコードのデバッグと検査のためのブラウザ開発者ツールを開きます',
       open: '開く',
       opened: '開発者ツールが開かれました',
       warning: '開発者ツールは主に開発とデバッグ用で、通常の使用では有効にする必要はありません',

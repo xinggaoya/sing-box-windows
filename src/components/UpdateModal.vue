@@ -9,7 +9,6 @@
     @update:show="handleUpdateShow"
   >
     <div class="modal-content">
-      <!-- Header Info -->
       <div class="update-header">
         <div class="version-badge new">
           <span class="label">{{ t('setting.update.newVersion') }}</span>
@@ -22,7 +21,6 @@
         </div>
       </div>
 
-      <!-- Meta Info -->
       <div class="update-meta">
         <div v-if="releaseDate" class="meta-item">
           <n-icon><CalendarOutline /></n-icon>
@@ -34,7 +32,6 @@
         </div>
       </div>
 
-      <!-- Release Notes -->
       <div v-if="releaseNotes" class="release-notes-container">
         <div class="notes-header">
           <n-icon><DocumentTextOutline /></n-icon>
@@ -45,11 +42,19 @@
         </div>
       </div>
 
-      <!-- Progress -->
-      <div v-if="isUpdating" class="progress-section">
+      <div v-if="!supportsInAppUpdate" class="platform-hint">
+        <n-icon><OpenOutline /></n-icon>
+        <span>{{ t('setting.update.externalUpdateHint') }}</span>
+      </div>
+
+      <div v-if="supportsInAppUpdate && isUpdating" class="progress-section">
         <div class="progress-info">
           <span class="status-text">
-            {{ updateStatus === 'installing' ? t('setting.update.installing') : t('setting.update.downloading') }}
+            {{
+              updateStatus === 'installing'
+                ? t('setting.update.installing')
+                : t('setting.update.downloading')
+            }}
           </span>
           <span class="percentage">{{ updateProgress.toFixed(0) }}%</span>
         </div>
@@ -61,53 +66,46 @@
           :status="updateStatus === 'error' ? 'error' : 'default'"
           class="custom-progress"
         />
-        <div class="progress-message" v-if="progressMessage">
+        <div v-if="progressMessage" class="progress-message">
           {{ progressMessage }}
         </div>
       </div>
 
-      <!-- Error -->
-      <div v-if="updateError" class="error-message">
+      <div v-if="supportsInAppUpdate && updateError" class="error-message">
         <n-icon><AlertCircleOutline /></n-icon>
         <span>{{ updateError }}</span>
       </div>
     </div>
 
-    <!-- Actions -->
     <template #action>
       <div class="modal-actions">
         <n-button
           secondary
           @click="onSkip"
-          :disabled="isUpdating"
+          :disabled="supportsInAppUpdate && isUpdating"
           class="skip-btn"
         >
           {{ t('setting.update.skipVersion') }}
         </n-button>
-        
+
         <div class="right-actions">
-          <n-button @click="onCancel" :disabled="isUpdating">
+          <n-button @click="onCancel" :disabled="supportsInAppUpdate && isUpdating">
             {{ t('setting.update.later') }}
           </n-button>
           <n-button
             type="primary"
-            :loading="isUpdating"
-            :disabled="isUpdating || updateStatus === 'installing'"
+            :loading="supportsInAppUpdate && isUpdating"
+            :disabled="actionDisabled"
             @click="onUpdate"
           >
             <template #icon>
               <n-icon>
-                <DownloadOutline v-if="!isUpdating" />
+                <OpenOutline v-if="!supportsInAppUpdate" />
+                <DownloadOutline v-else-if="!isUpdating" />
                 <SyncOutline v-else />
               </n-icon>
             </template>
-            {{
-              updateStatus === 'installing'
-                ? t('setting.update.installing')
-                : isUpdating
-                  ? t('setting.update.downloading')
-                  : t('setting.update.updateNow')
-            }}
+            {{ actionLabel }}
           </n-button>
         </div>
       </div>
@@ -116,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineProps, defineEmits, watch, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   DownloadOutline,
@@ -125,7 +123,8 @@ import {
   ArrowForwardOutline,
   CalendarOutline,
   ServerOutline,
-  AlertCircleOutline
+  AlertCircleOutline,
+  OpenOutline,
 } from '@vicons/ionicons5'
 import { listen, type Event } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
@@ -136,17 +135,34 @@ interface UpdateProgressPayload {
   message: string
 }
 
-const props = defineProps({
-  show: { type: Boolean, default: false },
-  latestVersion: { type: String, required: true },
-  currentVersion: { type: String, required: true },
-  downloadUrl: { type: String, default: '' },
-  releaseNotes: { type: String, default: '' },
-  releaseDate: { type: String, default: '' },
-  fileSize: { type: Number, default: 0 },
+interface UpdateModalProps {
+  show?: boolean
+  latestVersion: string
+  currentVersion: string
+  downloadUrl?: string
+  releasePageUrl?: string
+  releaseNotes?: string
+  releaseDate?: string
+  fileSize?: number
+  supportsInAppUpdate?: boolean
+}
+
+const props = withDefaults(defineProps<UpdateModalProps>(), {
+  show: false,
+  downloadUrl: '',
+  releasePageUrl: '',
+  releaseNotes: '',
+  releaseDate: '',
+  fileSize: 0,
+  supportsInAppUpdate: false,
 })
 
-const emits = defineEmits(['update:show', 'update', 'cancel', 'skip'])
+const emits = defineEmits<{
+  'update:show': [value: boolean]
+  update: []
+  cancel: []
+  skip: []
+}>()
 
 const message = useMessage()
 const { t } = useI18n()
@@ -181,19 +197,59 @@ const formattedDate = computed(() => {
 
 const formattedReleaseNotes = computed(() => {
   if (!props.releaseNotes) return ''
-  return props.releaseNotes
-    .replace(/^## (.+)$/gm, '### $1') // Downgrade headers
-    .replace(/\r\n/g, '\n')
+  return props.releaseNotes.replace(/^## (.+)$/gm, '### $1').replace(/\r\n/g, '\n')
 })
 
-watch(() => props.show, (newVal) => {
-  localShow.value = newVal
-  if (newVal) {
-    isUpdating.value = false
-    updateProgress.value = 0
-    updateStatus.value = 'downloading'
-    progressMessage.value = ''
-    updateError.value = ''
+const actionLabel = computed(() => {
+  if (!props.supportsInAppUpdate) {
+    return t('setting.update.openReleasePage')
+  }
+
+  if (updateStatus.value === 'installing') {
+    return t('setting.update.installing')
+  }
+
+  if (isUpdating.value) {
+    return t('setting.update.downloading')
+  }
+
+  return t('setting.update.updateNow')
+})
+
+const actionDisabled = computed(() => {
+  if (!props.supportsInAppUpdate) {
+    return !props.releasePageUrl
+  }
+  return isUpdating.value || updateStatus.value === 'installing'
+})
+
+const resetModalState = () => {
+  isUpdating.value = false
+  updateProgress.value = 0
+  updateStatus.value = 'downloading'
+  progressMessage.value = ''
+  updateError.value = ''
+}
+
+watch(
+  () => props.show,
+  (newVal) => {
+    localShow.value = newVal
+    if (newVal) {
+      resetModalState()
+    }
+  },
+)
+
+watch([() => localShow.value, () => props.supportsInAppUpdate], ([isOpen, supports]) => {
+  // 非 Windows 不监听安装进度，避免展示无效状态。
+  if (isOpen && supports) {
+    void setupProgressListener()
+    return
+  }
+
+  if (!isUpdating.value) {
+    cleanup()
   }
 })
 
@@ -203,53 +259,57 @@ const handleUpdateShow = (value: boolean) => {
 }
 
 const setupProgressListener = async () => {
-  try {
-    unlisten = await listen<UpdateProgressPayload>('update-progress', (event: Event<UpdateProgressPayload>) => {
-      const { status, progress, message: msg } = event.payload
-      updateProgress.value = progress
-      progressMessage.value = status === 'installing' ? t('setting.update.installStarted') : msg
+  if (unlisten || !props.supportsInAppUpdate) return
 
-      if (status === 'downloading') updateStatus.value = 'downloading'
-      else if (status === 'completed') {
-        updateStatus.value = 'completed'
-        isUpdating.value = false
-        message.success(t('notification.updateDownloaded'))
-        setTimeout(() => handleUpdateShow(false), 2000)
-      } else if (status === 'error') {
-        updateStatus.value = 'error'
-        updateError.value = msg
-        isUpdating.value = false
-      } else if (status === 'installing') {
-        updateStatus.value = 'installing'
-        updateProgress.value = 100
-      }
-    })
+  try {
+    unlisten = await listen<UpdateProgressPayload>(
+      'update-progress',
+      (event: Event<UpdateProgressPayload>) => {
+        const { status, progress, message: rawMessage } = event.payload
+        updateProgress.value = progress
+        progressMessage.value =
+          status === 'installing' ? t('setting.update.installStarted') : rawMessage
+
+        if (status === 'downloading') {
+          updateStatus.value = 'downloading'
+        } else if (status === 'completed') {
+          updateStatus.value = 'completed'
+          isUpdating.value = false
+          message.success(t('notification.updateDownloaded'))
+          setTimeout(() => handleUpdateShow(false), 2000)
+        } else if (status === 'error') {
+          updateStatus.value = 'error'
+          updateError.value = rawMessage
+          isUpdating.value = false
+        } else if (status === 'installing') {
+          updateStatus.value = 'installing'
+          updateProgress.value = 100
+        }
+      },
+    )
   } catch (error) {
     console.error('Failed to setup progress listener:', error)
   }
 }
 
-const onUpdate = async () => {
-  try {
+const onUpdate = () => {
+  if (props.supportsInAppUpdate) {
     isUpdating.value = true
     updateError.value = ''
     updateStatus.value = 'downloading'
     progressMessage.value = t('setting.update.preparingDownload')
-    emits('update', props.downloadUrl)
-  } catch (error) {
-    isUpdating.value = false
-    updateError.value = `${t('common.error')}: ${error}`
   }
+  emits('update')
 }
 
 const onCancel = () => {
-  if (isUpdating.value) return
+  if (props.supportsInAppUpdate && isUpdating.value) return
   handleUpdateShow(false)
   emits('cancel')
 }
 
 const onSkip = () => {
-  if (isUpdating.value) return
+  if (props.supportsInAppUpdate && isUpdating.value) return
   handleUpdateShow(false)
   emits('skip')
 }
@@ -261,14 +321,11 @@ const cleanup = () => {
   }
 }
 
-watch(localShow, (newVal) => {
-  if (newVal) setupProgressListener()
-  else if (!isUpdating.value) cleanup()
-})
-
 onMounted(() => {
   localShow.value = props.show
-  if (localShow.value) setupProgressListener()
+  if (localShow.value && props.supportsInAppUpdate) {
+    void setupProgressListener()
+  }
 })
 
 onBeforeUnmount(() => cleanup())
@@ -282,7 +339,8 @@ onBeforeUnmount(() => cleanup())
 .modal-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
+  padding: 4px 0;
 }
 
 .update-header {
@@ -290,34 +348,38 @@ onBeforeUnmount(() => cleanup())
   align-items: center;
   justify-content: center;
   gap: 16px;
-  padding: 12px 0;
 }
 
 .version-badge {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.version-badge.new {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(59, 130, 246, 0.12));
+  border-color: rgba(99, 102, 241, 0.24);
+}
+
+.version-badge.current {
+  background: var(--bg-secondary);
 }
 
 .version-badge .label {
   font-size: 12px;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 .version-badge .value {
   font-size: 18px;
   font-weight: 700;
-  font-family: monospace;
-}
-
-.version-badge.new .value {
-  color: var(--primary-color);
-}
-
-.version-badge.current .value {
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .arrow-icon {
@@ -367,6 +429,19 @@ onBeforeUnmount(() => cleanup())
   color: var(--text-primary);
 }
 
+.platform-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1));
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .progress-section {
   background: var(--bg-tertiary);
   padding: 16px;
@@ -411,7 +486,6 @@ onBeforeUnmount(() => cleanup())
   gap: 12px;
 }
 
-/* Markdown Styles */
 .markdown-body {
   white-space: pre-wrap;
 }

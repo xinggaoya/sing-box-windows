@@ -89,11 +89,13 @@ export type KernelOperationFailedPayload = KernelOperationEventPayload
 export interface UpdateAvailablePayload {
   latest_version: string
   download_url: string
+  release_page_url: string
   has_update: boolean
   release_notes?: string
   release_date?: string
   file_size?: number
   is_prerelease?: boolean
+  supports_in_app_update: boolean
 }
 
 export interface UpgradeSubscriptionRefreshFailedPayload {

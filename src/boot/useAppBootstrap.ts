@@ -5,19 +5,9 @@ import mitt from '@/utils/mitt'
 import { subscriptionService } from '@/services/subscription-service'
 import { eventService } from '@/services/event-service'
 import { APP_EVENTS } from '@/constants/events'
+import type { UpdateAvailablePayload } from '@/types/events'
 
 type MessageSetter = (message: ReturnType<typeof import('naive-ui').useMessage>) => void
-
-// 后端更新信息事件负载（与 UpdateStore 内部结构保持一致）
-interface UpdateInfoPayload {
-  latest_version: string
-  download_url: string
-  has_update: boolean
-  release_notes?: string
-  release_date?: string
-  file_size?: number
-  is_prerelease?: boolean
-}
 
 export interface AppBootstrapDeps {
   router: Router
@@ -55,7 +45,7 @@ export interface AppBootstrapDeps {
     updateStore: {
       initializeStore: () => Promise<void>
       autoCheckUpdate: boolean
-      applyUpdateInfo: (info: UpdateInfoPayload) => void
+      applyUpdateInfo: (info: UpdateAvailablePayload) => void
     }
     trafficStore: { initializeStore: () => Promise<void> }
     connectionStore: { initializeStore: () => Promise<void> }
@@ -88,7 +78,10 @@ export function useAppBootstrap(deps: AppBootstrapDeps) {
   const checkInitialWindowState = async () => {
     const appWindow = Window.getCurrent()
     try {
-      const [visible, minimized] = await Promise.all([appWindow.isVisible(), appWindow.isMinimized()])
+      const [visible, minimized] = await Promise.all([
+        appWindow.isVisible(),
+        appWindow.isMinimized(),
+      ])
       windowStore.windowState.isVisible = visible
 
       if (!visible || minimized) {

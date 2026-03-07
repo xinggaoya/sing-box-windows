@@ -7,9 +7,27 @@ use std::env;
 use std::path::Path;
 use tauri::{Emitter, Manager};
 
+const RELEASES_PAGE_URL: &str = "https://github.com/xinggaoya/sing-box-windows/releases";
+
 // 获取当前平台标识符 - 使用 Rust 标准库，更准确
 fn get_platform_identifier() -> &'static str {
     env::consts::OS
+}
+
+fn supports_in_app_update_for_platform(platform: &str) -> bool {
+    platform == "windows"
+}
+
+fn supports_in_app_update() -> bool {
+    supports_in_app_update_for_platform(get_platform_identifier())
+}
+
+fn resolve_release_page_url(release: &serde_json::Value) -> String {
+    release["html_url"]
+        .as_str()
+        .filter(|url| !url.trim().is_empty())
+        .unwrap_or(RELEASES_PAGE_URL)
+        .to_string()
 }
 
 #[cfg(test)]
@@ -158,11 +176,13 @@ fn get_platform_priority(filename: &str) -> i32 {
 pub struct UpdateInfo {
     pub latest_version: String,
     pub download_url: String,
+    pub release_page_url: String,
     pub has_update: bool,
     pub release_notes: Option<String>,
     pub release_date: Option<String>,
     pub file_size: Option<u64>,
     pub is_prerelease: bool,
+    pub supports_in_app_update: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -315,6 +335,9 @@ pub async fn check_update(
     // 获取发布说明
     let release_notes = release["body"].as_str().map(|s| s.to_string());
 
+    // 为非 Windows 平台保留发布页链接，避免继续走无效的应用内安装流程。
+    let release_page_url = resolve_release_page_url(&release);
+
     // 获取发布日期
     let release_date = release["published_at"].as_str().map(|s| s.to_string());
 
@@ -330,6 +353,7 @@ pub async fn check_update(
     let mut download_url = String::new();
     let mut file_size: Option<u64> = None;
     let mut best_priority = 0;
+    let supports_in_app_update = supports_in_app_update();
 
     // 遍历所有资源，找到最适合当前平台的安装包
     for asset in assets {
@@ -357,7 +381,7 @@ pub async fn check_update(
         }
     }
 
-    if download_url.is_empty() {
+    if supports_in_app_update && download_url.is_empty() {
         return Err(format!(
             "{}: 无法获取下载链接",
             messages::ERR_GET_VERSION_FAILED
@@ -370,11 +394,13 @@ pub async fn check_update(
     Ok(UpdateInfo {
         latest_version: tag_name.to_string(),
         download_url,
+        release_page_url,
         has_update,
         release_notes,
         release_date,
         file_size,
         is_prerelease,
+        supports_in_app_update,
     })
 }
 
@@ -456,6 +482,20 @@ pub async fn download_and_install_update(
     let window = app_handle
         .get_webview_window("main")
         .ok_or("无法获取主窗口")?;
+
+    if !supports_in_app_update() {
+        let error_msg = "当前平台暂不支持应用内更新，请前往版本页面下载最新版本";
+        let _ = window.emit(
+            "update-progress",
+            json!({
+                "status": "error",
+                "progress": 0,
+                "message": error_msg
+            }),
+        );
+        return Err(error_msg.to_string());
+    }
+
     let work_dir = get_work_dir_sync();
 
     // 根据下载链接和平台确定下载文件名

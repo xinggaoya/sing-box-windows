@@ -37,10 +37,10 @@ export default {
     disconnected: 'Disconnected',
   },
   home: {
-  kernelHealthy: "Kernel healthy",
-  kernelUnhealthy: "Kernel has issues",
-  kernelCheckedAt: "Last checked",
-  noIssues: "No issues",
+    kernelHealthy: 'Kernel healthy',
+    kernelUnhealthy: 'Kernel has issues',
+    kernelCheckedAt: 'Last checked',
+    noIssues: 'No issues',
     start: 'Start',
     stop: 'Stop',
     restart: 'Restart',
@@ -88,7 +88,8 @@ export default {
       tun: 'TUN Mode',
       manual: 'Manual Mode',
       systemTip: 'Automatically set system proxy',
-      tunTip: 'Use TUN virtual network card to proxy all traffic, requires administrator privileges',
+      tunTip:
+        'Use TUN virtual network card to proxy all traffic, requires administrator privileges',
       manualTip: 'Requires manual configuration of system proxy',
     },
     nodeMode: {
@@ -100,7 +101,8 @@ export default {
     switchMode: 'Switch Mode',
     tunConfirm: {
       title: 'Administrator permission required',
-      description: 'TUN mode needs the app to restart with administrator privileges. Restart as admin now?',
+      description:
+        'TUN mode needs the app to restart with administrator privileges. Restart as admin now?',
       confirm: 'Restart as admin',
     },
     sudoPassword: {
@@ -141,7 +143,7 @@ export default {
     noProxyGroups: 'No proxy groups available',
     checkConfigOrRefresh: 'Please check configuration file or refresh page',
     currentLabel: 'Current node:',
-    switchSuccess: 'Switched group \'{group}\' to \'{proxy}\'.',
+    switchSuccess: "Switched group '{group}' to '{proxy}'.",
     searchNode: 'Search nodes',
     onlyFavorites: 'Favorites only',
     batchTest: 'Batch test',
@@ -267,7 +269,7 @@ export default {
     trafficWithTotal: 'Traffic {used} / {total} (remaining {remaining})',
     expireAt: 'Expires {time}',
     noSubs: 'No subscriptions',
-    noSubscriptionsYet: 'You haven\'t added any subscriptions yet',
+    noSubscriptionsYet: "You haven't added any subscriptions yet",
     addFirstSubscription: 'Add first subscription',
     readConfigFailed: 'Failed to read configuration: ',
     configSaved: 'Configuration saved and applied',
@@ -276,13 +278,15 @@ export default {
     useOriginalConfig: 'Use original config (ports only)',
     useExtractedNodes: 'Extract nodes to local template',
     originalConfigJsonOnly: 'Original subscription only supports sing-box JSON config',
-    originalConfigWarning: 'When using the original config, advanced template options (DNS/routing/ads, etc.) will not apply',
+    originalConfigWarning:
+      'When using the original config, advanced template options (DNS/routing/ads, etc.) will not apply',
     configPathCollision: 'Detected duplicate config path. Regenerated config before switching.',
     urlSubscription: 'Subscription URL',
     manualConfig: 'JSON Config (Original)',
     uriList: 'Node Links / YAML',
     uriContent: 'Node Content',
-    uriContentPlaceholder: 'Supports vmess://, vless://, trojan://, ss://, hysteria2:// (one per line) or Clash/Mihomo YAML',
+    uriContentPlaceholder:
+      'Supports vmess://, vless://, trojan://, ss://, hysteria2:// (one per line) or Clash/Mihomo YAML',
     uriContentRequired: 'Please enter node links or Clash YAML',
     manualContent: 'Manual Configuration Content',
     urlHint: 'Supports sing-box JSON, Clash(Mihomo) YAML, and URI lists (Base64 supported)',
@@ -378,6 +382,7 @@ export default {
       confirmUpdate: 'Update now?',
       later: 'Maybe Later',
       updateNow: 'Update Now',
+      openReleasePage: 'Open Release Page',
       downloading: 'Downloading update',
       installing: 'Installing',
       preparingDownload: 'Preparing download...',
@@ -388,9 +393,11 @@ export default {
       releaseNotes: 'Release Notes',
       updateNotice: 'Update Notice',
       skipVersion: 'Skip This Version',
-      prereleaseWarningDesc: 'Pre-release versions may contain unstable features and potential issues, recommended for testing environments only.',
+      prereleaseWarningDesc:
+        'Pre-release versions may contain unstable features and potential issues, recommended for testing environments only.',
       prereleaseConfirm: 'Confirm Enable Pre-release',
-      prereleaseConfirmDesc: 'After enabling, you will receive pre-release version update notifications. These versions may not be stable, are you sure you want to continue?',
+      prereleaseConfirmDesc:
+        'After enabling, you will receive pre-release version update notifications. These versions may not be stable, are you sure you want to continue?',
       prereleaseEnabled: 'Pre-release versions enabled',
       prereleaseEnabledDesc: 'You will receive pre-release version update notifications',
       prereleaseDisabled: 'Pre-release versions disabled',
@@ -398,6 +405,8 @@ export default {
       newVersionFound: 'New version {version} found!',
       downloadStarted: 'Update download started in the background.',
       installStarted: 'Installer has started, please follow the prompts to finish installation',
+      externalUpdateHint:
+        'In-app update is not supported on this platform yet. Please open the release page and download the proper package manually.',
       downloadError: 'Update download failed: {error}',
       skipSuccess: 'Successfully skipped this version.',
       skipError: 'Failed to skip version: {error}',
@@ -438,7 +447,8 @@ export default {
       title: 'Kernel Management',
       advancedTag: 'Advanced',
       description: 'Manage Sing-Box kernel version and download',
-      embeddedHint: 'The app ships with a recommended embedded kernel version. Manual kernel updates are only for troubleshooting or testing.',
+      embeddedHint:
+        'The app ships with a recommended embedded kernel version. Manual kernel updates are only for troubleshooting or testing.',
       version: 'Kernel Version',
       download: 'Download Kernel',
       redownload: 'Redownload',
@@ -463,7 +473,8 @@ export default {
       pickFailed: 'Failed to pick file',
       importFailed: 'Kernel import failed',
       manualDownloadTitle: 'Manual Download Instructions',
-      manualDownloadGuide: 'Please follow these steps:\n1. Visit https://github.com/SagerNet/sing-box/releases/latest\n2. Download the corresponding system version of sing-box\n3. Place the extracted executable file in the following directory:\nWindows: User directory/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: User directory/.local/share/sing-box-windows/sing-box/sing-box\n\nAfter completion, click "Check Installation" button to verify installation.',
+      manualDownloadGuide:
+        'Please follow these steps:\n1. Visit https://github.com/SagerNet/sing-box/releases/latest\n2. Download the corresponding system version of sing-box\n3. Place the extracted executable file in the following directory:\nWindows: User directory/AppData/Local/sing-box-windows/sing-box/sing-box.exe\nLinux: User directory/.local/share/sing-box-windows/sing-box/sing-box\n\nAfter completion, click "Check Installation" button to verify installation.',
       installPrompt: 'Please download and install kernel before use.',
       downloadFailedMessage: 'Kernel download failed: {error}',
       downloadSuccess: 'Kernel downloaded successfully',
@@ -505,7 +516,8 @@ export default {
     },
     singboxProfile: {
       title: 'Subscription Config Profile (Advanced)',
-      originalConfigHint: 'Current subscription uses the original config, so the advanced options below will not be written',
+      originalConfigHint:
+        'Current subscription uses the original config, so the advanced options below will not be written',
       routingTitle: 'Routing & Downloads',
       dnsTitle: 'DNS',
       defaultOutbound: 'Default outbound for non-CN traffic',
@@ -539,7 +551,8 @@ export default {
       openDevtoolsDesc: 'Open browser developer tools for debugging and inspecting frontend code',
       open: 'Open',
       opened: 'Developer tools opened',
-      warning: 'Developer tools are mainly for development and debugging, no need to enable for normal use',
+      warning:
+        'Developer tools are mainly for development and debugging, no need to enable for normal use',
     },
     about: {
       title: 'About',

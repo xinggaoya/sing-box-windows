@@ -23,7 +23,10 @@ fn sample_releases() -> Vec<serde_json::Value> {
 
 #[test]
 fn update_channel_should_resolve_inputs_consistently() {
-    assert_eq!(UpdateChannel::from_inputs(Some("stable"), true), UpdateChannel::Stable);
+    assert_eq!(
+        UpdateChannel::from_inputs(Some("stable"), true),
+        UpdateChannel::Stable
+    );
     assert_eq!(
         UpdateChannel::from_inputs(Some(" Prerelease "), false),
         UpdateChannel::Prerelease
@@ -32,7 +35,10 @@ fn update_channel_should_resolve_inputs_consistently() {
         UpdateChannel::from_inputs(Some("autobuild"), false),
         UpdateChannel::Autobuild
     );
-    assert_eq!(UpdateChannel::from_inputs(None, false), UpdateChannel::Stable);
+    assert_eq!(
+        UpdateChannel::from_inputs(None, false),
+        UpdateChannel::Stable
+    );
     assert_eq!(
         UpdateChannel::from_inputs(Some("unknown"), true),
         UpdateChannel::Prerelease
@@ -48,16 +54,37 @@ fn update_channel_should_report_release_list_usage() {
 
 #[test]
 fn check_arch_compatibility_should_match_known_arch_aliases() {
-    assert!(check_arch_compatibility("sing-box-windows-amd64.exe", "x86_64"));
+    assert!(check_arch_compatibility(
+        "sing-box-windows-amd64.exe",
+        "x86_64"
+    ));
     assert!(check_arch_compatibility("sing-box-windows.exe", "x86_64"));
-    assert!(!check_arch_compatibility("sing-box-windows-arm64.exe", "x86_64"));
+    assert!(!check_arch_compatibility(
+        "sing-box-windows-arm64.exe",
+        "x86_64"
+    ));
 
-    assert!(check_arch_compatibility("sing-box-macos-arm64.dmg", "aarch64"));
-    assert!(check_arch_compatibility("sing-box-macos-universal.dmg", "aarch64"));
-    assert!(!check_arch_compatibility("sing-box-macos-x64.dmg", "aarch64"));
+    assert!(check_arch_compatibility(
+        "sing-box-macos-arm64.dmg",
+        "aarch64"
+    ));
+    assert!(check_arch_compatibility(
+        "sing-box-macos-universal.dmg",
+        "aarch64"
+    ));
+    assert!(!check_arch_compatibility(
+        "sing-box-macos-x64.dmg",
+        "aarch64"
+    ));
 
-    assert!(check_arch_compatibility("sing-box-linux-armv7.deb", "armv7"));
-    assert!(!check_arch_compatibility("sing-box-linux-arm64.deb", "armv7"));
+    assert!(check_arch_compatibility(
+        "sing-box-linux-armv7.deb",
+        "armv7"
+    ));
+    assert!(!check_arch_compatibility(
+        "sing-box-linux-arm64.deb",
+        "armv7"
+    ));
 
     assert!(check_arch_compatibility("sing-box-linux-i386.deb", "x86"));
     assert!(!check_arch_compatibility("sing-box-linux-x64.deb", "x86"));
@@ -107,5 +134,32 @@ fn compare_versions_should_handle_semver_and_plain_text_versions() {
     assert!(!compare_versions("1.1.0", "1.1.0"));
 
     assert!(compare_versions("nightly-2026-01-01", "nightly-2026-01-02"));
-    assert!(!compare_versions("nightly-2026-01-01", "nightly-2026-01-01"));
+    assert!(!compare_versions(
+        "nightly-2026-01-01",
+        "nightly-2026-01-01"
+    ));
+}
+
+#[test]
+fn supports_in_app_update_should_only_enable_windows() {
+    assert!(supports_in_app_update_for_platform("windows"));
+    assert!(!supports_in_app_update_for_platform("linux"));
+    assert!(!supports_in_app_update_for_platform("macos"));
+}
+
+#[test]
+fn resolve_release_page_url_should_prefer_html_url() {
+    let release = json!({
+        "html_url": "https://github.com/xinggaoya/sing-box-windows/releases/tag/v2.2.6"
+    });
+    assert_eq!(
+        resolve_release_page_url(&release),
+        "https://github.com/xinggaoya/sing-box-windows/releases/tag/v2.2.6"
+    );
+
+    let release_without_url = json!({});
+    assert_eq!(
+        resolve_release_page_url(&release_without_url),
+        "https://github.com/xinggaoya/sing-box-windows/releases"
+    );
 }

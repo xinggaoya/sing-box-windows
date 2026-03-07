@@ -19,6 +19,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_os::init()) // 添加 OS 信息插件
+        .plugin(tauri_plugin_opener::init()) // 统一打开外部版本页面
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec!["--hide"]),

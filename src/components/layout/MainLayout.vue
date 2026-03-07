@@ -117,9 +117,11 @@
       :latest-version="updateInfo.latestVersion"
       :current-version="updateInfo.currentVersion"
       :download-url="updateInfo.downloadUrl"
+      :release-page-url="updateInfo.releasePageUrl"
       :release-notes="updateInfo.releaseNotes"
       :release-date="updateInfo.releaseDate"
       :file-size="updateInfo.fileSize"
+      :supports-in-app-update="updateInfo.supportsInAppUpdate"
       @update="handleUpdate"
       @cancel="handleUpdateCancel"
       @skip="handleUpdateSkip"
@@ -151,7 +153,7 @@ import {
   RemoveOutline,
   SquareOutline,
   CloseOutline,
-  AnalyticsOutline
+  AnalyticsOutline,
 } from '@vicons/ionicons5'
 import { useMessage } from 'naive-ui'
 import mitt from 'mitt'
@@ -177,7 +179,8 @@ const windowStore = useWindowStore()
 const updateStore = useUpdateStore()
 const kernelStore = useKernelStore()
 const { t } = useI18n()
-const { statusState: kernelStatusState, statusClass: kernelStatusClass } = useKernelStatus(kernelStore)
+const { statusState: kernelStatusState, statusClass: kernelStatusClass } =
+  useKernelStatus(kernelStore)
 
 const appStatusLabel = computed(() => {
   switch (kernelStatusState.value) {
@@ -204,9 +207,11 @@ const updateInfo = ref({
   latestVersion: '',
   currentVersion: '',
   downloadUrl: '',
+  releasePageUrl: '',
   releaseNotes: '',
   releaseDate: '',
   fileSize: 0,
+  supportsInAppUpdate: false,
 })
 
 // Theme Configuration
@@ -217,7 +222,7 @@ const themeOverrides = computed(() => themeStore.themeOverrides)
 const currentMenu = computed(() => {
   const path = route.path
   if (path === '/' || path === '/home') return 'home'
-  
+
   const pathToMenuMap: Record<string, string> = {
     '/log': 'logs',
     '/sub': 'subscription',
@@ -262,36 +267,78 @@ const handleShowUpdateModal = (data: unknown) => {
 
   const payload = data as Record<string, unknown>
   updateInfo.value = {
-    latestVersion: typeof payload.latestVersion === 'string' ? payload.latestVersion : '',
+    latestVersion:
+      typeof payload.latestVersion === 'string'
+        ? payload.latestVersion
+        : typeof payload.latest_version === 'string'
+          ? payload.latest_version
+          : '',
     currentVersion:
       typeof payload.currentVersion === 'string' ? payload.currentVersion : updateStore.appVersion,
-    downloadUrl: typeof payload.downloadUrl === 'string' ? payload.downloadUrl : '',
-    releaseNotes: typeof payload.releaseNotes === 'string' ? payload.releaseNotes : '',
-    releaseDate: typeof payload.releaseDate === 'string' ? payload.releaseDate : '',
-    fileSize: typeof payload.fileSize === 'number' ? payload.fileSize : 0,
+    downloadUrl:
+      typeof payload.downloadUrl === 'string'
+        ? payload.downloadUrl
+        : typeof payload.download_url === 'string'
+          ? payload.download_url
+          : '',
+    releasePageUrl:
+      typeof payload.releasePageUrl === 'string'
+        ? payload.releasePageUrl
+        : typeof payload.release_page_url === 'string'
+          ? payload.release_page_url
+          : updateStore.releasePageUrl,
+    releaseNotes:
+      typeof payload.releaseNotes === 'string'
+        ? payload.releaseNotes
+        : typeof payload.release_notes === 'string'
+          ? payload.release_notes
+          : '',
+    releaseDate:
+      typeof payload.releaseDate === 'string'
+        ? payload.releaseDate
+        : typeof payload.release_date === 'string'
+          ? payload.release_date
+          : '',
+    fileSize:
+      typeof payload.fileSize === 'number'
+        ? payload.fileSize
+        : typeof payload.file_size === 'number'
+          ? payload.file_size
+          : 0,
+    supportsInAppUpdate:
+      typeof payload.supportsInAppUpdate === 'boolean'
+        ? payload.supportsInAppUpdate
+        : typeof payload.supports_in_app_update === 'boolean'
+          ? payload.supports_in_app_update
+          : updateStore.supportsInAppUpdate,
   }
   showUpdateModal.value = true
 }
 
 const handleUpdate = async () => {
   try {
-    message.info('Starting download...')
-    await updateStore.downloadAndInstallUpdate()
+    if (updateInfo.value.supportsInAppUpdate) {
+      message.info(t('setting.update.preparingDownload'))
+      await updateStore.downloadAndInstallUpdate()
+    } else {
+      await updateStore.openReleasePage()
+      showUpdateModal.value = false
+    }
     showUpdateModal.value = false
   } catch (error) {
-    message.error(`Update failed: ${error}`)
+    const errMsg = error instanceof Error ? error.message : String(error)
+    message.error(errMsg)
   }
 }
 
 const handleUpdateCancel = () => {
   showUpdateModal.value = false
-  message.info('Update cancelled')
 }
 
-const handleUpdateSkip = () => {
+const handleUpdateSkip = async () => {
   showUpdateModal.value = false
-  updateStore.skipCurrentVersion()
-  message.info('Version skipped')
+  await updateStore.skipCurrentVersion()
+  message.success(t('setting.update.skipSuccess'))
 }
 
 // Lifecycle
@@ -613,7 +660,9 @@ onUnmounted(() => {
 
 .page-fade-enter-active,
 .page-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .page-fade-enter-from {

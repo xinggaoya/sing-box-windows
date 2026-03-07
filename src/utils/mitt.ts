@@ -18,9 +18,11 @@ export interface DownloadProgress {
 export interface UpdateInfo {
   latest_version: string
   download_url: string
+  release_page_url: string
   has_update: boolean
   release_date?: string
   file_size?: number
+  supports_in_app_update?: boolean
 }
 
 // 定义更新弹窗数据接口
@@ -29,9 +31,11 @@ export interface UpdateModalData {
   latestVersion: string
   currentVersion: string
   downloadUrl: string
+  releasePageUrl: string
   releaseNotes: string
   releaseDate: string
   fileSize: number
+  supportsInAppUpdate: boolean
 }
 
 // 定义规则数据接口

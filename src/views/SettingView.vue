@@ -52,7 +52,9 @@
             <span>
               {{
                 hasNewVersion
-                  ? t('setting.update.newVersionFound', { version: kernelLatestVersion || t('setting.newVersionFound') })
+                  ? t('setting.update.newVersionFound', {
+                      version: kernelLatestVersion || t('setting.newVersionFound'),
+                    })
                   : t('setting.kernel.installPrompt')
               }}
             </span>
@@ -77,8 +79,16 @@
               block
               secondary
             >
-              <template #icon><n-icon><DownloadOutline /></n-icon></template>
-              {{ hasNewVersion ? t('setting.kernel.update') : kernelStore.hasVersionInfo() ? t('setting.kernel.redownload') : t('setting.kernel.download') }}
+              <template #icon
+                ><n-icon><DownloadOutline /></n-icon
+              ></template>
+              {{
+                hasNewVersion
+                  ? t('setting.kernel.update')
+                  : kernelStore.hasVersionInfo()
+                    ? t('setting.kernel.redownload')
+                    : t('setting.kernel.download')
+              }}
             </n-button>
             <div class="sub-actions">
               <n-button size="small" ghost @click="showManualDownloadModal" :disabled="downloading">
@@ -311,13 +321,19 @@
 
               <n-grid-item :span="12" :s="24" :m="12">
                 <n-form-item :label="t('setting.singboxProfile.defaultOutbound')">
-                  <n-select v-model:value="singboxProfileForm.defaultProxyOutbound" :options="defaultOutboundOptions" />
+                  <n-select
+                    v-model:value="singboxProfileForm.defaultProxyOutbound"
+                    :options="defaultOutboundOptions"
+                  />
                 </n-form-item>
               </n-grid-item>
 
               <n-grid-item :span="12" :s="24" :m="12">
                 <n-form-item :label="t('setting.singboxProfile.downloadDetour')">
-                  <n-select v-model:value="singboxProfileForm.downloadDetour" :options="downloadDetourOptions" />
+                  <n-select
+                    v-model:value="singboxProfileForm.downloadDetour"
+                    :options="downloadDetourOptions"
+                  />
                 </n-form-item>
               </n-grid-item>
 
@@ -382,25 +398,37 @@
 
               <n-grid-item :span="12" :s="24" :m="12">
                 <n-form-item :label="t('setting.singboxProfile.dnsProxy')">
-                  <n-input v-model:value="singboxProfileForm.dnsProxy" placeholder="https://1.1.1.1/dns-query" />
+                  <n-input
+                    v-model:value="singboxProfileForm.dnsProxy"
+                    placeholder="https://1.1.1.1/dns-query"
+                  />
                 </n-form-item>
               </n-grid-item>
 
               <n-grid-item :span="12" :s="24" :m="12">
                 <n-form-item :label="t('setting.singboxProfile.dnsCn')">
-                  <n-input v-model:value="singboxProfileForm.dnsCn" placeholder="h3://dns.alidns.com/dns-query" />
+                  <n-input
+                    v-model:value="singboxProfileForm.dnsCn"
+                    placeholder="h3://dns.alidns.com/dns-query"
+                  />
                 </n-form-item>
               </n-grid-item>
 
               <n-grid-item :span="12" :s="24" :m="12">
                 <n-form-item :label="t('setting.singboxProfile.dnsResolver')">
-                  <n-input v-model:value="singboxProfileForm.dnsResolver" placeholder="114.114.114.114" />
+                  <n-input
+                    v-model:value="singboxProfileForm.dnsResolver"
+                    placeholder="114.114.114.114"
+                  />
                 </n-form-item>
               </n-grid-item>
 
               <n-grid-item :span="12" :s="24" :m="12">
                 <n-form-item :label="t('setting.singboxProfile.urltestUrl')">
-                  <n-input v-model:value="singboxProfileForm.urltestUrl" placeholder="http://cp.cloudflare.com/generate_204" />
+                  <n-input
+                    v-model:value="singboxProfileForm.urltestUrl"
+                    placeholder="http://cp.cloudflare.com/generate_204"
+                  />
                 </n-form-item>
               </n-grid-item>
 
@@ -429,7 +457,13 @@
           <div class="update-status">
             <div class="version-info">
               <span>{{ t('setting.update.currentVersion') }}: {{ updateStore.appVersion }}</span>
-              <n-tag v-if="updateStore.hasUpdate" type="warning" size="small" round :bordered="false">
+              <n-tag
+                v-if="updateStore.hasUpdate"
+                type="warning"
+                size="small"
+                round
+                :bordered="false"
+              >
                 {{ t('setting.update.hasUpdate') }}
               </n-tag>
               <n-tag v-else type="success" size="small" round :bordered="false">
@@ -466,36 +500,54 @@
               </div>
             </div>
 
+            <div v-if="!updateStore.supportsInAppUpdate" class="update-platform-hint">
+              {{ t('setting.update.externalUpdateHint') }}
+            </div>
+
             <div class="update-actions">
               <n-button
                 type="primary"
                 strong
-                :loading="isUpdating"
-                :disabled="isUpdating"
+                :loading="updateStore.supportsInAppUpdate && isUpdating"
+                :disabled="
+                  updateStore.supportsInAppUpdate ? isUpdating : !updateStore.canOpenReleasePage
+                "
                 @click="handleUpdateNow"
               >
-                <template #icon><n-icon><DownloadOutline /></n-icon></template>
+                <template #icon>
+                  <n-icon>
+                    <OpenOutline v-if="!updateStore.supportsInAppUpdate" />
+                    <DownloadOutline v-else />
+                  </n-icon>
+                </template>
                 {{
-                  updateStatus === 'installing'
-                    ? t('setting.update.installing')
-                    : isUpdating
-                      ? t('setting.update.downloading')
-                      : t('setting.update.updateNow')
+                  !updateStore.supportsInAppUpdate
+                    ? t('setting.update.openReleasePage')
+                    : updateStatus === 'installing'
+                      ? t('setting.update.installing')
+                      : isUpdating
+                        ? t('setting.update.downloading')
+                        : t('setting.update.updateNow')
                 }}
               </n-button>
               <n-button
                 size="small"
                 text
                 @click="handleCheckUpdate"
-                :disabled="checkingUpdate || isUpdating"
+                :disabled="checkingUpdate || (updateStore.supportsInAppUpdate && isUpdating)"
               >
                 {{ t('setting.update.checkAgain') }}
               </n-button>
             </div>
 
-            <div v-if="showUpdateProgress" class="update-progress">
+            <div
+              v-if="updateStore.supportsInAppUpdate && showUpdateProgress"
+              class="update-progress"
+            >
               <div class="progress-header">
-                <span class="progress-text">{{ updateMessage || t('setting.update.downloading') }}</span>
+                <span class="progress-text">{{
+                  updateMessage || t('setting.update.downloading')
+                }}</span>
                 <span class="progress-value">{{ updateProgress.toFixed(0) }}%</span>
               </div>
               <n-progress
@@ -507,7 +559,10 @@
               />
             </div>
 
-            <div v-else-if="updateStatus === 'error'" class="update-error">
+            <div
+              v-else-if="updateStore.supportsInAppUpdate && updateStatus === 'error'"
+              class="update-error"
+            >
               {{ updateMessage || t('setting.update.updateFailed') }}
             </div>
           </div>
@@ -590,7 +645,11 @@
               <span class="meta-value">{{ backupPreview.warnings.length }}</span>
             </div>
             <div v-if="backupPreview.warnings.length > 0" class="backup-warning-list">
-              <div v-for="(warning, idx) in backupPreview.warnings" :key="idx" class="backup-warning-item">
+              <div
+                v-for="(warning, idx) in backupPreview.warnings"
+                :key="idx"
+                class="backup-warning-item"
+              >
                 {{ warning }}
               </div>
             </div>
@@ -615,7 +674,11 @@
             </div>
             <div class="about-item">
               <span class="label">{{ t('setting.kernel.version') }}</span>
-              <span class="value">{{ kernelStore.hasVersionInfo() ? formatVersion(kernelStore.getVersionString()) : t('setting.notInstalled') }}</span>
+              <span class="value">{{
+                kernelStore.hasVersionInfo()
+                  ? formatVersion(kernelStore.getVersionString())
+                  : t('setting.notInstalled')
+              }}</span>
             </div>
             <div class="about-item">
               <span class="label">{{ t('setting.about.system') }}</span>
@@ -626,8 +689,15 @@
               <span class="value">MIT License</span>
             </div>
             <div class="about-actions">
-              <n-button text tag="a" href="https://github.com/xinggaoya/sing-box-windows" target="_blank">
-                <template #icon><n-icon><LogoGithub /></n-icon></template>
+              <n-button
+                text
+                tag="a"
+                href="https://github.com/xinggaoya/sing-box-windows"
+                target="_blank"
+              >
+                <template #icon
+                  ><n-icon><LogoGithub /></n-icon
+                ></template>
                 GitHub
               </n-button>
             </div>
@@ -710,6 +780,7 @@ import {
   SettingsOutline,
   WarningOutline,
   DownloadOutline,
+  OpenOutline,
   PowerOutline,
   GlobeOutline,
   OptionsOutline,
@@ -720,7 +791,13 @@ import {
   ArchiveOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
-import { useAppStore, useKernelStore, useUpdateStore, useLocaleStore, useThemeStore } from '@/stores'
+import {
+  useAppStore,
+  useKernelStore,
+  useUpdateStore,
+  useLocaleStore,
+  useThemeStore,
+} from '@/stores'
 import { useSubStore } from '@/stores/subscription/SubStore'
 import type { Locale } from '@/stores/app/LocaleStore'
 import type { ThemeMode } from '@/stores/app/ThemeStore'
@@ -795,15 +872,17 @@ const kernelVersionOptions = computed(() => {
   const versions = kernelStore.availableVersions || []
   return [
     { label: t('setting.kernel.latest'), value: undefined },
-    ...versions.map(v => ({ label: v, value: v }))
+    ...versions.map((v) => ({ label: v, value: v })),
   ]
 })
 const updateStatus = computed(() => updateStore.updateState.status)
 const updateProgress = computed(() => updateStore.updateState.progress || 0)
 const updateMessage = computed(() => updateStore.updateState.message)
 const isUpdating = computed(() => ['downloading', 'installing'].includes(updateStatus.value))
-const showUpdateProgress = computed(() =>
-  ['downloading', 'installing', 'completed'].includes(updateStatus.value) || updateProgress.value > 0
+const showUpdateProgress = computed(
+  () =>
+    ['downloading', 'installing', 'completed'].includes(updateStatus.value) ||
+    updateProgress.value > 0,
 )
 const backupBusy = computed(
   () => backupExporting.value || backupValidating.value || backupRestoring.value,
@@ -847,7 +926,7 @@ const {
 
 // Methods
 const formatVersion = (v: string) => v.replace(/^v/, '')
-const isSupportedLocale = (l: string) => languageOptions.value.some(opt => opt.value === l)
+const isSupportedLocale = (l: string) => languageOptions.value.some((opt) => opt.value === l)
 
 const syncThemeForm = () => {
   themeForm.mode = themeStore.mode as ThemeMode
@@ -1005,12 +1084,17 @@ const handleUpdateNow = async () => {
   }
 
   try {
+    if (!updateStore.supportsInAppUpdate) {
+      await updateStore.openReleasePage()
+      return
+    }
+
     updateStore.updateProgress('downloading', 0, t('setting.update.preparingDownload'))
     await updateStore.downloadAndInstallUpdate()
   } catch (error) {
-    console.error('启动更新失败:', error)
+    console.error('执行更新操作失败:', error)
     const errMsg = error instanceof Error ? error.message : t('setting.update.updateFailed')
-    message.error(`${t('setting.update.updateFailed')}: ${errMsg}`)
+    message.error(errMsg)
   }
 }
 
@@ -1179,7 +1263,10 @@ onMounted(async () => {
   if (kernelStore.fetchLatestKernelVersion) {
     await kernelStore.fetchLatestKernelVersion()
   }
-  if (kernelStore.fetchKernelReleases && (!kernelStore.availableVersions || kernelStore.availableVersions.length === 0)) {
+  if (
+    kernelStore.fetchKernelReleases &&
+    (!kernelStore.availableVersions || kernelStore.availableVersions.length === 0)
+  ) {
     await kernelStore.fetchKernelReleases()
   }
   await updateStore.initializeStore?.()
@@ -1304,7 +1391,10 @@ onUnmounted(() => {
   border: 2px solid transparent;
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.2s ease;
   position: relative;
 }
 
@@ -1499,6 +1589,16 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
+.update-platform-hint {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.16);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .update-progress {
   display: flex;
   flex-direction: column;
@@ -1595,7 +1695,9 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   color: var(--text-secondary);
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .manual-drop-zone.active {
