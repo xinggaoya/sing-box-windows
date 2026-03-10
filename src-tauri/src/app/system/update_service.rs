@@ -4,6 +4,7 @@ use crate::utils::app_util::get_work_dir_sync;
 use semver::Version;
 use serde_json::json;
 use std::env;
+use std::fs;
 use std::path::Path;
 use tauri::{Emitter, Manager};
 
@@ -38,16 +39,249 @@ fn get_current_arch() -> &'static str {
     env::consts::ARCH
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PackageKind {
+    Exe,
+    Msi,
+    AppImage,
+    Deb,
+    Rpm,
+    Dmg,
+    AppTarGz,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LinuxPackagePreference {
+    Deb,
+    Rpm,
+    AppImage,
+}
+
+fn get_package_kind(filename: &str) -> PackageKind {
+    let filename_lower = filename.to_ascii_lowercase();
+
+    if filename_lower.ends_with(".app.tar.gz") {
+        PackageKind::AppTarGz
+    } else if filename_lower.ends_with(".appimage") {
+        PackageKind::AppImage
+    } else if filename_lower.ends_with(".msi") {
+        PackageKind::Msi
+    } else if filename_lower.ends_with(".exe") {
+        PackageKind::Exe
+    } else if filename_lower.ends_with(".deb") {
+        PackageKind::Deb
+    } else if filename_lower.ends_with(".rpm") {
+        PackageKind::Rpm
+    } else if filename_lower.ends_with(".dmg") {
+        PackageKind::Dmg
+    } else {
+        PackageKind::Unknown
+    }
+}
+
+fn extract_linux_release_identifiers(contents: &str) -> Vec<String> {
+    contents
+        .lines()
+        .filter_map(|line| line.split_once('='))
+        .filter(|(key, _)| *key == "ID" || *key == "ID_LIKE")
+        .flat_map(|(_, value)| {
+            value
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .split_whitespace()
+                .map(|item| item.to_ascii_lowercase())
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+fn detect_linux_package_preference_from_os_release(contents: &str) -> LinuxPackagePreference {
+    let identifiers = extract_linux_release_identifiers(contents);
+
+    if identifiers
+        .iter()
+        .any(|id| matches!(id.as_str(), "debian" | "ubuntu"))
+    {
+        LinuxPackagePreference::Deb
+    } else if identifiers.iter().any(|id| {
+        matches!(
+            id.as_str(),
+            "fedora"
+                | "rhel"
+                | "centos"
+                | "suse"
+                | "opensuse"
+                | "opensuse-tumbleweed"
+                | "opensuse-leap"
+                | "rocky"
+                | "almalinux"
+        )
+    }) {
+        LinuxPackagePreference::Rpm
+    } else {
+        LinuxPackagePreference::AppImage
+    }
+}
+
+fn detect_linux_package_preference() -> LinuxPackagePreference {
+    if get_platform_identifier() != "linux" {
+        return LinuxPackagePreference::AppImage;
+    }
+
+    ["/etc/os-release", "/usr/lib/os-release"]
+        .into_iter()
+        .find_map(|path| fs::read_to_string(path).ok())
+        .map(|contents| detect_linux_package_preference_from_os_release(&contents))
+        .unwrap_or(LinuxPackagePreference::AppImage)
+}
+
+fn get_platform_priority_for(
+    filename: &str,
+    platform: &str,
+    arch: &str,
+    linux_preference: LinuxPackagePreference,
+) -> i32 {
+    let filename_lower = filename.to_lowercase();
+    let package_kind = get_package_kind(filename);
+
+    let base_priority = match platform {
+        "windows" => match package_kind {
+            PackageKind::Exe => 20,
+            PackageKind::Msi => 10,
+            _ => 0,
+        },
+        "linux" => match linux_preference {
+            LinuxPackagePreference::Deb => match package_kind {
+                PackageKind::Deb => 20,
+                PackageKind::AppImage => 15,
+                PackageKind::Rpm => 10,
+                _ => 0,
+            },
+            LinuxPackagePreference::Rpm => match package_kind {
+                PackageKind::Rpm => 20,
+                PackageKind::AppImage => 15,
+                PackageKind::Deb => 10,
+                _ => 0,
+            },
+            LinuxPackagePreference::AppImage => match package_kind {
+                PackageKind::AppImage => 20,
+                PackageKind::Rpm => 15,
+                PackageKind::Deb => 10,
+                _ => 0,
+            },
+        },
+        "macos" => match package_kind {
+            PackageKind::Dmg => 20,
+            PackageKind::AppTarGz => 10,
+            _ => 0,
+        },
+        _ => 0,
+    };
+
+    if base_priority == 0 {
+        return 0;
+    }
+
+    let arch_bonus = match arch {
+        "x86_64" => {
+            if filename_lower.contains("x64")
+                || filename_lower.contains("x86_64")
+                || filename_lower.contains("amd64")
+            {
+                5
+            } else {
+                0
+            }
+        }
+        "aarch64" => {
+            if filename_lower.contains("arm64") || filename_lower.contains("aarch64") {
+                5
+            } else if filename_lower.contains("universal") {
+                4
+            } else {
+                0
+            }
+        }
+        _ => 0,
+    };
+
+    let special_bonus = if filename_lower.contains("portable") {
+        2
+    } else if filename_lower.contains("installer") || filename_lower.contains("latest") {
+        1
+    } else {
+        0
+    };
+
+    base_priority + arch_bonus + special_bonus
+}
+
+fn get_platform_priority(filename: &str) -> i32 {
+    get_platform_priority_for(
+        filename,
+        get_platform_identifier(),
+        get_current_arch(),
+        detect_linux_package_preference(),
+    )
+}
+
+fn resolve_update_filename(download_url: &str, platform: &str) -> &'static str {
+    match get_package_kind(download_url) {
+        PackageKind::Msi => "update.msi",
+        PackageKind::Exe => "update.exe",
+        PackageKind::AppImage => "update.AppImage",
+        PackageKind::Deb => "update.deb",
+        PackageKind::Rpm => "update.rpm",
+        PackageKind::Dmg => "update.dmg",
+        PackageKind::AppTarGz => "update.app.tar.gz",
+        PackageKind::Unknown => match platform {
+            "windows" => "update.exe",
+            "linux" => "update.AppImage",
+            "macos" => "update.dmg",
+            _ => "update.bin",
+        },
+    }
+}
+
+fn resolve_install_message(platform: &str, download_url: &str) -> &'static str {
+    match platform {
+        "windows" => "安装程序已启动，请按照提示完成安装",
+        "linux" => match get_package_kind(download_url) {
+            PackageKind::AppImage => "正在启动新版本应用程序...",
+            PackageKind::Deb | PackageKind::Rpm => "正在安装软件包，请根据提示输入密码...",
+            _ => "正在启动更新程序...",
+        },
+        "macos" => match get_package_kind(download_url) {
+            PackageKind::Dmg => "正在挂载安装镜像...",
+            PackageKind::AppTarGz => "正在解压应用程序...",
+            _ => "正在启动安装程序...",
+        },
+        _ => "正在启动安装程序...",
+    }
+}
+
+fn command_exists_on_path(command: &str) -> bool {
+    env::var_os("PATH")
+        .map(|paths| env::split_paths(&paths).any(|path| path.join(command).is_file()))
+        .unwrap_or(false)
+}
+
 // 检查文件是否匹配当前平台
 fn is_platform_compatible(filename: &str) -> bool {
     let platform = get_platform_identifier();
     let arch = get_current_arch();
+    let package_kind = get_package_kind(filename);
 
     // 只支持桌面平台
     let extension_match = match platform {
-        "windows" => filename.ends_with(".msi") || filename.ends_with(".exe"),
-        "linux" => filename.ends_with(".AppImage") || filename.ends_with(".deb"),
-        "macos" => filename.ends_with(".dmg") || filename.ends_with(".app.tar.gz"),
+        "windows" => matches!(package_kind, PackageKind::Msi | PackageKind::Exe),
+        "linux" => matches!(
+            package_kind,
+            PackageKind::AppImage | PackageKind::Deb | PackageKind::Rpm
+        ),
+        "macos" => matches!(package_kind, PackageKind::Dmg | PackageKind::AppTarGz),
         _ => false,
     };
 
@@ -69,7 +303,8 @@ fn check_arch_compatibility(filename: &str, current_arch: &str) -> bool {
             filename_lower.contains("x64")
                 || filename_lower.contains("x86_64")
                 || filename_lower.contains("amd64")
-                || !filename_lower.contains("arm") // 没有架构标识时默认兼容
+                || (!filename_lower.contains("arm") && !filename_lower.contains("aarch64"))
+            // 没有架构标识时默认兼容
         }
         "aarch64" => {
             // ARM64 Mac 优先选择 ARM64 或 Universal 包
@@ -91,84 +326,6 @@ fn check_arch_compatibility(filename: &str, current_arch: &str) -> bool {
         }
         _ => true, // 其他架构保守处理
     }
-}
-
-// 获取平台优先级分数（用于选择最合适的安装包）
-fn get_platform_priority(filename: &str) -> i32 {
-    let platform = get_platform_identifier();
-    let arch = get_current_arch();
-    let filename_lower = filename.to_lowercase();
-
-    // 基础优先级（桌面平台）
-    let base_priority = match platform {
-        "windows" => {
-            if filename.ends_with(".exe") {
-                20
-            } else if filename.ends_with(".msi") {
-                10
-            } else {
-                0
-            }
-        }
-        "linux" => {
-            if filename.ends_with(".deb") {
-                20
-            } else if filename.ends_with(".AppImage") {
-                10
-            } else {
-                0
-            }
-        }
-        "macos" => {
-            if filename.ends_with(".dmg") {
-                20
-            } else if filename.ends_with(".app.tar.gz") {
-                10
-            } else {
-                0
-            }
-        }
-        _ => 0,
-    };
-
-    if base_priority == 0 {
-        return 0;
-    }
-
-    // 架构匹配加分
-    let arch_bonus = match arch {
-        "x86_64" => {
-            if filename_lower.contains("x64")
-                || filename_lower.contains("x86_64")
-                || filename_lower.contains("amd64")
-            {
-                5
-            } else {
-                0
-            }
-        }
-        "aarch64" => {
-            if filename_lower.contains("arm64") || filename_lower.contains("aarch64") {
-                5
-            } else if filename_lower.contains("universal") {
-                4 // macOS Universal 包
-            } else {
-                0
-            }
-        }
-        _ => 0,
-    };
-
-    // 特殊标识加分
-    let special_bonus = if filename_lower.contains("portable") {
-        2
-    } else if filename_lower.contains("installer") || filename_lower.contains("latest") {
-        1
-    } else {
-        0
-    };
-
-    base_priority + arch_bonus + special_bonus
 }
 
 // 更新信息结构体
@@ -499,27 +656,8 @@ pub async fn download_and_install_update(
     let work_dir = get_work_dir_sync();
 
     // 根据下载链接和平台确定下载文件名
-    let update_filename = if download_url.ends_with(".msi") {
-        "update.msi"
-    } else if download_url.ends_with(".exe") {
-        "update.exe"
-    } else if download_url.ends_with(".AppImage") {
-        "update.AppImage"
-    } else if download_url.ends_with(".deb") {
-        "update.deb"
-    } else if download_url.ends_with(".dmg") {
-        "update.dmg"
-    } else if download_url.ends_with(".app.tar.gz") {
-        "update.app.tar.gz"
-    } else {
-        // 根据平台使用默认扩展名
-        match get_platform_identifier() {
-            "windows" => "update.exe",
-            "linux" => "update.AppImage",
-            "macos" => "update.dmg",
-            _ => "update.bin",
-        }
-    };
+    let platform = get_platform_identifier();
+    let update_filename = resolve_update_filename(&download_url, platform);
 
     let download_path = Path::new(&work_dir).join(update_filename);
 
@@ -588,103 +726,121 @@ pub async fn download_and_install_update(
     );
 
     // 启动安装程序（在后台运行）
-    let install_result = match get_platform_identifier() {
+    let install_result: Result<(), String> = match platform {
         "windows" => {
             // Windows: 根据文件类型选择不同的处理方式
-            if download_url.ends_with(".msi") {
+            if matches!(get_package_kind(&download_url), PackageKind::Msi) {
                 // MSI文件: 使用 msiexec 安装
                 let mut cmd = tokio::process::Command::new("msiexec");
                 cmd.arg("/i").arg(&download_path).arg("/passive");
                 #[cfg(target_os = "windows")]
                 cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
                 cmd.spawn()
-            } else if download_url.ends_with(".exe") {
+                    .map(|_| ())
+                    .map_err(|e| format!("启动安装程序失败: {}", e))
+            } else if matches!(get_package_kind(&download_url), PackageKind::Exe) {
                 // EXE文件: 直接运行
                 let mut cmd = tokio::process::Command::new(&download_path);
                 #[cfg(target_os = "windows")]
                 cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
                 cmd.spawn()
+                    .map(|_| ())
+                    .map_err(|e| format!("启动安装程序失败: {}", e))
             } else {
                 // 其他文件：尝试用默认方式运行
                 let mut cmd = tokio::process::Command::new(&download_path);
                 #[cfg(target_os = "windows")]
                 cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
                 cmd.spawn()
+                    .map(|_| ())
+                    .map_err(|e| format!("启动安装程序失败: {}", e))
             }
         }
         "linux" => {
             // Linux: 根据文件类型执行不同的安装逻辑
-            if download_url.ends_with(".AppImage") {
-                // AppImage: 添加执行权限并运行
-                let mut chmod_cmd = tokio::process::Command::new("chmod");
-                chmod_cmd.arg("+x").arg(&download_path);
-                chmod_cmd.spawn().and_then(|_| {
-                    let mut run_cmd = tokio::process::Command::new(&download_path);
-                    run_cmd.spawn()
-                })
-            } else if download_url.ends_with(".deb") {
-                // DEB包: 使用pkexec安装（需要管理员权限）
-                let mut cmd = tokio::process::Command::new("pkexec");
-                cmd.arg("dpkg")
-                    .arg("-i")
-                    .arg(&download_path)
-                    .arg("--force-architecture");
-                cmd.spawn()
-            } else {
-                // 其他二进制文件
-                let mut cmd = tokio::process::Command::new(&download_path);
-                cmd.spawn()
+            match get_package_kind(&download_url) {
+                PackageKind::AppImage => {
+                    // AppImage: 添加执行权限并运行
+                    let mut chmod_cmd = tokio::process::Command::new("chmod");
+                    chmod_cmd.arg("+x").arg(&download_path);
+                    chmod_cmd
+                        .spawn()
+                        .map_err(|e| format!("启动安装程序失败: {}", e))
+                        .and_then(|_| {
+                            let mut run_cmd = tokio::process::Command::new(&download_path);
+                            run_cmd
+                                .spawn()
+                                .map(|_| ())
+                                .map_err(|e| format!("启动安装程序失败: {}", e))
+                        })
+                }
+                PackageKind::Deb => {
+                    // DEB包: 使用pkexec安装（需要管理员权限）
+                    let mut cmd = tokio::process::Command::new("pkexec");
+                    cmd.arg("dpkg")
+                        .arg("-i")
+                        .arg(&download_path)
+                        .arg("--force-architecture");
+                    cmd.spawn()
+                        .map(|_| ())
+                        .map_err(|e| format!("启动安装程序失败: {}", e))
+                }
+                PackageKind::Rpm => {
+                    if !command_exists_on_path("rpm") {
+                        Err("当前系统缺少 rpm 命令，无法安装 RPM 包".to_string())
+                    } else {
+                        let mut cmd = tokio::process::Command::new("pkexec");
+                        cmd.arg("rpm").arg("-Uvh").arg(&download_path);
+                        cmd.spawn()
+                            .map(|_| ())
+                            .map_err(|e| format!("启动安装程序失败: {}", e))
+                    }
+                }
+                _ => {
+                    // 其他二进制文件
+                    let mut cmd = tokio::process::Command::new(&download_path);
+                    cmd.spawn()
+                        .map(|_| ())
+                        .map_err(|e| format!("启动安装程序失败: {}", e))
+                }
             }
         }
         "macos" => {
             // macOS: 根据文件类型执行不同的安装逻辑
-            if download_url.ends_with(".dmg") {
+            if matches!(get_package_kind(&download_url), PackageKind::Dmg) {
                 // DMG: 使用open命令挂载
                 let mut cmd = tokio::process::Command::new("open");
                 cmd.arg(&download_path);
                 cmd.spawn()
-            } else if download_url.ends_with(".app.tar.gz") {
+                    .map(|_| ())
+                    .map_err(|e| format!("启动安装程序失败: {}", e))
+            } else if matches!(get_package_kind(&download_url), PackageKind::AppTarGz) {
                 // app.tar.gz: 解压并运行
                 let mut cmd = tokio::process::Command::new("tar");
                 cmd.arg("-xzf").arg(&download_path);
                 cmd.spawn()
+                    .map(|_| ())
+                    .map_err(|e| format!("启动安装程序失败: {}", e))
             } else {
                 let mut cmd = tokio::process::Command::new(&download_path);
                 cmd.spawn()
+                    .map(|_| ())
+                    .map_err(|e| format!("启动安装程序失败: {}", e))
             }
         }
         _ => {
             // 其他平台：尝试直接运行
             let mut cmd = tokio::process::Command::new(&download_path);
             cmd.spawn()
+                .map(|_| ())
+                .map_err(|e| format!("启动安装程序失败: {}", e))
         }
     };
 
     match install_result {
-        Ok(_) => {
+        Ok(()) => {
             // 安装程序启动成功，发送安装开始事件
-            let install_message = match get_platform_identifier() {
-                "windows" => "安装程序已启动，请按照提示完成安装",
-                "linux" => {
-                    if download_url.ends_with(".AppImage") {
-                        "正在启动新版本应用程序..."
-                    } else if download_url.ends_with(".deb") {
-                        "正在安装软件包，请根据提示输入密码..."
-                    } else {
-                        "正在启动更新程序..."
-                    }
-                }
-                "macos" => {
-                    if download_url.ends_with(".dmg") {
-                        "正在挂载安装镜像..."
-                    } else if download_url.ends_with(".app.tar.gz") {
-                        "正在解压应用程序..."
-                    } else {
-                        "正在启动安装程序..."
-                    }
-                }
-                _ => "正在启动安装程序...",
-            };
+            let install_message = resolve_install_message(platform, &download_url);
 
             let _ = window.emit(
                 "update-progress",
@@ -696,8 +852,7 @@ pub async fn download_and_install_update(
             );
             Ok(())
         }
-        Err(e) => {
-            let error_msg = format!("启动安装程序失败: {}", e);
+        Err(error_msg) => {
             let _ = window.emit(
                 "update-progress",
                 json!({

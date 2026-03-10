@@ -18,7 +18,8 @@
     "kernel:fetch:all": "node scripts/fetch-kernel.mjs --all",
     "tauri": "node scripts/tauri-wrapper.mjs",
     "tauri dev": "node scripts/tauri-wrapper.mjs dev",
-    "tauri build": "node scripts/tauri-wrapper.mjs build"
+    "tauri build": "node scripts/tauri-wrapper.mjs build",
+    "tauri build:linux:rpm": "node scripts/tauri-wrapper.mjs build:linux:rpm"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

@@ -20,22 +20,26 @@ const aliasMap = new Map([
   ['build:linux', ['build', '--target', LINUX_TARGET.tauriTarget]],
   [
     'build:linux:deb',
-    ['build', '--target', LINUX_TARGET.tauriTarget, '--', '--bundle', 'deb']
+    ['build', '--target', LINUX_TARGET.tauriTarget, '--bundles', 'deb']
   ],
   [
     'build:linux:appimage',
-    ['build', '--target', LINUX_TARGET.tauriTarget, '--', '--bundle', 'appimage']
+    ['build', '--target', LINUX_TARGET.tauriTarget, '--bundles', 'appimage']
+  ],
+  [
+    'build:linux:rpm',
+    ['build', '--target', LINUX_TARGET.tauriTarget, '--bundles', 'rpm']
   ],
   ['build:windows', ['build', '--target', WINDOWS_TARGET.tauriTarget]],
   ['build:macos', ['build', '--target', MACOS_ARM64_TARGET.tauriTarget]],
   ['build:macos:intel', ['build', '--target', MACOS_AMD64_TARGET.tauriTarget]],
   [
     'build:macos:dmg',
-    ['build', '--target', MACOS_ARM64_TARGET.tauriTarget, '--', '--bundle', 'dmg']
+    ['build', '--target', MACOS_ARM64_TARGET.tauriTarget, '--bundles', 'dmg']
   ],
   [
     'build:macos:app',
-    ['build', '--target', MACOS_ARM64_TARGET.tauriTarget, '--', '--bundle', 'app']
+    ['build', '--target', MACOS_ARM64_TARGET.tauriTarget, '--bundles', 'app']
   ]
 ])
 

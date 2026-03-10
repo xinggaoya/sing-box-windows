@@ -33,6 +33,7 @@
       "msi",
       "nsis",
       "deb",
+      "rpm",
       "appimage",
       "dmg",
       "app"

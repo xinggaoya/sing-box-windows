@@ -178,6 +178,26 @@ pnpm install
 pnpm kernel:fetch
 ```
 
+### Linux 系统依赖
+
+Ubuntu / Debian:
+
+```bash
+sudo apt update
+sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev \
+  libappindicator3-dev librsvg2-dev
+```
+
+Fedora / RHEL 系:
+
+```bash
+sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget file \
+  libappindicator-gtk3-devel librsvg2-devel libxdo-devel
+sudo dnf group install "c-development"
+```
+
+当前仓库的 Linux 打包已支持 `deb`、`rpm` 和 `AppImage`。在 Fedora 上本地构建 RPM 时，优先使用 wrapper 提供的目标别名，不要绕过 `scripts/tauri-wrapper.mjs`。
+
 ### 日常开发
 
 ```bash
@@ -205,6 +225,12 @@ pnpm test:kernel-targets
 ```bash
 # 构建桌面产物
 pnpm tauri build
+
+# 在 Linux x86_64 上仅构建 RPM
+pnpm run tauri build:linux:rpm
+
+# 等价写法：显式指定 Linux target + bundle 类型
+pnpm run tauri build --target x86_64-unknown-linux-gnu --bundles rpm
 ```
 
 当前项目统一要求通过 `scripts/tauri-wrapper.mjs` 触发 Tauri 构建，不要绕过 wrapper 直接修改资源打包逻辑。

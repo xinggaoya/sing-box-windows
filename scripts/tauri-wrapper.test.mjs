@@ -20,6 +20,18 @@ test('applyAliasArgs 应展开预设构建别名', () => {
   assert.equal(args[2], 'x86_64-pc-windows-msvc')
 })
 
+test('applyAliasArgs 应支持 Linux RPM 构建别名', () => {
+  const args = applyAliasArgs(['build:linux:rpm'])
+
+  assert.deepEqual(args, [
+    'build',
+    '--target',
+    'x86_64-unknown-linux-gnu',
+    '--bundles',
+    'rpm'
+  ])
+})
+
 test('hasOption 和 getOptionValue 支持普通与等号参数', () => {
   const args = ['build', '--target=x86_64-pc-windows-msvc', '--config', 'tmp/test.json']
 

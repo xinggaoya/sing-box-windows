@@ -88,6 +88,96 @@ fn check_arch_compatibility_should_match_known_arch_aliases() {
 
     assert!(check_arch_compatibility("sing-box-linux-i386.deb", "x86"));
     assert!(!check_arch_compatibility("sing-box-linux-x64.deb", "x86"));
+    assert!(check_arch_compatibility(
+        "sing-box-linux-x86_64.rpm",
+        "x86_64"
+    ));
+    assert!(!check_arch_compatibility(
+        "sing-box-linux-aarch64.rpm",
+        "x86_64"
+    ));
+}
+
+#[test]
+fn get_package_kind_should_detect_supported_linux_formats() {
+    assert_eq!(
+        get_package_kind("sing-box-linux-x86_64.rpm"),
+        PackageKind::Rpm
+    );
+    assert_eq!(
+        get_package_kind("sing-box-windows_2.2.6_amd64.AppImage"),
+        PackageKind::AppImage
+    );
+    assert_eq!(
+        get_package_kind("sing-box-windows_2.2.6_amd64.deb"),
+        PackageKind::Deb
+    );
+}
+
+#[test]
+fn detect_linux_package_preference_should_follow_os_release() {
+    let fedora_os_release = r#"
+ID=fedora
+ID_LIKE="fedora rhel"
+"#;
+    assert_eq!(
+        detect_linux_package_preference_from_os_release(fedora_os_release),
+        LinuxPackagePreference::Rpm
+    );
+
+    let ubuntu_os_release = r#"
+ID=ubuntu
+ID_LIKE=debian
+"#;
+    assert_eq!(
+        detect_linux_package_preference_from_os_release(ubuntu_os_release),
+        LinuxPackagePreference::Deb
+    );
+
+    let arch_os_release = r#"
+ID=arch
+ID_LIKE=archlinux
+"#;
+    assert_eq!(
+        detect_linux_package_preference_from_os_release(arch_os_release),
+        LinuxPackagePreference::AppImage
+    );
+}
+
+#[test]
+fn get_platform_priority_for_linux_should_respect_distribution_preference() {
+    let rpm = "sing-box-windows-2.2.6-1.x86_64.rpm";
+    let deb = "sing-box-windows_2.2.6_amd64.deb";
+    let appimage = "sing-box-windows_2.2.6_amd64.AppImage";
+
+    assert!(
+        get_platform_priority_for(rpm, "linux", "x86_64", LinuxPackagePreference::Rpm)
+            > get_platform_priority_for(deb, "linux", "x86_64", LinuxPackagePreference::Rpm)
+    );
+    assert!(
+        get_platform_priority_for(deb, "linux", "x86_64", LinuxPackagePreference::Deb)
+            > get_platform_priority_for(rpm, "linux", "x86_64", LinuxPackagePreference::Deb)
+    );
+    assert!(
+        get_platform_priority_for(
+            appimage,
+            "linux",
+            "x86_64",
+            LinuxPackagePreference::AppImage
+        ) > get_platform_priority_for(rpm, "linux", "x86_64", LinuxPackagePreference::AppImage)
+    );
+}
+
+#[test]
+fn resolve_update_filename_and_message_should_cover_rpm() {
+    assert_eq!(
+        resolve_update_filename("https://example.com/app-2.2.6-1.x86_64.rpm", "linux"),
+        "update.rpm"
+    );
+    assert_eq!(
+        resolve_install_message("linux", "https://example.com/app-2.2.6-1.x86_64.rpm"),
+        "正在安装软件包，请根据提示输入密码..."
+    );
 }
 
 #[test]
