@@ -435,7 +435,7 @@ pub fn request_app_exit<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     tauri::async_runtime::spawn(async move {
         match tokio::time::timeout(
             Duration::from_secs(4),
-            crate::app::core::kernel_service::runtime::stop_kernel(),
+            crate::app::core::kernel_service::runtime::stop_kernel(None),
         )
         .await
         {

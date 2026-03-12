@@ -74,7 +74,7 @@ impl ProcessManager {
                     .unwrap_or(false);
             }
 
-            return false;
+            false
         }
 
         #[cfg(target_os = "macos")]
@@ -127,6 +127,187 @@ impl ProcessManager {
         }
     }
 
+    async fn persist_started_process_pid(
+        &self,
+        child_pid: u32,
+        kernel_name: &str,
+        tun_enabled: bool,
+    ) {
+        #[cfg(target_os = "linux")]
+        {
+            if tun_enabled {
+                match self
+                    .resolve_linux_managed_kernel_pid(child_pid, kernel_name)
+                    .await
+                {
+                    Some(real_pid) => {
+                        if let Err(e) = self.persist_managed_pid(real_pid) {
+                            warn!("记录 Linux 托管内核 PID 失败 (pid={}): {}", real_pid, e);
+                        } else {
+                            info!(
+                                "已记录 Linux 托管内核 PID: {} (启动子进程 PID: {})",
+                                real_pid, child_pid
+                            );
+                        }
+                    }
+                    None => {
+                        // sudo 包装进程可能比真实 sing-box 更早退出，此时宁可不记录，也不把错误 PID 写入托管文件。
+                        warn!("未能解析 Linux TUN 模式下的真实内核 PID，后续将回退到按进程名清理");
+                        self.clear_managed_pid();
+                    }
+                }
+                return;
+            }
+        }
+
+        let _ = kernel_name;
+        if let Err(e) = self.persist_managed_pid(child_pid) {
+            warn!("记录托管内核 PID 失败 (pid={}): {}", child_pid, e);
+        }
+    }
+
+    async fn is_managed_kernel_pid_active(&self, pid: u32, kernel_name: &str) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            return crate::platform::list_active_processes_by_name(kernel_name)
+                .await
+                .map(|active_pids| active_pids.contains(&pid))
+                .unwrap_or_else(|err| {
+                    warn!("读取 Linux 活跃内核 PID 失败: {}", err);
+                    self.is_pid_matching_kernel_name(pid, kernel_name)
+                });
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            self.is_pid_matching_kernel_name(pid, kernel_name)
+        }
+    }
+
+    async fn try_kill_pid_with_optional_privilege(
+        &self,
+        app_handle: Option<&AppHandle>,
+        pid: u32,
+        kernel_name: &str,
+    ) {
+        if let Err(err) = kill_process_by_pid(pid) {
+            warn!("终止托管内核进程失败 (pid={}): {}", pid, err);
+        }
+
+        sleep(Duration::from_millis(250)).await;
+        if !self.is_managed_kernel_pid_active(pid, kernel_name).await {
+            return;
+        }
+
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        if let Some(app_handle) = app_handle {
+            warn!(
+                "普通权限终止 PID {} 失败，尝试使用 sudo 继续清理 {}",
+                pid, kernel_name
+            );
+            match crate::app::system::sudo_service::kill_process_by_pid_with_saved_password(
+                app_handle, pid,
+            )
+            .await
+            {
+                Ok(_) => {
+                    sleep(Duration::from_millis(250)).await;
+                    if !self.is_managed_kernel_pid_active(pid, kernel_name).await {
+                        info!("已通过 sudo 终止内核进程 PID: {}", pid);
+                        return;
+                    }
+                }
+                Err(err) => {
+                    warn!("使用 sudo 终止 PID {} 失败: {}", pid, err);
+                }
+            }
+        }
+
+        warn!("PID {} 在终止后仍处于活跃状态", pid);
+    }
+
+    async fn has_active_managed_kernel_pid(&self) -> bool {
+        let kernel_name = crate::platform::get_kernel_executable_name();
+        let Some(pid) = self.read_managed_pid() else {
+            return false;
+        };
+
+        #[cfg(target_os = "linux")]
+        {
+            match crate::platform::list_active_processes_by_name(kernel_name).await {
+                Ok(active_pids) => {
+                    if active_pids.contains(&pid) {
+                        return true;
+                    }
+
+                    if self.is_pid_matching_kernel_name(pid, kernel_name) {
+                        info!("托管 PID {} 已不是活跃 {} 进程，清理记录", pid, kernel_name);
+                    } else {
+                        warn!(
+                            "托管 PID({}) 与当前活跃内核进程({})不匹配，已清除记录",
+                            pid, kernel_name
+                        );
+                    }
+                    self.clear_managed_pid();
+                    return false;
+                }
+                Err(e) => {
+                    warn!("读取 Linux 活跃内核 PID 失败: {}", e);
+                }
+            }
+        }
+
+        if self.is_pid_matching_kernel_name(pid, kernel_name) {
+            return true;
+        }
+
+        self.clear_managed_pid();
+        false
+    }
+
+    #[cfg(target_os = "linux")]
+    async fn resolve_linux_managed_kernel_pid(
+        &self,
+        child_pid: u32,
+        kernel_name: &str,
+    ) -> Option<u32> {
+        const RESOLVE_ATTEMPTS: usize = 8;
+        const RESOLVE_INTERVAL_MS: u64 = 150;
+
+        for attempt in 1..=RESOLVE_ATTEMPTS {
+            match crate::platform::list_active_processes_by_name(kernel_name).await {
+                Ok(active_pids) if active_pids.contains(&child_pid) => {
+                    info!("Linux 启动子进程 PID 已切换为真实内核 PID: {}", child_pid);
+                    return Some(child_pid);
+                }
+                Ok(active_pids) if active_pids.len() == 1 => {
+                    return active_pids.first().copied();
+                }
+                Ok(active_pids) if !active_pids.is_empty() => {
+                    let selected = active_pids.iter().copied().max();
+                    warn!(
+                        "第{}次解析真实内核 PID 时检测到多个活跃 {} 进程 {:?}，回退选择最大 PID {:?}",
+                        attempt, kernel_name, active_pids, selected
+                    );
+                    return selected;
+                }
+                Ok(_) => {
+                    debug!(
+                        "第{}次解析真实内核 PID 时尚未检测到活跃 {}",
+                        attempt, kernel_name
+                    );
+                }
+                Err(e) => {
+                    warn!("第{}次解析真实内核 PID 失败: {}", attempt, e);
+                }
+            }
+
+            sleep(Duration::from_millis(RESOLVE_INTERVAL_MS)).await;
+        }
+
+        None
+    }
+
     // 启动进程（带系统环境检查和重试机制）
     // tun_enabled: 是否启用 TUN 模式，在 Linux/macOS 上需要特殊权限提升
     pub async fn start(
@@ -140,8 +321,9 @@ impl ProcessManager {
         // 验证配置文件有效性
         self.validate_config(config_path).await?;
 
-        // 先检查本地是否有sing-box进程在运行，如果有则先终止
-        if let Err(e) = self.kill_existing_processes().await {
+        // 先检查本地是否有 sing-box 进程在运行，如果有则先终止。
+        // Linux/macOS 的 TUN 进程可能是 root 身份，需要携带 app_handle 走 sudo 回退。
+        if let Err(e) = self.kill_existing_processes(Some(app_handle)).await {
             warn!("终止已有sing-box进程失败: {}", e);
         }
 
@@ -231,9 +413,12 @@ impl ProcessManager {
                         let mut process_guard = self.process.write().await;
                         *process_guard = Some(child);
                     }
-                    if let Err(e) = self.persist_managed_pid(child_pid) {
-                        warn!("记录托管内核 PID 失败 (pid={}): {}", child_pid, e);
-                    }
+                    self.persist_started_process_pid(
+                        child_pid,
+                        crate::platform::get_kernel_executable_name(),
+                        tun_enabled,
+                    )
+                    .await;
 
                     // 更稳健的启动检查
                     if self.verify_startup().await {
@@ -438,12 +623,34 @@ impl ProcessManager {
     }
 
     // 仅清理本程序托管过的内核 PID，避免误杀用户自行运行的 sing-box 进程。
-    pub async fn kill_existing_processes(&self) -> std::io::Result<()> {
+    pub async fn kill_existing_processes(
+        &self,
+        app_handle: Option<&AppHandle>,
+    ) -> std::io::Result<()> {
         let kernel_name = crate::platform::get_kernel_executable_name();
         let Some(pid) = self.read_managed_pid() else {
             info!("未发现托管 PID 记录，跳过内核进程清理");
             return Ok(());
         };
+
+        #[cfg(target_os = "linux")]
+        {
+            match crate::platform::list_active_processes_by_name(kernel_name).await {
+                Ok(active_pids) => {
+                    if !active_pids.contains(&pid) {
+                        info!(
+                            "托管 PID {} 当前不是活跃 {} 进程（活跃 PID: {:?}），跳过清理并清除记录",
+                            pid, kernel_name, active_pids
+                        );
+                        self.clear_managed_pid();
+                        return Ok(());
+                    }
+                }
+                Err(e) => {
+                    warn!("复核 Linux 活跃内核 PID 失败，将回退到传统校验: {}", e);
+                }
+            }
+        }
 
         if !self.is_pid_matching_kernel_name(pid, kernel_name) {
             warn!(
@@ -455,9 +662,8 @@ impl ProcessManager {
         }
 
         info!("发现托管内核进程 PID: {}，开始清理", pid);
-        if let Err(e) = kill_process_by_pid(pid) {
-            warn!("终止托管内核进程失败 (pid={}): {}", pid, e);
-        }
+        self.try_kill_pid_with_optional_privilege(app_handle, pid, kernel_name)
+            .await;
         self.clear_managed_pid();
         sleep(Duration::from_millis(300)).await;
 
@@ -466,13 +672,16 @@ impl ProcessManager {
 
     // 按进程名强制清理所有内核进程。
     // 用于“检测到旧内核残留导致启动冲突”场景，优先保证新启动流程可恢复。
-    pub async fn force_kill_kernel_processes_by_name(&self) -> std::result::Result<(), String> {
+    pub async fn force_kill_kernel_processes_by_name(
+        &self,
+        app_handle: Option<&AppHandle>,
+    ) -> std::result::Result<(), String> {
         let kernel_name = crate::platform::get_kernel_executable_name();
         info!("按进程名强制清理内核进程: {}", kernel_name);
 
-        crate::platform::kill_processes_by_name(kernel_name)
+        let plain_kill_result = crate::platform::kill_processes_by_name(kernel_name)
             .await
-            .map_err(|e| format!("按进程名终止内核进程失败: {}", e))?;
+            .map_err(|e| format!("按进程名终止内核进程失败: {}", e));
 
         // 清理本地句柄与 PID 记录，避免后续状态仍指向被外部终止的旧进程。
         {
@@ -481,23 +690,85 @@ impl ProcessManager {
         }
         self.clear_managed_pid();
 
-        sleep(Duration::from_millis(350)).await;
-        match crate::platform::is_process_running(kernel_name).await {
-            Ok(true) => Err(format!(
-                "强制清理后仍检测到 {} 进程在运行，可能存在权限不足",
-                kernel_name
-            )),
-            Ok(false) => Ok(()),
-            Err(e) => {
-                // 检测失败时不直接阻断：终止命令已成功执行，交由上层启动稳定性校验兜底。
-                warn!("强制清理后状态复核失败，继续后续流程: {}", e);
-                Ok(())
+        #[cfg(target_os = "linux")]
+        {
+            const VERIFY_ATTEMPTS: usize = 5;
+            const VERIFY_INTERVAL_MS: u64 = 400;
+
+            if let Err(err) = plain_kill_result {
+                warn!("普通权限按名称终止内核失败: {}", err);
+            }
+
+            for attempt in 1..=VERIFY_ATTEMPTS {
+                sleep(Duration::from_millis(VERIFY_INTERVAL_MS)).await;
+
+                match crate::platform::list_active_processes_by_name(kernel_name).await {
+                    Ok(active_pids) if active_pids.is_empty() => {
+                        info!("按进程名强制清理完成，未发现活跃 {} 进程", kernel_name);
+                        return Ok(());
+                    }
+                    Ok(active_pids) => {
+                        #[cfg(any(target_os = "linux", target_os = "macos"))]
+                        if attempt == 1 {
+                            if let Some(app_handle) = app_handle {
+                                warn!(
+                                    "普通权限按名称清理后仍检测到活跃 {} 进程 {:?}，尝试使用 sudo 继续清理",
+                                    kernel_name, active_pids
+                                );
+                                match crate::app::system::sudo_service::kill_processes_by_name_with_saved_password(app_handle, kernel_name).await {
+                                    Ok(_) => {
+                                        continue;
+                                    }
+                                    Err(err) => {
+                                        warn!("使用 sudo 按名称终止 {} 失败: {}", kernel_name, err);
+                                    }
+                                }
+                            }
+                        }
+
+                        if attempt == VERIFY_ATTEMPTS {
+                            return Err(format!(
+                                "强制清理后仍检测到 {} 活跃进程在运行，PID: {:?}，可能存在权限不足",
+                                kernel_name, active_pids
+                            ));
+                        }
+
+                        info!(
+                            "第{}次复核时仍检测到活跃 {} 进程: {:?}，继续等待退出",
+                            attempt, kernel_name, active_pids
+                        );
+                    }
+                    Err(e) => {
+                        warn!("强制清理后状态复核失败，继续后续流程: {}", e);
+                        return Ok(());
+                    }
+                }
+            }
+
+            Ok(())
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            plain_kill_result?;
+            sleep(Duration::from_millis(350)).await;
+            match crate::platform::is_process_running(kernel_name).await {
+                Ok(true) => Err(format!(
+                    "强制清理后仍检测到 {} 进程在运行，可能存在权限不足",
+                    kernel_name
+                )),
+                Ok(false) => Ok(()),
+                Err(e) => {
+                    // 检测失败时不直接阻断：终止命令已成功执行，交由上层启动稳定性校验兜底。
+                    warn!("强制清理后状态复核失败，继续后续流程: {}", e);
+                    Ok(())
+                }
             }
         }
     }
 
     // 停止进程
-    pub async fn stop(&self) -> Result<()> {
+    pub async fn stop(&self, app_handle: Option<&AppHandle>) -> Result<()> {
         // 尝试关闭系统代理
         if let Err(e) = disable_system_proxy() {
             warn!("关闭系统代理失败: {}", e);
@@ -552,7 +823,7 @@ impl ProcessManager {
         }
 
         // 兜底：尝试清理托管 PID 记录对应的进程
-        if let Err(e) = self.kill_existing_processes().await {
+        if let Err(e) = self.kill_existing_processes(app_handle).await {
             warn!("清理托管内核进程失败: {}", e);
         }
 
@@ -567,7 +838,7 @@ impl ProcessManager {
         tun_enabled: bool,
     ) -> Result<()> {
         info!("正在重启内核进程，TUN模式: {}", tun_enabled);
-        self.stop().await?;
+        self.stop(Some(app_handle)).await?;
         sleep(Duration::from_millis(1000)).await;
         self.start(app_handle, config_path, tun_enabled).await?;
         info!("内核进程重启完成");
@@ -645,37 +916,40 @@ impl ProcessManager {
 
     // 检查进程是否运行（使用读锁，提升并发性能）
     pub async fn is_running(&self) -> bool {
-        let process_guard = self.process.read().await;
+        let has_process_handle = {
+            let process_guard = self.process.read().await;
+            process_guard.is_some()
+        };
 
-        if let Some(ref _proc) = *process_guard {
-            // 这里我们不能直接调用 try_wait，因为它需要可变引用
-            // 我们需要在写锁中进行状态检查
-            drop(process_guard);
+        if has_process_handle {
+            let mut wrapper_exited = false;
 
-            // 获取写锁进行状态检查
-            let mut process_guard = self.process.write().await;
-            if let Some(ref mut proc) = *process_guard {
-                match proc.try_wait() {
-                    Ok(None) => true, // 进程还在运行
-                    Ok(Some(_)) => {
-                        // 进程已退出，清理状态
-                        *process_guard = None;
-                        self.clear_managed_pid();
-                        false
-                    }
-                    Err(_) => {
-                        // 检查失败，清理状态
-                        *process_guard = None;
-                        self.clear_managed_pid();
-                        false
+            {
+                let mut process_guard = self.process.write().await;
+                if let Some(ref mut proc) = *process_guard {
+                    match proc.try_wait() {
+                        Ok(None) => return true,
+                        Ok(Some(status)) => {
+                            info!("托管启动子进程已退出，状态: {}", status);
+                            *process_guard = None;
+                            wrapper_exited = true;
+                        }
+                        Err(err) => {
+                            warn!("检查托管启动子进程状态失败: {}", err);
+                            *process_guard = None;
+                            wrapper_exited = true;
+                        }
                     }
                 }
-            } else {
-                false
             }
-        } else {
-            false
+
+            if wrapper_exited && self.has_active_managed_kernel_pid().await {
+                info!("托管启动子进程已退出，但记录的内核 PID 仍在运行");
+                return true;
+            }
         }
+
+        self.has_active_managed_kernel_pid().await
     }
 }
 

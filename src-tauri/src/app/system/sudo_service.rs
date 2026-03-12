@@ -177,6 +177,27 @@ async fn load_saved_password(app: &AppHandle) -> Result<Option<String>, String> 
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
+async fn load_validated_saved_password(app_handle: &AppHandle) -> Result<String, String> {
+    let saved = load_saved_password(app_handle).await?;
+    let Some(password) = saved else {
+        return Err(SUDO_PASSWORD_REQUIRED.to_string());
+    };
+
+    if let Err(err) = validate_sudo_password(&password) {
+        if err == SUDO_PASSWORD_INVALID {
+            let _ = delete_saved_password(app_handle).await;
+            return Err(format!(
+                "{}: saved password cleared, please re-enter",
+                SUDO_PASSWORD_INVALID
+            ));
+        }
+        return Err(err);
+    }
+
+    Ok(password)
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 async fn save_password(app: &AppHandle, password: &str) -> Result<(), String> {
     use crate::app::storage::enhanced_storage_service::get_enhanced_storage;
 
@@ -255,6 +276,106 @@ fn can_run_sudo_non_interactive() -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn run_sudo_command(password: Option<&str>, args: &[&str]) -> Result<std::process::Output, String> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    if can_run_sudo_non_interactive() {
+        return Command::new("sudo")
+            .arg("-n")
+            .arg("--")
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| format!("执行 sudo 命令失败: {}", e));
+    }
+
+    let password = password.ok_or_else(|| SUDO_PASSWORD_REQUIRED.to_string())?;
+    let mut child = Command::new("sudo")
+        .args(["-S", "-k", "-p", "", "--"])
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("执行 sudo 命令失败: {}", e))?;
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin
+            .write_all(password.as_bytes())
+            .and_then(|_| stdin.write_all(b"\n"))
+            .map_err(|e| format!("写入 sudo 密码失败: {}", e))?;
+    }
+
+    child
+        .wait_with_output()
+        .map_err(|e| format!("等待 sudo 命令失败: {}", e))
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn map_sudo_command_result(output: std::process::Output, action: &str) -> Result<(), String> {
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if stderr.is_empty() {
+        return Err(format!(
+            "{}失败，退出码: {:?}",
+            action,
+            output.status.code()
+        ));
+    }
+
+    Err(format!("{}失败: {}", action, stderr))
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub async fn kill_process_by_pid_with_saved_password(
+    app_handle: &AppHandle,
+    pid: u32,
+) -> Result<(), String> {
+    let password = load_validated_saved_password(app_handle).await?;
+    let pid_string = pid.to_string();
+    let output = run_sudo_command(Some(&password), &["kill", "-9", &pid_string])?;
+    map_sudo_command_result(output, &format!("sudo 终止进程 PID {}", pid))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+pub async fn kill_process_by_pid_with_saved_password(
+    _app_handle: &AppHandle,
+    _pid: u32,
+) -> Result<(), String> {
+    Err(SUDO_UNSUPPORTED.to_string())
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub async fn kill_processes_by_name_with_saved_password(
+    app_handle: &AppHandle,
+    process_name: &str,
+) -> Result<(), String> {
+    let password = load_validated_saved_password(app_handle).await?;
+    let output = run_sudo_command(Some(&password), &["pkill", "-9", "-x", process_name])?;
+
+    // `pkill` 退出码 1 表示没有匹配的进程，不应阻断清理流程。
+    if output.status.success() || output.status.code() == Some(1) {
+        return Ok(());
+    }
+
+    map_sudo_command_result(output, &format!("sudo 按名称终止进程 {}", process_name))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+pub async fn kill_processes_by_name_with_saved_password(
+    _app_handle: &AppHandle,
+    _process_name: &str,
+) -> Result<(), String> {
+    Err(SUDO_UNSUPPORTED.to_string())
+}
+
 /// Linux/macOS: 读取已保存密码并用 sudo 提权启动内核。
 ///
 /// 设计目标：
@@ -271,23 +392,7 @@ pub async fn spawn_kernel_with_saved_password(
     use std::io::Write;
     use std::process::{Command, Stdio};
 
-    let saved = load_saved_password(app_handle).await?;
-    let Some(password) = saved else {
-        return Err(SUDO_PASSWORD_REQUIRED.to_string());
-    };
-
-    // 如果用户改了系统密码，这里会失败：我们要清除旧密码并提示重新设置。
-    if let Err(err) = validate_sudo_password(&password) {
-        // 密码不对时，避免后续反复失败，直接清空缓存。
-        if err == SUDO_PASSWORD_INVALID {
-            let _ = delete_saved_password(app_handle).await;
-            return Err(format!(
-                "{}: saved password cleared, please re-enter",
-                SUDO_PASSWORD_INVALID
-            ));
-        }
-        return Err(err);
-    }
+    let password = load_validated_saved_password(app_handle).await?;
 
     // 首选：非交互 sudo（更安全，避免密码进入内核 stdin）
     if can_run_sudo_non_interactive() {

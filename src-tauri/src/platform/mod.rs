@@ -23,6 +23,24 @@ pub async fn is_process_running(process_name: &str) -> Result<bool, String> {
     platform_is_process_running(process_name).await
 }
 
+/// 列出指定名称的活跃进程 PID。
+pub async fn list_active_processes_by_name(process_name: &str) -> Result<Vec<u32>, String> {
+    #[cfg(target_os = "linux")]
+    {
+        return platform_list_active_processes_by_name(process_name).await;
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        let running = is_process_running(process_name).await?;
+        if running {
+            Ok(vec![0])
+        } else {
+            Ok(Vec::new())
+        }
+    }
+}
+
 /// 杀死指定名称的所有进程
 pub async fn kill_processes_by_name(process_name: &str) -> Result<(), String> {
     platform_kill_processes_by_name(process_name).await

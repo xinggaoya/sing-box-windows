@@ -85,7 +85,7 @@ pub fn run() {
 
                 // 启动时清理可能残留的内核进程，避免复用非本程序启动的内核实例。
                 if let Err(e) = crate::process::manager::ProcessManager::new()
-                    .kill_existing_processes()
+                    .kill_existing_processes(Some(&app_handle))
                     .await
                 {
                     tracing::warn!("启动时清理内核进程失败: {}", e);

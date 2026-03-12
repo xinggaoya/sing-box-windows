@@ -218,7 +218,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
 
         // 尝试多次停止内核
         for i in 0..5 {
-            let _ = stop_kernel().await; // stop_kernel 内部已有 guard disable 和 2s 等待
+            let _ = stop_kernel(Some(&app_handle)).await; // stop_kernel 内部已有 guard disable 和 2s 等待
 
             if !is_kernel_running().await.unwrap_or(true) {
                 info!("内核已成功停止");
@@ -231,7 +231,10 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
         // 最后再次确认
         if is_kernel_running().await.unwrap_or(false) {
             warn!("几次尝试后内核仍在运行，尝试强制终止进程...");
-            if let Err(e) = PROCESS_MANAGER.kill_existing_processes().await {
+            if let Err(e) = PROCESS_MANAGER
+                .kill_existing_processes(Some(&app_handle))
+                .await
+            {
                 warn!("强制终止内核进程失败: {}", e);
             }
             tokio::time::sleep(Duration::from_millis(500)).await;

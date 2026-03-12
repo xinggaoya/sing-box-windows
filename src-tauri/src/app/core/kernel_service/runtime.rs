@@ -117,7 +117,7 @@ async fn try_cleanup_conflicting_kernel(app_handle: &AppHandle) -> Result<(), St
     );
 
     PROCESS_MANAGER
-        .force_kill_kernel_processes_by_name()
+        .force_kill_kernel_processes_by_name(Some(app_handle))
         .await
 }
 
@@ -314,7 +314,7 @@ pub async fn start_kernel_with_state(
             if let Err(e) = verify_kernel_startup_stability(resolved.api_port).await {
                 error!("? 内核稳定性校验失败: {}", e);
                 KERNEL_STATE.mark_failed();
-                if let Err(stop_err) = PROCESS_MANAGER.stop().await {
+                if let Err(stop_err) = PROCESS_MANAGER.stop(Some(&app_handle)).await {
                     warn!("稳定性校验失败后的进程清理失败: {}", stop_err);
                 }
                 emit_kernel_error_with_context(
@@ -411,7 +411,7 @@ pub async fn start_kernel_with_state(
 async fn stop_kernel_command_impl(app_handle: AppHandle) -> Result<serde_json::Value, String> {
     info!("?? 停止内核（编排器模式）");
 
-    match stop_kernel().await {
+    match stop_kernel(Some(&app_handle)).await {
         Ok(_) => {
             emit_kernel_stopped(&app_handle);
             Ok(serde_json::json!({
@@ -446,18 +446,25 @@ async fn restart_kernel_internal(
     let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
 
     // 先尝试停止，超时时强杀
-    let stop_result = tokio::time::timeout(Duration::from_secs(4), stop_kernel()).await;
+    let stop_result =
+        tokio::time::timeout(Duration::from_secs(4), stop_kernel(Some(&app_handle))).await;
     match stop_result {
         Ok(Ok(_)) => info!("? 快速重启：停止阶段完成"),
         Ok(Err(e)) => {
             warn!("? 快速重启：停止失败，继续强杀: {}", e);
-            if let Err(e) = PROCESS_MANAGER.force_kill_kernel_processes_by_name().await {
+            if let Err(e) = PROCESS_MANAGER
+                .force_kill_kernel_processes_by_name(Some(&app_handle))
+                .await
+            {
                 error!("强制清理内核进程失败: {}", e);
             }
         }
         Err(_) => {
             warn!("? 快速重启：停止超时，强制清理");
-            if let Err(e) = PROCESS_MANAGER.force_kill_kernel_processes_by_name().await {
+            if let Err(e) = PROCESS_MANAGER
+                .force_kill_kernel_processes_by_name(Some(&app_handle))
+                .await
+            {
                 error!("强制清理内核进程失败: {}", e);
             }
         }
@@ -605,13 +612,13 @@ pub async fn kernel_restart_fast(
 
 // 退出+停核逻辑不再保留单独 API，前端统一使用快速重启或停止
 
-pub async fn stop_kernel() -> Result<String, String> {
+pub async fn stop_kernel(app_handle: Option<&AppHandle>) -> Result<String, String> {
     KERNEL_STATE.set_state(KernelState::Stopping);
     disable_kernel_guard().await;
     SHOULD_STOP_EVENTS.store(true, std::sync::atomic::Ordering::Relaxed);
     cleanup_event_relay_tasks().await;
 
-    if let Err(e) = PROCESS_MANAGER.stop().await {
+    if let Err(e) = PROCESS_MANAGER.stop(app_handle).await {
         KERNEL_STATE.mark_failed();
         return Err(format!("{}: {}", messages::ERR_PROCESS_STOP_FAILED, e));
     }

@@ -5,15 +5,20 @@
 ### ✨ 主要更新
 - **Fedora / RPM 支持补齐** - Linux 打包新增 `rpm` 产物，本地与 Release CI 都可直接生成 `x86_64` RPM 安装包
 - **Linux 安装包选择更准确** - 更新检查会根据发行版偏好选择 `rpm` / `deb` / `AppImage`，Fedora / RHEL 系优先返回 RPM
+- **Linux TUN 关闭链路修复** - TUN 模式下若内核以 `sudo/root` 身份启动，停止/快速重启会在普通权限清理失败后自动回退到 sudo 清理，避免出现“能启动但无法关闭”的问题
 
 ### 🔧 优化改进
 - **Tauri 打包别名修正** - `scripts/tauri-wrapper.mjs` 的 Linux / macOS 预设别名改为使用 Tauri 2 正确的 `--bundles` 参数，避免 bundle 参数误透传给 cargo
 - **发布流水线补齐 RPM** - Release 工作流增加 Linux RPM 依赖安装与产物上传，预发布页面会一并附带 `.rpm`
 - **本机构建入口新增 RPM** - 新增 `pnpm run tauri build:linux:rpm`，便于 Fedora 等 RPM 系发行版本地构建验证
+- **Linux 进程探测更稳健** - `sing-box` 进程检测新增活跃 PID 过滤，忽略 zombie 进程并输出更明确的复核日志
+- **Linux 生命周期管理增强** - TUN 提权启动后会尽量记录真实 `sing-box` PID，停止/替换/更新内核时优先复用真实托管 PID 进行清理
+- **清理失败诊断增强** - `kill/pkill` 与 sudo 清理链路补充错误透传和回退日志，便于定位权限不足、残留 root 进程等问题
 
 ### 📚 文档更新
 - 重写 `README.md`、`README.zh.md`、`docs/development.md`、`docs/i18n.md`，统一当前跨平台架构、内核拉取流程、本地数据目录与发布说明
 - **Linux 构建文档补充** - 开发文档新增 Fedora / RHEL 依赖安装说明，以及 Linux RPM 构建命令示例
+- **更新日志补充 Linux TUN 修复说明** - 记录 Linux 下 TUN root 进程关闭回退、活跃 PID 复核与残留进程清理策略调整
 
 ## [v2.2.6] - 2026-03-05
 
@@ -185,4 +190,3 @@
 ---
 
 > 💡 **提示**: 建议定期更新以获得最新功能和安全修复。
-

@@ -85,7 +85,7 @@ async fn import_kernel_executable_inner(
     let kernel_path = paths::get_kernel_path();
     let was_running_before_import = is_kernel_running().await.unwrap_or(false);
     if was_running_before_import {
-        stop_running_kernel_for_replace().await?;
+        stop_running_kernel_for_replace(app_handle).await?;
     }
 
     let backup_path = replace_installed_kernel(&staged_binary_path, &kernel_path).await?;
@@ -220,11 +220,11 @@ async fn validate_kernel_binary(binary_path: &Path) -> Result<String, String> {
     Ok(version)
 }
 
-async fn stop_running_kernel_for_replace() -> Result<(), String> {
+async fn stop_running_kernel_for_replace(app_handle: &AppHandle) -> Result<(), String> {
     info!("检测到内核正在运行，准备停止以执行手动导入替换");
 
     for attempt in 1..=5 {
-        let _ = stop_kernel().await;
+        let _ = stop_kernel(Some(app_handle)).await;
         if !is_kernel_running().await.unwrap_or(true) {
             info!("内核已停止，可继续替换");
             return Ok(());
@@ -235,7 +235,7 @@ async fn stop_running_kernel_for_replace() -> Result<(), String> {
 
     warn!("常规停止失败，尝试强制终止残留进程");
     PROCESS_MANAGER
-        .kill_existing_processes()
+        .kill_existing_processes(Some(app_handle))
         .await
         .map_err(|e| format!("强制终止内核进程失败: {}", e))?;
 
