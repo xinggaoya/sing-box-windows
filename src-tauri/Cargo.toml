@@ -33,7 +33,7 @@ serde_yaml = "0.9"
 
 # Tauri 2.0 最新版本
 tauri = { version = "2.10.2", features = ["tray-icon", "unstable", "devtools"] }
-reqwest = { version = "0.12", features = ["json", "stream", "native-tls-vendored"] }
+reqwest = { version = "0.12", features = ["json", "stream", "native-tls-vendored", "blocking"] }
 dirs = "5.0.1"
 tokio = { version = "1.48", features = ["full"] }
 futures-util = "0.3"
