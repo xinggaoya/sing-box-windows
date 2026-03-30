@@ -188,6 +188,7 @@ import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
 import { useSudoStore } from '@/stores'
 import { formatBytes, formatSpeed } from '@/utils'
+import { proxyService } from '@/services/proxy-service'
 
 defineOptions({
   name: 'HomeView',
@@ -525,6 +526,16 @@ onMounted(async () => {
   }
   checkAdmin()
   await kernelStore.initializeStore()
+
+  // Sync node proxy mode from actual Clash API state
+  try {
+    const mode = await proxyService.getCurrentProxyMode()
+    if (mode === 'global' || mode === 'rule') {
+      currentNodeProxyMode.value = mode
+    }
+  } catch {
+    // keep default 'rule' if API not ready
+  }
 })
 </script>
 
