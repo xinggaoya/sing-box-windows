@@ -1,5 +1,5 @@
 use crate::app::constants::paths;
-use crate::app::core::kernel_service::embedded::ensure_embedded_kernel;
+use crate::app::core::kernel_service::embedded::{ensure_embedded_kernel, ensure_external_ui};
 use crate::app::core::kernel_service::utils::emit_kernel_error_with_context;
 use crate::app::core::kernel_service::{
     check_config_validity, is_kernel_running, orchestrated_restart_kernel,
@@ -119,6 +119,11 @@ async fn auto_manage_kernel_internal(
 
     if let Err(err) = ensure_embedded_kernel(&app_handle).await {
         warn!("安装内嵌内核失败，继续按现有逻辑处理: {}", err);
+    }
+
+    // 预下载 metacubexd UI，避免首次启动时 sing-box 下载阻塞 API
+    if let Err(err) = ensure_external_ui().await {
+        warn!("预下载 metacubexd UI 失败（内核启动时仍可自行下载）: {}", err);
     }
 
     let overrides = options.to_overrides();

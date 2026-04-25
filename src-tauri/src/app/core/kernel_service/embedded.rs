@@ -2,7 +2,9 @@ use crate::app::constants::paths;
 use crate::app::storage::enhanced_storage_service::{
     db_get_app_config, db_save_app_config_internal,
 };
+use crate::utils::http_client;
 use semver::Version;
+use std::io::Cursor;
 use std::path::Path;
 use tauri::{AppHandle, Manager};
 use tracing::{info, warn};
@@ -244,5 +246,138 @@ fn is_embedded_newer(current: &str, embedded: &str) -> Option<bool> {
         (Ok(current_ver), Ok(embedded_ver)) => Some(embedded_ver > current_ver),
         _ if current == embedded => Some(false),
         _ => None,
+    }
+}
+
+/// 确保 metacubexd 外部 UI 已就绪。
+/// 首次启动时 sing-box 会从 GitHub 下载 metacubexd，此下载在 API 启动前执行，
+/// 可能导致稳定性校验超时。此函数在内核启动前预下载，消除该阻塞。
+const METACUBEXD_URL: &str =
+    "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip";
+const METACUBEXD_DIR: &str = "metacubexd";
+const METACUBEXD_DOWNLOAD_TIMEOUT_SECS: u64 = 120;
+
+pub async fn ensure_external_ui() -> Result<(), String> {
+    let work_dir = paths::get_kernel_work_dir();
+    let ui_dir = work_dir.join(METACUBEXD_DIR);
+
+    // 检测 UI 是否已存在（以 index.html 为标志）
+    if ui_dir.join("index.html").exists() {
+        return Ok(());
+    }
+
+    info!("metacubexd UI 不存在，开始预下载: {}", METACUBEXD_URL);
+
+    let client = http_client::get_client();
+    let response = client
+        .get(METACUBEXD_URL)
+        .timeout(std::time::Duration::from_secs(METACUBEXD_DOWNLOAD_TIMEOUT_SECS))
+        .send()
+        .await
+        .map_err(|e| format!("下载 metacubexd 失败: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "下载 metacubexd 失败，HTTP 状态码: {}",
+            response.status()
+        ));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("读取 metacubexd 响应体失败: {}", e))?;
+
+    info!(
+        "metacubexd 下载完成 ({} 字节)，开始解压",
+        bytes.len()
+    );
+
+    // 解压到临时目录，成功后原子重命名到目标位置
+    let temp_dir = work_dir.join(format!("{}.tmp", METACUBEXD_DIR));
+    if temp_dir.exists() {
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+    }
+
+    extract_zip_to_dir(&bytes, &temp_dir)?;
+
+    // GitHub zip 内顶层目录名形如 "metacubexd-gh-pages"，需提取其内容
+    let extracted_content = find_single_subdirectory(&temp_dir);
+    let source_dir = extracted_content.as_ref().unwrap_or(&temp_dir);
+
+    // 原子替换：先清理旧目录（如果有），再重命名
+    if ui_dir.exists() {
+        let _ = tokio::fs::remove_dir_all(&ui_dir).await;
+    }
+    tokio::fs::rename(source_dir, &ui_dir)
+        .await
+        .map_err(|e| format!("移动 metacubexd 目录失败: {}", e))?;
+
+    // 清理临时目录
+    if temp_dir.exists() {
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+    }
+
+    info!("metacubexd UI 预下载安装完成: {:?}", ui_dir);
+    Ok(())
+}
+
+/// 将 zip 数据解压到指定目录
+fn extract_zip_to_dir(bytes: &[u8], target_dir: &Path) -> Result<(), String> {
+    use std::fs;
+    fs::create_dir_all(target_dir)
+        .map_err(|e| format!("创建临时目录失败: {}", e))?;
+
+    let reader = Cursor::new(bytes);
+    let mut archive = zip::ZipArchive::new(reader)
+        .map_err(|e| format!("解析 zip 失败: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| format!("读取 zip 条目失败: {}", e))?;
+
+        let out_path = match file.enclosed_name() {
+            Some(path) => target_dir.join(path),
+            None => continue,
+        };
+
+        if file.is_dir() {
+            fs::create_dir_all(&out_path)
+                .map_err(|e| format!("创建目录失败: {}", e))?;
+        } else {
+            if let Some(parent) = out_path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("创建父目录失败: {}", e))?;
+            }
+            let mut outfile = fs::File::create(&out_path)
+                .map_err(|e| format!("创建文件失败: {}", e))?;
+            std::io::copy(&mut file, &mut outfile)
+                .map_err(|e| format!("写入文件失败: {}", e))?;
+
+            // Unix 平台设置可执行权限
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Some(mode) = file.unix_mode() {
+                    let perms = fs::Permissions::from_mode(mode);
+                    fs::set_permissions(&out_path, perms)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 查找 zip 解压后是否只有一个子目录（GitHub zip 通常如此）
+fn find_single_subdirectory(dir: &Path) -> Option<std::path::PathBuf> {
+    let mut entries = std::fs::read_dir(dir).ok()?;
+    let first = entries.next()?.ok()?;
+    // 如果只有一个条目且是目录，使用它作为源目录
+    if entries.next().is_none() && first.file_type().ok()?.is_dir() {
+        Some(first.path())
+    } else {
+        None
     }
 }

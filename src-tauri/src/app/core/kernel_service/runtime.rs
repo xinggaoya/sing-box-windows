@@ -1,4 +1,4 @@
-use crate::app::constants::common::messages;
+﻿use crate::app::constants::common::messages;
 use crate::app::core::kernel_service::event::{
     cleanup_event_relay_tasks, start_websocket_relay, SHOULD_STOP_EVENTS,
 };
@@ -56,12 +56,12 @@ impl ResolvedProxyState {
 }
 
 fn classify_startup_stability_failure(detail: &str) -> (&'static str, &'static str) {
-    if detail.contains("API状态码") {
-        ("KERNEL_API_HTTP_ERROR", "内核 API 返回了错误状态码")
-    } else if detail.contains("立即退出") {
-        ("KERNEL_PROCESS_EXITED_EARLY", "内核启动后很快退出")
+    if detail.contains("API status") {
+        ("KERNEL_API_HTTP_ERROR", "kernel API returned error status code")
+    } else if detail.contains("exited immediately") {
+        ("KERNEL_PROCESS_EXITED_EARLY", "kernel process exited shortly after startup")
     } else {
-        ("KERNEL_API_TIMEOUT", "内核 API 在稳定性窗口内未就绪")
+        ("KERNEL_API_TIMEOUT", "kernel API not ready within stability window")
     }
 }
 
@@ -81,10 +81,13 @@ fn classify_runtime_start_failure(detail: &str) -> &'static str {
 }
 
 async fn verify_kernel_startup_stability(api_port: u16) -> Result<(), String> {
-    // 稳定性窗口：尽早识别“启动成功后立刻崩溃”的假成功场景。
-    const MAX_CHECKS: u8 = 4;
-    const RETRY_INTERVAL_MS: u64 = 450;
-    const API_TIMEOUT_MS: u64 = 500;
+    // stability window: detect false-positive "started then crashed" scenarios.
+    // first run may need to download metacubexd UI / rule sets,
+    // use exponential backoff for cold starts; success returns quickly.
+    const MAX_CHECKS: u8 = 10;
+    const INITIAL_RETRY_INTERVAL_MS: u64 = 300;
+    const MAX_RETRY_INTERVAL_MS: u64 = 2000;
+    const API_TIMEOUT_MS: u64 = 1000;
 
     let client = http_client::get_client();
     let api_url = format!("http://127.0.0.1:{}/version", api_port);
@@ -92,7 +95,7 @@ async fn verify_kernel_startup_stability(api_port: u16) -> Result<(), String> {
 
     for attempt in 1..=MAX_CHECKS {
         if !is_kernel_running().await.unwrap_or(false) {
-            return Err("内核进程启动后立即退出".to_string());
+            return Err("kernel process exited immediately after startup".to_string());
         }
 
         match client
@@ -101,24 +104,40 @@ async fn verify_kernel_startup_stability(api_port: u16) -> Result<(), String> {
             .send()
             .await
         {
-            Ok(response) if response.status().is_success() => return Ok(()),
+            Ok(response) if response.status().is_success() => {
+                info!(
+                    "kernel stability check passed (attempt {}/{})",
+                    attempt, MAX_CHECKS
+                );
+                return Ok(());
+            }
             Ok(response) => {
                 last_error = format!(
-                    "稳定性检查第{}次失败：API状态码 {}",
+                    "stability check attempt {} failed: API status {}",
                     attempt,
                     response.status()
                 );
             }
             Err(e) => {
-                last_error = format!("稳定性检查第{}次失败：API连接异常 {}", attempt, e);
+                last_error = format!(
+                    "stability check attempt {} failed: API connection error {}",
+                    attempt, e
+                );
             }
         }
 
-        tokio::time::sleep(Duration::from_millis(RETRY_INTERVAL_MS)).await;
+        if attempt < MAX_CHECKS {
+            // exponential backoff: 300 -> 600 -> 1200 -> 2000 -> 2000 -> ...
+            let exp_shift = (attempt as u64).min(3);
+            let delay = INITIAL_RETRY_INTERVAL_MS
+                .saturating_mul(1 << exp_shift)
+                .min(MAX_RETRY_INTERVAL_MS);
+            tokio::time::sleep(Duration::from_millis(delay)).await;
+        }
     }
 
     if last_error.is_empty() {
-        last_error = "稳定性窗口内 API 未就绪".to_string();
+        last_error = "API not ready within stability window".to_string();
     }
 
     Err(last_error)
@@ -383,6 +402,15 @@ pub async fn start_kernel_with_state(
 
             if let Err(e) = verify_kernel_startup_stability(resolved.api_port).await {
                 error!("? 内核稳定性校验失败: {}", e);
+
+                // 读取内核 stderr 输出辅助诊断
+                if let Some(stderr_output) = PROCESS_MANAGER.read_stderr_output().await {
+                    let trimmed = stderr_output.trim();
+                    if !trimmed.is_empty() {
+                        warn!("内核 stderr 输出:\n{}", trimmed);
+                    }
+                }
+
                 KERNEL_STATE.mark_failed();
                 let (code, message) = classify_startup_stability_failure(&e);
                 if let Err(stop_err) = PROCESS_MANAGER.stop(Some(&app_handle)).await {

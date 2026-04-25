@@ -514,7 +514,7 @@ impl ProcessManager {
             let _ = (tun_enabled, kernel_str, app_handle); // Windows 不使用这些参数，由应用整体权限控制
             let mut cmd = Command::new(kernel_path);
             cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
-            cmd.stdout(Stdio::null()).stderr(Stdio::null());
+            cmd.stdout(Stdio::null()).stderr(Stdio::piped());
             crate::platform::configure_std_command(&mut cmd);
 
             let child = cmd
@@ -539,7 +539,7 @@ impl ProcessManager {
             } else {
                 let mut cmd = Command::new(kernel_path);
                 cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
-                cmd.stdout(Stdio::null()).stderr(Stdio::null());
+                cmd.stdout(Stdio::null()).stderr(Stdio::piped());
 
                 let child = cmd
                     .spawn()
@@ -564,7 +564,7 @@ impl ProcessManager {
             } else {
                 let mut cmd = Command::new(kernel_path);
                 cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
-                cmd.stdout(Stdio::null()).stderr(Stdio::null());
+                cmd.stdout(Stdio::null()).stderr(Stdio::piped());
 
                 let child = cmd
                     .spawn()
@@ -579,7 +579,7 @@ impl ProcessManager {
             let _ = (tun_enabled, app_handle);
             let mut cmd = Command::new(kernel_path);
             cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
-            cmd.stdout(Stdio::null()).stderr(Stdio::null());
+            cmd.stdout(Stdio::null()).stderr(Stdio::piped());
 
             let child = cmd
                 .spawn()
@@ -628,6 +628,26 @@ impl ProcessManager {
         }
         self.clear_managed_pid();
         Ok(())
+    }
+
+    /// Read kernel process stderr for startup failure diagnostics.
+    /// Uses non-blocking read since process uses std::process::Child.
+    pub async fn read_stderr_output(&self) -> Option<String> {
+        let mut process_guard = self.process.write().await;
+        let child = process_guard.as_mut()?;
+
+        use std::io::Read;
+        if let Some(stderr) = child.stderr.as_mut() {
+            let mut buf = Vec::with_capacity(4096);
+            // non-blocking: read whatever is available
+            let _ = stderr.read_to_end(&mut buf);
+            if buf.is_empty() {
+                return None;
+            }
+            String::from_utf8(buf).ok()
+        } else {
+            None
+        }
     }
 
     // 仅清理本程序托管过的内核 PID，避免误杀用户自行运行的 sing-box 进程。
