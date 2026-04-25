@@ -355,13 +355,13 @@ fn extract_zip_to_dir(bytes: &[u8], target_dir: &Path) -> Result<(), String> {
             std::io::copy(&mut file, &mut outfile)
                 .map_err(|e| format!("写入文件失败: {}", e))?;
 
-            // Unix 平台设置可执行权限
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
                 if let Some(mode) = file.unix_mode() {
                     let perms = fs::Permissions::from_mode(mode);
-                    fs::set_permissions(&out_path, perms)?;
+                    fs::set_permissions(&out_path, perms)
+                        .map_err(|e| format!("set permissions failed: {}", e))?;
                 }
             }
         }
