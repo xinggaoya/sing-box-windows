@@ -1,6 +1,6 @@
 use crate::app::constants::paths;
 use crate::app::singbox::common::{
-    PRIVATE_IP_CIDRS, RS_GEOIP_PRIVATE, RS_GEOSITE_PRIVATE, TAG_DIRECT,
+    ensure_kernel_log_output, PRIVATE_IP_CIDRS, RS_GEOIP_PRIVATE, RS_GEOSITE_PRIVATE, TAG_DIRECT,
 };
 use crate::app::singbox::config_generator;
 use crate::app::storage::state_model::AppConfig;
@@ -272,6 +272,7 @@ async fn update_singbox_config_ports(
     // 修改API端口和代理端口
     if let Some(config_obj) = config.as_object_mut() {
         sanitize_geoip_private_rule_sets(config_obj);
+        ensure_kernel_log_output(config_obj);
 
         // 修改experimental.clash_api配置（如果存在）
         if let Some(experimental) = config_obj.get_mut("experimental") {

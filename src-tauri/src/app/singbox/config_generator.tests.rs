@@ -99,6 +99,28 @@ fn generated_dns_servers_should_use_new_format() {
 }
 
 #[test]
+fn generated_log_should_write_to_kernel_work_dir_file() {
+    let config = generate_base_config(&AppConfig::default());
+    let log = config
+        .get("log")
+        .and_then(|v| v.as_object())
+        .expect("log 配置应存在");
+
+    assert_eq!(log.get("disabled").and_then(|v| v.as_bool()), Some(false));
+    assert_eq!(log.get("level").and_then(|v| v.as_str()), Some("info"));
+    assert_eq!(log.get("timestamp").and_then(|v| v.as_bool()), Some(true));
+
+    let output = log
+        .get("output")
+        .and_then(|v| v.as_str())
+        .expect("log.output 应存在");
+    assert!(
+        output.ends_with("sing-box.log"),
+        "log.output 应指向 sing-box.log: {output}"
+    );
+}
+
+#[test]
 fn ads_dns_rule_should_use_reject_action() {
     let app_config = AppConfig {
         singbox_block_ads: true,

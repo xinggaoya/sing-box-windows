@@ -1,5 +1,5 @@
 use super::common::{
-    build_dns_server_config, dns_strategy, node_domain_resolver_strategy,
+    build_dns_server_config, dns_strategy, kernel_log_output_path, node_domain_resolver_strategy,
     normalize_default_outbound, normalize_download_detour, normalize_fake_dns_filter_mode, DNS_CN,
     DNS_FAKEIP, DNS_PROXY, DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, PRIVATE_IP_CIDRS,
     RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE,
@@ -232,6 +232,8 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             disabled: false,
             level: "info".to_string(),
             timestamp: true,
+            // 将内核日志写入工作目录文件，避免 GUI 拉起时 console/stderr 输出长期堆积。
+            output: Some(kernel_log_output_path()),
         },
         experimental: ExperimentalConfig {
             cache_file: CacheFileConfig {

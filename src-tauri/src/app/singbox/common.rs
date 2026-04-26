@@ -1,6 +1,7 @@
 use super::config_schema::DnsServerConfig;
+use crate::app::constants::paths;
 use crate::app::storage::state_model::AppConfig;
-use serde_json::json;
+use serde_json::{json, Map, Value};
 use std::net::IpAddr;
 use url::Url;
 
@@ -49,6 +50,33 @@ pub const PRIVATE_IP_CIDRS: &[&str] = &[
     "fc00::/7",
     "fe80::/10",
 ];
+
+pub fn kernel_log_output_path() -> String {
+    paths::get_kernel_work_dir()
+        .join("sing-box.log")
+        .to_string_lossy()
+        .to_string()
+}
+
+pub fn ensure_kernel_log_output(config_obj: &mut Map<String, Value>) {
+    let log = config_obj.entry("log".to_string()).or_insert(json!({}));
+    if !log.is_object() {
+        *log = json!({});
+    }
+
+    let Some(log_obj) = log.as_object_mut() else {
+        return;
+    };
+
+    log_obj
+        .entry("disabled".to_string())
+        .or_insert(json!(false));
+    log_obj.entry("level".to_string()).or_insert(json!("info"));
+    log_obj
+        .entry("timestamp".to_string())
+        .or_insert(json!(true));
+    log_obj.insert("output".to_string(), json!(kernel_log_output_path()));
+}
 
 pub fn normalize_default_outbound(app_config: &AppConfig) -> &'static str {
     match app_config.singbox_default_proxy_outbound.as_str() {

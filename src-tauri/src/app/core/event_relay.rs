@@ -41,77 +41,63 @@ impl<R: Send + Sync + 'static + Serialize> EventDirectRelay<R> {
         }
     }
 
-    /// 启动直接事件中继
+    /// 启动直接事件中继。
+    ///
+    /// 该 future 的生命周期必须跟随 websocket 读取循环，不能被一个空的发送任务提前结束；
+    /// 否则前端会在内核仍运行时失去日志/连接/流量事件。
     pub async fn start(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let url = self.endpoint.as_str();
         let (ws_stream, _) = connect_async(url).await?;
-        let (mut _write, mut read) = ws_stream.split();
+        let (_write, mut read) = ws_stream.split();
 
-        let app_handle = self.app_handle.clone();
-        let event_name = self.event_name.clone();
-        let parser = self.parser.clone();
-        let _event_name_for_logging = event_name.clone();
-        // let _event_name_for_logging2 = event_name_for_logging.clone();
-        // let _event_name_for_logging3 = event_name_for_logging.clone();
+        let mut message_count = 0u64;
 
-        // 处理接收到的消息
-        let receive_task = tokio::task::spawn(async move {
-            let mut message_count = 0u64;
+        while let Some(msg) = read.next().await {
+            match msg {
+                Ok(Message::Text(text)) => match serde_json::from_str::<Value>(&text) {
+                    Ok(data) => {
+                        let parsed_data = (self.parser.as_ref())(data);
 
-            while let Some(msg) = read.next().await {
-                match msg {
-                    Ok(Message::Text(text)) => {
-                        match serde_json::from_str::<Value>(&text) {
-                            Ok(data) => {
-                                let parsed_data = parser(data);
+                        // 直接发送 Tauri 事件到前端
+                        self.app_handle
+                            .emit(&self.event_name, &parsed_data)
+                            .map_err(|e| {
+                                let message = format!("发送{}事件失败: {}", self.event_name, e);
+                                error!("{}", message);
+                                std::io::Error::new(std::io::ErrorKind::BrokenPipe, message)
+                            })?;
 
-                                // 直接发送Tauri事件到前端
-                                if let Err(e) = app_handle.emit(&event_name, &parsed_data) {
-                                    error!("发送{}事件失败: {}", event_name, e);
-                                    break;
-                                }
+                        message_count += 1;
 
-                                message_count += 1;
-
-                                // 每100条消息记录一次
-                                if message_count % 100 == 0 {
-                                    info!("已处理{}条数据", message_count);
-                                }
-                            }
-                            Err(e) => {
-                                warn!("解析{}数据失败: {}", event_name, e);
-                            }
+                        // 每100条消息记录一次
+                        if message_count % 100 == 0 {
+                            info!("{} 已处理{}条数据", self.event_name, message_count);
                         }
                     }
-                    Ok(Message::Close(_)) => {
-                        info!("连接已关闭");
-                        break;
-                    }
                     Err(e) => {
-                        error!("连接错误: {}", e);
-                        break;
+                        warn!("解析{}数据失败: {}", self.event_name, e);
                     }
-                    _ => {}
+                },
+                Ok(Message::Close(frame)) => {
+                    let message = format!("{} websocket 连接已关闭: {:?}", self.event_name, frame);
+                    warn!("{}", message);
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::ConnectionAborted,
+                        message,
+                    )
+                    .into());
                 }
-            }
-        });
-
-        // 发送初始消息以保持连接活跃
-        let send_task = tokio::task::spawn(async move {
-            // 这里可以发送初始握手消息
-        });
-
-        // 等待任务完成
-        tokio::select! {
-            _ = receive_task => {
-                info!("接收任务结束");
-            }
-            _ = send_task => {
-                info!("发送任务结束");
+                Err(e) => {
+                    error!("{} websocket 连接错误: {}", self.event_name, e);
+                    return Err(e.into());
+                }
+                _ => {}
             }
         }
 
-        Ok(())
+        let message = format!("{} websocket 数据流结束", self.event_name);
+        warn!("{}", message);
+        Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, message).into())
     }
 }
 

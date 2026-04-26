@@ -1,7 +1,7 @@
 use super::common::{
-    build_dns_server_config, dns_strategy, normalize_default_outbound, normalize_download_detour,
-    normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_PROXY, DNS_RESOLVER,
-    FAKE_DNS_FILTER_GLOBAL_NON_CN, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN,
+    build_dns_server_config, dns_strategy, ensure_kernel_log_output, normalize_default_outbound,
+    normalize_download_detour, normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_PROXY,
+    DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN,
     RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM,
     RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM,
     TAG_YOUTUBE,
@@ -27,6 +27,7 @@ fn proxy_listen_address(app_config: &AppConfig) -> &'static str {
 /// - 该函数会覆盖/重建 `inbounds`，确保 mixed/tun 与端口设置始终与 AppConfig 一致。
 pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) {
     if let Some(config_obj) = config.as_object_mut() {
+        ensure_kernel_log_output(config_obj);
         apply_inbounds_settings(config_obj, app_config);
 
         // 针对“本程序生成的订阅配置”，尝试同步高级选项。

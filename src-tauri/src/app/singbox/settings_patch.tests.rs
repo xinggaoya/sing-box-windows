@@ -69,6 +69,46 @@ fn apply_app_settings_should_remove_legacy_inbound_fields_from_existing_config()
 }
 
 #[test]
+fn apply_app_settings_should_add_kernel_log_output_to_existing_config() {
+    let mut config = json!({
+        "dns": {
+            "servers": [],
+            "rules": []
+        },
+        "experimental": {
+            "clash_api": {},
+            "cache_file": {}
+        },
+        "inbounds": [],
+        "route": {
+            "rule_set": [],
+            "rules": [],
+            "final": "direct",
+            "auto_detect_interface": true
+        }
+    });
+
+    apply_app_settings_to_config(&mut config, &AppConfig::default());
+
+    let log = config
+        .get("log")
+        .and_then(|v| v.as_object())
+        .expect("应补充 log 配置");
+    assert_eq!(log.get("disabled").and_then(|v| v.as_bool()), Some(false));
+    assert_eq!(log.get("level").and_then(|v| v.as_str()), Some("info"));
+    assert_eq!(log.get("timestamp").and_then(|v| v.as_bool()), Some(true));
+
+    let output = log
+        .get("output")
+        .and_then(|v| v.as_str())
+        .expect("应补充 log.output");
+    assert!(
+        output.ends_with("sing-box.log"),
+        "log.output 应指向 sing-box.log: {output}"
+    );
+}
+
+#[test]
 fn apply_app_settings_should_not_reintroduce_legacy_fields_when_tun_enabled() {
     let mut config = json!({
         "dns": {

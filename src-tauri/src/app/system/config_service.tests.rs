@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::singbox::common::ensure_kernel_log_output;
 use serde_json::json;
 
 fn outside_config_path(file_name: &str) -> String {
@@ -109,6 +110,55 @@ fn sanitize_geoip_private_rule_sets_should_rewrite_route_entries() {
     assert_eq!(second_rule_sets.len(), 1);
     assert_eq!(second_rule_sets[0].as_str(), Some("keep-tag"));
     assert!(has_private_ip_rule(rules));
+}
+
+#[test]
+fn ensure_kernel_log_output_should_insert_file_output() {
+    let mut config_obj = json!({
+        "route": {
+            "rules": []
+        }
+    })
+    .as_object()
+    .cloned()
+    .expect("config json should be an object");
+
+    ensure_kernel_log_output(&mut config_obj);
+
+    let log = config_obj
+        .get("log")
+        .and_then(|value| value.as_object())
+        .expect("log object should be inserted");
+    assert_eq!(log.get("disabled").and_then(|v| v.as_bool()), Some(false));
+    assert_eq!(log.get("level").and_then(|v| v.as_str()), Some("info"));
+    assert_eq!(log.get("timestamp").and_then(|v| v.as_bool()), Some(true));
+
+    let output = log
+        .get("output")
+        .and_then(|value| value.as_str())
+        .expect("log.output should be inserted");
+    assert!(
+        output.ends_with("sing-box.log"),
+        "log.output should point at sing-box.log: {output}"
+    );
+}
+
+#[test]
+fn ensure_kernel_log_output_should_replace_invalid_log_value() {
+    let mut config_obj = json!({
+        "log": null
+    })
+    .as_object()
+    .cloned()
+    .expect("config json should be an object");
+
+    ensure_kernel_log_output(&mut config_obj);
+
+    assert!(config_obj
+        .get("log")
+        .and_then(|value| value.get("output"))
+        .and_then(|value| value.as_str())
+        .is_some_and(|output| output.ends_with("sing-box.log")));
 }
 
 #[test]

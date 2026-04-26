@@ -192,6 +192,28 @@ git tag -d v2.2.7
 - 优先新发一个修正版本，例如 `v2.2.8`
 - 不要默认删除并重写已公开的发布 tag
 
+如果确认当前 tag 仍处于预发布验证阶段，且必须用同一个版本号重发（例如修复刚发布预览包中的阻断问题），按以下顺序撤回并重新触发：
+
+```bash
+# 1. 先确保修复 commit 已经推到默认分支
+git push origin master
+
+# 2. 删除 GitHub 预发布和远端 tag
+gh release delete v2.2.7 --yes --cleanup-tag
+
+# 3. 将本地 tag 移到新的修复 commit
+git tag -f v2.2.7 HEAD
+
+# 4. 重新推送 tag，触发 release.yml 再构建预发布
+git push origin v2.2.7
+```
+
+注意：
+
+- 只在预发布未转正式版、用户还未广泛下载时使用这条路径
+- 已正式发布或已经公开分发的版本，优先递增补丁版本重新发布
+- `gh release delete --cleanup-tag` 会删除远端 tag；执行前确认 tag 名无误
+
 ## 故障排查
 
 ### `git push` 凭据失败

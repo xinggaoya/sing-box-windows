@@ -3,17 +3,22 @@ use crate::app::constants::{messages, paths};
 use crate::app::core::kernel_service::state::KERNEL_STATE;
 use crate::utils::proxy_util::disable_system_proxy;
 
+use std::collections::VecDeque;
+use std::io::{BufRead, BufReader};
 #[cfg(target_os = "macos")]
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use tauri::AppHandle;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
 use tracing::{debug, error, info, warn};
 
+const STDERR_TAIL_LIMIT: usize = 200;
+
 pub struct ProcessManager {
     process: Arc<RwLock<Option<Child>>>,
+    stderr_tail: Arc<StdMutex<VecDeque<String>>>,
 }
 
 impl Default for ProcessManager {
@@ -26,7 +31,56 @@ impl ProcessManager {
     pub fn new() -> Self {
         Self {
             process: Arc::new(RwLock::new(None)),
+            stderr_tail: Arc::new(StdMutex::new(VecDeque::with_capacity(STDERR_TAIL_LIMIT))),
         }
+    }
+
+    fn push_stderr_tail(tail: &Arc<StdMutex<VecDeque<String>>>, line: String) {
+        let Ok(mut guard) = tail.lock() else {
+            return;
+        };
+
+        if guard.len() >= STDERR_TAIL_LIMIT {
+            guard.pop_front();
+        }
+        guard.push_back(line);
+    }
+
+    fn clear_stderr_tail(&self) {
+        if let Ok(mut guard) = self.stderr_tail.lock() {
+            guard.clear();
+        }
+    }
+
+    fn attach_stderr_drain(&self, child: &mut Child) -> Result<()> {
+        let Some(stderr) = child.stderr.take() else {
+            return Ok(());
+        };
+
+        let tail = Arc::clone(&self.stderr_tail);
+        std::thread::Builder::new()
+            .name("sing-box-stderr-drain".to_string())
+            .spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    match line {
+                        Ok(line) => {
+                            debug!(target: "sing_box_stderr", "{}", line);
+                            Self::push_stderr_tail(&tail, line);
+                        }
+                        Err(err) => {
+                            Self::push_stderr_tail(
+                                &tail,
+                                format!("读取 sing-box stderr 失败: {}", err),
+                            );
+                            break;
+                        }
+                    }
+                }
+            })
+            .map_err(|e| ProcessError::StartFailed(format!("启动 stderr 读取线程失败: {}", e)))?;
+
+        Ok(())
     }
 
     fn managed_pid_file() -> std::path::PathBuf {
@@ -385,6 +439,7 @@ impl ProcessManager {
 
         // 检查系统环境，特别是在开机自启动时
         self.check_system_environment().await?;
+        self.clear_stderr_tail();
 
         // 多次尝试启动进程
         let max_attempts = 3;
@@ -517,9 +572,10 @@ impl ProcessManager {
             cmd.stdout(Stdio::null()).stderr(Stdio::piped());
             crate::platform::configure_std_command(&mut cmd);
 
-            let child = cmd
+            let mut child = cmd
                 .spawn()
                 .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
+            self.attach_stderr_drain(&mut child)?;
             Ok(child)
         }
 
@@ -541,9 +597,10 @@ impl ProcessManager {
                 cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
                 cmd.stdout(Stdio::null()).stderr(Stdio::piped());
 
-                let child = cmd
+                let mut child = cmd
                     .spawn()
                     .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
+                self.attach_stderr_drain(&mut child)?;
                 Ok(child)
             }
         }
@@ -566,9 +623,10 @@ impl ProcessManager {
                 cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
                 cmd.stdout(Stdio::null()).stderr(Stdio::piped());
 
-                let child = cmd
+                let mut child = cmd
                     .spawn()
                     .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
+                self.attach_stderr_drain(&mut child)?;
                 Ok(child)
             }
         }
@@ -581,9 +639,10 @@ impl ProcessManager {
             cmd.args(["run", "-D", work_dir_str, "-c", config_str]);
             cmd.stdout(Stdio::null()).stderr(Stdio::piped());
 
-            let child = cmd
+            let mut child = cmd
                 .spawn()
                 .map_err(|e| ProcessError::StartFailed(format!("启动内核进程失败: {}", e)))?;
+            self.attach_stderr_drain(&mut child)?;
             Ok(child)
         }
     }
@@ -631,23 +690,17 @@ impl ProcessManager {
     }
 
     /// Read kernel process stderr for startup failure diagnostics.
-    /// Uses non-blocking read since process uses std::process::Child.
+    /// The pipe is drained continuously after process spawn, so this returns the bounded tail.
     pub async fn read_stderr_output(&self) -> Option<String> {
-        let mut process_guard = self.process.write().await;
-        let child = process_guard.as_mut()?;
+        let Ok(guard) = self.stderr_tail.lock() else {
+            return None;
+        };
 
-        use std::io::Read;
-        if let Some(stderr) = child.stderr.as_mut() {
-            let mut buf = Vec::with_capacity(4096);
-            // non-blocking: read whatever is available
-            let _ = stderr.read_to_end(&mut buf);
-            if buf.is_empty() {
-                return None;
-            }
-            String::from_utf8(buf).ok()
-        } else {
-            None
+        if guard.is_empty() {
+            return None;
         }
+
+        Some(guard.iter().cloned().collect::<Vec<_>>().join("\n"))
     }
 
     // 仅清理本程序托管过的内核 PID，避免误杀用户自行运行的 sing-box 进程。
@@ -1002,4 +1055,28 @@ impl ProcessManager {
 // 使用PID强制终止进程
 fn kill_process_by_pid(pid: u32) -> std::io::Result<()> {
     crate::platform::kill_process_by_pid(pid).map_err(std::io::Error::other)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn stderr_tail_should_keep_only_recent_lines() {
+        let manager = ProcessManager::new();
+
+        for i in 0..(STDERR_TAIL_LIMIT + 25) {
+            ProcessManager::push_stderr_tail(&manager.stderr_tail, format!("line-{i}"));
+        }
+
+        let output = manager
+            .read_stderr_output()
+            .await
+            .expect("stderr tail should exist");
+        let lines = output.lines().collect::<Vec<_>>();
+
+        assert_eq!(lines.len(), STDERR_TAIL_LIMIT);
+        assert!(!output.contains("line-0"));
+        assert!(output.contains(&format!("line-{}", STDERR_TAIL_LIMIT + 24)));
+    }
 }

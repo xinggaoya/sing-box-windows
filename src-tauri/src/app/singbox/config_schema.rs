@@ -22,6 +22,8 @@ pub(crate) struct LogConfig {
     pub disabled: bool,
     pub level: String,
     pub timestamp: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

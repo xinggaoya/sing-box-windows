@@ -127,7 +127,11 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                         }
 
                         if should_attempt_self_heal && Instant::now() >= next_tun_self_heal_at {
-                            info!("触发 TUN 自愈重启，准备重启内核进程");
+                            let port_value = GUARDED_API_PORT.load(Ordering::Relaxed);
+                            info!(
+                                "触发 TUN 自愈重启，准备重启内核进程: api_port={}, failures={}, cooldown_secs={}",
+                                port_value, tun_connectivity_failures, policy.cooldown_secs
+                            );
 
                             let config_path = resolve_config_path_or_default(&app_handle).await;
                             let tun_enabled = GUARDED_TUN_ENABLED.load(Ordering::Relaxed);
@@ -137,7 +141,6 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                                 .await
                             {
                                 Ok(_) => {
-                                    let port_value = GUARDED_API_PORT.load(Ordering::Relaxed);
                                     KERNEL_STATE.mark_running(port_value);
                                     if port_value > 0 {
                                         if let Err(e) = start_websocket_relay(
@@ -196,7 +199,12 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                     continue;
                 }
                 _ => {
-                    info!("守护检测到内核停止，尝试自动重启...");
+                    let port_value = GUARDED_API_PORT.load(Ordering::Relaxed);
+                    let tun_enabled = GUARDED_TUN_ENABLED.load(Ordering::Relaxed);
+                    info!(
+                        "守护检测到内核停止，尝试自动重启: api_port={}, tun_enabled={}",
+                        port_value, tun_enabled
+                    );
                     KERNEL_STATE.mark_crashed();
 
                     emit_kernel_stopped(&app_handle);
@@ -235,7 +243,6 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                         break;
                     }
 
-                    let tun_enabled = GUARDED_TUN_ENABLED.load(Ordering::Relaxed);
                     if let Err(err) = PROCESS_MANAGER
                         .start(&app_handle, &config_path, tun_enabled)
                         .await
@@ -270,7 +277,6 @@ pub(super) async fn enable_kernel_guard(app_handle: AppHandle, api_port: u16, tu
                         continue;
                     }
 
-                    let port_value = GUARDED_API_PORT.load(Ordering::Relaxed);
                     KERNEL_STATE.mark_running(port_value);
                     if port_value > 0 {
                         if let Err(e) =
