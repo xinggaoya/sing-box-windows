@@ -118,6 +118,31 @@
       </div>
 
       <!-- Proxy Modes -->
+      <div class="grid-section proxy-port-section">
+        <div class="section-header">
+          <h3 class="section-title">{{ t('home.proxyPort.title') }}</h3>
+          <n-button size="small" secondary @click="showPortModal = true">
+            <template #icon>
+              <n-icon><SettingsOutline /></n-icon>
+            </template>
+            {{ t('common.edit') }}
+          </n-button>
+        </div>
+        <div class="proxy-port-card">
+          <div class="proxy-port-desc">{{ t('home.proxyPort.desc') }}</div>
+          <div class="proxy-port-list">
+            <div class="proxy-port-row">
+              <span class="proxy-port-protocol">HTTP</span>
+              <code>{{ proxyAddress }}</code>
+            </div>
+            <div class="proxy-port-row">
+              <span class="proxy-port-protocol">SOCKS5</span>
+              <code>{{ proxyAddress }}</code>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="grid-section">
         <div class="section-header">
           <h3 class="section-title">{{ t('home.proxyHeader.flowMode') }}</h3>
@@ -180,6 +205,8 @@
         </div>
       </div>
     </div>
+
+    <PortSettingsDialog v-model:show="showPortModal" />
   </div>
 </template>
 
@@ -208,6 +235,7 @@ import { proxyService } from '@/services/proxy-service'
 import { sudoService } from '@/services/sudo-service'
 import { systemService } from '@/services/system-service'
 import StatusCard from '@/components/common/StatusCard.vue'
+import PortSettingsDialog from '@/components/common/PortSettingsDialog.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
 import { useSudoStore } from '@/stores'
@@ -240,6 +268,7 @@ const isAdmin = ref(false)
 const platform = ref<'windows' | 'linux' | 'macos' | 'unknown'>('unknown')
 const currentNodeProxyMode = ref('rule')
 const modeSwitchPending = ref(false)
+const showPortModal = ref(false)
 
 const isWindowsPlatform = computed(() => platform.value === 'windows')
 const isUnixPlatform = computed(() => platform.value === 'linux' || platform.value === 'macos')
@@ -265,6 +294,7 @@ const statusTitle = computed(() => {
 
 const systemProxyEnabled = computed(() => appStore.systemProxyEnabled)
 const tunProxyEnabled = computed(() => appStore.tunEnabled)
+const proxyAddress = computed(() => `127.0.0.1:${appStore.proxyPort}`)
 
 const nodeProxyModes = [
   {
@@ -714,6 +744,10 @@ onMounted(async () => {
 
 /* Sections */
 .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
@@ -730,6 +764,49 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.proxy-port-card {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+}
+
+.proxy-port-desc {
+  margin-bottom: 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.proxy-port-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.proxy-port-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+}
+
+.proxy-port-protocol {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.proxy-port-row code {
+  color: var(--text-primary);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
 }
 
 .mode-card {

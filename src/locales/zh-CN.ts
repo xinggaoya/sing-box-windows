@@ -62,6 +62,10 @@ export default {
       flowMode: '流量代理模式',
       nodeMode: '节点代理模式',
     },
+    proxyPort: {
+      title: '本地代理端口',
+      desc: '浏览器插件或其他客户端可使用以下地址；HTTP 和 SOCKS5 共用同一个 mixed 入站端口。',
+    },
     statusDescriptions: {
       runningDesc: '内核正在运行，代理服务可用',
       disconnectedDesc: '内核已启动但连接异常，请检查配置',

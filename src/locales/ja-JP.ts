@@ -77,6 +77,10 @@ export default {
       flowMode: 'トラフィックプロキシモード',
       nodeMode: 'ノードプロキシモード',
     },
+    proxyPort: {
+      title: 'ローカルプロキシポート',
+      desc: 'ブラウザ拡張機能や他のクライアントでこのアドレスを使用できます。HTTP と SOCKS5 は同じ mixed インバウンドポートを共有します。',
+    },
 
     // 状态描述
     status: {

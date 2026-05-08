@@ -141,31 +141,7 @@
       </n-tabs>
     </div>
 
-    <!-- Port Modal -->
-    <n-modal
-      v-model:show="showPortModal"
-      preset="dialog"
-      :title="t('setting.network.portSettings')"
-      class="modern-modal"
-      :style="{ width: '400px' }"
-    >
-      <n-form label-placement="top">
-        <n-form-item :label="t('setting.network.proxyPort')">
-          <n-input-number v-model:value="tempProxyPort" :min="1024" :max="65535" />
-        </n-form-item>
-        <n-form-item :label="t('setting.network.apiPort')">
-          <n-input-number v-model:value="tempApiPort" :min="1024" :max="65535" />
-        </n-form-item>
-      </n-form>
-      <template #action>
-        <n-space justify="end">
-          <n-button @click="showPortModal = false">{{ t('common.cancel') }}</n-button>
-          <n-button type="primary" @click="savePortSettings" :loading="portSettingsLoading">
-            {{ t('common.save') }}
-          </n-button>
-        </n-space>
-      </template>
-    </n-modal>
+    <PortSettingsDialog v-model:show="showPortModal" />
 
     <!-- Manual Kernel Import Modal -->
     <n-modal
@@ -235,6 +211,7 @@ import type { UpdateChannel } from '@/stores/app/UpdateStore'
 import { systemService, type BackupImportResult } from '@/services/system-service'
 import { supportedLocales } from '@/locales'
 import PageHeader from '@/components/common/PageHeader.vue'
+import PortSettingsDialog from '@/components/common/PortSettingsDialog.vue'
 import { ACCENT_PRESETS, TUN_STACK_OPTIONS } from '@/views/setting/setting-options'
 import { useKernelDownload } from '@/views/setting/useKernelDownload'
 import { useUpdateProgressListener } from '@/views/setting/useUpdateProgressListener'
@@ -277,9 +254,6 @@ const backupPreview = ref<BackupImportResult | null>(null)
 const accentPresets = ACCENT_PRESETS
 
 const showPortModal = ref(false)
-const tempProxyPort = ref(12080)
-const tempApiPort = ref(12081)
-const portSettingsLoading = ref(false)
 const showManualImportModal = ref(false)
 const manualImporting = ref(false)
 const manualKernelPath = ref('')
@@ -702,24 +676,7 @@ const handleRestoreBackup = async () => {
 }
 
 const showPortSettings = () => {
-  tempProxyPort.value = appStore.proxyPort
-  tempApiPort.value = appStore.apiPort
   showPortModal.value = true
-}
-
-const savePortSettings = async () => {
-  portSettingsLoading.value = true
-  try {
-    appStore.proxyPort = tempProxyPort.value
-    appStore.apiPort = tempApiPort.value
-    await appStore.saveToBackend({ applyRuntime: true })
-    message.success(t('common.saveSuccess'))
-    showPortModal.value = false
-  } catch (e) {
-    message.error(t('common.saveFailed'))
-  } finally {
-    portSettingsLoading.value = false
-  }
 }
 
 onMounted(async () => {

@@ -62,6 +62,10 @@ export default {
       flowMode: 'Flow Proxy Mode',
       nodeMode: 'Node Proxy Mode',
     },
+    proxyPort: {
+      title: 'Local Proxy Port',
+      desc: 'Use these addresses in browser extensions or other clients. HTTP and SOCKS5 share the same mixed inbound port.',
+    },
     statusDescriptions: {
       runningDesc: 'Kernel is running, proxy service available',
       disconnectedDesc: 'Kernel started but connection abnormal, please check configuration',
