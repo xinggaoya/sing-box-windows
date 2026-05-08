@@ -1,12 +1,12 @@
 <template>
   <div class="page-container">
-    <!-- Header Section -->
     <div class="home-header">
       <div class="header-info">
-        <h1 class="page-title">{{ t('nav.home') }}</h1>
-        <div class="status-badge" :class="statusClass">
-          <div class="status-dot"></div>
-          {{ statusTitle }}
+        <div class="status-hero" :class="statusClass">
+          <div class="status-indicator"></div>
+          <div class="status-text">
+            <div class="status-label">{{ statusTitle }}</div>
+          </div>
         </div>
       </div>
 
@@ -71,9 +71,7 @@
       </div>
     </n-alert>
 
-    <!-- Main Grid -->
     <div class="dashboard-grid">
-      <!-- Traffic Stats -->
       <div class="grid-section full-width">
         <div class="stats-row">
           <StatusCard
@@ -108,7 +106,6 @@
           </StatusCard>
         </div>
 
-        <!-- Traffic Chart -->
         <div class="chart-section">
           <TrafficChart
             :upload-speed="trafficStore.traffic.up"
@@ -117,35 +114,34 @@
         </div>
       </div>
 
-      <!-- Proxy Modes -->
-      <div class="grid-section proxy-port-section">
-        <div class="section-header">
-          <h3 class="section-title">{{ t('home.proxyPort.title') }}</h3>
-          <n-button size="small" secondary @click="showPortModal = true">
-            <template #icon>
-              <n-icon><SettingsOutline /></n-icon>
-            </template>
+      <div class="grid-section">
+        <div class="card-header">
+          <div class="card-header-icon port-icon">
+            <n-icon :size="16"><SettingsOutline /></n-icon>
+          </div>
+          <h3 class="card-title">{{ t('home.proxyPort.title') }}</h3>
+          <n-button size="tiny" quaternary @click="showPortModal = true">
             {{ t('common.edit') }}
           </n-button>
         </div>
         <div class="proxy-port-card">
-          <div class="proxy-port-desc">{{ t('home.proxyPort.desc') }}</div>
-          <div class="proxy-port-list">
-            <div class="proxy-port-row">
-              <span class="proxy-port-protocol">HTTP</span>
-              <code>{{ proxyAddress }}</code>
-            </div>
-            <div class="proxy-port-row">
-              <span class="proxy-port-protocol">SOCKS5</span>
-              <code>{{ proxyAddress }}</code>
-            </div>
+          <div class="port-row">
+            <div class="port-protocol">HTTP</div>
+            <code class="port-address">{{ proxyAddress }}</code>
+          </div>
+          <div class="port-row">
+            <div class="port-protocol">SOCKS5</div>
+            <code class="port-address">{{ proxyAddress }}</code>
           </div>
         </div>
       </div>
 
       <div class="grid-section">
-        <div class="section-header">
-          <h3 class="section-title">{{ t('home.proxyHeader.flowMode') }}</h3>
+        <div class="card-header">
+          <div class="card-header-icon flow-icon">
+            <n-icon :size="16"><SwapVerticalOutline /></n-icon>
+          </div>
+          <h3 class="card-title">{{ t('home.proxyHeader.flowMode') }}</h3>
         </div>
         <div class="mode-cards">
           <div
@@ -153,12 +149,12 @@
             :class="{ active: systemProxyEnabled }"
             @click="toggleSystemProxy(!systemProxyEnabled)"
           >
-            <div class="mode-icon">
-              <n-icon><GlobeOutline /></n-icon>
+            <div class="mode-card-icon" :class="{ active: systemProxyEnabled }">
+              <n-icon :size="20"><GlobeOutline /></n-icon>
             </div>
-            <div class="mode-info">
-              <div class="mode-name">{{ t('home.proxyMode.system') }}</div>
-              <div class="mode-desc">{{ t('home.proxyMode.systemTip') }}</div>
+            <div class="mode-card-info">
+              <div class="mode-card-name">{{ t('home.proxyMode.system') }}</div>
+              <div class="mode-card-desc">{{ t('home.proxyMode.systemTip') }}</div>
             </div>
             <n-switch :value="systemProxyEnabled" size="small" :disabled="modeSwitchPending" />
           </div>
@@ -168,22 +164,24 @@
             :class="{ active: tunProxyEnabled }"
             @click="toggleTunProxy(!tunProxyEnabled)"
           >
-            <div class="mode-icon">
-              <n-icon><FlashOutline /></n-icon>
+            <div class="mode-card-icon" :class="{ active: tunProxyEnabled }">
+              <n-icon :size="20"><FlashOutline /></n-icon>
             </div>
-            <div class="mode-info">
-              <div class="mode-name">{{ t('home.proxyMode.tun') }}</div>
-              <div class="mode-desc">{{ t('home.proxyMode.tunTip') }}</div>
+            <div class="mode-card-info">
+              <div class="mode-card-name">{{ t('home.proxyMode.tun') }}</div>
+              <div class="mode-card-desc">{{ t('home.proxyMode.tunTip') }}</div>
             </div>
             <n-switch :value="tunProxyEnabled" size="small" :disabled="modeSwitchPending" />
           </div>
         </div>
       </div>
 
-      <!-- Node Modes -->
       <div class="grid-section">
-        <div class="section-header">
-          <h3 class="section-title">{{ t('home.proxyHeader.nodeMode') }}</h3>
+        <div class="card-header">
+          <div class="card-header-icon node-icon">
+            <n-icon :size="16"><RadioOutline /></n-icon>
+          </div>
+          <h3 class="card-title">{{ t('home.proxyHeader.nodeMode') }}</h3>
         </div>
         <div class="mode-cards">
           <div
@@ -193,14 +191,14 @@
             :class="{ active: currentNodeProxyMode === mode.value }"
             @click="handleNodeProxyModeChange(mode.value)"
           >
-            <div class="mode-icon">
-              <n-icon><component :is="mode.icon" /></n-icon>
+            <div class="mode-card-icon" :class="{ active: currentNodeProxyMode === mode.value }">
+              <n-icon :size="20"><component :is="mode.icon" /></n-icon>
             </div>
-            <div class="mode-info">
-              <div class="mode-name">{{ t(mode.nameKey) }}</div>
-              <div class="mode-desc">{{ t(mode.tipKey) }}</div>
+            <div class="mode-card-info">
+              <div class="mode-card-name">{{ t(mode.nameKey) }}</div>
+              <div class="mode-card-desc">{{ t(mode.tipKey) }}</div>
             </div>
-            <div class="radio-indicator"></div>
+            <div class="radio-dot" :class="{ active: currentNodeProxyMode === mode.value }"></div>
           </div>
         </div>
       </div>
@@ -224,6 +222,7 @@ import {
   FlashOutline,
   RadioOutline,
   SettingsOutline,
+  SwapVerticalOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -249,7 +248,6 @@ const { t } = useI18n()
 const message = useMessage()
 const dialog = useDialog()
 
-// Stores
 const appStore = useAppStore()
 const kernelStore = useKernelStore()
 const trafficStore = useTrafficStore()
@@ -257,7 +255,6 @@ const connectionStore = useConnectionStore()
 const themeStore = useThemeStore()
 const sudoStore = useSudoStore()
 
-// Kernel status (shared with layout)
 const {
   statusClass,
   statusState,
@@ -316,7 +313,6 @@ const getKernelFailureText = (fallback: string) =>
 
 const syncCurrentNodeProxyMode = async () => {
   try {
-    // 首页展示应以当前后端真实状态为准，而不是本地默认值。
     const mode = await proxyService.getCurrentProxyMode()
     if (mode === 'global' || mode === 'rule') {
       currentNodeProxyMode.value = mode
@@ -326,7 +322,6 @@ const syncCurrentNodeProxyMode = async () => {
   }
 }
 
-// Methods
 const toggleSystemProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
 
@@ -360,10 +355,9 @@ const confirmTunSwitch = () => {
 
     const handlePositiveClick = async () => {
       modeSwitchPending.value = true
-      if (dialogReactive) dialogReactive.loading = true // 显示加载条，提示正在以管理员方式重启
+      if (dialogReactive) dialogReactive.loading = true
 
       try {
-        // 非管理员场景下先准备好配置并请求以管理员重启
         const success = await prepareTunModeWithAdminRestart()
         finish(success)
         return success
@@ -420,7 +414,6 @@ const enableTunWithKernelRestart = async (options?: { allowSudoRetry?: boolean }
 
     await appStore.toggleTun(false)
 
-    // Linux/macOS：sudo 密码缺失/失效时，提示用户重新设置，并允许一次自动重试
     if (isUnixPlatform.value) {
       const code = parseSudoCode(getKernelFailureText(''))
       if (code === 'required' || code === 'invalid') {
@@ -453,7 +446,6 @@ const toggleTunProxy = async (value: boolean) => {
 
   if (value) {
     if (isWindowsPlatform.value) {
-      // Windows：启用TUN模式前先刷新管理员状态，有权限时不弹窗直接处理
       await checkAdmin()
 
       if (isAdmin.value) {
@@ -462,7 +454,6 @@ const toggleTunProxy = async (value: boolean) => {
         await confirmTunSwitch()
       }
     } else if (isUnixPlatform.value) {
-      // Linux/macOS：首次启用 TUN 弹窗收集系统密码，后续自动 sudo 提权启动内核
       const status = await sudoService.getStatus()
       if (!status.supported) {
         message.error(t('home.sudoPassword.unsupported'))
@@ -477,7 +468,6 @@ const toggleTunProxy = async (value: boolean) => {
       message.error(t('home.sudoPassword.unsupported'))
     }
   } else {
-    // 禁用TUN模式 - 需要重启内核
     try {
       modeSwitchPending.value = true
       await appStore.toggleTun(false)
@@ -489,12 +479,10 @@ const toggleTunProxy = async (value: boolean) => {
         return
       }
 
-      // TUN模式切换需要重启内核
       const success = await kernelStore.restartKernel()
       if (success) {
         message.success(t('notification.proxyModeChanged'))
       } else {
-        // 如果重启失败，恢复状态
         await appStore.toggleTun(true)
         message.error(t('home.restartFailed'))
       }
@@ -531,15 +519,12 @@ const restartAsAdmin = async () => {
   }
 }
 
-// 已移除switchProxyModeAndRefreshKernel - 不再需要，因为System Proxy和TUN是独立的
-
 const requestRestartAsAdmin = async () => {
   await systemService.restartAsAdmin()
 }
 
 const prepareTunModeWithAdminRestart = async () => {
   try {
-    // 保存TUN启用状态
     await appStore.toggleTun(true)
     const applied = await kernelStore.applyProxySettings()
     if (!applied) {
@@ -549,12 +534,10 @@ const prepareTunModeWithAdminRestart = async () => {
     }
     await appStore.saveToBackend()
 
-    // 停止内核
     if (appStore.isRunning) {
       await kernelStore.stopKernel()
     }
 
-    // 重启为管理员
     await requestRestartAsAdmin()
     return true
   } catch (error) {
@@ -614,79 +597,92 @@ onMounted(async () => {
   gap: var(--layout-page-gap, 20px);
 }
 
-/* Header */
 .home-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
 }
 
-.header-info {
+.status-hero {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
+  padding: 10px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
 }
 
-.page-title {
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  letter-spacing: -0.02em;
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
 }
 
-.status-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
+.status-hero.running {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.04);
 }
 
-.status-badge.running {
-  background: rgba(16, 185, 129, 0.1);
+.status-hero.running .status-indicator {
+  background: #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+}
+
+.status-hero.running .status-label {
   color: #10b981;
 }
 
-.status-badge.pending {
-  background: rgba(245, 158, 11, 0.1);
+.status-hero.pending,
+.status-hero.disconnected {
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.status-hero.pending .status-indicator,
+.status-hero.disconnected .status-indicator {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.status-hero.pending .status-label,
+.status-hero.disconnected .status-label {
   color: #f59e0b;
 }
 
-.status-badge.disconnected {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+.status-hero.stopped,
+.status-hero.failed {
+  border-color: rgba(239, 68, 68, 0.2);
 }
 
-.status-badge.failed {
-  background: rgba(239, 68, 68, 0.12);
+.status-hero.stopped .status-indicator,
+.status-hero.failed .status-indicator {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.status-hero.stopped .status-label,
+.status-hero.failed .status-label {
   color: #ef4444;
 }
 
-.status-badge.crashed {
-  background: rgba(249, 115, 22, 0.12);
+.status-hero.crashed {
+  border-color: rgba(249, 115, 22, 0.2);
+}
+
+.status-hero.crashed .status-indicator {
+  background: #f97316;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+}
+
+.status-hero.crashed .status-label {
   color: #f97316;
 }
 
-.status-badge.stopped {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.status-badge.running .status-dot {
-  box-shadow: 0 0 8px currentColor;
+.status-label {
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .header-actions {
@@ -725,7 +721,6 @@ onMounted(async () => {
   padding-left: 18px;
 }
 
-/* Grid */
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -742,79 +737,93 @@ onMounted(async () => {
   gap: var(--layout-grid-gap, 24px);
 }
 
-/* Sections */
-.section-header {
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.card-header-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-header-icon.port-icon {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0ea5e9;
+}
+
+.card-header-icon.flow-icon {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+}
+
+.card-header-icon.node-icon {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.proxy-port-card {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.port-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
 }
 
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  text-transform: uppercase;
+.port-protocol {
+  font-size: 11px;
+  font-weight: 700;
   color: var(--text-tertiary);
-  letter-spacing: 0.05em;
-  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.port-address {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  color: var(--text-primary);
 }
 
 .mode-cards {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.proxy-port-card {
-  padding: 16px;
-  border-radius: 16px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-}
-
-.proxy-port-desc {
-  margin-bottom: 14px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.proxy-port-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.proxy-port-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--bg-tertiary);
-}
-
-.proxy-port-protocol {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.proxy-port-row code {
-  color: var(--text-primary);
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
-  font-size: 13px;
+  gap: 8px;
 }
 
 .mode-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border-radius: 16px;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 14px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   cursor: pointer;
@@ -823,15 +832,15 @@ onMounted(async () => {
 
 .mode-card:hover {
   border-color: var(--border-hover);
-  transform: translateX(4px);
+  background: var(--bg-secondary);
 }
 
 .mode-card.active {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(99, 102, 241, 0.02));
   border-color: var(--primary-color);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04), rgba(99, 102, 241, 0.01));
 }
 
-.mode-icon {
+.mode-card-icon {
   width: 40px;
   height: 40px;
   border-radius: 10px;
@@ -840,52 +849,46 @@ onMounted(async () => {
   justify-content: center;
   background: var(--bg-tertiary);
   color: var(--text-secondary);
-  font-size: 20px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
-.mode-card.active .mode-icon {
+.mode-card-icon.active {
   background: var(--primary-color);
   color: white;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
 }
 
-.mode-info {
+.mode-card-info {
   flex: 1;
+  min-width: 0;
 }
 
-.mode-name {
+.mode-card-name {
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 2px;
 }
 
-.mode-desc {
+.mode-card-desc {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
+  margin-top: 1px;
 }
 
-.radio-indicator {
-  width: 20px;
-  height: 20px;
+.radio-dot {
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: 2px solid var(--border-color);
-  position: relative;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
-.mode-card.active .radio-indicator {
+.radio-dot.active {
   border-color: var(--primary-color);
-}
-
-.mode-card.active .radio-indicator::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
   background: var(--primary-color);
+  box-shadow: inset 0 0 0 3px var(--panel-bg);
 }
 
 @media (max-width: 768px) {
@@ -903,12 +906,12 @@ onMounted(async () => {
 }
 
 .chart-section {
-  margin-top: 24px;
+  margin-top: 20px;
   height: 200px;
   background: var(--glass-bg);
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--glass-border);
   overflow: hidden;
-  padding: 16px;
+  padding: 14px;
 }
 </style>
