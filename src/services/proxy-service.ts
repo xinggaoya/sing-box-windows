@@ -1,5 +1,6 @@
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
+import type { ProxyProvidersResponse, RuleProvidersResponse, RulesResponse } from '@/types/controller'
 import { NotificationService } from './notification-service'
 import { invokeWithAppContext } from './invoke-client'
 import i18n from '@/locales'
@@ -182,6 +183,12 @@ export class ProxyService {
     })
   }
 
+  async getProxyProviders() {
+    return invokeWithAppContext<ProxyProvidersResponse>('get_proxy_providers', undefined, {
+      withApiPort: 'port',
+    })
+  }
+
   async changeProxy(group: string, proxy: string, server?: string, port?: number) {
     const args = { group, proxy, server, port }
     return invokeWithAppContext<void>(
@@ -246,8 +253,36 @@ export class ProxyService {
 
   async getRules(port?: number) {
     const args = typeof port === 'number' ? { port } : undefined
-    return invokeWithAppContext<unknown>('get_rules', args, {
+    return invokeWithAppContext<RulesResponse>('get_rules', args, {
       withApiPort: typeof port === 'number' ? undefined : 'port'
+    })
+  }
+
+  async getRuleProviders(port?: number) {
+    const args = typeof port === 'number' ? { port } : undefined
+    return invokeWithAppContext<RuleProvidersResponse>('get_rule_providers', args, {
+      withApiPort: typeof port === 'number' ? undefined : 'port',
+    })
+  }
+
+  async updateProxyProvider(provider: string, port?: number) {
+    const args = typeof port === 'number' ? { provider, port } : { provider }
+    return invokeWithAppContext<void>('update_proxy_provider', args, {
+      withApiPort: typeof port === 'number' ? undefined : 'port',
+    })
+  }
+
+  async updateRuleProvider(provider: string, port?: number) {
+    const args = typeof port === 'number' ? { provider, port } : { provider }
+    return invokeWithAppContext<void>('update_rule_provider', args, {
+      withApiPort: typeof port === 'number' ? undefined : 'port',
+    })
+  }
+
+  async toggleRuleDisabled(index: number, disabled: boolean, port?: number) {
+    const args = typeof port === 'number' ? { index, disabled, port } : { index, disabled }
+    return invokeWithAppContext<void>('toggle_rule_disabled', args, {
+      withApiPort: typeof port === 'number' ? undefined : 'port',
     })
   }
 }

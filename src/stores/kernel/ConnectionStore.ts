@@ -1,298 +1,227 @@
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { useLocalStorage } from '@vueuse/core'
 import { APP_EVENTS } from '@/constants/events'
 import { eventService } from '@/services/event-service'
-import type { ConnectionItem, ConnectionsDataPayload } from '@/types/events'
+import { connectionService } from '@/services/connection-service'
+import type { ConnectionItem, ConnectionsDataPayload, MemoryStatsPayload } from '@/types/events'
 
-// 定义连接状态接口
-interface ConnectionState {
-  connected: boolean
-  connecting: boolean
-  error: Error | null
-}
+type ConnectionTab = 'active' | 'closed'
+type ConnectionSortKey =
+  | 'start'
+  | 'download'
+  | 'upload'
+  | 'downloadSpeed'
+  | 'uploadSpeed'
+  | 'host'
+  | 'rule'
+  | 'process'
 
-export const useConnectionStore = defineStore(
-  'connection',
-  () => {
-    // 连接数据配置
-    const MAX_CONNECTIONS = 500 // 最大保存连接数
-    const CONNECTION_CLEANUP_THRESHOLD = 400 // 清理阈值
-    const CONNECTION_RETAIN_COUNT = 200 // 清理后保留的连接数
+export const useConnectionStore = defineStore('connection', () => {
+  const MAX_CLOSED_CONNECTIONS = 500
 
-    // 连接状态
-    const connectionsState = ref<ConnectionState>({
-      connected: false,
-      connecting: false,
-      error: null,
-    })
+  const activeConnections = ref<ConnectionItem[]>([])
+  const closedConnections = ref<ConnectionItem[]>([])
+  const latestConnectionMsg = ref<ConnectionsDataPayload | null>(null)
+  const latestMemory = ref<MemoryStatsPayload | null>(null)
+  const paused = ref(false)
+  const loading = ref(false)
+  const closingMap = ref<Record<string, boolean>>({})
+  const isClosingAll = ref(false)
 
-    const memoryState = ref<ConnectionState>({
-      connected: false,
-      connecting: false,
-      error: null,
-    })
+  const activeTab = useLocalStorage<ConnectionTab>('connections-active-tab', 'active')
+  const searchQuery = useLocalStorage('connections-search-query', '')
+  const quickFilterEnabled = useLocalStorage('connections-quick-filter-enabled', false)
+  const sourceIPFilter = useLocalStorage('connections-source-ip-filter', '')
+  const sortKey = useLocalStorage<ConnectionSortKey>('connections-sort-key', 'start')
+  const sortDesc = useLocalStorage('connections-sort-desc', true)
+  const groupingKey = useLocalStorage<string | null>('connections-grouping-key', null)
 
-    // 连接信息
-    const connections = ref<ConnectionItem[]>([])
-    const connectionsTotal = ref({
-      upload: 0,
-      download: 0,
-    })
+  const connectionState = ref({
+    connected: false,
+    connecting: false,
+    error: null as Error | null,
+  })
 
-    // 内存使用信息
-    const memory = ref({
-      inuse: 0,
-      oslimit: 0,
-      lastUpdated: Date.now(), // 添加最后更新时间戳
-    })
+  const memoryState = ref({
+    connected: false,
+    connecting: false,
+    error: null as Error | null,
+  })
 
-    // 健康检查定时器
-    let connectionsHealthCheck: number | null = null
-    let memoryHealthCheck: number | null = null
+  const connectionsTotal = computed(() => ({
+    upload: latestConnectionMsg.value?.uploadTotal || 0,
+    download: latestConnectionMsg.value?.downloadTotal || 0,
+  }))
 
-    // 内存清理定时器
-    let memoryCleanupTimer: number | null = null
+  const memory = computed(() => ({
+    inuse: latestMemory.value?.inuse || 0,
+    oslimit: latestMemory.value?.oslimit || 0,
+    lastUpdated: Date.now(),
+  }))
 
-    // 事件监听器状态
-    let eventListenersSetup = false
+  const connections = computed(() => activeConnections.value)
 
-    // 健康检查函数 - 连接数据
-    const startConnectionsHealthCheck = () => {
-      // 清除已有的定时器
-      if (connectionsHealthCheck !== null) {
-        clearInterval(connectionsHealthCheck)
-      }
+  let connectionsUnlisten: (() => void) | null = null
+  let memoryUnlisten: (() => void) | null = null
 
-      // 设置新的定时器，每5秒检查一次
-      connectionsHealthCheck = window.setInterval(() => {
-        const lastConnection =
-          connections.value.length > 0 ? connections.value[connections.value.length - 1] : null
-
-        // 如果超过15秒没有新数据且状态为已连接，尝试重新连接
-        if (
-          connectionsState.value.connected &&
-          (!lastConnection || Date.now() - new Date(lastConnection.start).getTime() > 15000)
-        ) {
-          console.log('🔄 连接数据长时间未更新，可能需要重新连接')
-        }
-      }, 5000)
-    }
-
-    // 健康检查函数 - 内存数据
-    const startMemoryHealthCheck = () => {
-      // 清除已有的定时器
-      if (memoryHealthCheck !== null) {
-        clearInterval(memoryHealthCheck)
-      }
-
-      // 设置新的定时器，每5秒检查一次
-      memoryHealthCheck = window.setInterval(() => {
-        // 如果超过10秒没有更新数据且状态为已连接，尝试重新连接
-        if (memoryState.value.connected && Date.now() - memory.value.lastUpdated > 10000) {
-          console.log('🔄 内存数据长时间未更新，可能需要重新连接')
-        }
-      }, 5000)
-    }
-
-    // 设置Tauri事件监听器
-    const setupEventListeners = async () => {
-      if (eventListenersSetup) return
-
-      try {
-        // 监听连接数据事件
-        await eventService.onConnectionsData((data) => {
-          if (data && Array.isArray(data.connections)) {
-            updateConnections(data)
-            connectionsState.value.connected = true
-            connectionsState.value.error = null
-          }
-        })
-
-        // 监听内存数据事件
-        await eventService.onMemoryData((data) => {
-          if (data && typeof data.inuse === 'number' && typeof data.oslimit === 'number') {
-            updateMemory(data)
-            memoryState.value.connected = true
-            memoryState.value.error = null
-          }
-        })
-
-        // 当收到任何数据时，说明连接正常
-        connectionsState.value.connected = true
-        memoryState.value.connected = true
-
-        eventListenersSetup = true
-        console.log('✅ 连接Store事件监听器设置完成')
-      } catch (error) {
-        console.error('❌ 连接Store事件监听器设置失败:', error)
-      }
-    }
-
-    // 清理事件监听器
-    const cleanupEventListeners = () => {
-      if (!eventListenersSetup) return
-
-      try {
-        eventService.removeEventListener(APP_EVENTS.connectionsData)
-        eventService.removeEventListener(APP_EVENTS.memoryData)
-      } catch (error) {
-        console.error('清理连接监听器时出错:', error)
-      } finally {
-        eventListenersSetup = false
-      }
-
-      // 清除健康检查定时器
-      if (connectionsHealthCheck !== null) {
-        clearInterval(connectionsHealthCheck)
-        connectionsHealthCheck = null
-      }
-
-      if (memoryHealthCheck !== null) {
-        clearInterval(memoryHealthCheck)
-        memoryHealthCheck = null
-      }
-    }
-
-    // 重置连接数据
-    const resetData = () => {
-      connections.value = []
-      connectionsTotal.value = {
-        upload: 0,
-        download: 0,
-      }
-      memory.value = {
-        inuse: 0,
-        oslimit: 0,
-        lastUpdated: Date.now(),
-      }
-      connectionsState.value = {
-        connected: false,
-        connecting: false,
-        error: null,
-      }
-      memoryState.value = {
-        connected: false,
-        connecting: false,
-        error: null,
-      }
-    }
-
-    // 智能连接数据清理
-    const smartConnectionCleanup = () => {
-      if (connections.value.length <= CONNECTION_CLEANUP_THRESHOLD) {
-        return // 未达到清理阈值
-      }
-
-      // 按时间排序，保留最新的连接
-      const sortedConnections = [...connections.value].sort(
-        (a, b) => new Date(b.start).getTime() - new Date(a.start).getTime(),
-      )
-
-      connections.value = sortedConnections.slice(0, CONNECTION_RETAIN_COUNT)
-      console.log(`🧹 清理连接数据，保留 ${connections.value.length} 条最新连接`)
-    }
-
-    // 启动内存监控
-    const startMemoryMonitoring = () => {
-      if (memoryCleanupTimer) {
-        clearInterval(memoryCleanupTimer)
-      }
-
-      memoryCleanupTimer = window.setInterval(() => {
-        // 检查连接数量并进行清理
-        if (connections.value.length >= CONNECTION_CLEANUP_THRESHOLD) {
-          smartConnectionCleanup()
-        }
-
-        // 检查内存数据时效性
-        const now = Date.now()
-        if (now - memory.value.lastUpdated > 60000) {
-          // 1分钟无更新
-          // 可能需要重新连接内存监控
-          if (memoryState.value.connected) {
-            console.log('🔄 内存数据长时间未更新，可能需要重新连接')
-          }
-        }
-      }, 30 * 1000) // 30秒检查一次
-    }
-
-    // 停止内存监控
-    const stopMemoryMonitoring = () => {
-      if (memoryCleanupTimer) {
-        clearInterval(memoryCleanupTimer)
-        memoryCleanupTimer = null
-      }
-    }
-
-    // 更新连接数据（优化版本）
-    const updateConnections = (data: ConnectionsDataPayload) => {
-      try {
-        if (data?.connections && Array.isArray(data.connections)) {
-          // 限制连接数量以防止内存溢出
-          const newConnections = data.connections.slice(0, MAX_CONNECTIONS)
-          connections.value = newConnections
-
-          connectionsTotal.value = {
-            upload: data.uploadTotal || 0,
-            download: data.downloadTotal || 0,
-          }
-        }
-      } catch (error) {
-        console.error('更新连接数据失败:', error)
-      }
-    }
-
-    // 更新内存数据（优化版本）
-    const updateMemory = (data: { inuse: number; oslimit: number }) => {
-      try {
-        if (data && typeof data.inuse === 'number' && typeof data.oslimit === 'number') {
-          memory.value = {
-            inuse: data.inuse,
-            oslimit: data.oslimit,
-            lastUpdated: Date.now(),
-          }
-        }
-      } catch (error) {
-        console.error('更新内存数据失败:', error)
-      }
-    }
-
-    // 初始化Store
-    const initializeStore = async () => {
-      try {
-        console.log('🔧 初始化 ConnectionStore...')
-        await setupEventListeners()
-        startConnectionsHealthCheck()
-        startMemoryHealthCheck()
-        startMemoryMonitoring()
-        console.log('✅ ConnectionStore 初始化完成')
-      } catch (error) {
-        console.error('❌ ConnectionStore 初始化失败:', error)
-      }
-    }
+  const normalizeConnection = (
+    connection: ConnectionItem,
+    previous?: ConnectionItem,
+  ): ConnectionItem => {
+    const downloadSpeed =
+      typeof connection.downloadSpeed === 'number'
+        ? connection.downloadSpeed
+        : Math.max(0, connection.download - (previous?.download || connection.download))
+    const uploadSpeed =
+      typeof connection.uploadSpeed === 'number'
+        ? connection.uploadSpeed
+        : Math.max(0, connection.upload - (previous?.upload || connection.upload))
 
     return {
-      // 状态
-      connectionsState,
-      memoryState,
-
-      // 数据
-      connections,
-      connectionsTotal,
-      memory,
-
-      // 方法
-      setupEventListeners,
-      cleanupEventListeners,
-      resetData,
-      updateConnections,
-      updateMemory,
-      smartConnectionCleanup,
-      startMemoryMonitoring,
-      stopMemoryMonitoring,
-      startConnectionsHealthCheck,
-      startMemoryHealthCheck,
-      initializeStore, // 添加这个方法
+      ...connection,
+      downloadSpeed,
+      uploadSpeed,
     }
-  },
-)
+  }
+
+  const updateConnections = (payload: ConnectionsDataPayload) => {
+    latestConnectionMsg.value = payload
+    connectionState.value.connected = true
+    connectionState.value.connecting = false
+    connectionState.value.error = null
+
+    const previousActiveMap = new Map(activeConnections.value.map((item) => [item.id, item]))
+    const normalizedActive = payload.connections.map((connection) =>
+      normalizeConnection(connection, previousActiveMap.get(connection.id)),
+    )
+
+    if (paused.value) {
+      return
+    }
+
+    const nextIds = new Set(normalizedActive.map((item) => item.id))
+    const newlyClosed = activeConnections.value.filter((item) => !nextIds.has(item.id))
+    if (newlyClosed.length) {
+      const mergedClosed = [...newlyClosed, ...closedConnections.value]
+      const dedup = new Map<string, ConnectionItem>()
+      mergedClosed.forEach((connection) => {
+        if (!dedup.has(connection.id)) {
+          dedup.set(connection.id, connection)
+        }
+      })
+      closedConnections.value = Array.from(dedup.values()).slice(0, MAX_CLOSED_CONNECTIONS)
+    }
+
+    activeConnections.value = normalizedActive
+  }
+
+  const updateMemory = (payload: MemoryStatsPayload) => {
+    latestMemory.value = payload
+    memoryState.value.connected = true
+    memoryState.value.connecting = false
+    memoryState.value.error = null
+  }
+
+  const setupEventListeners = async () => {
+    if (!connectionsUnlisten) {
+      connectionsUnlisten = await eventService.onConnectionsData((payload) => {
+        updateConnections(payload)
+      })
+    }
+
+    if (!memoryUnlisten) {
+      memoryUnlisten = await eventService.onMemoryData((payload) => {
+        updateMemory(payload)
+      })
+    }
+  }
+
+  const cleanupEventListeners = () => {
+    try {
+      connectionsUnlisten?.()
+      memoryUnlisten?.()
+      eventService.removeEventListener(APP_EVENTS.connectionsData)
+      eventService.removeEventListener(APP_EVENTS.memoryData)
+    } finally {
+      connectionsUnlisten = null
+      memoryUnlisten = null
+    }
+  }
+
+  const initializeStore = async () => {
+    await setupEventListeners()
+  }
+
+  const clearClosedConnections = () => {
+    closedConnections.value = []
+  }
+
+  const togglePaused = () => {
+    paused.value = !paused.value
+  }
+
+  const closeConnection = async (id: string) => {
+    if (closingMap.value[id]) return
+    closingMap.value = {
+      ...closingMap.value,
+      [id]: true,
+    }
+
+    try {
+      await connectionService.closeOne(id)
+    } finally {
+      closingMap.value = {
+        ...closingMap.value,
+        [id]: false,
+      }
+    }
+  }
+
+  const closeAllConnections = async () => {
+    if (isClosingAll.value) return
+    isClosingAll.value = true
+    try {
+      await connectionService.closeAll()
+    } finally {
+      isClosingAll.value = false
+    }
+  }
+
+  const searchableConnections = computed(() =>
+    activeTab.value === 'closed' ? closedConnections.value : activeConnections.value,
+  )
+
+  return {
+    activeConnections,
+    closedConnections,
+    latestConnectionMsg,
+    latestMemory,
+    paused,
+    loading,
+    closingMap,
+    isClosingAll,
+    activeTab,
+    searchQuery,
+    quickFilterEnabled,
+    sourceIPFilter,
+    sortKey,
+    sortDesc,
+    groupingKey,
+    connectionState,
+    memoryState,
+    connectionsTotal,
+    memory,
+    connections,
+    searchableConnections,
+    setupEventListeners,
+    cleanupEventListeners,
+    initializeStore,
+    updateConnections,
+    updateMemory,
+    clearClosedConnections,
+    togglePaused,
+    closeConnection,
+    closeAllConnections,
+  }
+})

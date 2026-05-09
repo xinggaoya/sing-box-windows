@@ -2,498 +2,564 @@
   <div class="page-container">
     <PageHeader :title="t('connections.title')" :subtitle="t('connections.subtitle')">
       <template #actions>
-        <n-button
-          @click="refreshConnections"
-          :loading="loading"
-          type="primary"
-          secondary
-          round
-        >
-          <template #icon>
-            <n-icon><RefreshOutline /></n-icon>
-          </template>
-          {{ t('common.refresh') }}
-        </n-button>
+        <n-space>
+          <n-button secondary @click="refreshConnections">
+            <template #icon>
+              <n-icon><RefreshOutline /></n-icon>
+            </template>
+            {{ t('common.refresh') }}
+          </n-button>
+          <n-button secondary @click="connectionStore.togglePaused()">
+            <template #icon>
+              <n-icon>
+                <PauseOutline v-if="!connectionStore.paused" />
+                <PlayOutline v-else />
+              </n-icon>
+            </template>
+            {{ connectionStore.paused ? proxyLabels.resume : proxyLabels.pause }}
+          </n-button>
+          <n-button
+            type="error"
+            secondary
+            :loading="connectionStore.isClosingAll"
+            @click="closeAll"
+          >
+            <template #icon>
+              <n-icon><CloseOutline /></n-icon>
+            </template>
+            {{ proxyLabels.closeAll }}
+          </n-button>
+        </n-space>
       </template>
     </PageHeader>
 
-  
-    <!-- Filters -->
-    <div class="filter-section">
-      <div class="filter-bar">
+    <div class="toolbar-card">
+      <div class="toolbar-row">
+        <n-tabs
+          :value="connectionStore.activeTab"
+          type="segment"
+          size="small"
+          @update:value="updateActiveTab"
+        >
+          <n-tab-pane name="active" :tab="proxyLabels.active" />
+          <n-tab-pane name="closed" :tab="proxyLabels.closed" />
+        </n-tabs>
+
         <n-input
-          v-model:value="searchQuery"
+          v-model:value="connectionStore.searchQuery"
           :placeholder="t('connections.searchPlaceholder')"
           clearable
-          round
           class="search-input"
         >
           <template #prefix>
             <n-icon><SearchOutline /></n-icon>
           </template>
         </n-input>
-        
+
         <n-select
-          v-model:value="networkFilter"
-          :options="networkOptions"
-          :placeholder="t('connections.networkTypeFilter')"
+          v-model:value="connectionStore.sourceIPFilter"
+          :options="sourceIpOptions"
           clearable
-          class="filter-select"
+          :placeholder="proxyLabels.sourceFilter"
+          class="source-select"
         />
-        
+
         <n-select
-          v-model:value="ruleFilter"
-          :options="ruleOptions"
-          :placeholder="t('connections.ruleFilter')"
-          clearable
-          class="filter-select"
+          v-model:value="connectionStore.sortKey"
+          :options="sortOptions"
+          class="sort-select"
         />
+
+        <n-select
+          v-model:value="connectionStore.groupingKey"
+          :options="groupingOptions"
+          clearable
+          class="sort-select"
+          :placeholder="proxyLabels.grouping"
+        />
+
+        <n-button quaternary @click="connectionStore.sortDesc = !connectionStore.sortDesc">
+          <template #icon>
+            <n-icon>
+              <ArrowDownOutline v-if="connectionStore.sortDesc" />
+              <ArrowUpOutline v-else />
+            </n-icon>
+          </template>
+          {{ proxyLabels.sortOrder }}
+        </n-button>
+      </div>
+
+      <div class="stats-row">
+        <n-tag size="small" round :bordered="false" type="primary">
+          {{ t('connections.activeConnections') }}: {{ connectionStore.activeConnections.length }}
+        </n-tag>
+        <n-tag size="small" round :bordered="false">
+          {{ proxyLabels.closed }}: {{ connectionStore.closedConnections.length }}
+        </n-tag>
+        <n-tag size="small" round :bordered="false" type="warning">
+          ↑ {{ formatBytes(connectionStore.connectionsTotal.upload) }}
+        </n-tag>
+        <n-tag size="small" round :bordered="false" type="success">
+          ↓ {{ formatBytes(connectionStore.connectionsTotal.download) }}
+        </n-tag>
+        <n-tag size="small" round :bordered="false" type="default">
+          {{ proxyLabels.quickFilter }}: {{ connectionStore.quickFilterEnabled ? labelsOnOff.on : labelsOnOff.off }}
+        </n-tag>
       </div>
     </div>
 
-    <!-- Connections List -->
-    <div class="connections-section">
-      <n-spin :show="loading">
-        <div v-if="filteredConnections.length > 0" class="connections-grid">
-          <div
-            v-for="conn in filteredConnections"
-            :key="conn.id"
-            class="connection-card"
-          >
-            <div class="card-header">
-              <div class="header-left">
-                <n-tag size="small" :type="getNetworkTagType(conn.metadata.network)" round :bordered="false">
-                  {{ conn.metadata.network?.toUpperCase() || 'TCP' }}
-                </n-tag>
-                <span class="conn-id">#{{ getConnectionShortId(conn.id) }}</span>
-              </div>
-              <span class="conn-time">{{ formatConnectionTime(conn.start) }}</span>
-            </div>
-
-            <div class="card-body">
-              <div class="info-row">
-                <div class="info-item">
-                  <span class="label">{{ t('connections.source') }}</span>
-                  <span class="value" :title="getSourceText(conn)">{{ getSourceText(conn) }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">{{ t('connections.destination') }}</span>
-                  <span class="value highlight" :title="getDestinationText(conn)">{{ getDestinationText(conn) }}</span>
-                </div>
-              </div>
-
-              <div class="info-row">
-                <div class="info-item">
-                  <span class="label">{{ t('connections.rule') }}</span>
-                  <span class="value">
-                    <n-tag size="small" :type="getRuleTagType(conn.rule)" :bordered="false">
-                      {{ conn.rule }}
-                    </n-tag>
-                  </span>
-                </div>
-                <div class="info-item">
-                  <span class="label">{{ t('connections.traffic') }}</span>
-                  <div class="traffic-stats">
-                    <span class="up">
-                      <n-icon size="12"><ArrowUpOutline /></n-icon>
-                      {{ formatBytes(conn.upload) }}
-                    </span>
-                    <span class="down">
-                      <n-icon size="12"><ArrowDownOutline /></n-icon>
-                      {{ formatBytes(conn.download) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+    <div v-if="groupedRows.length" class="table-card">
+      <template v-for="group in groupedRows" :key="group.key">
+        <div v-if="group.type === 'group'" class="group-row">
+          <div class="group-title">
+            <span>{{ group.key }}</span>
+            <n-tag size="tiny" round>{{ group.count }}</n-tag>
           </div>
         </div>
 
-        <!-- Empty State -->
-        <div v-else class="empty-state">
-          <div class="empty-icon">
-            <n-icon size="48"><LinkOutline /></n-icon>
+        <button
+          v-for="connection in group.connections"
+          :key="connection.id"
+          type="button"
+          class="connection-row"
+          @click="selectedConnection = connection"
+        >
+          <div class="row-top">
+            <div class="row-title">
+              <n-tag size="small" :bordered="false" round :type="getNetworkType(connection)">
+                {{ (connection.metadata.network || 'tcp').toUpperCase() }}
+              </n-tag>
+              <span class="destination">{{ getDestinationText(connection) }}</span>
+            </div>
+            <div class="row-actions">
+              <span class="connect-time">{{ formatTimeAgo(connection.start) }}</span>
+              <n-button
+                text
+                type="error"
+                :loading="connectionStore.closingMap[connection.id]"
+                @click.stop="closeOne(connection.id)"
+              >
+                {{ proxyLabels.close }}
+              </n-button>
+            </div>
           </div>
-          <h3 class="empty-title">
-            {{ searchQuery || networkFilter || ruleFilter ? t('connections.noMatchingConnections2') : t('connections.noActiveConnections') }}
-          </h3>
-          <n-button
-            v-if="!searchQuery && !networkFilter && !ruleFilter"
-            @click="refreshConnections"
-            type="primary"
-          >
-            {{ t('connections.refreshConnections') }}
-          </n-button>
-          <n-button
-            v-else
-            @click="clearFilters"
-            secondary
-          >
-            {{ t('rules.clearFilters') }}
-          </n-button>
-        </div>
-      </n-spin>
+
+          <div class="row-grid">
+            <div>
+              <span class="cell-label">{{ t('connections.source') }}</span>
+              <span class="cell-value">{{ getSourceText(connection) }}</span>
+            </div>
+            <div>
+              <span class="cell-label">{{ t('connections.rule') }}</span>
+              <span class="cell-value">{{ getRuleText(connection) }}</span>
+            </div>
+            <div>
+              <span class="cell-label">Chain</span>
+              <span class="cell-value">{{ connection.chains.join(' > ') || '-' }}</span>
+            </div>
+            <div>
+              <span class="cell-label">{{ t('connections.traffic') }}</span>
+              <span class="cell-value">
+                ↑ {{ formatSpeed(connection.uploadSpeed || 0) }} / ↓
+                {{ formatSpeed(connection.downloadSpeed || 0) }}
+              </span>
+            </div>
+          </div>
+        </button>
+      </template>
     </div>
+
+    <div v-else class="empty-state">
+      <div class="empty-icon">
+        <n-icon size="48"><LinkOutline /></n-icon>
+      </div>
+      <h3 class="empty-title">
+        {{ connectionStore.activeTab === 'active' ? t('connections.noActiveConnections') : proxyLabels.noClosed }}
+      </h3>
+    </div>
+
+    <n-modal v-model:show="detailVisible" preset="card" :title="proxyLabels.detailTitle" style="width: 720px">
+      <div v-if="selectedConnection" class="detail-grid">
+        <div><strong>ID</strong><span>{{ selectedConnection.id }}</span></div>
+        <div><strong>{{ t('connections.rule') }}</strong><span>{{ getRuleText(selectedConnection) }}</span></div>
+        <div><strong>{{ t('connections.source') }}</strong><span>{{ getSourceText(selectedConnection) }}</span></div>
+        <div><strong>{{ t('connections.destination') }}</strong><span>{{ getDestinationText(selectedConnection) }}</span></div>
+        <div><strong>Process</strong><span>{{ selectedConnection.metadata.process || selectedConnection.metadata.processPath || '-' }}</span></div>
+        <div><strong>Inbound</strong><span>{{ selectedConnection.metadata.inboundName || selectedConnection.metadata.inboundUser || '-' }}</span></div>
+        <div><strong>Network</strong><span>{{ selectedConnection.metadata.network || '-' }}</span></div>
+        <div><strong>Type</strong><span>{{ selectedConnection.metadata.type || '-' }}</span></div>
+        <div><strong>Sniff Host</strong><span>{{ selectedConnection.metadata.sniffHost || '-' }}</span></div>
+        <div><strong>Remote</strong><span>{{ selectedConnection.metadata.remoteDestination || '-' }}</span></div>
+        <div><strong>Upload</strong><span>{{ formatBytes(selectedConnection.upload) }}</span></div>
+        <div><strong>Download</strong><span>{{ formatBytes(selectedConnection.download) }}</span></div>
+      </div>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
+  ArrowDownOutline,
+  ArrowUpOutline,
+  CloseOutline,
+  LinkOutline,
+  PauseOutline,
+  PlayOutline,
   RefreshOutline,
   SearchOutline,
-  LinkOutline,
-  ArrowUpOutline,
-  ArrowDownOutline,
-  FilterOutline,
 } from '@vicons/ionicons5'
+import PageHeader from '@/components/common/PageHeader.vue'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useI18n } from 'vue-i18n'
-import PageHeader from '@/components/common/PageHeader.vue'
-import StatusCard from '@/components/common/StatusCard.vue'
+import type { ConnectionItem } from '@/types/events'
+import { formatBytes, formatSpeed } from '@/utils'
 
 defineOptions({
-  name: 'ConnectionsView'
+  name: 'ConnectionsView',
 })
 
+const { t, locale } = useI18n()
 const message = useMessage()
-const loading = ref(false)
 const connectionStore = useConnectionStore()
-const { t } = useI18n()
+const selectedConnection = ref<ConnectionItem | null>(null)
 
-const searchQuery = ref('')
-const networkFilter = ref(null)
-const ruleFilter = ref(null)
+const proxyLabels = computed(() => ({
+  active: locale.value.startsWith('zh') ? '活跃连接' : 'Active',
+  closed: locale.value.startsWith('zh') ? '已关闭' : 'Closed',
+  pause: locale.value.startsWith('zh') ? '暂停更新' : 'Pause',
+  resume: locale.value.startsWith('zh') ? '恢复更新' : 'Resume',
+  close: locale.value.startsWith('zh') ? '关闭' : 'Close',
+  closeAll: locale.value.startsWith('zh') ? '关闭全部连接' : 'Close All',
+  sourceFilter: locale.value.startsWith('zh') ? '来源 IP' : 'Source IP',
+  sortOrder: locale.value.startsWith('zh') ? '顺序' : 'Order',
+  grouping: locale.value.startsWith('zh') ? '分组' : 'Grouping',
+  quickFilter: locale.value.startsWith('zh') ? '快速筛选' : 'Quick filter',
+  detailTitle: locale.value.startsWith('zh') ? '连接详情' : 'Connection Details',
+  noClosed: locale.value.startsWith('zh') ? '暂无已关闭连接' : 'No closed connections',
+}))
 
-// Interfaces
-interface ConnectionMetadata {
-  destinationIP: string
-  destinationPort: string
-  dnsMode: string
-  host: string
-  network: string
-  processPath: string
-  sourceIP: string
-  sourcePort: string
-  type: string
-}
+const labelsOnOff = computed(() => ({
+  on: locale.value.startsWith('zh') ? '开' : 'On',
+  off: locale.value.startsWith('zh') ? '关' : 'Off',
+}))
 
-interface Connection {
-  chains: string[]
-  download: number
-  id: string
-  metadata: ConnectionMetadata
-  rule: string
-  rulePayload: string
-  start: string
-  upload: number
-}
-
-// Computed
-const connections = computed(() => connectionStore.connections)
-const connectionsTotal = computed(() => connectionStore.connectionsTotal)
-
-const filteredConnections = computed(() => {
-  return connections.value.filter((conn) => {
-    const matchesSearch =
-      !searchQuery.value ||
-      conn.id.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (conn.metadata.host?.toLowerCase() || '').includes(searchQuery.value.toLowerCase()) ||
-      conn.metadata.destinationIP.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      conn.metadata.sourceIP.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (conn.rule && String(conn.rule).toLowerCase().includes(searchQuery.value.toLowerCase())) ||
-      (conn.metadata.processPath?.toLowerCase() || '').includes(searchQuery.value.toLowerCase())
-
-    const matchesNetwork =
-      !networkFilter.value ||
-      (conn.metadata.network &&
-        networkFilter.value &&
-        String(conn.metadata.network).toLowerCase() === String(networkFilter.value).toLowerCase())
-
-    const matchesRule =
-      !ruleFilter.value ||
-      (conn.rule &&
-        ruleFilter.value &&
-        String(conn.rule).toLowerCase() === String(ruleFilter.value).toLowerCase())
-
-    return matchesSearch && matchesNetwork && matchesRule
-  })
+const detailVisible = computed({
+  get: () => !!selectedConnection.value,
+  set: (value: boolean) => {
+    if (!value) {
+      selectedConnection.value = null
+    }
+  },
 })
 
-const networkOptions = computed(() => {
-  const networks = new Set<string>()
-  connections.value.forEach((conn) => {
-    if (conn.metadata.network) {
-      networks.add(String(conn.metadata.network).toUpperCase())
+const sourceIpOptions = computed(() => {
+  const values = new Set<string>()
+  connectionStore.searchableConnections.forEach((connection) => {
+    if (connection.metadata.sourceIP) {
+      values.add(connection.metadata.sourceIP)
     }
   })
-  return Array.from(networks).map((network) => ({ label: network, value: network.toLowerCase() }))
+  return Array.from(values).map((value) => ({ label: value, value }))
 })
 
-const ruleOptions = computed(() => {
-  const rules = new Set<string>()
-  connections.value.forEach((conn) => {
-    if (conn.rule) {
-      rules.add(conn.rule)
-    }
-  })
-  return Array.from(rules).map((rule) => ({ label: rule, value: rule }))
+const sortOptions = computed(() => {
+  const labels: Record<string, string> = {
+    start: locale.value.startsWith('zh') ? '连接时间' : 'Start Time',
+    download: locale.value.startsWith('zh') ? '下载总量' : 'Download',
+    upload: locale.value.startsWith('zh') ? '上传总量' : 'Upload',
+    downloadSpeed: locale.value.startsWith('zh') ? '下载速度' : 'Download Speed',
+    uploadSpeed: locale.value.startsWith('zh') ? '上传速度' : 'Upload Speed',
+    host: locale.value.startsWith('zh') ? '目标地址' : 'Host',
+    process: locale.value.startsWith('zh') ? '进程' : 'Process',
+    rule: locale.value.startsWith('zh') ? '规则' : 'Rule',
+  }
+
+  return Object.entries(labels).map(([value, label]) => ({ label, value }))
 })
 
-const connectionStats = computed(() => [
-  {
-    label: t('connections.activeConnections'),
-    value: connections.value.length,
-    icon: LinkOutline,
-    type: 'primary' as const,
-  },
-  {
-    label: t('home.traffic.uploadTotal'),
-    value: formatBytes(connectionsTotal.value.upload),
-    icon: ArrowUpOutline,
-    type: 'warning' as const,
-  },
-  {
-    label: t('home.traffic.downloadTotal'),
-    value: formatBytes(connectionsTotal.value.download),
-    icon: ArrowDownOutline,
-    type: 'success' as const,
-  },
-  {
-    label: t('connections.matchedConnections'),
-    value: filteredConnections.value.length,
-    icon: FilterOutline,
-    type: 'default' as const,
-  },
+const groupingOptions = computed(() => [
+  { label: locale.value.startsWith('zh') ? '按规则' : 'Rule', value: 'rule' },
+  { label: locale.value.startsWith('zh') ? '按进程' : 'Process', value: 'process' },
+  { label: locale.value.startsWith('zh') ? '按目标' : 'Destination', value: 'host' },
+  { label: locale.value.startsWith('zh') ? '按来源 IP' : 'Source IP', value: 'sourceIP' },
 ])
 
-// Methods
-const formatBytes = (bytes: number) => {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i]
-}
+const filteredConnections = computed(() => {
+  const query = connectionStore.searchQuery.trim().toLowerCase()
+  return connectionStore.searchableConnections.filter((connection) => {
+    const matchesQuery =
+      !query ||
+      connection.id.toLowerCase().includes(query) ||
+      getDestinationText(connection).toLowerCase().includes(query) ||
+      getSourceText(connection).toLowerCase().includes(query) ||
+      getRuleText(connection).toLowerCase().includes(query) ||
+      (connection.metadata.process || connection.metadata.processPath || '').toLowerCase().includes(query)
 
-const getConnectionShortId = (id: string): string => {
-  if (!id) return 'N/A'
-  return id.length > 8 ? id.substring(0, 8) + '...' : id
-}
+    const matchesSource =
+      !connectionStore.sourceIPFilter || connection.metadata.sourceIP === connectionStore.sourceIPFilter
 
-const formatConnectionTime = (timeString: string): string => {
-  try {
-    const date = new Date(timeString)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
+    const matchesQuickFilter =
+      !connectionStore.quickFilterEnabled ||
+      !getRuleText(connection).toLowerCase().includes('direct')
 
-    if (diff < 60000) {
-      return t('connections.secondsAgo', { count: Math.floor(diff / 1000) })
-    } else if (diff < 3600000) {
-      return t('connections.minutesAgo', { count: Math.floor(diff / 60000) })
-    } else if (diff < 86400000) {
-      return t('connections.hoursAgo', { count: Math.floor(diff / 3600000) })
-    } else {
-      return date.toLocaleDateString()
+    return matchesQuery && matchesSource && matchesQuickFilter
+  })
+})
+
+const sortedConnections = computed(() => {
+  const list = [...filteredConnections.value]
+  const factor = connectionStore.sortDesc ? -1 : 1
+
+  return list.sort((left, right) => {
+    const leftValue = getSortValue(left, connectionStore.sortKey)
+    const rightValue = getSortValue(right, connectionStore.sortKey)
+
+    if (typeof leftValue === 'number' && typeof rightValue === 'number') {
+      return (leftValue - rightValue) * factor
     }
-  } catch (e) {
-    return t('common.unknown')
+
+    return String(leftValue).localeCompare(String(rightValue)) * factor
+  })
+})
+
+const groupedRows = computed(() => {
+  const grouping = connectionStore.groupingKey
+  if (!grouping) {
+    return [
+      {
+        type: 'group' as const,
+        key: '',
+        count: sortedConnections.value.length,
+        connections: sortedConnections.value,
+      },
+    ]
+  }
+
+  const groups = new Map<string, ConnectionItem[]>()
+  sortedConnections.value.forEach((connection) => {
+    const key = String(getGroupValue(connection, grouping) || '-')
+    const list = groups.get(key) || []
+    list.push(connection)
+    groups.set(key, list)
+  })
+
+  return Array.from(groups.entries()).map(([key, connections]) => ({
+    type: 'group' as const,
+    key,
+    count: connections.length,
+    connections,
+  }))
+})
+
+const refreshConnections = async () => {
+  await connectionStore.setupEventListeners()
+  message.success(t('connections.refreshSuccess'))
+}
+
+const closeOne = async (id: string) => {
+  try {
+    await connectionStore.closeConnection(id)
+    message.success(proxyLabels.value.close)
+  } catch (error) {
+    message.error(String(error))
   }
 }
 
-const getSourceText = (conn: Connection): string => {
-  const { sourceIP, sourcePort } = conn.metadata
-  return `${sourceIP}:${sourcePort}`
+const closeAll = async () => {
+  try {
+    await connectionStore.closeAllConnections()
+    message.success(proxyLabels.value.closeAll)
+  } catch (error) {
+    message.error(String(error))
+  }
 }
 
-const getDestinationText = (conn: Connection): string => {
-  const { destinationIP, destinationPort, host } = conn.metadata
-  return host || `${destinationIP}:${destinationPort}`
+const updateActiveTab = (value: string) => {
+  if (value === 'active' || value === 'closed') {
+    connectionStore.activeTab = value
+  }
 }
 
-const getNetworkTagType = (network: string): 'info' | 'warning' | 'default' => {
-  if (network === 'tcp') return 'info'
+const getSortValue = (connection: ConnectionItem, key: string) => {
+  switch (key) {
+    case 'download':
+      return connection.download
+    case 'upload':
+      return connection.upload
+    case 'downloadSpeed':
+      return connection.downloadSpeed || 0
+    case 'uploadSpeed':
+      return connection.uploadSpeed || 0
+    case 'host':
+      return getDestinationText(connection)
+    case 'process':
+      return connection.metadata.process || connection.metadata.processPath || ''
+    case 'rule':
+      return getRuleText(connection)
+    default:
+      return new Date(connection.start).getTime()
+  }
+}
+
+const getGroupValue = (connection: ConnectionItem, key: string) => {
+  switch (key) {
+    case 'rule':
+      return connection.rule
+    case 'process':
+      return connection.metadata.process || connection.metadata.processPath
+    case 'host':
+      return getDestinationText(connection)
+    case 'sourceIP':
+      return connection.metadata.sourceIP
+    default:
+      return getSortValue(connection, key)
+  }
+}
+
+const getSourceText = (connection: ConnectionItem) =>
+  `${connection.metadata.sourceIP || '-'}:${connection.metadata.sourcePort || '-'}`
+
+const getDestinationText = (connection: ConnectionItem) =>
+  connection.metadata.remoteDestination ||
+  connection.metadata.host ||
+  `${connection.metadata.destinationIP || '-'}:${connection.metadata.destinationPort || '-'}`
+
+const getRuleText = (connection: ConnectionItem) =>
+  connection.rulePayload ? `${connection.rule} : ${connection.rulePayload}` : connection.rule || '-'
+
+const getNetworkType = (connection: ConnectionItem) => {
+  const network = (connection.metadata.network || '').toLowerCase()
   if (network === 'udp') return 'warning'
+  if (network === 'tcp') return 'info'
   return 'default'
 }
 
-const getRuleTagType = (rule: string): 'success' | 'error' | 'info' | 'warning' => {
-  if (!rule) return 'info'
-  if (rule.includes('direct')) return 'success'
-  if (rule.includes('proxy')) return 'info'
-  if (rule.includes('reject')) return 'error'
-  return 'warning'
+const formatTimeAgo = (time: string) => {
+  const diff = Date.now() - new Date(time).getTime()
+  if (diff < 60_000) return t('connections.secondsAgo', { count: Math.max(1, Math.floor(diff / 1000)) })
+  if (diff < 3_600_000) return t('connections.minutesAgo', { count: Math.floor(diff / 60_000) })
+  if (diff < 86_400_000) return t('connections.hoursAgo', { count: Math.floor(diff / 3_600_000) })
+  return new Date(time).toLocaleString()
 }
 
-const clearFilters = () => {
-  searchQuery.value = ''
-  networkFilter.value = null
-  ruleFilter.value = null
-}
-
-const refreshConnections = async () => {
-  loading.value = true
-  try {
-    message.success(t('connections.refreshSuccess'))
-  } catch (error) {
-    message.error(t('connections.refreshError', { error: String(error) }))
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(async () => {
-  if (!connections.value.length) {
-    await connectionStore.setupEventListeners()
-    refreshConnections()
-  }
-})
-
-onUnmounted(() => {
-  connectionStore.cleanupEventListeners()
-})
+watch(
+  () => connectionStore.activeTab,
+  () => {
+    selectedConnection.value = null
+  },
+)
 </script>
 
 <style scoped>
 .page-container {
-  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
+  padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
   max-width: var(--layout-page-max-width, 1400px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--layout-page-gap, 24px);
+  gap: var(--layout-page-gap, 16px);
 }
 
-
-.filter-section {
+.toolbar-card,
+.table-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 16px;
   padding: 16px;
 }
 
-.filter-bar {
-  display: flex;
-  gap: var(--layout-row-gap, 16px);
-  flex-wrap: wrap;
-}
-
-.search-input {
-  flex: 2;
-  min-width: 200px;
-}
-
-.filter-select {
-  flex: 1;
-  min-width: 160px;
-}
-
-.connections-grid {
+.toolbar-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: var(--layout-row-gap, 16px);
-}
-
-.connection-card {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  padding: 16px;
-  transition: all 0.2s ease;
-}
-
-.connection-card:hover {
-  border-color: var(--border-hover);
-  transform: translateY(-2px);
-  box-shadow: var(--panel-shadow);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
+  grid-template-columns: auto minmax(220px, 1fr) 180px 180px 180px auto;
+  gap: 12px;
   align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color);
 }
 
-.header-left {
+.search-input,
+.source-select,
+.sort-select {
+  width: 100%;
+}
+
+.stats-row {
   display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.group-row {
+  padding: 8px 0;
+}
+
+.group-title {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  font-weight: 600;
 }
 
-.conn-id {
-  font-family: monospace;
-  font-size: 12px;
-  color: var(--text-tertiary);
+.connection-row {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  border-radius: 14px;
+  padding: 14px;
+  margin-top: 10px;
+  text-align: left;
+  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
-.conn-time {
-  font-size: 12px;
-  color: var(--text-tertiary);
+.connection-row:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
 }
 
-.card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.info-row {
+.row-top {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+  align-items: center;
 }
 
-.info-item {
+.row-title,
+.row-actions {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
+  gap: 10px;
+  align-items: center;
 }
 
-.info-item .label {
+.destination {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.connect-time {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.row-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cell-label {
+  display: block;
   font-size: 11px;
   text-transform: uppercase;
   color: var(--text-tertiary);
-  letter-spacing: 0.05em;
+  margin-bottom: 4px;
 }
 
-.info-item .value {
-  font-size: 13px;
+.cell-value {
+  display: block;
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.info-item .value.highlight {
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.traffic-stats {
-  display: flex;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.traffic-stats .up {
-  color: #ef4444;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.traffic-stats .down {
-  color: #10b981;
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  word-break: break-all;
 }
 
 .empty-state {
@@ -513,7 +579,39 @@ onUnmounted(() => {
 .empty-title {
   font-size: 18px;
   font-weight: 600;
-  margin: 0 0 16px;
+  margin: 0;
   color: var(--text-primary);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.detail-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-grid span {
+  word-break: break-all;
+}
+
+@media (max-width: 960px) {
+  .toolbar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .row-grid,
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .row-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

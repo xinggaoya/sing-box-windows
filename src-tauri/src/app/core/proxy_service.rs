@@ -45,7 +45,8 @@ fn resolve_proxy_listen_address(state: &ProxyRuntimeState) -> &'static str {
 
 fn build_inbounds_for_state(state: &ProxyRuntimeState) -> Vec<config_model::Inbound> {
     if state.tun_enabled {
-        let mut inbounds = TunProfile::from_options(&state.tun_options, None).to_inbounds(state.proxy_port);
+        let mut inbounds =
+            TunProfile::from_options(&state.tun_options, None).to_inbounds(state.proxy_port);
         if let Some(mixed) = inbounds.get_mut(0) {
             mixed.listen = Some(resolve_proxy_listen_address(state).to_string());
             mixed.set_system_proxy = Some(state.system_proxy_enabled);
@@ -290,18 +291,142 @@ pub fn get_api_token() -> String {
     "".to_string()
 }
 
+fn build_controller_url(port: u16, path: &str) -> String {
+    format!("http://127.0.0.1:{}/{}", port, path.trim_start_matches('/'))
+}
+
+async fn fetch_controller_json(port: u16, path: &str) -> Result<Value, String> {
+    let url = build_controller_url(port, path);
+    http_client::get_json::<Value>(&url)
+        .await
+        .map_err(|e| format!("请求 {} 失败: {}", path, e))
+}
+
+async fn put_controller(port: u16, path: &str) -> Result<(), String> {
+    let url = build_controller_url(port, path);
+    let client = http_client::get_client();
+    let response = client
+        .put(&url)
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| format!("请求 {} 失败: {}", path, e))?;
+
+    if response.status().is_success() {
+        return Ok(());
+    }
+
+    Err(format!(
+        "请求 {} 失败，HTTP状态码: {}",
+        path,
+        response.status()
+    ))
+}
+
+async fn patch_controller_json(port: u16, path: &str, data: &Value) -> Result<(), String> {
+    let url = build_controller_url(port, path);
+    let client = http_client::get_client();
+    let response = client
+        .patch(&url)
+        .json(data)
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| format!("请求 {} 失败: {}", path, e))?;
+
+    if response.status().is_success() {
+        return Ok(());
+    }
+
+    Err(format!(
+        "请求 {} 失败，HTTP状态码: {}",
+        path,
+        response.status()
+    ))
+}
+
+async fn delete_controller(port: u16, path: &str) -> Result<(), String> {
+    let url = build_controller_url(port, path);
+    let client = http_client::get_client();
+    let response = client
+        .delete(&url)
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| format!("请求 {} 失败: {}", path, e))?;
+
+    if response.status().is_success() {
+        return Ok(());
+    }
+
+    Err(format!(
+        "请求 {} 失败，HTTP状态码: {}",
+        path,
+        response.status()
+    ))
+}
+
 // 获取代理节点列表
 #[tauri::command]
 pub async fn get_proxies(port: u16) -> Result<Value, String> {
-    let url = format!("http://127.0.0.1:{}/proxies", port);
-
-    match http_client::get_json::<Value>(&url).await {
+    match fetch_controller_json(port, "proxies").await {
         Ok(data) => Ok(data),
         Err(e) => {
             error!("获取代理列表失败: {}", e);
-            Err(format!("获取代理列表失败: {}", e))
+            Err(e)
         }
     }
+}
+
+#[tauri::command]
+pub async fn get_proxy_providers(port: u16) -> Result<Value, String> {
+    match fetch_controller_json(port, "providers/proxies").await {
+        Ok(data) => Ok(data),
+        Err(e) => {
+            error!("获取代理 provider 列表失败: {}", e);
+            Err(e)
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn update_proxy_provider(provider: String, port: u16) -> Result<(), String> {
+    let path = format!("providers/proxies/{}", urlencoding::encode(&provider));
+    put_controller(port, &path).await
+}
+
+#[tauri::command]
+pub async fn get_rule_providers(port: u16) -> Result<Value, String> {
+    match fetch_controller_json(port, "providers/rules").await {
+        Ok(data) => Ok(data),
+        Err(e) => {
+            error!("获取规则 provider 列表失败: {}", e);
+            Err(e)
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn update_rule_provider(provider: String, port: u16) -> Result<(), String> {
+    let path = format!("providers/rules/{}", urlencoding::encode(&provider));
+    put_controller(port, &path).await
+}
+
+#[tauri::command]
+pub async fn toggle_rule_disabled(index: usize, disabled: bool, port: u16) -> Result<(), String> {
+    let payload = json!({ index.to_string(): disabled });
+    patch_controller_json(port, "rules/disable", &payload).await
+}
+
+#[tauri::command]
+pub async fn close_all_connections(port: u16) -> Result<(), String> {
+    delete_controller(port, "connections").await
+}
+
+#[tauri::command]
+pub async fn close_connection(id: String, port: u16) -> Result<(), String> {
+    let path = format!("connections/{}", urlencoding::encode(&id));
+    delete_controller(port, &path).await
 }
 
 // 切换代理节点

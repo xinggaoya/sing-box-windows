@@ -16,6 +16,7 @@ export * from './kernel/ProxyStore'
 export * from './kernel/ConnectionStore'
 export * from './kernel/TrafficStore'
 export * from './kernel/LogStore'
+export * from './kernel/RulesStore'
 
 // 导出订阅相关Store
 export * from './subscription/SubStore'

@@ -17,22 +17,34 @@ export interface ConnectionMetadata {
   destinationPort: string
   dnsMode: string
   host: string
+  sniffHost?: string
   network: string
+  process?: string
   processPath: string
+  remoteDestination?: string
   sourceIP: string
   sourcePort: string
   type: string
+  inboundName?: string
+  inboundIP?: string
+  inboundPort?: string
+  inboundUser?: string
+  uid?: number
+  specialProxy?: string
+  specialRules?: string
 }
 
 export interface ConnectionItem {
   chains: string[]
   download: number
+  downloadSpeed?: number
   id: string
   metadata: ConnectionMetadata
   rule: string
   rulePayload: string
   start: string
   upload: number
+  uploadSpeed?: number
 }
 
 export interface ConnectionsDataPayload {

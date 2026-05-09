@@ -104,6 +104,15 @@
           >
             <template #icon><PulseOutline /></template>
           </StatusCard>
+
+          <StatusCard
+            :label="t('proxy.title')"
+            :value="proxyStore.groupCount"
+            :description="`${t('proxy.dashboard.nodeTotal')}: ${proxyStore.nodeCount}`"
+            type="default"
+          >
+            <template #icon><GlobeOutline /></template>
+          </StatusCard>
         </div>
 
         <div class="chart-section">
@@ -228,6 +237,7 @@ import { useAppStore } from '@/stores'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
+import { useProxyStore } from '@/stores/kernel/ProxyStore'
 import { useThemeStore } from '@/stores/app/ThemeStore'
 import { kernelService } from '@/services/kernel-service'
 import { proxyService } from '@/services/proxy-service'
@@ -252,6 +262,7 @@ const appStore = useAppStore()
 const kernelStore = useKernelStore()
 const trafficStore = useTrafficStore()
 const connectionStore = useConnectionStore()
+const proxyStore = useProxyStore()
 const themeStore = useThemeStore()
 const sudoStore = useSudoStore()
 
@@ -583,6 +594,7 @@ onMounted(async () => {
   }
   checkAdmin()
   await kernelStore.initializeStore()
+  await proxyStore.fetchProxies().catch(() => undefined)
   await syncCurrentNodeProxyMode()
 })
 </script>
