@@ -125,32 +125,23 @@
 
       <div class="grid-section">
         <div class="card-header">
-          <div class="card-header-icon port-icon">
-            <n-icon :size="16"><SettingsOutline /></n-icon>
-          </div>
-          <h3 class="card-title">{{ t('home.proxyPort.title') }}</h3>
-          <n-button size="tiny" quaternary @click="showPortModal = true">
-            {{ t('common.edit') }}
-          </n-button>
-        </div>
-        <div class="proxy-port-card">
-          <div class="port-row">
-            <div class="port-protocol">HTTP</div>
-            <code class="port-address">{{ proxyAddress }}</code>
-          </div>
-          <div class="port-row">
-            <div class="port-protocol">SOCKS5</div>
-            <code class="port-address">{{ proxyAddress }}</code>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid-section">
-        <div class="card-header">
           <div class="card-header-icon flow-icon">
             <n-icon :size="16"><SwapVerticalOutline /></n-icon>
           </div>
           <h3 class="card-title">{{ t('home.proxyHeader.flowMode') }}</h3>
+        </div>
+        <div class="port-info-bar">
+          <div class="port-item">
+            <span class="port-label">HTTP</span>
+            <code class="port-value">{{ proxyAddress }}</code>
+          </div>
+          <div class="port-item">
+            <span class="port-label">SOCKS5</span>
+            <code class="port-value">{{ proxyAddress }}</code>
+          </div>
+          <n-button size="tiny" quaternary @click="showPortModal = true">
+            {{ t('common.edit') }}
+          </n-button>
         </div>
         <div class="mode-cards">
           <div
@@ -745,7 +736,7 @@ onMounted(async () => {
 
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--layout-grid-gap, 24px);
 }
 
@@ -766,9 +757,34 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.card-header-icon.port-icon {
-  background: rgba(14, 165, 233, 0.1);
-  color: #0ea5e9;
+.port-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  margin-bottom: 8px;
+}
+
+.port-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.port-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.port-value {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  color: var(--text-primary);
 }
 
 .card-header-icon.flow-icon {
@@ -789,39 +805,6 @@ onMounted(async () => {
   flex: 1;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.proxy-port-card {
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.port-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--bg-tertiary);
-}
-
-.port-protocol {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-tertiary);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.port-address {
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
-  font-size: 13px;
-  color: var(--text-primary);
 }
 
 .mode-cards {
@@ -913,7 +896,11 @@ onMounted(async () => {
   }
 
   .stats-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .port-info-bar {
+    flex-wrap: wrap;
   }
 }
 
