@@ -38,6 +38,9 @@ importers:
       '@vueuse/core':
         specifier: ^14.1.0
         version: 14.1.0(vue@3.5.26(typescript@5.6.3))
+      flag-icons:
+        specifier: ^7.5.0
+        version: 7.5.0
       pinia:
         specifier: ^2.3.1
         version: 2.3.1(typescript@5.6.3)(vue@3.5.26(typescript@5.6.3))
@@ -1355,6 +1358,9 @@ packages:
     resolution: {integrity: sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng==}
     engines: {node: '>=10'}
 
+  flag-icons@7.5.0:
+    resolution: {integrity: sha512-kd+MNXviFIg5hijH766tt+3x76ele1AXlo4zDdCxIvqWZhKt4T83bOtxUOOMlTx/EcFdUMH5yvQgYlFh1EqqFg==}
+
   flat-cache@4.0.1:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
     engines: {node: '>=16'}
@@ -2072,6 +2078,7 @@ packages:
   vue-i18n@9.14.5:
     resolution: {integrity: sha512-0jQ9Em3ymWngyiIkj0+c/k7WgaPO+TNzjKSNq9BvBQaKJECqn9cd9fL4tkDhB5G1QBskGl9YxxbDAhgbFtpe2g==}
     engines: {node: '>= 16'}
+    deprecated: v9 and v10 no longer supported. please migrate to v11. about maintenance status, see https://vue-i18n.intlify.dev/guide/maintenance.html
     peerDependencies:
       vue: ^3.0.0
 
@@ -3355,6 +3362,8 @@ snapshots:
     dependencies:
       locate-path: 6.0.0
       path-exists: 4.0.0
+
+  flag-icons@7.5.0: {}
 
   flat-cache@4.0.1:
     dependencies:

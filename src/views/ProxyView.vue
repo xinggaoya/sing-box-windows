@@ -62,7 +62,12 @@
                 </n-tag>
               </div>
               <div class="group-now">
-                {{ t('proxy.currentLabel') }} {{ group.now || '-' }}
+                {{ t('proxy.currentLabel') }}
+                <span v-if="group.now" class="inline-node-name">
+                  <img v-if="getNodeFlagUrl(group.now)" class="node-flag" :src="getNodeFlagUrl(group.now)" alt="" />
+                  <span>{{ group.now }}</span>
+                </span>
+                <span v-else>-</span>
               </div>
             </div>
 
@@ -80,7 +85,19 @@
           </div>
 
           <div class="group-stats">
-            <span>{{ labels.recommended }} {{ proxyStore.getRecommendedNode(group) || '-' }}</span>
+            <span>
+              {{ labels.recommended }}
+              <span v-if="proxyStore.getRecommendedNode(group)" class="inline-node-name">
+                <img
+                  v-if="getNodeFlagUrl(proxyStore.getRecommendedNode(group))"
+                  class="node-flag"
+                  :src="getNodeFlagUrl(proxyStore.getRecommendedNode(group))"
+                  alt=""
+                />
+                <span>{{ proxyStore.getRecommendedNode(group) }}</span>
+              </span>
+              <span v-else>-</span>
+            </span>
             <span>{{ labels.favorites }} {{ group.all.filter((node) => proxyStore.isFavorite(node)).length }}</span>
           </div>
 
@@ -94,7 +111,10 @@
               @click="changeProxy(group.name, node)"
             >
               <div class="node-head">
-                <span class="node-name">{{ node }}</span>
+                <span class="node-name">
+                  <img v-if="getNodeFlagUrl(node)" class="node-flag" :src="getNodeFlagUrl(node)" alt="" />
+                  <span>{{ node }}</span>
+                </span>
                 <div class="node-actions">
                   <n-button text @click.stop="proxyStore.toggleFavorite(node)">
                     <n-icon>
@@ -185,7 +205,10 @@
 
           <div class="provider-node-list">
             <div v-for="proxy in getProviderNodes(provider)" :key="proxy.name" class="provider-node-item">
-              <span class="provider-node-name">{{ proxy.name }}</span>
+              <span class="provider-node-name">
+                <img v-if="getNodeFlagUrl(proxy.name)" class="node-flag" :src="getNodeFlagUrl(proxy.name)" alt="" />
+                <span>{{ proxy.name }}</span>
+              </span>
               <n-tag size="small" round :bordered="false">{{ formatLatency(proxy.name) }}</n-tag>
             </div>
           </div>
@@ -227,6 +250,20 @@ const message = useMessage()
 const proxyStore = useProxyStore()
 const searchQuery = ref('')
 const favoritesOnly = ref(false)
+
+const countryCodeAliases: Record<string, string> = {
+  UK: 'GB',
+}
+
+const proxyPrefixCountryCodes = new Set(['CF', 'CL', 'SS'])
+
+const getFlagIconCountryCode = (code: string) => {
+  if (code === 'EU') return 'eu'
+  const normalizedCode = countryCodeAliases[code] || code
+  if (!/^[A-Z]{2}$/.test(normalizedCode)) return ''
+
+  return normalizedCode.toLowerCase()
+}
 
 const labels = computed(() => ({
   groupsTab: locale.value.startsWith('zh') ? '代理组' : 'Groups',
@@ -377,6 +414,29 @@ const getVisibleNodes = (group: ProxyGroup) => {
 const getProviderNodes = (provider: ProxyProvider) =>
   (provider.proxies || []).slice().sort((left, right) => left.name.localeCompare(right.name))
 
+const getNodeCountryCode = (nodeName: string) => {
+  const tokens = nodeName
+    .toUpperCase()
+    .split(/[^A-Z]+/)
+    .filter(Boolean)
+  const countryCodes = tokens.filter((token) => token === 'EU' || /^[A-Z]{2}$/.test(token))
+  if (!countryCodes.length) return ''
+
+  const preferredCode =
+    countryCodes.length > 1 && proxyPrefixCountryCodes.has(countryCodes[0])
+      ? countryCodes[1]
+      : countryCodes[0]
+  return getFlagIconCountryCode(preferredCode)
+}
+
+const getNodeFlagUrl = (nodeName?: string | null) => {
+  if (!nodeName) return ''
+  const countryCode = getNodeCountryCode(nodeName)
+  return countryCode
+    ? new URL(`../../node_modules/flag-icons/flags/4x3/${countryCode}.svg`, import.meta.url).href
+    : ''
+}
+
 const formatLatency = (proxyName: string) => {
   const latency = proxyStore.getLatency(proxyName)
   return latency > 0 ? `${latency} ms` : t('proxy.clickToTest')
@@ -516,9 +576,28 @@ if (!proxyStore.proxyGroups.length) {
 
 .node-name,
 .provider-node-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   color: var(--text-primary);
   word-break: break-all;
+}
+
+.inline-node-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.node-flag {
+  width: 1.25em;
+  height: 0.9em;
+  min-width: 1.25em;
+  object-fit: cover;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .node-provider {
