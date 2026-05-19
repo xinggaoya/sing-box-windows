@@ -65,7 +65,7 @@
                 {{ t('proxy.currentLabel') }}
                 <span v-if="group.now" class="inline-node-name">
                   <img v-if="getNodeFlagUrl(group.now)" class="node-flag" :src="getNodeFlagUrl(group.now)" alt="" />
-                  <span>{{ group.now }}</span>
+                  <span>{{ getDisplayNodeName(group.now) }}</span>
                 </span>
                 <span v-else>-</span>
               </div>
@@ -94,7 +94,7 @@
                   :src="getNodeFlagUrl(proxyStore.getRecommendedNode(group))"
                   alt=""
                 />
-                <span>{{ proxyStore.getRecommendedNode(group) }}</span>
+                <span>{{ getDisplayNodeName(proxyStore.getRecommendedNode(group)) }}</span>
               </span>
               <span v-else>-</span>
             </span>
@@ -113,7 +113,7 @@
               <div class="node-head">
                 <span class="node-name">
                   <img v-if="getNodeFlagUrl(node)" class="node-flag" :src="getNodeFlagUrl(node)" alt="" />
-                  <span>{{ node }}</span>
+                  <span>{{ getDisplayNodeName(node) }}</span>
                 </span>
                 <div class="node-actions">
                   <n-button text @click.stop="proxyStore.toggleFavorite(node)">
@@ -207,7 +207,7 @@
             <div v-for="proxy in getProviderNodes(provider)" :key="proxy.name" class="provider-node-item">
               <span class="provider-node-name">
                 <img v-if="getNodeFlagUrl(proxy.name)" class="node-flag" :src="getNodeFlagUrl(proxy.name)" alt="" />
-                <span>{{ proxy.name }}</span>
+                <span>{{ getDisplayNodeName(proxy.name) }}</span>
               </span>
               <n-tag size="small" round :bordered="false">{{ formatLatency(proxy.name) }}</n-tag>
             </div>
@@ -251,11 +251,299 @@ const proxyStore = useProxyStore()
 const searchQuery = ref('')
 const favoritesOnly = ref(false)
 
+const flagIconUrls = import.meta.glob('../../node_modules/flag-icons/flags/4x3/*.svg', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>
+
 const countryCodeAliases: Record<string, string> = {
   UK: 'GB',
 }
 
+const countryDisplayLocales = ['zh-CN', 'zh-Hans', 'zh-TW', 'zh-Hant', 'ja-JP', 'en-US']
+const allCountryCodes = [
+  'AC',
+  'AD',
+  'AE',
+  'AF',
+  'AG',
+  'AI',
+  'AL',
+  'AM',
+  'AO',
+  'AQ',
+  'AR',
+  'AS',
+  'AT',
+  'AU',
+  'AW',
+  'AX',
+  'AZ',
+  'BA',
+  'BB',
+  'BD',
+  'BE',
+  'BF',
+  'BG',
+  'BH',
+  'BI',
+  'BJ',
+  'BL',
+  'BM',
+  'BN',
+  'BO',
+  'BQ',
+  'BR',
+  'BS',
+  'BT',
+  'BV',
+  'BW',
+  'BY',
+  'BZ',
+  'CA',
+  'CC',
+  'CD',
+  'CF',
+  'CG',
+  'CH',
+  'CI',
+  'CK',
+  'CL',
+  'CM',
+  'CN',
+  'CO',
+  'CP',
+  'CR',
+  'CU',
+  'CV',
+  'CW',
+  'CX',
+  'CY',
+  'CZ',
+  'DE',
+  'DG',
+  'DJ',
+  'DK',
+  'DM',
+  'DO',
+  'DZ',
+  'EA',
+  'EC',
+  'EE',
+  'EG',
+  'EH',
+  'ER',
+  'ES',
+  'ET',
+  'EU',
+  'FI',
+  'FJ',
+  'FK',
+  'FM',
+  'FO',
+  'FR',
+  'GA',
+  'GB',
+  'GD',
+  'GE',
+  'GF',
+  'GG',
+  'GH',
+  'GI',
+  'GL',
+  'GM',
+  'GN',
+  'GP',
+  'GQ',
+  'GR',
+  'GS',
+  'GT',
+  'GU',
+  'GW',
+  'GY',
+  'HK',
+  'HM',
+  'HN',
+  'HR',
+  'HT',
+  'HU',
+  'IC',
+  'ID',
+  'IE',
+  'IL',
+  'IM',
+  'IN',
+  'IO',
+  'IQ',
+  'IR',
+  'IS',
+  'IT',
+  'JE',
+  'JM',
+  'JO',
+  'JP',
+  'KE',
+  'KG',
+  'KH',
+  'KI',
+  'KM',
+  'KN',
+  'KP',
+  'KR',
+  'KW',
+  'KY',
+  'KZ',
+  'LA',
+  'LB',
+  'LC',
+  'LI',
+  'LK',
+  'LR',
+  'LS',
+  'LT',
+  'LU',
+  'LV',
+  'LY',
+  'MA',
+  'MC',
+  'MD',
+  'ME',
+  'MF',
+  'MG',
+  'MH',
+  'MK',
+  'ML',
+  'MM',
+  'MN',
+  'MO',
+  'MP',
+  'MQ',
+  'MR',
+  'MS',
+  'MT',
+  'MU',
+  'MV',
+  'MW',
+  'MX',
+  'MY',
+  'MZ',
+  'NA',
+  'NC',
+  'NE',
+  'NF',
+  'NG',
+  'NI',
+  'NL',
+  'NO',
+  'NP',
+  'NR',
+  'NU',
+  'NZ',
+  'OM',
+  'PA',
+  'PE',
+  'PF',
+  'PG',
+  'PH',
+  'PK',
+  'PL',
+  'PM',
+  'PN',
+  'PR',
+  'PS',
+  'PT',
+  'PW',
+  'PY',
+  'QA',
+  'RE',
+  'RO',
+  'RS',
+  'RU',
+  'RW',
+  'SA',
+  'SB',
+  'SC',
+  'SD',
+  'SE',
+  'SG',
+  'SH',
+  'SI',
+  'SJ',
+  'SK',
+  'SL',
+  'SM',
+  'SN',
+  'SO',
+  'SR',
+  'SS',
+  'ST',
+  'SV',
+  'SX',
+  'SY',
+  'SZ',
+  'TA',
+  'TC',
+  'TD',
+  'TF',
+  'TG',
+  'TH',
+  'TJ',
+  'TK',
+  'TL',
+  'TM',
+  'TN',
+  'TO',
+  'TR',
+  'TT',
+  'TV',
+  'TW',
+  'TZ',
+  'UA',
+  'UG',
+  'UM',
+  'UN',
+  'US',
+  'UY',
+  'UZ',
+  'VA',
+  'VC',
+  'VE',
+  'VG',
+  'VI',
+  'VN',
+  'VU',
+  'WF',
+  'WS',
+  'XK',
+  'YE',
+  'YT',
+  'ZA',
+  'ZM',
+  'ZW',
+]
+
+const countryNameOverrides: Array<[RegExp, string]> = [
+  [/东京|東京|大阪/i, 'JP'],
+  [/香港|hong\s*kong/i, 'HK'],
+  [/台湾|台灣|taiwan/i, 'TW'],
+  [/美国|美國|洛杉矶|洛杉磯|西雅图|西雅圖|纽约|紐約|america|united\s*states/i, 'US'],
+  [/英国|英國|伦敦|倫敦|britain|united\s*kingdom/i, 'GB'],
+  [/首尔|首爾|korea/i, 'KR'],
+  [/澳洲/i, 'AU'],
+  [/沙特阿拉伯|沙特|saudi/i, 'SA'],
+  [/阿联酋|阿聯酋|uae|united\s*arab\s*emirates/i, 'AE'],
+]
+
 const proxyPrefixCountryCodes = new Set(['CF', 'CL', 'SS'])
+const informationalNodePatterns = [
+  /^剩余流量[:：]/,
+  /^距离下次重置剩余[:：]/,
+  /^套餐到期[:：]/,
+  /^官网[:：]/,
+  /^星云[:：]/,
+  /^https?:\/\//i,
+]
 
 const getFlagIconCountryCode = (code: string) => {
   if (code === 'EU') return 'eu'
@@ -264,6 +552,49 @@ const getFlagIconCountryCode = (code: string) => {
 
   return normalizedCode.toLowerCase()
 }
+
+const stripLeadingFlagEmoji = (nodeName: string) =>
+  nodeName.replace(/^[\u{1f1e6}-\u{1f1ff}]{2}\s*/u, '').trim()
+
+const isInformationalNodeName = (nodeName: string) =>
+  informationalNodePatterns.some((pattern) => pattern.test(stripLeadingFlagEmoji(nodeName)))
+
+const normalizeCountryLabel = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[\s·・,，.。()（）[\]【】'’"“”_-]/g, '')
+    .trim()
+
+const getLocalizedCountryNameEntries = () => {
+  const entries: Array<{ code: string; label: string }> = []
+  const seen = new Set<string>()
+
+  countryDisplayLocales.forEach((displayLocale) => {
+    const displayNames = new Intl.DisplayNames([displayLocale], { type: 'region' })
+    allCountryCodes.forEach((countryCode) => {
+      let label: string | undefined
+      try {
+        label = displayNames.of(countryCode)
+      } catch {
+        return
+      }
+      if (!label || label === countryCode) return
+
+      const normalizedLabel = normalizeCountryLabel(label)
+      if (!normalizedLabel || normalizedLabel.length < 2) return
+
+      const key = `${countryCode}:${normalizedLabel}`
+      if (seen.has(key)) return
+
+      seen.add(key)
+      entries.push({ code: countryCode, label: normalizedLabel })
+    })
+  })
+
+  return entries.sort((left, right) => right.label.length - left.label.length)
+}
+
+const localizedCountryNameEntries = getLocalizedCountryNameEntries()
 
 const labels = computed(() => ({
   groupsTab: locale.value.startsWith('zh') ? '代理组' : 'Groups',
@@ -415,7 +746,23 @@ const getProviderNodes = (provider: ProxyProvider) =>
   (provider.proxies || []).slice().sort((left, right) => left.name.localeCompare(right.name))
 
 const getNodeCountryCode = (nodeName: string) => {
-  const tokens = nodeName
+  const normalizedName = stripLeadingFlagEmoji(nodeName)
+  if (isInformationalNodeName(normalizedName)) return ''
+
+  const override = countryNameOverrides.find(([pattern]) => pattern.test(normalizedName))
+  if (override) {
+    return getFlagIconCountryCode(override[1])
+  }
+
+  const normalizedNodeName = normalizeCountryLabel(normalizedName)
+  const localizedCountry = localizedCountryNameEntries.find((entry) =>
+    normalizedNodeName.includes(entry.label),
+  )
+  if (localizedCountry) {
+    return getFlagIconCountryCode(localizedCountry.code)
+  }
+
+  const tokens = normalizedName
     .toUpperCase()
     .split(/[^A-Z]+/)
     .filter(Boolean)
@@ -429,12 +776,13 @@ const getNodeCountryCode = (nodeName: string) => {
   return getFlagIconCountryCode(preferredCode)
 }
 
+const getDisplayNodeName = (nodeName?: string | null) =>
+  nodeName ? stripLeadingFlagEmoji(nodeName) : '-'
+
 const getNodeFlagUrl = (nodeName?: string | null) => {
   if (!nodeName) return ''
   const countryCode = getNodeCountryCode(nodeName)
-  return countryCode
-    ? new URL(`../../node_modules/flag-icons/flags/4x3/${countryCode}.svg`, import.meta.url).href
-    : ''
+  return countryCode ? flagIconUrls[`../../node_modules/flag-icons/flags/4x3/${countryCode}.svg`] || '' : ''
 }
 
 const formatLatency = (proxyName: string) => {
