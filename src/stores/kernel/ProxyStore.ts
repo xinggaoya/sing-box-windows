@@ -32,6 +32,7 @@ export const useProxyStore = defineStore('proxy', () => {
   const latencyTestUrl = useLocalStorage('proxy-latency-url', '')
   const latencyTimeoutMs = useLocalStorage('proxy-latency-timeout-ms', DEFAULT_TIMEOUT_MS)
   const autoCloseConnections = useLocalStorage('proxy-auto-close-connections', true)
+  const selectedGroup = ref<string>('')
 
   const proxyGroups = computed<ProxyGroup[]>(() =>
     Object.entries(rawProxies.value)
@@ -158,6 +159,10 @@ export const useProxyStore = defineStore('proxy', () => {
 
       rawProviders.value =
         providersResponse.status === 'fulfilled' ? providersResponse.value.providers || {} : {}
+
+      if (!selectedGroup.value && proxyGroups.value.length) {
+        selectedGroup.value = proxyGroups.value[0].name
+      }
     } finally {
       loading.value = false
     }
@@ -326,6 +331,7 @@ export const useProxyStore = defineStore('proxy', () => {
     latencyTestUrl,
     latencyTimeoutMs,
     autoCloseConnections,
+    selectedGroup,
     proxyGroups,
     proxyProviders,
     proxyNodeMap,

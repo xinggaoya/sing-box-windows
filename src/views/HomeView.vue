@@ -1,22 +1,30 @@
 <template>
-  <div class="page-container">
-    <div class="home-header">
-      <div class="header-info">
-        <div class="status-hero" :class="statusClass">
-          <div class="status-indicator"></div>
-          <div class="status-text">
-            <div class="status-label">{{ statusTitle }}</div>
+  <div class="home-page">
+    <div class="hero-section" :class="statusClass">
+      <div class="hero-bg-glow"></div>
+      <div class="hero-content">
+        <div class="hero-row-top">
+          <div class="hero-left">
+            <div class="hero-status-dot"></div>
+            <div class="hero-info">
+              <div class="hero-title-row">
+                <h2 class="hero-title">{{ statusTitle }}</h2>
+                <span class="hero-speed-item">
+                  <span class="meta-arrow up">↑</span>
+                  {{ formatSpeed(trafficStore.traffic.up) }}
+                </span>
+                <span class="hero-speed-item">
+                  <span class="meta-arrow down">↓</span>
+                  {{ formatSpeed(trafficStore.traffic.down) }}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-
-      <div class="header-actions">
-        <n-tooltip trigger="hover">
-          <template #trigger>
+          <div class="hero-actions">
             <n-button
-              class="action-button"
               :type="kernelRunning ? 'error' : 'primary'"
               size="large"
+              round
               :loading="kernelLoading"
               @click="restartKernel"
             >
@@ -25,26 +33,51 @@
               </template>
               {{ t('home.restart') }}
             </n-button>
-          </template>
-          {{ t('home.restart') }}
-        </n-tooltip>
-
-        <n-tooltip v-if="isWindowsPlatform && !isAdmin" trigger="hover">
-          <template #trigger>
-            <n-button
-              class="action-button"
-              secondary
-              type="warning"
-              size="large"
-              @click="restartAsAdmin"
-            >
-              <template #icon>
-                <n-icon><ShieldCheckmarkOutline /></n-icon>
+            <n-tooltip v-if="isWindowsPlatform && !isAdmin" trigger="hover">
+              <template #trigger>
+                <n-button
+                  size="large"
+                  round
+                  secondary
+                  type="warning"
+                  @click="restartAsAdmin"
+                >
+                  <template #icon>
+                    <n-icon><ShieldCheckmarkOutline /></n-icon>
+                  </template>
+                </n-button>
               </template>
-            </n-button>
-          </template>
-          {{ t('home.restartAsAdmin') }}
-        </n-tooltip>
+              {{ t('home.restartAsAdmin') }}
+            </n-tooltip>
+          </div>
+        </div>
+
+        <div class="hero-row-stats" v-if="kernelRunning">
+          <div class="hero-stat">
+            <span class="hero-stat-label">HTTP</span>
+            <code class="hero-stat-value">{{ proxyAddress }}</code>
+          </div>
+          <div class="hero-stat-sep"></div>
+          <div class="hero-stat">
+            <span class="hero-stat-label">SOCKS5</span>
+            <code class="hero-stat-value">{{ proxyAddress }}</code>
+          </div>
+          <div class="hero-stat-sep"></div>
+          <div class="hero-stat">
+            <span class="hero-stat-label">{{ t('nav.connections') }}</span>
+            <code class="hero-stat-value">{{ connectionStore.connections.length }}</code>
+          </div>
+          <div class="hero-stat-sep"></div>
+          <div class="hero-stat">
+            <span class="hero-stat-label">{{ t('proxy.title') }}</span>
+            <code class="hero-stat-value">{{ currentNodeProxyMode === 'global' ? t('home.nodeMode.global') : t('home.nodeMode.rule') }}</code>
+          </div>
+          <div class="hero-stat-sep"></div>
+          <div class="hero-stat">
+            <span class="hero-stat-label">{{ t('home.traffic.total') }}</span>
+            <code class="hero-stat-value">{{ formatBytes(trafficStore.traffic.totalUp + trafficStore.traffic.totalDown) }}</code>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -71,134 +104,79 @@
       </div>
     </n-alert>
 
-    <div class="dashboard-grid">
-      <div class="grid-section full-width">
-        <div class="stats-row">
-          <StatusCard
-            :label="t('home.traffic.up')"
-            :value="formatSpeed(trafficStore.traffic.up)"
-            :description="
-              t('home.traffic.total') + ': ' + formatBytes(trafficStore.traffic.totalUp)
-            "
-            type="primary"
-          >
-            <template #icon><ArrowUpOutline /></template>
-          </StatusCard>
-
-          <StatusCard
-            :label="t('home.traffic.down')"
-            :value="formatSpeed(trafficStore.traffic.down)"
-            :description="
-              t('home.traffic.total') + ': ' + formatBytes(trafficStore.traffic.totalDown)
-            "
-            type="success"
-          >
-            <template #icon><ArrowDownOutline /></template>
-          </StatusCard>
-
-          <StatusCard
-            :label="t('nav.connections')"
-            :value="connectionStore.connections.length"
-            :description="t('home.memory') + ': ' + formatBytes(connectionStore.memory.inuse)"
-            type="warning"
-          >
-            <template #icon><PulseOutline /></template>
-          </StatusCard>
-
-          <StatusCard
-            :label="t('proxy.title')"
-            :value="proxyStore.groupCount"
-            :description="`${t('proxy.dashboard.nodeTotal')}: ${proxyStore.nodeCount}`"
-            type="default"
-          >
-            <template #icon><GlobeOutline /></template>
-          </StatusCard>
-        </div>
-
-        <div class="chart-section">
-          <TrafficChart
-            :upload-speed="trafficStore.traffic.up"
-            :download-speed="trafficStore.traffic.down"
-          />
-        </div>
+    <div class="main-grid">
+      <div class="chart-panel">
+        <TrafficChart
+          :upload-speed="trafficStore.traffic.up"
+          :download-speed="trafficStore.traffic.down"
+        />
       </div>
 
-      <div class="grid-section">
-        <div class="card-header">
-          <div class="card-header-icon flow-icon">
-            <n-icon :size="16"><SwapVerticalOutline /></n-icon>
+      <div class="side-panels">
+        <div class="mode-panel">
+          <div class="panel-header">
+            <span class="panel-title">{{ t('home.proxyHeader.flowMode') }}</span>
+            <n-button size="tiny" quaternary @click="showPortModal = true">
+              {{ t('common.edit') }}
+            </n-button>
           </div>
-          <h3 class="card-title">{{ t('home.proxyHeader.flowMode') }}</h3>
-        </div>
-        <div class="port-info-bar">
-          <div class="port-item">
-            <span class="port-label">HTTP</span>
-            <code class="port-value">{{ proxyAddress }}</code>
-          </div>
-          <div class="port-item">
-            <span class="port-label">SOCKS5</span>
-            <code class="port-value">{{ proxyAddress }}</code>
-          </div>
-          <n-button size="tiny" quaternary @click="showPortModal = true">
-            {{ t('common.edit') }}
-          </n-button>
-        </div>
-        <div class="mode-cards">
-          <div
-            class="mode-card"
-            :class="{ active: systemProxyEnabled }"
-            @click="toggleSystemProxy(!systemProxyEnabled)"
-          >
-            <div class="mode-card-icon" :class="{ active: systemProxyEnabled }">
-              <n-icon :size="20"><GlobeOutline /></n-icon>
+          <div class="toggle-list">
+            <div class="toggle-item" :class="{ active: systemProxyEnabled }">
+              <div class="toggle-icon">
+                <n-icon :size="18"><GlobeOutline /></n-icon>
+              </div>
+              <div class="toggle-info">
+                <span class="toggle-name">{{ t('home.proxyMode.system') }}</span>
+                <code class="toggle-port">{{ proxyAddress }}</code>
+              </div>
+              <n-switch :value="systemProxyEnabled" size="small" :disabled="modeSwitchPending" @update:value="(v: boolean) => toggleSystemProxy(v)" />
             </div>
-            <div class="mode-card-info">
-              <div class="mode-card-name">{{ t('home.proxyMode.system') }}</div>
-              <div class="mode-card-desc">{{ t('home.proxyMode.systemTip') }}</div>
+            <div class="toggle-item" :class="{ active: tunProxyEnabled }">
+              <div class="toggle-icon">
+                <n-icon :size="18"><FlashOutline /></n-icon>
+              </div>
+              <div class="toggle-info">
+                <span class="toggle-name">{{ t('home.proxyMode.tun') }}</span>
+                <span class="toggle-desc">{{ t('home.proxyMode.tunTip') }}</span>
+              </div>
+              <n-switch :value="tunProxyEnabled" size="small" :disabled="modeSwitchPending" @update:value="(v: boolean) => toggleTunProxy(v)" />
             </div>
-            <n-switch :value="systemProxyEnabled" size="small" :disabled="modeSwitchPending" />
           </div>
+        </div>
 
-          <div
-            class="mode-card"
-            :class="{ active: tunProxyEnabled }"
-            @click="toggleTunProxy(!tunProxyEnabled)"
-          >
-            <div class="mode-card-icon" :class="{ active: tunProxyEnabled }">
-              <n-icon :size="20"><FlashOutline /></n-icon>
+        <div class="proxy-mode-panel">
+          <div class="panel-header">
+            <span class="panel-title">{{ t('home.proxyHeader.nodeMode') }}</span>
+          </div>
+          <div class="mode-chips">
+            <div
+              v-for="mode in nodeProxyModes"
+              :key="mode.value"
+              class="mode-chip"
+              :class="{ active: currentNodeProxyMode === mode.value }"
+              @click="handleNodeProxyModeChange(mode.value)"
+            >
+              <n-icon :size="15"><component :is="mode.icon" /></n-icon>
+              <span>{{ t(mode.nameKey) }}</span>
             </div>
-            <div class="mode-card-info">
-              <div class="mode-card-name">{{ t('home.proxyMode.tun') }}</div>
-              <div class="mode-card-desc">{{ t('home.proxyMode.tunTip') }}</div>
-            </div>
-            <n-switch :value="tunProxyEnabled" size="small" :disabled="modeSwitchPending" />
           </div>
         </div>
-      </div>
 
-      <div class="grid-section">
-        <div class="card-header">
-          <div class="card-header-icon node-icon">
-            <n-icon :size="16"><RadioOutline /></n-icon>
+        <div class="traffic-info">
+          <div class="traffic-row">
+            <span class="traffic-label">
+              <span class="traffic-dot upload"></span>
+              {{ t('home.traffic.up') }}
+            </span>
+            <span class="traffic-val">{{ formatBytes(trafficStore.traffic.totalUp) }}</span>
           </div>
-          <h3 class="card-title">{{ t('home.proxyHeader.nodeMode') }}</h3>
-        </div>
-        <div class="mode-cards">
-          <div
-            v-for="mode in nodeProxyModes"
-            :key="mode.value"
-            class="mode-card"
-            :class="{ active: currentNodeProxyMode === mode.value }"
-            @click="handleNodeProxyModeChange(mode.value)"
-          >
-            <div class="mode-card-icon" :class="{ active: currentNodeProxyMode === mode.value }">
-              <n-icon :size="20"><component :is="mode.icon" /></n-icon>
-            </div>
-            <div class="mode-card-info">
-              <div class="mode-card-name">{{ t(mode.nameKey) }}</div>
-              <div class="mode-card-desc">{{ t(mode.tipKey) }}</div>
-            </div>
-            <div class="radio-dot" :class="{ active: currentNodeProxyMode === mode.value }"></div>
+          <div class="traffic-divider"></div>
+          <div class="traffic-row">
+            <span class="traffic-label">
+              <span class="traffic-dot download"></span>
+              {{ t('home.traffic.down') }}
+            </span>
+            <span class="traffic-val">{{ formatBytes(trafficStore.traffic.totalDown) }}</span>
           </div>
         </div>
       </div>
@@ -215,26 +193,19 @@ import { useDialog, useMessage, type DialogReactive } from 'naive-ui'
 import {
   PowerOutline,
   ShieldCheckmarkOutline,
-  ArrowUpOutline,
-  ArrowDownOutline,
-  PulseOutline,
   GlobeOutline,
   FlashOutline,
   RadioOutline,
-  SettingsOutline,
-  SwapVerticalOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useProxyStore } from '@/stores/kernel/ProxyStore'
-import { useThemeStore } from '@/stores/app/ThemeStore'
 import { kernelService } from '@/services/kernel-service'
 import { proxyService } from '@/services/proxy-service'
 import { sudoService } from '@/services/sudo-service'
 import { systemService } from '@/services/system-service'
-import StatusCard from '@/components/common/StatusCard.vue'
 import PortSettingsDialog from '@/components/common/PortSettingsDialog.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
@@ -254,7 +225,6 @@ const kernelStore = useKernelStore()
 const trafficStore = useTrafficStore()
 const connectionStore = useConnectionStore()
 const proxyStore = useProxyStore()
-const themeStore = useThemeStore()
 const sudoStore = useSudoStore()
 
 const {
@@ -319,8 +289,7 @@ const syncCurrentNodeProxyMode = async () => {
     if (mode === 'global' || mode === 'rule') {
       currentNodeProxyMode.value = mode
     }
-  } catch (error) {
-    // 后端未就绪时保持当前 UI 状态，避免启动阶段闪烁成错误模式。
+  } catch {
   }
 }
 
@@ -591,115 +560,215 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page-container {
+.home-page {
   padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
   max-width: var(--layout-page-max-width, 1200px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--layout-page-gap, 20px);
+  gap: 16px;
 }
 
-.home-header {
+.hero-section {
+  position: relative;
+  border-radius: 20px;
+  padding: 24px 28px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  overflow: hidden;
+}
+
+.hero-bg-glow {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.hero-section.running .hero-bg-glow {
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.12), transparent 70%);
+  opacity: 1;
+}
+
+.hero-section.failed .hero-bg-glow,
+.hero-section.stopped .hero-bg-glow {
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.08), transparent 70%);
+  opacity: 1;
+}
+
+.hero-section.pending .hero-bg-glow,
+.hero-section.disconnected .hero-bg-glow {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.08), transparent 70%);
+  opacity: 1;
+}
+
+.hero-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hero-row-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 20px;
 }
 
-.status-hero {
+.hero-left {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 10px 20px;
-  border-radius: 14px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel-bg);
+  gap: 16px;
 }
 
-.status-indicator {
-  width: 12px;
-  height: 12px;
+.hero-status-dot {
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--text-tertiary);
   flex-shrink: 0;
+  transition: all 0.4s ease;
 }
 
-.status-hero.running {
-  border-color: rgba(16, 185, 129, 0.2);
-  background: rgba(16, 185, 129, 0.04);
-}
-
-.status-hero.running .status-indicator {
+.hero-section.running .hero-status-dot {
   background: #10b981;
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.5), 0 0 4px rgba(16, 185, 129, 0.8);
+  animation: pulse-green 2s ease-in-out infinite;
 }
 
-.status-hero.running .status-label {
+.hero-section.pending .hero-status-dot,
+.hero-section.disconnected .hero-status-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+.hero-section.stopped .hero-status-dot,
+.hero-section.failed .hero-status-dot {
+  background: #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+.hero-section.crashed .hero-status-dot {
+  background: #f97316;
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.hero-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.hero-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.hero-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.hero-section.running .hero-title {
   color: #10b981;
 }
 
-.status-hero.pending,
-.status-hero.disconnected {
-  border-color: rgba(245, 158, 11, 0.2);
-}
-
-.status-hero.pending .status-indicator,
-.status-hero.disconnected .status-indicator {
-  background: #f59e0b;
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
-}
-
-.status-hero.pending .status-label,
-.status-hero.disconnected .status-label {
-  color: #f59e0b;
-}
-
-.status-hero.stopped,
-.status-hero.failed {
-  border-color: rgba(239, 68, 68, 0.2);
-}
-
-.status-hero.stopped .status-indicator,
-.status-hero.failed .status-indicator {
-  background: #ef4444;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
-}
-
-.status-hero.stopped .status-label,
-.status-hero.failed .status-label {
+.hero-section.failed .hero-title,
+.hero-section.stopped .hero-title {
   color: #ef4444;
 }
 
-.status-hero.crashed {
-  border-color: rgba(249, 115, 22, 0.2);
-}
-
-.status-hero.crashed .status-indicator {
-  background: #f97316;
-  box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
-}
-
-.status-hero.crashed .status-label {
-  color: #f97316;
-}
-
-.status-label {
-  font-size: 15px;
+.hero-speed-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
   font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-.header-actions {
+.meta-arrow {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.meta-arrow.up {
+  color: #10b981;
+}
+
+.meta-arrow.down {
+  color: var(--primary-color);
+}
+
+.meta-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.hero-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
-.action-button {
-  border-radius: 12px;
+.hero-row-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  flex-wrap: wrap;
+}
+
+.hero-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hero-stat-value {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
   font-weight: 600;
+  color: var(--text-primary);
+}
+
+.hero-stat-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border-color);
+  flex-shrink: 0;
 }
 
 .diagnosis-alert {
-  margin-bottom: 12px;
+  border-radius: 14px;
 }
 
 .diagnosis-body {
@@ -724,193 +793,209 @@ onMounted(async () => {
   padding-left: 18px;
 }
 
-.dashboard-grid {
+.main-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--layout-grid-gap, 24px);
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  min-height: 0;
 }
 
-.grid-section.full-width {
-  grid-column: span 2;
+.chart-panel {
+  min-height: 280px;
+  border-radius: 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  overflow: hidden;
+  padding: 14px;
 }
 
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--layout-grid-gap, 24px);
+.side-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.card-header {
+.mode-panel,
+.proxy-mode-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.panel-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   margin-bottom: 12px;
 }
 
-.card-header-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.port-info-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--bg-tertiary);
-  margin-bottom: 8px;
-}
-
-.port-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.port-label {
-  font-size: 11px;
+.panel-title {
+  font-size: 12px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
-.port-value {
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
-  font-size: 13px;
-  color: var(--text-primary);
-}
-
-.card-header-icon.flow-icon {
-  background: rgba(168, 85, 247, 0.1);
-  color: #a855f7;
-}
-
-.card-header-icon.node-icon {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-}
-
-.card-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin: 0;
-  flex: 1;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.mode-cards {
+.toggle-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.mode-card {
+.toggle-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  cursor: pointer;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
   transition: all 0.2s ease;
 }
 
-.mode-card:hover {
-  border-color: var(--border-hover);
-  background: var(--bg-secondary);
+.toggle-item.active {
+  background: rgba(99, 102, 241, 0.06);
 }
 
-.mode-card.active {
-  border-color: var(--primary-color);
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04), rgba(99, 102, 241, 0.01));
-}
-
-.mode-card-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+.toggle-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
   color: var(--text-secondary);
   flex-shrink: 0;
-  transition: all 0.2s ease;
 }
 
-.mode-card-icon.active {
+.toggle-item.active .toggle-icon {
   background: var(--primary-color);
   color: white;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
-.mode-card-info {
+.toggle-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
-.mode-card-name {
-  font-size: 14px;
+.toggle-name {
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.mode-card-desc {
-  font-size: 12px;
+.toggle-desc,
+.toggle-port {
+  font-size: 11px;
   color: var(--text-tertiary);
-  margin-top: 1px;
 }
 
-.radio-dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid var(--border-color);
-  flex-shrink: 0;
+.toggle-port {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+.mode-chips {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.radio-dot.active {
-  border-color: var(--primary-color);
-  background: var(--primary-color);
-  box-shadow: inset 0 0 0 3px var(--panel-bg);
+.mode-chip:hover {
+  color: var(--text-primary);
 }
 
-@media (max-width: 768px) {
-  .dashboard-grid {
+.mode-chip.active {
+  background: var(--primary-color);
+  color: white;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.traffic-info {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.traffic-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border-color);
+  flex-shrink: 0;
+}
+
+.traffic-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.traffic-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.traffic-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.traffic-dot.upload {
+  background: #10b981;
+}
+
+.traffic-dot.download {
+  background: var(--primary-color);
+}
+
+.traffic-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .main-grid {
     grid-template-columns: 1fr;
   }
 
-  .grid-section.full-width {
-    grid-column: span 1;
+  .chart-panel {
+    min-height: 200px;
   }
 
-  .stats-row {
-    grid-template-columns: repeat(2, 1fr);
+  .hero-content {
+    flex-direction: column;
+    align-items: flex-start;
   }
-
-  .port-info-bar {
-    flex-wrap: wrap;
-  }
-}
-
-.chart-section {
-  margin-top: 20px;
-  height: 200px;
-  background: var(--glass-bg);
-  border-radius: 14px;
-  border: 1px solid var(--glass-border);
-  overflow: hidden;
-  padding: 14px;
 }
 </style>

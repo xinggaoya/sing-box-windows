@@ -11,35 +11,6 @@
       </template>
     </PageHeader>
 
-    
-    <div class="summary-grid" v-if="subStore.list.length > 0">
-      <StatusCard
-        :label="t('sub.total')"
-        :value="subStore.list.length"
-        :description="subSummary.activeLabel"
-        type="primary"
-      >
-        <template #icon><LinkOutline /></template>
-      </StatusCard>
-
-      <StatusCard
-        :label="t('sub.active')"
-        :value="subStore.activeIndex === null ? '-' : subStore.list[subStore.activeIndex]?.name || '-'"
-        :description="subSummary.configLabel"
-        type="success"
-      >
-        <template #icon><CheckmarkCircleOutline /></template>
-      </StatusCard>
-
-      <StatusCard
-        :label="subSummary.groupsTitle"
-        :value="proxyStore.groupCount"
-        :description="subSummary.groupsDesc"
-        type="warning"
-      >
-        <template #icon><StatsChartOutline /></template>
-      </StatusCard>
-    </div>
 
     <!-- Subscription List -->
     <div class="subscription-section">
@@ -277,7 +248,6 @@ import { ref, computed, onMounted, onUnmounted, h, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useSubStore } from '@/stores/subscription/SubStore'
 import { useAppStore } from '@/stores'
-import { useProxyStore } from '@/stores/kernel/ProxyStore'
 import { subscriptionService } from '@/services/subscription-service'
 import type { SubscriptionPersistResult } from '@/services/subscription-service'
 import { kernelService } from '@/services/kernel-service'
@@ -315,7 +285,6 @@ import {
 } from '@vicons/ionicons5'
 import type { FormInst, FormRules, DropdownOption } from 'naive-ui'
 import PageHeader from '@/components/common/PageHeader.vue'
-import StatusCard from '@/components/common/StatusCard.vue'
 
 defineOptions({
   name: 'SubView'
@@ -330,7 +299,6 @@ interface SubscriptionForm extends Subscription {
 const message = useMessage()
 const subStore = useSubStore()
 const appStore = useAppStore()
-const proxyStore = useProxyStore()
 const { t } = useI18n()
 
 const showAddModal = ref(false)
@@ -363,19 +331,6 @@ const autoUpdateOptions = computed(() => [
 ])
 
 const autoUpdateDisabled = computed(() => activeTab.value !== 'url')
-
-const subSummary = computed(() => {
-  const activeItem =
-    subStore.activeIndex !== null && subStore.list[subStore.activeIndex]
-      ? subStore.list[subStore.activeIndex]
-      : null
-  return {
-    activeLabel: activeItem ? `${t('sub.active')}: ${activeItem.name}` : t('sub.noSubs'),
-    configLabel: activeItem?.configPath || appStore.activeConfigPath || '-',
-    groupsTitle: t('proxy.dashboard.groupTotal'),
-    groupsDesc: `${t('proxy.dashboard.nodeTotal')}: ${proxyStore.nodeCount}`,
-  }
-})
 
 const markUseOriginalTouched = () => {
   useOriginalTouched.value = true
@@ -855,7 +810,6 @@ const { startAutoUpdateLoop, stopAutoUpdateLoop } = useSubscriptionAutoUpdate({
 
 onMounted(() => {
   subStore.resetLoadingState()
-  proxyStore.fetchProxies().catch(() => undefined)
   startAutoUpdateLoop()
 })
 
@@ -880,12 +834,6 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--layout-subscription-gap, 20px);
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
 }
 
 .sub-card {

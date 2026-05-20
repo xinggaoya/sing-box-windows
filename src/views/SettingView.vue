@@ -1,137 +1,109 @@
 <template>
-  <div class="page-container">
-    <div class="settings-layout">
-      <nav class="settings-nav">
-        <div class="nav-header">
-          <h2 class="nav-title">{{ t('setting.title') }}</h2>
-          <p class="nav-subtitle">{{ t('setting.subtitle') }}</p>
+  <div class="settings-page">
+    <div class="settings-tabs">
+      <button
+        v-for="item in navItems"
+        :key="item.key"
+        class="settings-tab"
+        :class="{ active: activeTab === item.key }"
+        @click="activeTab = item.key"
+      >
+        <n-icon :size="16"><component :is="item.icon" /></n-icon>
+        <span>{{ item.label }}</span>
+        <span v-if="item.key === 'kernel' && hasNewVersion" class="tab-dot"></span>
+        <span v-if="item.key === 'maintenance' && updateStore.hasUpdate" class="tab-dot"></span>
+      </button>
+    </div>
+
+    <div class="settings-body">
+      <transition name="section-fade" mode="out-in">
+        <div :key="activeTab" class="settings-content">
+          <SettingsBasicTab
+            v-if="activeTab === 'basics'"
+            :t="t"
+            :locale-store="localeStore"
+            :theme-store="themeStore"
+            :auto-start="autoStart"
+            :auto-hide-to-tray-on-autostart="autoHideToTrayOnAutostart"
+            :tray-close-behavior="trayCloseBehavior"
+            :language-options="languageOptions"
+            :tray-close-behavior-options="trayCloseBehaviorOptions"
+            :accent-presets="accentPresets"
+            :on-auto-start-change="onAutoStartChange"
+            :on-auto-hide-to-tray-on-autostart-change="onAutoHideToTrayOnAutostartChange"
+            :on-tray-close-behavior-change="onTrayCloseBehaviorChange"
+            :on-change-language="handleChangeLanguage"
+            :on-theme-mode-change="onThemeModeChange"
+            :on-accent-change="onAccentChange"
+            :select-accent-preset="selectAccentPreset"
+            :on-compact-mode-change="onCompactModeChange"
+          />
+
+          <SettingsKernelTab
+            v-if="activeTab === 'kernel'"
+            :t="t"
+            :kernel-store="kernelStore"
+            :selected-kernel-version="selectedKernelVersion"
+            :kernel-version-options="kernelVersionOptions"
+            :has-new-version="hasNewVersion"
+            :kernel-latest-version="kernelLatestVersion"
+            :downloading="downloading"
+            :loading="loading"
+            :download-progress="downloadProgress"
+            :download-message="downloadMessage"
+            :on-selected-kernel-version-change="onSelectedKernelVersionChange"
+            :download-the-kernel="downloadTheKernel"
+            :show-manual-download-modal="showManualDownloadModal"
+            :check-manual-install="checkManualInstall"
+            :format-version="formatVersion"
+          />
+
+          <SettingsAdvancedTab
+            v-if="activeTab === 'advanced'"
+            :t="t"
+            :app-store="appStore"
+            :tun-stack-options="tunStackOptions"
+            :using-original-config="usingOriginalConfig"
+            :on-ip-version-change="onIpVersionChange"
+            :on-lan-access-change="onLanAccessChange"
+            :show-port-settings="showPortSettings"
+          />
+
+          <SettingsMaintenanceTab
+            v-if="activeTab === 'maintenance'"
+            :t="t"
+            :update-store="updateStore"
+            :checking-update="checkingUpdate"
+            :update-status="updateStatus"
+            :update-progress="updateProgress"
+            :update-message="updateMessage"
+            :is-updating="isUpdating"
+            :show-update-progress="showUpdateProgress"
+            :update-channel-options="updateChannelOptions"
+            :backup-exporting="backupExporting"
+            :backup-validating="backupValidating"
+            :backup-restoring="backupRestoring"
+            :backup-busy="backupBusy"
+            :backup-preview="backupPreview"
+            :handle-update-now="handleUpdateNow"
+            :handle-check-update="handleCheckUpdate"
+            :on-auto-check-update-change="onAutoCheckUpdateChange"
+            :on-update-channel-change="onUpdateChannelChange"
+            :handle-export-backup="handleExportBackup"
+            :handle-validate-backup="handleValidateBackup"
+            :handle-restore-backup="handleRestoreBackup"
+          />
+
+          <SettingsAboutTab
+            v-if="activeTab === 'about'"
+            :t="t"
+            :update-store="updateStore"
+            :kernel-store="kernelStore"
+            :platform-info="platformInfo"
+            :format-version="formatVersion"
+          />
         </div>
-
-        <div class="nav-items">
-          <button
-            v-for="item in navItems"
-            :key="item.key"
-            class="nav-item"
-            :class="{ active: activeTab === item.key }"
-            @click="activeTab = item.key"
-          >
-            <div class="nav-item-icon">
-              <n-icon :size="18"><component :is="item.icon" /></n-icon>
-            </div>
-            <div class="nav-item-text">
-              <span class="nav-item-label">{{ item.label }}</span>
-            </div>
-            <div v-if="item.key === 'kernel' && hasNewVersion" class="nav-badge"></div>
-            <div
-              v-if="item.key === 'maintenance' && updateStore.hasUpdate"
-              class="nav-badge"
-            ></div>
-          </button>
-        </div>
-      </nav>
-
-      <div class="settings-content">
-        <div class="content-scroll">
-          <transition name="section-fade" mode="out-in">
-            <div :key="activeTab" class="content-section">
-              <div class="section-hero">
-                <div class="section-hero-icon">
-                  <n-icon :size="22"><component :is="currentSectionMeta.icon" /></n-icon>
-                </div>
-                <div>
-                  <h3 class="section-hero-title">{{ currentSectionMeta.label }}</h3>
-                  <p class="section-hero-desc">{{ currentSectionMeta.description }}</p>
-                </div>
-              </div>
-
-              <SettingsBasicTab
-                v-if="activeTab === 'basics'"
-                :t="t"
-                :locale-store="localeStore"
-                :theme-store="themeStore"
-                :auto-start="autoStart"
-                :auto-hide-to-tray-on-autostart="autoHideToTrayOnAutostart"
-                :tray-close-behavior="trayCloseBehavior"
-                :language-options="languageOptions"
-                :tray-close-behavior-options="trayCloseBehaviorOptions"
-                :accent-presets="accentPresets"
-                :on-auto-start-change="onAutoStartChange"
-                :on-auto-hide-to-tray-on-autostart-change="onAutoHideToTrayOnAutostartChange"
-                :on-tray-close-behavior-change="onTrayCloseBehaviorChange"
-                :on-change-language="handleChangeLanguage"
-                :on-theme-mode-change="onThemeModeChange"
-                :on-accent-change="onAccentChange"
-                :select-accent-preset="selectAccentPreset"
-                :on-compact-mode-change="onCompactModeChange"
-              />
-
-              <SettingsKernelTab
-                v-if="activeTab === 'kernel'"
-                :t="t"
-                :kernel-store="kernelStore"
-                :selected-kernel-version="selectedKernelVersion"
-                :kernel-version-options="kernelVersionOptions"
-                :has-new-version="hasNewVersion"
-                :kernel-latest-version="kernelLatestVersion"
-                :downloading="downloading"
-                :loading="loading"
-                :download-progress="downloadProgress"
-                :download-message="downloadMessage"
-                :on-selected-kernel-version-change="onSelectedKernelVersionChange"
-                :download-the-kernel="downloadTheKernel"
-                :show-manual-download-modal="showManualDownloadModal"
-                :check-manual-install="checkManualInstall"
-                :format-version="formatVersion"
-              />
-
-              <SettingsAdvancedTab
-                v-if="activeTab === 'advanced'"
-                :t="t"
-                :app-store="appStore"
-                :tun-stack-options="tunStackOptions"
-                :using-original-config="usingOriginalConfig"
-                :on-ip-version-change="onIpVersionChange"
-                :on-lan-access-change="onLanAccessChange"
-                :show-port-settings="showPortSettings"
-              />
-
-              <SettingsMaintenanceTab
-                v-if="activeTab === 'maintenance'"
-                :t="t"
-                :update-store="updateStore"
-                :checking-update="checkingUpdate"
-                :update-status="updateStatus"
-                :update-progress="updateProgress"
-                :update-message="updateMessage"
-                :is-updating="isUpdating"
-                :show-update-progress="showUpdateProgress"
-                :update-channel-options="updateChannelOptions"
-                :backup-exporting="backupExporting"
-                :backup-validating="backupValidating"
-                :backup-restoring="backupRestoring"
-                :backup-busy="backupBusy"
-                :backup-preview="backupPreview"
-                :handle-update-now="handleUpdateNow"
-                :handle-check-update="handleCheckUpdate"
-                :on-auto-check-update-change="onAutoCheckUpdateChange"
-                :on-update-channel-change="onUpdateChannelChange"
-                :handle-export-backup="handleExportBackup"
-                :handle-validate-backup="handleValidateBackup"
-                :handle-restore-backup="handleRestoreBackup"
-              />
-
-              <SettingsAboutTab
-                v-if="activeTab === 'about'"
-                :t="t"
-                :update-store="updateStore"
-                :kernel-store="kernelStore"
-                :platform-info="platformInfo"
-                :format-version="formatVersion"
-              />
-            </div>
-          </transition>
-        </div>
-      </div>
+      </transition>
     </div>
 
     <PortSettingsDialog v-model:show="showPortModal" />
@@ -180,11 +152,7 @@ import { ref, computed, onMounted, onUnmounted, watch, type Component } from 'vu
 import { Window } from '@tauri-apps/api/window'
 import { useDialog, useMessage } from 'naive-ui'
 import {
-  SettingsOutline,
   DownloadOutline,
-  PowerOutline,
-  OptionsOutline,
-  RefreshOutline,
   InformationCircleOutline,
   ColorPaletteOutline,
   HardwareChipOutline,
@@ -215,6 +183,7 @@ import SettingsKernelTab from '@/views/setting/components/SettingsKernelTab.vue'
 import SettingsAdvancedTab from '@/views/setting/components/SettingsAdvancedTab.vue'
 import SettingsMaintenanceTab from '@/views/setting/components/SettingsMaintenanceTab.vue'
 import SettingsAboutTab from '@/views/setting/components/SettingsAboutTab.vue'
+import '@/views/setting/setting-shared.css'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -252,7 +221,6 @@ let manualDropUnlisten: (() => void) | null = null
 interface NavItem {
   key: SettingTabKey
   label: string
-  description: string
   icon: Component
 }
 
@@ -260,38 +228,29 @@ const navItems = computed<NavItem[]>(() => [
   {
     key: 'basics',
     label: t('setting.navigation.basics'),
-    description: t('setting.navigation.basicsDesc'),
     icon: ColorPaletteOutline,
   },
   {
     key: 'kernel',
     label: t('setting.navigation.kernel'),
-    description: t('setting.navigation.kernelDesc'),
     icon: HardwareChipOutline,
   },
   {
     key: 'advanced',
     label: t('setting.navigation.advanced'),
-    description: t('setting.navigation.advancedDesc'),
     icon: GlobeOutline,
   },
   {
     key: 'maintenance',
     label: t('setting.navigation.maintenance'),
-    description: t('setting.navigation.maintenanceDesc'),
     icon: CloudDownloadOutline,
   },
   {
     key: 'about',
     label: t('setting.navigation.about'),
-    description: t('setting.navigation.aboutDesc'),
     icon: InformationCircleOutline,
   },
 ])
-
-const currentSectionMeta = computed(() => {
-  return navItems.value.find((item) => item.key === activeTab.value) || navItems.value[0]
-})
 
 const languageOptions = computed<{ label: string; value: Locale }[]>(() => [
   { label: t('setting.language.auto'), value: 'auto' },
@@ -742,185 +701,70 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.page-container {
-  height: 100%;
-  max-width: var(--layout-page-max-width, 1200px);
-  margin: 0 auto;
+.settings-page {
   padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
+  max-width: var(--layout-page-max-width, 1400px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
 }
 
-.settings-layout {
+.settings-tabs {
   display: flex;
-  gap: 0;
-  height: calc(100vh - 50px - var(--layout-page-padding-y, 24px) * 2);
+  gap: 4px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: var(--layout-card-radius, 16px);
-  overflow: hidden;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.04);
+  border-radius: 12px;
+  padding: 4px;
 }
 
-.settings-nav {
-  width: 220px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--panel-border);
-  background: var(--bg-tertiary);
-  padding: 20px 12px;
-  gap: 8px;
-}
-
-.nav-header {
-  padding: 4px 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 4px;
-}
-
-.nav-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 4px;
-  letter-spacing: -0.02em;
-}
-
-.nav-subtitle {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.nav-items {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 4px 0;
-}
-
-.nav-item {
+.settings-tab {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
   border: none;
   background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  text-align: left;
-  width: 100%;
   position: relative;
+  white-space: nowrap;
 }
 
-.nav-item:hover {
-  background: var(--bg-secondary);
+.settings-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
 }
 
-.nav-item.active {
-  background: var(--bg-secondary);
-  box-shadow: 0 0 0 1px var(--primary-color), 0 2px 8px rgba(99, 102, 241, 0.1);
-}
-
-.nav-item-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-}
-
-.nav-item.active .nav-item-icon {
+.settings-tab.active {
   background: var(--primary-color);
   color: white;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
 }
 
-.nav-item-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.nav-item-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.nav-item.active .nav-item-label {
-  color: var(--primary-color);
-}
-
-.nav-badge {
-  width: 8px;
-  height: 8px;
+.tab-dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #f59e0b;
   box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
   flex-shrink: 0;
 }
 
-.settings-content {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.content-scroll {
+.settings-body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 24px 28px;
 }
 
-.content-section {
-  max-width: 800px;
-}
-
-.section-hero {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.section-hero-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-  color: white;
-  flex-shrink: 0;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25);
-}
-
-.section-hero-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.section-hero-desc {
-  font-size: 13px;
-  color: var(--text-tertiary);
-  margin: 2px 0 0;
+.settings-content {
+  max-width: 720px;
 }
 
 .section-fade-enter-active,
@@ -930,12 +774,12 @@ onUnmounted(() => {
 
 .section-fade-enter-from {
   opacity: 0;
-  transform: translateX(8px);
+  transform: translateY(6px);
 }
 
 .section-fade-leave-to {
   opacity: 0;
-  transform: translateX(-8px);
+  transform: translateY(-6px);
 }
 
 .manual-import-body {
@@ -997,47 +841,20 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
-  .page-container {
+  .settings-page {
     padding: 14px;
   }
 
-  .settings-layout {
-    flex-direction: column;
-    height: auto;
-    min-height: calc(100vh - 50px - 28px);
-  }
-
-  .settings-nav {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--panel-border);
-    padding: 12px;
-  }
-
-  .nav-header {
-    display: none;
-  }
-
-  .nav-items {
-    flex-direction: row;
+  .settings-tabs {
     overflow-x: auto;
-    padding: 0;
   }
 
-  .nav-item {
-    flex-direction: column;
-    gap: 4px;
-    padding: 8px;
-    text-align: center;
-    flex-shrink: 0;
-  }
-
-  .nav-item-text {
+  .settings-tab span:not(.tab-dot) {
     display: none;
   }
 
-  .content-scroll {
-    padding: 16px;
+  .settings-tab {
+    padding: 8px 12px;
   }
 }
 </style>

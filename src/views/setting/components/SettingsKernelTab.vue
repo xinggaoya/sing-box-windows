@@ -1,24 +1,22 @@
 <template>
-  <div class="settings-panel">
-    <div class="kernel-hero">
-      <div class="kernel-hero-left">
-        <div class="kernel-version-badge" :class="versionBadgeClass">
-          <n-icon :size="16">
-            <CheckmarkCircleOutline v-if="props.kernelStore.hasVersionInfo()" />
-            <AlertCircleOutline v-else />
-          </n-icon>
-          <span>{{ versionDisplay }}</span>
+  <div class="setting-section">
+    <div class="kernel-status-row">
+      <div class="kernel-version-badge" :class="versionBadgeClass">
+        <n-icon :size="14">
+          <CheckmarkCircleOutline v-if="props.kernelStore.hasVersionInfo()" />
+          <AlertCircleOutline v-else />
+        </n-icon>
+        <span>{{ versionDisplay }}</span>
+      </div>
+      <div class="kernel-status-info">
+        <div class="setting-label">
+          {{
+            props.kernelStore.hasVersionInfo()
+              ? props.t('setting.kernel.title')
+              : props.t('setting.kernel.installPrompt')
+          }}
         </div>
-        <div class="kernel-hero-text">
-          <div class="kernel-hero-title">
-            {{
-              props.kernelStore.hasVersionInfo()
-                ? props.t('setting.kernel.title')
-                : props.t('setting.kernel.installPrompt')
-            }}
-          </div>
-          <div class="kernel-hero-desc">{{ props.t('setting.kernel.embeddedHint') }}</div>
-        </div>
+        <div class="setting-desc">{{ props.t('setting.kernel.embeddedHint') }}</div>
       </div>
       <n-select
         :value="props.selectedKernelVersion"
@@ -26,7 +24,7 @@
         :loading="props.kernelStore.isLoading"
         :disabled="props.downloading"
         size="small"
-        style="width: 180px"
+        style="width: 160px"
         placeholder="Latest"
         @update:value="props.onSelectedKernelVersionChange"
       />
@@ -34,10 +32,10 @@
 
     <div
       v-if="props.hasNewVersion || !props.kernelStore.hasVersionInfo()"
-      class="kernel-alert"
-      :class="props.hasNewVersion ? 'update' : 'install'"
+      class="setting-alert"
+      :class="props.hasNewVersion ? 'warning' : 'install'"
     >
-      <n-icon :size="18">
+      <n-icon :size="16">
         <WarningOutline v-if="props.hasNewVersion" />
         <DownloadOutline v-else />
       </n-icon>
@@ -52,7 +50,7 @@
       </span>
     </div>
 
-    <div v-if="props.downloading" class="kernel-progress">
+    <div v-if="props.downloading" class="download-progress-card">
       <div class="progress-header">
         <span class="progress-label">{{ props.t('setting.kernel.downloading') }}</span>
         <span class="progress-value">{{ props.downloadProgress.toFixed(0) }}%</span>
@@ -66,13 +64,20 @@
       <div v-if="props.downloadMessage" class="progress-msg">{{ props.downloadMessage }}</div>
     </div>
 
-    <div class="kernel-actions">
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label">
+          {{
+            props.kernelStore.hasVersionInfo()
+              ? props.t('setting.kernel.redownload')
+              : props.t('setting.kernel.download')
+          }}
+        </div>
+      </div>
       <n-button
         :type="props.kernelStore.hasVersionInfo() ? 'default' : 'primary'"
         :loading="props.loading"
         :disabled="props.downloading"
-        block
-        size="large"
         @click="props.downloadTheKernel"
       >
         <template #icon>
@@ -93,7 +98,7 @@
         <template #icon><n-icon :size="14"><FolderOpenOutline /></n-icon></template>
         {{ props.t('setting.kernel.manualDownload') }}
       </n-button>
-      <span class="divider-dot"></span>
+      <span class="sub-divider"></span>
       <n-button text size="small" :disabled="props.downloading" @click="props.checkManualInstall">
         <template #icon><n-icon :size="14"><RefreshOutline /></n-icon></template>
         {{ props.t('setting.kernel.checkInstall') }}
@@ -151,37 +156,20 @@ const versionBadgeClass = computed(() =>
 </script>
 
 <style scoped>
-.settings-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.kernel-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px;
-  border-radius: 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--panel-border);
-}
-
-.kernel-hero-left {
+.kernel-status-row {
   display: flex;
   align-items: center;
   gap: 14px;
-  min-width: 0;
+  padding: 14px 0;
 }
 
 .kernel-version-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
+  gap: 5px;
+  padding: 5px 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -196,45 +184,17 @@ const versionBadgeClass = computed(() =>
   color: #ef4444;
 }
 
-.kernel-hero-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+.kernel-status-info {
+  flex: 1;
+  min-width: 0;
 }
 
-.kernel-hero-desc {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-top: 2px;
-}
-
-.kernel-alert {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  font-size: 13px;
-}
-
-.kernel-alert.update {
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
-}
-
-.kernel-alert.install {
-  background: rgba(14, 165, 233, 0.08);
-  border: 1px solid rgba(14, 165, 233, 0.2);
-  color: #0ea5e9;
-}
-
-.kernel-progress {
+.download-progress-card {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 16px;
-  border-radius: 12px;
+  padding: 14px;
+  border-radius: 10px;
   background: var(--bg-secondary);
   border: 1px solid var(--panel-border);
 }
@@ -263,19 +223,15 @@ const versionBadgeClass = computed(() =>
   text-align: center;
 }
 
-.kernel-actions {
-  padding: 0;
-}
-
 .kernel-sub-actions {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 4px;
+  padding: 4px 0 8px;
 }
 
-.divider-dot {
+.sub-divider {
   width: 3px;
   height: 3px;
   border-radius: 50%;
