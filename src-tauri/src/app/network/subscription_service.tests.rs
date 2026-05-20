@@ -1,4 +1,5 @@
 use super::{
+    active_config_change_requires_restart,
     extract_nodes_from_subscription, extract_subscription_userinfo,
     merge_subscription_fetch_result, parse_subscription_userinfo,
     should_retry_subscription_userinfo, try_decode_base64_to_text, SubscriptionFetchResult,
@@ -15,6 +16,26 @@ fn base64_uri_list_should_extract_nodes_after_decode() {
     let decoded = try_decode_base64_to_text(&b64).expect("decode should work");
     let nodes = extract_nodes_from_subscription(&decoded).expect("extract should work");
     assert_eq!(nodes.len(), 2);
+}
+
+#[test]
+fn active_config_change_should_request_runtime_restart() {
+    assert!(active_config_change_requires_restart(
+        &Some("D:/configs/old.json".to_string()),
+        &Some("D:/configs/new.json".to_string()),
+    ));
+    assert!(active_config_change_requires_restart(
+        &Some("D:/configs/old.json".to_string()),
+        &None,
+    ));
+}
+
+#[test]
+fn unchanged_active_config_should_not_request_runtime_restart() {
+    assert!(!active_config_change_requires_restart(
+        &Some("D:/configs/current.json".to_string()),
+        &Some("D:/configs/current.json".to_string()),
+    ));
 }
 
 #[test]

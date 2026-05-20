@@ -74,6 +74,17 @@ struct SubscriptionFetchResult {
 
 const SUBSCRIPTION_USERINFO_COMPAT_UAS: [&str; 2] = ["clash.meta", "clash-verge/1.7.7"];
 
+fn normalized_active_config_path(path: &Option<String>) -> Option<&str> {
+    path.as_deref().map(str::trim).filter(|value| !value.is_empty())
+}
+
+fn active_config_change_requires_restart(
+    previous: &Option<String>,
+    next: &Option<String>,
+) -> bool {
+    normalized_active_config_path(previous) != normalized_active_config_path(next)
+}
+
 fn parse_subscription_userinfo(raw: &str) -> Option<SubscriptionUserInfo> {
     let mut info = SubscriptionUserInfo {
         upload: None,
@@ -439,6 +450,7 @@ pub async fn set_active_config_path(
         &app_handle,
         &app_config,
         use_original_config,
+        active_config_change_requires_restart(&previous, &app_config.active_config_path),
         "active-config-path-updated",
     )
     .await;

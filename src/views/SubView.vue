@@ -563,9 +563,6 @@ const handleConfirm = () => {
         }
 
         message.success(t('sub.addAndUseSuccess'))
-        if (appStore.isRunning) {
-          await kernelService.restartKernel()
-        }
       } else {
         if (isManual && resolvedManualContent && useOriginalConfig) {
           if (!isJsonContent(resolvedManualContent)) {
@@ -677,9 +674,6 @@ const refreshSubscription = async (index: number, applyRuntime = false, silent =
       message.success(applyRuntime ? t('sub.refreshAndApplied') : t('sub.refreshSuccess'))
     }
 
-    if (applyRuntime && appStore.isRunning) {
-      await kernelService.restartKernel()
-    }
   } catch (error) {
     message.error(t('sub.refreshFailed') + error)
   } finally {
@@ -744,9 +738,6 @@ const useSubscription = async (index: number) => {
     await subStore.setActiveIndex(index)
     subStore.list[index].lastUpdate = Date.now()
     message.success(t('sub.useSuccess'))
-    if (appStore.isRunning) {
-      await kernelService.restartKernel()
-    }
   } catch (error) {
     message.error(t('sub.useFailed') + error)
   } finally {
@@ -847,9 +838,6 @@ const saveCurrentConfig = async () => {
     }
     message.success(t('sub.configSaved'))
     showConfigModal.value = false
-    if (appStore.isRunning) {
-      await kernelService.restartKernel()
-    }
   } catch (error) {
     message.error(t('sub.saveConfigFailed') + error)
   } finally {

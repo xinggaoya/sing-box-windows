@@ -103,6 +103,7 @@ pub(crate) async fn apply_runtime_config_update(
     app: &AppHandle,
     effective_config: &AppConfig,
     use_original_config_hint: Option<bool>,
+    force_restart: bool,
     reason: &'static str,
 ) {
     if let Some(path) = effective_config.active_config_path.as_deref() {
@@ -118,7 +119,7 @@ pub(crate) async fn apply_runtime_config_update(
         }
     }
 
-    auto_manage_with_saved_config(app, false, reason).await;
+    auto_manage_with_saved_config(app, force_restart, reason).await;
 }
 
 /// 获取数据库服务的辅助函数（单例初始化）
@@ -413,7 +414,7 @@ pub async fn db_save_app_config(
     let effective_config = db_get_app_config_internal(&app).await?;
     // 保存设置后，尽量把变更同步到“当前生效配置文件”，避免用户需要重新下载订阅/重启应用才能生效。
     // 同步逻辑采用“局部 patch”策略：如果配置文件不是本程序生成的结构，会尽量只修改端口/TUN/DNS 策略等通用字段。
-    apply_runtime_config_update(&app, &effective_config, None, "app-config-updated").await;
+    apply_runtime_config_update(&app, &effective_config, None, false, "app-config-updated").await;
 
     Ok(())
 }
