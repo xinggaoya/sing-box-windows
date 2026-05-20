@@ -171,6 +171,7 @@ export default {
     resume: 'Resume',
     close: 'Close',
     closeAll: 'Close All',
+    actions: 'Actions',
     sourceFilter: 'Source IP',
     sortOrder: 'Order',
     grouping: 'Grouping',

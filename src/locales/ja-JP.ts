@@ -195,6 +195,7 @@ export default {
     resume: '更新を再開',
     close: '閉じる',
     closeAll: 'すべての接続を閉じる',
+    actions: '操作',
     sourceFilter: '送信元 IP',
     sortOrder: '順序',
     grouping: 'グループ化',

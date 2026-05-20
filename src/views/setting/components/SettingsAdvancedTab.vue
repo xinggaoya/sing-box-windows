@@ -319,6 +319,18 @@
               </n-form-item>
             </div>
 
+            <div class="form-section-title">{{ extraLabels.logRetentionPrefs }}</div>
+            <div class="form-grid">
+              <n-form-item :label="extraLabels.logMaxRows">
+                <n-input-number
+                  v-model:value="logStore.maxLogs"
+                  :min="100"
+                  :max="5000"
+                  :step="100"
+                />
+              </n-form-item>
+            </div>
+
         </div>
       </transition>
     </div>
@@ -340,6 +352,7 @@ import { useMessage } from 'naive-ui'
 import type { useAppStore } from '@/stores'
 import { useAdvancedSettingsForm } from '@/views/setting/useAdvancedSettingsForm'
 import { useProxyStore } from '@/stores/kernel/ProxyStore'
+import { useLogStore } from '@/stores/kernel/LogStore'
 import { useI18n } from 'vue-i18n'
 
 type LabeledOption = { label: string; value: string }
@@ -358,6 +371,7 @@ const props = defineProps<{
 const message = useMessage()
 const { locale } = useI18n()
 const proxyStore = useProxyStore()
+const logStore = useLogStore()
 
 const expandedSections = reactive({
   network: true,
@@ -397,6 +411,8 @@ const extraLabels = computed(() => {
     proxyAutoClose: zh ? '切换节点后关闭现有连接' : 'Close existing connections after switch',
     latencyTimeout: zh ? '测速超时(ms)' : 'Latency timeout (ms)',
     latencyUrl: zh ? '测速 URL' : 'Latency URL',
+    logRetentionPrefs: zh ? '日志保留' : 'Log Retention',
+    logMaxRows: zh ? '最大日志条数' : 'Maximum log rows',
   }
 })
 

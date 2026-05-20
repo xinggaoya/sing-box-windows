@@ -169,6 +169,7 @@ export default {
     resume: '恢复更新',
     close: '关闭',
     closeAll: '关闭全部连接',
+    actions: '操作',
     sourceFilter: '来源 IP',
     sortOrder: '顺序',
     grouping: '分组',

@@ -121,11 +121,12 @@
               <th>{{ t('connections.chain') }}</th>
               <th>{{ t('connections.rule') }}</th>
               <th>{{ t('connections.process') }}</th>
+              <th class="action-column">{{ t('connections.actions') }}</th>
             </tr>
           </thead>
           <tbody v-for="group in groupedRows" :key="group.key || 'all'">
             <tr v-if="group.key" class="group-row">
-              <td colspan="8">
+              <td colspan="9">
                 <div class="group-title">
                   <span>{{ group.key }}</span>
                   <n-tag size="tiny" round>{{ group.count }}</n-tag>
@@ -157,6 +158,20 @@
               </td>
               <td class="truncate-cell" :title="getProcessText(connection)">
                 {{ getProcessText(connection) }}
+              </td>
+              <td class="action-cell">
+                <n-button
+                  v-if="connectionStore.activeTab === 'active'"
+                  text
+                  size="small"
+                  type="error"
+                  :loading="connectionStore.closingMap[connection.id]"
+                  @click.stop="closeOne(connection.id)"
+                  @keydown.stop
+                >
+                  {{ proxyLabels.close }}
+                </n-button>
+                <span v-else>-</span>
               </td>
             </tr>
           </tbody>
@@ -366,6 +381,15 @@ const closeAll = async () => {
   }
 }
 
+const closeOne = async (id: string) => {
+  try {
+    await connectionStore.closeConnection(id)
+    message.success(proxyLabels.value.close)
+  } catch (error) {
+    message.error(String(error))
+  }
+}
+
 const updateActiveTab = (value: string) => {
   if (value === 'active' || value === 'closed') {
     connectionStore.activeTab = value
@@ -484,7 +508,7 @@ watch(
 
 .connection-table {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1200px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -507,7 +531,7 @@ watch(
 
 .connection-table th:nth-child(1),
 .connection-table td:nth-child(1) {
-  width: 23%;
+  width: 22%;
 }
 
 .connection-table th:nth-child(2),
@@ -518,7 +542,7 @@ watch(
 .connection-table td:nth-child(4),
 .connection-table th:nth-child(5),
 .connection-table td:nth-child(5) {
-  width: 10%;
+  width: 9%;
 }
 
 .connection-table th:nth-child(6),
@@ -527,7 +551,12 @@ watch(
 .connection-table td:nth-child(7),
 .connection-table th:nth-child(8),
 .connection-table td:nth-child(8) {
-  width: 12.333%;
+  width: 11.333%;
+}
+
+.connection-table th:nth-child(9),
+.connection-table td:nth-child(9) {
+  width: 8%;
 }
 
 .group-row td {
@@ -582,6 +611,11 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.action-column,
+.action-cell {
+  text-align: right;
 }
 
 .empty-state {

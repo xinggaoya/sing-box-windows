@@ -199,6 +199,7 @@ export default {
     resume: 'Возобновить обновления',
     close: 'Закрыть',
     closeAll: 'Закрыть все соединения',
+    actions: 'Действия',
     sourceFilter: 'IP источника',
     sortOrder: 'Порядок',
     grouping: 'Группировка',
