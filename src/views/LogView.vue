@@ -52,21 +52,47 @@
     </div>
 
     <div v-if="groupedLogs.length" class="logs-card">
-      <template v-for="group in groupedLogs" :key="group.key">
-        <div v-if="group.key" class="group-row">
-          <span>{{ group.key }}</span>
-          <n-tag size="tiny" round>{{ group.items.length }}</n-tag>
-        </div>
-
-        <div v-for="log in group.items" :key="log.seq" class="log-row" :class="log.type">
-          <div class="log-meta">
-            <span>#{{ log.seq }}</span>
-            <span>{{ log.type.toUpperCase() }}</span>
-            <span>{{ formatTime(log.timestamp) }}</span>
-          </div>
-          <div class="log-payload">{{ log.payload }}</div>
-        </div>
-      </template>
+      <div class="log-table-wrap">
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>{{ t('log.sequence') }}</th>
+              <th>{{ t('log.level') }}</th>
+              <th>{{ t('log.time') }}</th>
+              <th>{{ t('log.content') }}</th>
+            </tr>
+          </thead>
+          <tbody v-for="group in groupedLogs" :key="group.key || 'all'">
+            <tr v-if="group.key" class="group-row">
+              <td colspan="4">
+                <div class="group-title">
+                  <span>{{ group.key }}</span>
+                  <n-tag size="tiny" round>{{ group.items.length }}</n-tag>
+                </div>
+              </td>
+            </tr>
+            <tr
+              v-for="log in group.items"
+              :key="log.seq"
+              class="log-row"
+              :class="log.type"
+              tabindex="0"
+              @click="selectedLog = log"
+              @keydown.enter="selectedLog = log"
+              @keydown.space.prevent="selectedLog = log"
+            >
+              <td>#{{ log.seq }}</td>
+              <td>
+                <n-tag size="small" round :bordered="false" :type="getLogTagType(log.type)">
+                  {{ log.type.toUpperCase() }}
+                </n-tag>
+              </td>
+              <td>{{ formatTime(log.timestamp) }}</td>
+              <td class="payload-cell" :title="log.payload">{{ log.payload }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-else class="empty-state">
@@ -75,11 +101,23 @@
       </div>
       <h3 class="empty-title">{{ t('log.noLogs') }}</h3>
     </div>
+
+    <n-modal v-model:show="detailVisible" preset="card" :title="t('log.detailTitle')" style="width: 720px">
+      <div v-if="selectedLog" class="detail-grid">
+        <div><strong>{{ t('log.sequence') }}</strong><span>#{{ selectedLog.seq }}</span></div>
+        <div><strong>{{ t('log.level') }}</strong><span>{{ selectedLog.type.toUpperCase() }}</span></div>
+        <div><strong>{{ t('log.time') }}</strong><span>{{ formatTime(selectedLog.timestamp) }}</span></div>
+        <div class="detail-payload">
+          <strong>{{ t('log.content') }}</strong>
+          <span>{{ selectedLog.payload }}</span>
+        </div>
+      </div>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   ArrowDownOutline,
@@ -88,27 +126,37 @@ import {
   SearchOutline,
 } from '@vicons/ionicons5'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { useLogStore } from '@/stores/kernel/LogStore'
+import { useLogStore, type LogEntry } from '@/stores/kernel/LogStore'
 import { useI18n } from 'vue-i18n'
 
 defineOptions({
   name: 'LogView',
 })
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const message = useMessage()
 const logStore = useLogStore()
+const selectedLog = ref<LogEntry | null>(null)
 
 const labels = computed(() => ({
-  pause: locale.value.startsWith('zh') ? '暂停接收' : 'Pause',
-  resume: locale.value.startsWith('zh') ? '恢复接收' : 'Resume',
-  sortOrder: locale.value.startsWith('zh') ? '顺序' : 'Order',
-  grouping: locale.value.startsWith('zh') ? '分组' : 'Grouping',
-  filtered: locale.value.startsWith('zh') ? '筛选后' : 'Filtered',
-  status: locale.value.startsWith('zh') ? '状态' : 'Status',
-  paused: locale.value.startsWith('zh') ? '已暂停' : 'Paused',
-  streaming: locale.value.startsWith('zh') ? '实时流' : 'Streaming',
+  pause: t('log.pause'),
+  resume: t('log.resume'),
+  sortOrder: t('log.sortOrder'),
+  grouping: t('log.grouping'),
+  filtered: t('log.filtered'),
+  status: t('log.status'),
+  paused: t('log.paused'),
+  streaming: t('log.streaming'),
 }))
+
+const detailVisible = computed({
+  get: () => !!selectedLog.value,
+  set: (value: boolean) => {
+    if (!value) {
+      selectedLog.value = null
+    }
+  },
+})
 
 const logTypeOptions = computed(() => {
   const types = Array.from(new Set(logStore.logs.map((log) => log.type)))
@@ -117,22 +165,22 @@ const logTypeOptions = computed(() => {
 
 const sortOptions = computed(() => [
   {
-    label: locale.value.startsWith('zh') ? '序号' : 'Sequence',
+    label: t('log.sequence'),
     value: 'seq',
   },
   {
-    label: locale.value.startsWith('zh') ? '级别' : 'Level',
+    label: t('log.level'),
     value: 'type',
   },
   {
-    label: locale.value.startsWith('zh') ? '时间' : 'Time',
+    label: t('log.time'),
     value: 'timestamp',
   },
 ])
 
 const groupingOptions = computed(() => [
-  { label: locale.value.startsWith('zh') ? '按级别' : 'Level', value: 'type' },
-  { label: locale.value.startsWith('zh') ? '按日期' : 'Date', value: 'date' },
+  { label: t('log.groupByLevel'), value: 'type' },
+  { label: t('log.groupByDate'), value: 'date' },
 ])
 
 const sortedLogs = computed(() => {
@@ -196,6 +244,15 @@ const exportLogs = () => {
   message.success(t('log.exportedSuccess'))
 }
 
+const getLogTagType = (type: string) => {
+  const value = type.toLowerCase()
+  if (value === 'error') return 'error'
+  if (value === 'warning') return 'warning'
+  if (value === 'success') return 'success'
+  if (value === 'info') return 'info'
+  return 'default'
+}
+
 const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString()
 const formatDate = (timestamp: number) => new Date(timestamp).toLocaleDateString()
 </script>
@@ -232,48 +289,86 @@ const formatDate = (timestamp: number) => new Date(timestamp).toLocaleDateString
   margin-top: 12px;
 }
 
-.group-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 0;
+.log-table-wrap {
+  overflow-x: auto;
+}
+
+.log-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.log-table th {
+  padding: 0 12px 10px;
+  color: var(--text-tertiary);
+  font-size: 12px;
   font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.log-table td {
+  padding: 12px;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.log-table th:nth-child(1),
+.log-table td:nth-child(1) {
+  width: 86px;
+}
+
+.log-table th:nth-child(2),
+.log-table td:nth-child(2) {
+  width: 112px;
+}
+
+.log-table th:nth-child(3),
+.log-table td:nth-child(3) {
+  width: 190px;
+}
+
+.group-row td {
+  padding: 14px 12px 8px;
+  border-top: 0;
+  background: transparent;
+}
+
+.group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .log-row {
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.2s ease;
 }
 
-.log-row.error {
-  border-color: rgba(239, 68, 68, 0.35);
+.log-row:hover,
+.log-row:focus-visible {
+  background: var(--hover-bg);
 }
 
-.log-row.warning {
-  border-color: rgba(245, 158, 11, 0.35);
+.log-row.error .payload-cell {
+  color: var(--error-color);
 }
 
-.log-row.info {
-  border-color: rgba(59, 130, 246, 0.35);
+.log-row.warning .payload-cell {
+  color: var(--warning-color);
 }
 
-.log-meta {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-bottom: 8px;
-}
-
-.log-payload {
-  white-space: pre-wrap;
-  word-break: break-word;
+.payload-cell {
+  overflow: hidden;
   color: var(--text-primary);
-  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-state {
@@ -296,8 +391,37 @@ const formatDate = (timestamp: number) => new Date(timestamp).toLocaleDateString
   color: var(--text-primary);
 }
 
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.detail-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-grid span {
+  word-break: break-word;
+}
+
+.detail-payload {
+  grid-column: 1 / -1;
+}
+
+.detail-payload span {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
 @media (max-width: 960px) {
   .toolbar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-grid {
     grid-template-columns: 1fr;
   }
 }

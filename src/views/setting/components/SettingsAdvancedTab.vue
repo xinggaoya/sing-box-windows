@@ -319,47 +319,6 @@
               </n-form-item>
             </div>
 
-            <div class="form-section-title">{{ extraLabels.connectionPrefs }}</div>
-            <div class="form-grid">
-              <n-form-item :label="extraLabels.connectionGrouping">
-                <n-select v-model:value="connectionStore.groupingKey" :options="connectionGroupingOptions" clearable />
-              </n-form-item>
-              <n-form-item :label="extraLabels.connectionSort">
-                <n-select v-model:value="connectionStore.sortKey" :options="connectionSortOptions" />
-              </n-form-item>
-            </div>
-
-            <div class="toggles-grid">
-              <div class="toggle-item">
-                <span class="toggle-label">{{ extraLabels.connectionSortDesc }}</span>
-                <n-switch v-model:value="connectionStore.sortDesc" />
-              </div>
-              <div class="toggle-item">
-                <span class="toggle-label">{{ extraLabels.connectionQuickFilter }}</span>
-                <n-switch v-model:value="connectionStore.quickFilterEnabled" />
-              </div>
-            </div>
-
-            <div class="form-section-title">{{ extraLabels.logPrefs }}</div>
-            <div class="form-grid">
-              <n-form-item :label="extraLabels.logGrouping">
-                <n-select v-model:value="logStore.groupingKey" :options="logGroupingOptions" clearable />
-              </n-form-item>
-              <n-form-item :label="extraLabels.logSort">
-                <n-select v-model:value="logStore.sortKey" :options="logSortOptions" />
-              </n-form-item>
-            </div>
-
-            <div class="form-grid">
-              <n-form-item :label="extraLabels.logMaxRows">
-                <n-input-number
-                  v-model:value="logStore.maxLogs"
-                :min="100"
-                :max="5000"
-                :step="100"
-                />
-              </n-form-item>
-            </div>
         </div>
       </transition>
     </div>
@@ -381,8 +340,6 @@ import { useMessage } from 'naive-ui'
 import type { useAppStore } from '@/stores'
 import { useAdvancedSettingsForm } from '@/views/setting/useAdvancedSettingsForm'
 import { useProxyStore } from '@/stores/kernel/ProxyStore'
-import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
-import { useLogStore } from '@/stores/kernel/LogStore'
 import { useI18n } from 'vue-i18n'
 
 type LabeledOption = { label: string; value: string }
@@ -401,8 +358,6 @@ const props = defineProps<{
 const message = useMessage()
 const { locale } = useI18n()
 const proxyStore = useProxyStore()
-const connectionStore = useConnectionStore()
-const logStore = useLogStore()
 
 const expandedSections = reactive({
   network: true,
@@ -442,15 +397,6 @@ const extraLabels = computed(() => {
     proxyAutoClose: zh ? '切换节点后关闭现有连接' : 'Close existing connections after switch',
     latencyTimeout: zh ? '测速超时(ms)' : 'Latency timeout (ms)',
     latencyUrl: zh ? '测速 URL' : 'Latency URL',
-    connectionPrefs: zh ? '连接页偏好' : 'Connections Preferences',
-    connectionGrouping: zh ? '默认分组' : 'Default Grouping',
-    connectionSort: zh ? '默认排序' : 'Default Sort',
-    connectionSortDesc: zh ? '降序排序' : 'Sort descending',
-    connectionQuickFilter: zh ? '启用快速筛选' : 'Enable quick filter',
-    logPrefs: zh ? '日志页偏好' : 'Logs Preferences',
-    logGrouping: zh ? '日志分组' : 'Log Grouping',
-    logSort: zh ? '日志排序' : 'Log Sort',
-    logMaxRows: zh ? '最大日志条数' : 'Maximum log rows',
   }
 })
 
@@ -468,45 +414,6 @@ const proxyDisplayOptions = computed(() => {
   return [
     { label: zh ? '卡片' : 'Card', value: 'card' },
     { label: zh ? '紧凑列表' : 'Compact List', value: 'list' },
-  ]
-})
-
-const connectionGroupingOptions = computed(() => {
-  const zh = locale.value.startsWith('zh')
-  return [
-    { label: zh ? '按规则' : 'Rule', value: 'rule' },
-    { label: zh ? '按进程' : 'Process', value: 'process' },
-    { label: zh ? '按目标' : 'Destination', value: 'host' },
-    { label: zh ? '按来源 IP' : 'Source IP', value: 'sourceIP' },
-  ]
-})
-
-const connectionSortOptions = computed(() => {
-  const zh = locale.value.startsWith('zh')
-  return [
-    { label: zh ? '连接时间' : 'Start time', value: 'start' },
-    { label: zh ? '下载速度' : 'Download speed', value: 'downloadSpeed' },
-    { label: zh ? '上传速度' : 'Upload speed', value: 'uploadSpeed' },
-    { label: zh ? '目标地址' : 'Destination', value: 'host' },
-    { label: zh ? '规则' : 'Rule', value: 'rule' },
-    { label: zh ? '进程' : 'Process', value: 'process' },
-  ]
-})
-
-const logGroupingOptions = computed(() => {
-  const zh = locale.value.startsWith('zh')
-  return [
-    { label: zh ? '按级别' : 'Level', value: 'type' },
-    { label: zh ? '按日期' : 'Date', value: 'date' },
-  ]
-})
-
-const logSortOptions = computed(() => {
-  const zh = locale.value.startsWith('zh')
-  return [
-    { label: zh ? '序号' : 'Sequence', value: 'seq' },
-    { label: zh ? '级别' : 'Level', value: 'type' },
-    { label: zh ? '时间' : 'Time', value: 'timestamp' },
   ]
 })
 </script>

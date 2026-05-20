@@ -109,64 +109,59 @@
     </div>
 
     <div v-if="groupedRows.length" class="table-card">
-      <template v-for="group in groupedRows" :key="group.key">
-        <div v-if="group.type === 'group'" class="group-row">
-          <div class="group-title">
-            <span>{{ group.key }}</span>
-            <n-tag size="tiny" round>{{ group.count }}</n-tag>
-          </div>
-        </div>
-
-        <button
-          v-for="connection in group.connections"
-          :key="connection.id"
-          type="button"
-          class="connection-row"
-          @click="selectedConnection = connection"
-        >
-          <div class="row-top">
-            <div class="row-title">
-              <n-tag size="small" :bordered="false" round :type="getNetworkType(connection)">
-                {{ (connection.metadata.network || 'tcp').toUpperCase() }}
-              </n-tag>
-              <span class="destination">{{ getDestinationText(connection) }}</span>
-            </div>
-            <div class="row-actions">
-              <span class="connect-time">{{ formatTimeAgo(connection.start) }}</span>
-              <n-button
-                text
-                type="error"
-                :loading="connectionStore.closingMap[connection.id]"
-                @click.stop="closeOne(connection.id)"
-              >
-                {{ proxyLabels.close }}
-              </n-button>
-            </div>
-          </div>
-
-          <div class="row-grid">
-            <div>
-              <span class="cell-label">{{ t('connections.source') }}</span>
-              <span class="cell-value">{{ getSourceText(connection) }}</span>
-            </div>
-            <div>
-              <span class="cell-label">{{ t('connections.rule') }}</span>
-              <span class="cell-value">{{ getRuleText(connection) }}</span>
-            </div>
-            <div>
-              <span class="cell-label">Chain</span>
-              <span class="cell-value">{{ connection.chains.join(' > ') || '-' }}</span>
-            </div>
-            <div>
-              <span class="cell-label">{{ t('connections.traffic') }}</span>
-              <span class="cell-value">
-                ↑ {{ formatSpeed(connection.uploadSpeed || 0) }} / ↓
-                {{ formatSpeed(connection.downloadSpeed || 0) }}
-              </span>
-            </div>
-          </div>
-        </button>
-      </template>
+      <div class="connection-table-wrap">
+        <table class="connection-table">
+          <thead>
+            <tr>
+              <th>{{ t('connections.destination') }}</th>
+              <th>{{ t('connections.download') }}</th>
+              <th>{{ t('connections.upload') }}</th>
+              <th>{{ t('connections.downloadSpeed') }}</th>
+              <th>{{ t('connections.uploadSpeed') }}</th>
+              <th>{{ t('connections.chain') }}</th>
+              <th>{{ t('connections.rule') }}</th>
+              <th>{{ t('connections.process') }}</th>
+            </tr>
+          </thead>
+          <tbody v-for="group in groupedRows" :key="group.key || 'all'">
+            <tr v-if="group.key" class="group-row">
+              <td colspan="8">
+                <div class="group-title">
+                  <span>{{ group.key }}</span>
+                  <n-tag size="tiny" round>{{ group.count }}</n-tag>
+                </div>
+              </td>
+            </tr>
+            <tr
+              v-for="connection in group.connections"
+              :key="connection.id"
+              class="connection-row"
+              tabindex="0"
+              @click="selectedConnection = connection"
+              @keydown.enter="selectedConnection = connection"
+              @keydown.space.prevent="selectedConnection = connection"
+            >
+              <td class="destination-cell">
+                <span class="primary-cell">{{ getDestinationText(connection) }}</span>
+                <span class="secondary-cell">{{ getSourceText(connection) }}</span>
+              </td>
+              <td>{{ formatBytes(connection.download) }}</td>
+              <td>{{ formatBytes(connection.upload) }}</td>
+              <td>{{ formatSpeed(connection.downloadSpeed || 0) }}</td>
+              <td>{{ formatSpeed(connection.uploadSpeed || 0) }}</td>
+              <td class="truncate-cell" :title="getChainText(connection)">
+                {{ getChainText(connection) }}
+              </td>
+              <td class="truncate-cell" :title="getRuleText(connection)">
+                {{ getRuleText(connection) }}
+              </td>
+              <td class="truncate-cell" :title="getProcessText(connection)">
+                {{ getProcessText(connection) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-else class="empty-state">
@@ -184,14 +179,18 @@
         <div><strong>{{ t('connections.rule') }}</strong><span>{{ getRuleText(selectedConnection) }}</span></div>
         <div><strong>{{ t('connections.source') }}</strong><span>{{ getSourceText(selectedConnection) }}</span></div>
         <div><strong>{{ t('connections.destination') }}</strong><span>{{ getDestinationText(selectedConnection) }}</span></div>
-        <div><strong>Process</strong><span>{{ selectedConnection.metadata.process || selectedConnection.metadata.processPath || '-' }}</span></div>
-        <div><strong>Inbound</strong><span>{{ selectedConnection.metadata.inboundName || selectedConnection.metadata.inboundUser || '-' }}</span></div>
-        <div><strong>Network</strong><span>{{ selectedConnection.metadata.network || '-' }}</span></div>
-        <div><strong>Type</strong><span>{{ selectedConnection.metadata.type || '-' }}</span></div>
-        <div><strong>Sniff Host</strong><span>{{ selectedConnection.metadata.sniffHost || '-' }}</span></div>
-        <div><strong>Remote</strong><span>{{ selectedConnection.metadata.remoteDestination || '-' }}</span></div>
-        <div><strong>Upload</strong><span>{{ formatBytes(selectedConnection.upload) }}</span></div>
-        <div><strong>Download</strong><span>{{ formatBytes(selectedConnection.download) }}</span></div>
+        <div><strong>{{ t('connections.process') }}</strong><span>{{ getProcessText(selectedConnection) }}</span></div>
+        <div><strong>{{ t('connections.inbound') }}</strong><span>{{ selectedConnection.metadata.inboundName || selectedConnection.metadata.inboundUser || '-' }}</span></div>
+        <div><strong>{{ t('connections.network') }}</strong><span>{{ selectedConnection.metadata.network || '-' }}</span></div>
+        <div><strong>{{ t('connections.type') }}</strong><span>{{ selectedConnection.metadata.type || '-' }}</span></div>
+        <div><strong>{{ t('connections.sniffHost') }}</strong><span>{{ selectedConnection.metadata.sniffHost || '-' }}</span></div>
+        <div><strong>{{ t('connections.remote') }}</strong><span>{{ selectedConnection.metadata.remoteDestination || '-' }}</span></div>
+        <div><strong>{{ t('connections.upload') }}</strong><span>{{ formatBytes(selectedConnection.upload) }}</span></div>
+        <div><strong>{{ t('connections.download') }}</strong><span>{{ formatBytes(selectedConnection.download) }}</span></div>
+        <div><strong>{{ t('connections.uploadSpeed') }}</strong><span>{{ formatSpeed(selectedConnection.uploadSpeed || 0) }}</span></div>
+        <div><strong>{{ t('connections.downloadSpeed') }}</strong><span>{{ formatSpeed(selectedConnection.downloadSpeed || 0) }}</span></div>
+        <div><strong>{{ t('connections.chain') }}</strong><span>{{ getChainText(selectedConnection) }}</span></div>
+        <div><strong>{{ t('connections.started') }}</strong><span>{{ formatTimeAgo(selectedConnection.start) }}</span></div>
       </div>
     </n-modal>
   </div>
@@ -220,29 +219,29 @@ defineOptions({
   name: 'ConnectionsView',
 })
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const message = useMessage()
 const connectionStore = useConnectionStore()
 const selectedConnection = ref<ConnectionItem | null>(null)
 
 const proxyLabels = computed(() => ({
-  active: locale.value.startsWith('zh') ? '活跃连接' : 'Active',
-  closed: locale.value.startsWith('zh') ? '已关闭' : 'Closed',
-  pause: locale.value.startsWith('zh') ? '暂停更新' : 'Pause',
-  resume: locale.value.startsWith('zh') ? '恢复更新' : 'Resume',
-  close: locale.value.startsWith('zh') ? '关闭' : 'Close',
-  closeAll: locale.value.startsWith('zh') ? '关闭全部连接' : 'Close All',
-  sourceFilter: locale.value.startsWith('zh') ? '来源 IP' : 'Source IP',
-  sortOrder: locale.value.startsWith('zh') ? '顺序' : 'Order',
-  grouping: locale.value.startsWith('zh') ? '分组' : 'Grouping',
-  quickFilter: locale.value.startsWith('zh') ? '快速筛选' : 'Quick filter',
-  detailTitle: locale.value.startsWith('zh') ? '连接详情' : 'Connection Details',
-  noClosed: locale.value.startsWith('zh') ? '暂无已关闭连接' : 'No closed connections',
+  active: t('connections.active'),
+  closed: t('connections.closed'),
+  pause: t('connections.pause'),
+  resume: t('connections.resume'),
+  close: t('connections.close'),
+  closeAll: t('connections.closeAll'),
+  sourceFilter: t('connections.sourceFilter'),
+  sortOrder: t('connections.sortOrder'),
+  grouping: t('connections.grouping'),
+  quickFilter: t('connections.quickFilter'),
+  detailTitle: t('connections.detailTitle'),
+  noClosed: t('connections.noClosed'),
 }))
 
 const labelsOnOff = computed(() => ({
-  on: locale.value.startsWith('zh') ? '开' : 'On',
-  off: locale.value.startsWith('zh') ? '关' : 'Off',
+  on: t('connections.on'),
+  off: t('connections.off'),
 }))
 
 const detailVisible = computed({
@@ -266,24 +265,24 @@ const sourceIpOptions = computed(() => {
 
 const sortOptions = computed(() => {
   const labels: Record<string, string> = {
-    start: locale.value.startsWith('zh') ? '连接时间' : 'Start Time',
-    download: locale.value.startsWith('zh') ? '下载总量' : 'Download',
-    upload: locale.value.startsWith('zh') ? '上传总量' : 'Upload',
-    downloadSpeed: locale.value.startsWith('zh') ? '下载速度' : 'Download Speed',
-    uploadSpeed: locale.value.startsWith('zh') ? '上传速度' : 'Upload Speed',
-    host: locale.value.startsWith('zh') ? '目标地址' : 'Host',
-    process: locale.value.startsWith('zh') ? '进程' : 'Process',
-    rule: locale.value.startsWith('zh') ? '规则' : 'Rule',
+    start: t('connections.startTime'),
+    download: t('connections.download'),
+    upload: t('connections.upload'),
+    downloadSpeed: t('connections.downloadSpeed'),
+    uploadSpeed: t('connections.uploadSpeed'),
+    host: t('connections.destinationAddress'),
+    process: t('connections.process'),
+    rule: t('connections.rule'),
   }
 
   return Object.entries(labels).map(([value, label]) => ({ label, value }))
 })
 
 const groupingOptions = computed(() => [
-  { label: locale.value.startsWith('zh') ? '按规则' : 'Rule', value: 'rule' },
-  { label: locale.value.startsWith('zh') ? '按进程' : 'Process', value: 'process' },
-  { label: locale.value.startsWith('zh') ? '按目标' : 'Destination', value: 'host' },
-  { label: locale.value.startsWith('zh') ? '按来源 IP' : 'Source IP', value: 'sourceIP' },
+  { label: t('connections.groupByRule'), value: 'rule' },
+  { label: t('connections.groupByProcess'), value: 'process' },
+  { label: t('connections.groupByDestination'), value: 'host' },
+  { label: t('connections.groupBySourceIP'), value: 'sourceIP' },
 ])
 
 const filteredConnections = computed(() => {
@@ -358,15 +357,6 @@ const refreshConnections = async () => {
   message.success(t('connections.refreshSuccess'))
 }
 
-const closeOne = async (id: string) => {
-  try {
-    await connectionStore.closeConnection(id)
-    message.success(proxyLabels.value.close)
-  } catch (error) {
-    message.error(String(error))
-  }
-}
-
 const closeAll = async () => {
   try {
     await connectionStore.closeAllConnections()
@@ -429,12 +419,10 @@ const getDestinationText = (connection: ConnectionItem) =>
 const getRuleText = (connection: ConnectionItem) =>
   connection.rulePayload ? `${connection.rule} : ${connection.rulePayload}` : connection.rule || '-'
 
-const getNetworkType = (connection: ConnectionItem) => {
-  const network = (connection.metadata.network || '').toLowerCase()
-  if (network === 'udp') return 'warning'
-  if (network === 'tcp') return 'info'
-  return 'default'
-}
+const getChainText = (connection: ConnectionItem) => connection.chains.join(' > ') || '-'
+
+const getProcessText = (connection: ConnectionItem) =>
+  connection.metadata.process || connection.metadata.processPath || '-'
 
 const formatTimeAgo = (time: string) => {
   const diff = Date.now() - new Date(time).getTime()
@@ -490,8 +478,62 @@ watch(
   margin-top: 12px;
 }
 
-.group-row {
-  padding: 8px 0;
+.connection-table-wrap {
+  overflow-x: auto;
+}
+
+.connection-table {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.connection-table th {
+  padding: 0 12px 10px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.connection-table td {
+  padding: 12px;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.connection-table th:nth-child(1),
+.connection-table td:nth-child(1) {
+  width: 23%;
+}
+
+.connection-table th:nth-child(2),
+.connection-table td:nth-child(2),
+.connection-table th:nth-child(3),
+.connection-table td:nth-child(3),
+.connection-table th:nth-child(4),
+.connection-table td:nth-child(4),
+.connection-table th:nth-child(5),
+.connection-table td:nth-child(5) {
+  width: 10%;
+}
+
+.connection-table th:nth-child(6),
+.connection-table td:nth-child(6),
+.connection-table th:nth-child(7),
+.connection-table td:nth-child(7),
+.connection-table th:nth-child(8),
+.connection-table td:nth-child(8) {
+  width: 12.333%;
+}
+
+.group-row td {
+  padding: 14px 12px 8px;
+  border-top: 0;
+  background: transparent;
 }
 
 .group-title {
@@ -499,67 +541,47 @@ watch(
   align-items: center;
   gap: 8px;
   font-weight: 600;
-}
-
-.connection-row {
-  width: 100%;
-  border: 1px solid var(--border-color);
-  background: transparent;
-  border-radius: 14px;
-  padding: 14px;
-  margin-top: 10px;
-  text-align: left;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.connection-row:hover {
-  border-color: var(--border-hover);
-  transform: translateY(-1px);
-}
-
-.row-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-}
-
-.row-title,
-.row-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.destination {
-  font-weight: 600;
   color: var(--text-primary);
 }
 
-.connect-time {
+.connection-row {
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.2s ease;
+}
+
+.connection-row:hover,
+.connection-row:focus-visible {
+  background: var(--hover-bg);
+}
+
+.destination-cell {
+  min-width: 0;
+}
+
+.primary-cell,
+.secondary-cell {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.primary-cell {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.secondary-cell {
+  margin-top: 3px;
+  color: var(--text-tertiary);
   font-size: 12px;
-  color: var(--text-tertiary);
 }
 
-.row-grid {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.cell-label {
-  display: block;
-  font-size: 11px;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-  margin-bottom: 4px;
-}
-
-.cell-value {
-  display: block;
-  color: var(--text-secondary);
-  word-break: break-all;
+.truncate-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-state {
@@ -604,14 +626,8 @@ watch(
     grid-template-columns: 1fr;
   }
 
-  .row-grid,
   .detail-grid {
     grid-template-columns: 1fr;
-  }
-
-  .row-top {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 </style>
