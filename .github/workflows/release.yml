@@ -34,6 +34,9 @@ jobs:
           - os: macos-15-intel
             target: x86_64-apple-darwin
             name: macos-intel
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            name: windows-arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -64,6 +67,9 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+      - name: install rust target
+        if: matrix.target == 'aarch64-pc-windows-msvc'
+        run: rustup target add aarch64-pc-windows-msvc
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -120,7 +126,7 @@ jobs:
           fi
 
       - name: Create Windows portable zip
-        if: matrix.os == 'windows-latest'
+        if: contains(matrix.name, 'windows') # Run for all Windows architectures
         shell: pwsh
         run: |
           $exePath = "src-tauri/target/${{ matrix.target }}/release/sing-box-windows.exe"
@@ -160,7 +166,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: windows-artifacts
-          path: windows-artifacts/
+          path: windows-artifacts/x64/
+
+      - name: Download Windows ARM64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-arm64-artifacts
+          path: windows-artifacts/arm64/
 
       - name: Download Linux artifacts
         uses: actions/download-artifact@v4
@@ -210,9 +222,9 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           body: ${{ steps.extract_notes.outputs.release_notes }}
           files: |
-            windows-artifacts/msi/*.msi
-            windows-artifacts/nsis/*.exe
-            windows-artifacts/portable/sing-box-windows-portable.zip
+            windows-artifacts/**/*.msi
+            windows-artifacts/**/*.exe
+            windows-artifacts/**/*.zip
             linux-artifacts/appimage/sing-box-windows_*.AppImage*
             linux-artifacts/deb/sing-box-windows_*.deb*
             linux-artifacts/rpm/*.rpm
