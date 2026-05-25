@@ -8,6 +8,12 @@ const KERNEL_TARGETS = Object.freeze([
     tauriTarget: 'x86_64-pc-windows-msvc'
   },
   {
+    platform: 'windows',
+    arch: 'arm64',
+    executable: 'sing-box.exe',
+    tauriTarget: 'aarch64-pc-windows-msvc'
+  },
+  {
     platform: 'linux',
     arch: 'amd64',
     executable: 'sing-box',
