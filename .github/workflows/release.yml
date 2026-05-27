@@ -136,7 +136,8 @@ jobs:
           }
           $portableDir = "src-tauri/target/${{ matrix.target }}/release/bundle/portable"
           New-Item -ItemType Directory -Path $portableDir -Force | Out-Null
-          $zipPath = Join-Path $portableDir "sing-box-windows-portable.zip"
+          $suffix = if ("${{ matrix.target }}" -eq "aarch64-pc-windows-msvc") { "-arm64" } else { "" }
+          $zipPath = Join-Path $portableDir "sing-box-windows${suffix}-portable.zip"
           Compress-Archive -Path $exePath -DestinationPath $zipPath -Force
 
       - name: Upload artifacts
