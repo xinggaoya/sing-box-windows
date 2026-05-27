@@ -164,7 +164,8 @@ git push origin master v2.2.7
 
 当前 workflow 期望的主要产物包括：
 
-- Windows: `.msi`、`nsis .exe`、portable `.zip`
+- Windows x64: `.msi`、`nsis .exe`、portable `.zip`
+- Windows ARM64: `.msi`、`nsis .exe`、portable `-arm64.zip`
 - Linux: `.deb`、`.rpm`、`.AppImage`
 - macOS: `.dmg`、`.app.tar.gz`
 

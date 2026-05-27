@@ -12,6 +12,7 @@ import {
 } from './kernel-targets.mjs'
 
 const WINDOWS_TARGET = requireTarget('windows', 'amd64')
+const WINDOWS_ARM64_TARGET = requireTarget('windows', 'arm64')
 const LINUX_TARGET = requireTarget('linux', 'amd64')
 const MACOS_ARM64_TARGET = requireTarget('macos', 'arm64')
 const MACOS_AMD64_TARGET = requireTarget('macos', 'amd64')
@@ -31,6 +32,7 @@ const aliasMap = new Map([
     ['build', '--target', LINUX_TARGET.tauriTarget, '--bundles', 'rpm']
   ],
   ['build:windows', ['build', '--target', WINDOWS_TARGET.tauriTarget]],
+  ['build:windows:arm64', ['build', '--target', WINDOWS_ARM64_TARGET.tauriTarget]],
   ['build:macos', ['build', '--target', MACOS_ARM64_TARGET.tauriTarget]],
   ['build:macos:intel', ['build', '--target', MACOS_AMD64_TARGET.tauriTarget]],
   [

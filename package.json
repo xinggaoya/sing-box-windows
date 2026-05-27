@@ -19,7 +19,8 @@
     "tauri": "node scripts/tauri-wrapper.mjs",
     "tauri dev": "node scripts/tauri-wrapper.mjs dev",
     "tauri build": "node scripts/tauri-wrapper.mjs build",
-    "tauri build:linux:rpm": "node scripts/tauri-wrapper.mjs build:linux:rpm"
+    "tauri build:linux:rpm": "node scripts/tauri-wrapper.mjs build:linux:rpm",
+    "tauri build:windows:arm64": "node scripts/tauri-wrapper.mjs build:windows:arm64"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
