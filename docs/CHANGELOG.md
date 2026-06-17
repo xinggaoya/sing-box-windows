@@ -2,6 +2,10 @@
 
 ## [v2.3.1] - 2026-06-17
 
+### 🐛 问题修复
+
+- **修复发布版本启动白屏** - 将 naive-ui 及其强依赖（vueuc、css-render、vooks、treemate 等）合并到同一打包 chunk，修复 Rollup 跨 chunk 循环引用导致的 `Cannot access 'ac' before initialization` 运行时错误
+
 ### ✨ 新功能
 
 - **首页显示本地代理端口（#50）** - 首页新增本地代理端口卡片，直接展示浏览器插件常用的 HTTP / SOCKS5 地址；当前 sing-box 使用 mixed 入站，因此两种协议共用同一个代理端口，并可从首页快速打开端口设置

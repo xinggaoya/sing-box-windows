@@ -22,11 +22,8 @@ const vendorChunkGroups: Array<[string, string[]]> = [
   ],
   [
     'vendor-naive-ui',
-    ['/node_modules/naive-ui/'],
-  ],
-  [
-    'vendor-ui-utils',
     [
+      '/node_modules/naive-ui/',
       '/node_modules/vueuc/',
       '/node_modules/vooks/',
       '/node_modules/vdirs/',
