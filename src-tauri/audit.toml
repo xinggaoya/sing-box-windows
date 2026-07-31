@@ -1,0 +1,14 @@
+# cargo-audit 配置
+# https://github.com/rustsec/rustsec/tree/main/cargo-audit
+
+[advisories]
+# 以下为传递依赖漏洞，项目代码无实际触发路径，待上游 crate 升级后自然消除。
+
+# generic-array 0.14.7 — RUSTSEC-2020-0146 (CVE-2020-36465)
+# 受影响范围: 整个 0.14 系列（arr! 宏生命周期问题，仅 1.x 修复）
+# 实际风险: 极低。项目代码不直接使用 generic-array，也不暴露 arr! 宏。
+#          该漏洞仅在调用 arr! 宏时触发，而 aead/block-buffer/crypto-common/
+#          sqlx-mysql 等依赖均在内部使用且不向项目暴露该宏。
+# 传递依赖链: aead 0.5 / block-buffer 0.10 / crypto-common 0.1 / inout 0.1 / sqlx-mysql 0.8
+# 这些上游 crate 升级到 generic-array 1.x 后漏洞自动消除，目前无法在项目层单独升级。
+ignore = ["RUSTSEC-2020-0146"]
