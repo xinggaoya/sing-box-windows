@@ -26,11 +26,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, onMounted, onBeforeUnmount } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import mitt from '@/utils/mitt'
-import { useMessage } from 'naive-ui'
 
 import {
   useThemeStore,
@@ -46,6 +44,7 @@ import {
   useLogStore,
 } from '@/stores'
 
+import MessageConsumer from '@/components/MessageConsumer.vue'
 import UpdateNotification from '@/components/UpdateNotification.vue'
 import SudoPasswordModal from '@/components/system/SudoPasswordModal.vue'
 import { useAppBootstrap } from '@/boot/useAppBootstrap'
@@ -56,21 +55,8 @@ import { useSudoStore } from '@/stores'
 import { kernelService } from '@/services/kernel-service'
 import type { KernelFailurePayload, KernelOperationFailedPayload } from '@/types/events'
 
-const MessageConsumer = defineComponent({
-  name: 'MessageConsumer',
-  setup() {
-    const message = useMessage()
-
-    onMounted(() => {
-      mitt.emit('message-instance-ready', message)
-    })
-
-    return () => null
-  },
-})
-
 const router = useRouter()
-const { locale, t } = useI18n()
+const { locale, t, te } = useI18n()
 
 const themeStore = useThemeStore()
 const appStore = useAppStore()
@@ -133,28 +119,9 @@ const shouldNotifyKernelFailure = (key: string) => {
 }
 
 const mapKernelFailureCodeToMessage = (code: string, fallback: string) => {
-  switch (code) {
-    case 'KERNEL_CONFIG_INVALID':
-      return '内核配置无效，请检查配置后重试'
-    case 'KERNEL_BINARY_MISSING':
-      return '未检测到内核文件，请先安装内核'
-    case 'KERNEL_START_UNSTABLE':
-      return '内核启动后快速退出，请检查配置或端口占用'
-    case 'KERNEL_GUARD_RESTART_FAILED':
-      return '内核异常停止且自动重启失败'
-    case 'KERNEL_GUARD_SELF_HEAL_FAILED':
-      return '内核自愈重启失败'
-    case 'KERNEL_STOP_FAILED':
-      return '内核停止失败'
-    case 'KERNEL_AUTO_MANAGE_FAILED':
-      return '内核自动管理失败'
-    case 'KERNEL_CONFLICT_DETECTED':
-      return '检测到旧内核正在运行，正在尝试强制停止后继续'
-    case 'KERNEL_CONFLICT_FORCE_STOP_FAILED':
-      return '旧内核进程强制停止失败，请手动结束进程后重试'
-    default:
-      return fallback
-  }
+  const key = `notification.kernelErrors.${code}`
+  // vue-i18n 的 t() 在 key 缺失时回退到 key 本身；这里用 te() 判断，未命中时用 fallback
+  return te(key) ? t(key) : fallback
 }
 
 const normalizeKernelFailurePayload = (payload: KernelFailurePayload | unknown): NormalizedKernelFailure => {
@@ -162,7 +129,7 @@ const normalizeKernelFailurePayload = (payload: KernelFailurePayload | unknown):
   const code = typed.code || 'KERNEL_RUNTIME_ERROR'
   const rawMessage = extractKernelErrorMessage(payload)
   const details = typed.details || rawMessage
-  const baseMessage = typed.message || rawMessage || '内核运行异常'
+  const baseMessage = typed.message || rawMessage || t('notification.kernelErrors.KERNEL_RUNTIME_ERROR')
   const userMessage = mapKernelFailureCodeToMessage(code, baseMessage)
   const source = typed.source || 'kernel'
   const recoverable = typed.recoverable === true
@@ -174,9 +141,9 @@ const normalizeKernelOperationFailedPayload = (
   payload: KernelOperationFailedPayload | unknown,
 ): NormalizedKernelFailure => {
   const typed = payload && typeof payload === 'object' ? (payload as KernelOperationFailedPayload) : {}
-  const details = extractKernelErrorMessage(payload) || '未知错误'
+  const details = extractKernelErrorMessage(payload) || t('notification.kernelErrors.KERNEL_RUNTIME_ERROR')
   const operation = typed.operation || 'kernel.operation'
-  const userMessage = `内核操作失败：${operation}`
+  const userMessage = t('notification.kernelErrors.KERNEL_OPERATION_FAILED', { operation })
   return {
     code: 'KERNEL_OPERATION_FAILED',
     userMessage,
@@ -196,7 +163,7 @@ const notifyKernelFailure = (failure: NormalizedKernelFailure) => {
     appStore.showErrorMessage?.(failure.userMessage)
   }
   if (failure.details && failure.details !== failure.userMessage) {
-    appStore.showInfoMessage?.(`详情：${failure.details}`)
+    appStore.showInfoMessage?.(t('notification.kernelErrors.details', { details: failure.details }))
   }
 }
 
