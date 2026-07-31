@@ -92,3 +92,8 @@ pub(super) async fn cleanup_event_relay_tasks() {
 
     info!("已清理所有事件中继任务");
 }
+
+/// 事件中继是否收到停止信号（供 event_relay 持续重连循环判断退出）。
+pub fn events_should_stop() -> bool {
+    SHOULD_STOP_EVENTS.load(Ordering::Relaxed)
+}

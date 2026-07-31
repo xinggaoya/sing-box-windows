@@ -126,6 +126,7 @@ pub async fn kernel_get_status_enhanced(
     }
 
     let startup_diagnosis = KERNEL_STATE.get_startup_diagnosis();
+    let restart_stats = KERNEL_STATE.get_restart_stats();
     let payload = KernelStatusPayload::new(
         process_running,
         api_ready,
@@ -147,7 +148,10 @@ pub async fn kernel_get_status_enhanced(
         "readiness": payload.readiness,
         "startup_diagnosis": payload.startup_diagnosis,
         "kernel_state": KERNEL_STATE.get_state().as_str(),
-        "state_version": current_state_version()
+        "state_version": current_state_version(),
+        "restart_count": restart_stats.restart_count,
+        "last_restart_reason": restart_stats.last_restart_reason,
+        "last_restart_at": restart_stats.last_restart_at
     }))
 }
 

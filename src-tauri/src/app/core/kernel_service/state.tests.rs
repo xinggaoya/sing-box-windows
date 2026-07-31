@@ -83,3 +83,30 @@ fn test_kernel_state_should_record_higher_priority_startup_diagnosis() {
     assert_eq!(diagnosis.kind, StartupDiagnosisKind::ConfigInvalid);
     assert_eq!(diagnosis.code, "KERNEL_CONFIG_INVALID");
 }
+
+#[test]
+fn test_restart_stats_accumulates_and_records_reason_and_time() {
+    let manager = KernelStateManager::new();
+
+    // 初始状态：无重启记录
+    let initial = manager.get_restart_stats();
+    assert_eq!(initial.restart_count, 0);
+    assert!(initial.last_restart_reason.is_none());
+    assert!(initial.last_restart_at.is_none());
+
+    manager.record_restart("process-crashed");
+    let after_one = manager.get_restart_stats();
+    assert_eq!(after_one.restart_count, 1);
+    assert_eq!(after_one.last_restart_reason.as_deref(), Some("process-crashed"));
+    assert!(after_one.last_restart_at.is_some());
+
+    manager.record_restart("tun-connectivity");
+    let after_two = manager.get_restart_stats();
+    assert_eq!(after_two.restart_count, 2);
+    assert_eq!(
+        after_two.last_restart_reason.as_deref(),
+        Some("tun-connectivity")
+    );
+    // 时间戳单调非减（快机器上两次调用可能在同一毫秒）
+    assert!(after_two.last_restart_at >= after_one.last_restart_at);
+}

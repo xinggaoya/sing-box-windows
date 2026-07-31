@@ -12,7 +12,8 @@ use crate::app::core::kernel_service::utils::{
 };
 use crate::app::core::kernel_service::PROCESS_MANAGER;
 use crate::app::core::proxy_service::{
-    apply_proxy_runtime_state, update_dns_strategy, ProxyRuntimeState,
+    apply_os_proxy, apply_proxy_runtime_state, update_dns_strategy, write_inbounds_to_config,
+    ProxyRuntimeState,
 };
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
@@ -80,7 +81,7 @@ fn classify_runtime_start_failure(detail: &str) -> &'static str {
     }
 }
 
-async fn verify_kernel_startup_stability(api_port: u16) -> Result<(), String> {
+async fn verify_kernel_startup_stability(api_port: u16, proxy_port: u16) -> Result<(), String> {
     // stability window: detect false-positive "started then crashed" scenarios.
     // first run may need to download metacubexd UI / rule sets,
     // use exponential backoff for cold starts; success returns quickly.
@@ -88,6 +89,7 @@ async fn verify_kernel_startup_stability(api_port: u16) -> Result<(), String> {
     const INITIAL_RETRY_INTERVAL_MS: u64 = 300;
     const MAX_RETRY_INTERVAL_MS: u64 = 2000;
     const API_TIMEOUT_MS: u64 = 1000;
+    const PROXY_PORT_PROBE_MS: u64 = 300;
 
     let client = http_client::get_client();
     let api_url = format!("http://127.0.0.1:{}/version", api_port);
@@ -105,11 +107,34 @@ async fn verify_kernel_startup_stability(api_port: u16) -> Result<(), String> {
             .await
         {
             Ok(response) if response.status().is_success() => {
-                info!(
-                    "kernel stability check passed (attempt {}/{})",
-                    attempt, MAX_CHECKS
-                );
-                return Ok(());
+                // API 就绪 ≠ mixed inbound 已对外 accept。额外校验代理端口可连，
+                // 避免"API 通但代理没通"导致系统代理指向尚未监听的端口。
+                match tokio::time::timeout(
+                    Duration::from_millis(PROXY_PORT_PROBE_MS),
+                    tokio::net::TcpStream::connect(("127.0.0.1", proxy_port)),
+                )
+                .await
+                {
+                    Ok(Ok(_)) => {
+                        info!(
+                            "kernel stability check passed (attempt {}/{}, proxy_port={})",
+                            attempt, MAX_CHECKS, proxy_port
+                        );
+                        return Ok(());
+                    }
+                    Ok(Err(e)) => {
+                        last_error = format!(
+                            "stability check attempt {} failed: proxy port {} not ready: {}",
+                            attempt, proxy_port, e
+                        );
+                    }
+                    Err(_) => {
+                        last_error = format!(
+                            "stability check attempt {} failed: proxy port {} probe timed out",
+                            attempt, proxy_port
+                        );
+                    }
+                }
             }
             Ok(response) => {
                 last_error = format!(
@@ -239,6 +264,19 @@ pub async fn start_kernel_with_state(
     app_handle: AppHandle,
     resolved: &ResolvedProxyState,
 ) -> Result<serde_json::Value, String> {
+    start_kernel_impl(app_handle, resolved, true).await
+}
+
+/// 内核启动实现。
+///
+/// `reactivate_guard` 控制是否在启动成功后调用 `enable_kernel_guard`：
+/// - 普通启动（true）：建立守护任务；
+/// - 守护/自愈调用（false）：守护循环已在运行，避免重建自身，也避免非 Send future 链。
+pub(super) async fn start_kernel_impl(
+    app_handle: AppHandle,
+    resolved: &ResolvedProxyState,
+    reactivate_guard: bool,
+) -> Result<serde_json::Value, String> {
     let _attempt_id = KERNEL_STATE.begin_attempt("kernel-start");
     KERNEL_STATE.set_state(KernelState::Starting);
     KERNEL_STATE.update_readiness(|readiness| {
@@ -286,7 +324,9 @@ pub async fn start_kernel_with_state(
         warn!("更新端口配置失败: {}", e);
     }
 
-    if let Err(e) = apply_proxy_runtime_state(&app_handle, &resolved.proxy).await {
+    // 启动前仅写入 inbound 配置，不开启 OS 系统代理。
+    // OS 代理在内核端口真正监听后再开启（见下方），避免代理指向尚未就绪的端口。
+    if let Err(e) = write_inbounds_to_config(&app_handle, &resolved.proxy).await {
         KERNEL_STATE.mark_failed();
         let detail = format!("应用代理配置失败: {}", e);
         emit_kernel_error_with_context(
@@ -320,12 +360,16 @@ pub async fn start_kernel_with_state(
         KERNEL_STATE.update_readiness(|readiness| {
             readiness.relay_ready = true;
         });
-        enable_kernel_guard(
-            app_handle.clone(),
-            resolved.api_port,
-            resolved.proxy.tun_enabled,
-        )
-        .await;
+        // 内核已在运行（端口已监听），安全地应用 OS 代理设置。
+        apply_os_proxy(&resolved.proxy);
+        if reactivate_guard {
+            enable_kernel_guard(
+                app_handle.clone(),
+                resolved.api_port,
+                resolved.proxy.tun_enabled,
+            )
+            .await;
+        }
         info!("内核已在运行中");
         return Ok(serde_json::json!({
             "success": true,
@@ -408,7 +452,9 @@ pub async fn start_kernel_with_state(
         Ok(_) => {
             info!("? 内核进程启动成功，开始稳定性校验");
 
-            if let Err(e) = verify_kernel_startup_stability(resolved.api_port).await {
+            if let Err(e) =
+                verify_kernel_startup_stability(resolved.api_port, resolved.proxy.proxy_port).await
+            {
                 error!("? 内核稳定性校验失败: {}", e);
 
                 // 读取内核 stderr 输出辅助诊断
@@ -443,6 +489,10 @@ pub async fn start_kernel_with_state(
                 readiness.relay_ready = false;
             });
 
+            // 稳定性校验通过（含 proxy_port 连通校验），此时端口已就绪，
+            // 安全地开启 OS 系统代理，避免代理指向尚未监听的端口。
+            apply_os_proxy(&resolved.proxy);
+
             info!("?? 启动事件中继服务，端口: {}", resolved.api_port);
             match start_websocket_relay(app_handle.clone(), Some(resolved.api_port)).await {
                 Ok(_) => {
@@ -451,12 +501,14 @@ pub async fn start_kernel_with_state(
                         readiness.relay_ready = true;
                     });
 
-                    enable_kernel_guard(
-                        app_handle.clone(),
-                        resolved.api_port,
-                        resolved.proxy.tun_enabled,
-                    )
-                    .await;
+                    if reactivate_guard {
+                        enable_kernel_guard(
+                            app_handle.clone(),
+                            resolved.api_port,
+                            resolved.proxy.tun_enabled,
+                        )
+                        .await;
+                    }
 
                     emit_kernel_started(
                         &app_handle,
@@ -464,6 +516,7 @@ pub async fn start_kernel_with_state(
                         resolved.api_port,
                         resolved.proxy.proxy_port,
                         false,
+                        true,
                     );
 
                     Ok(serde_json::json!({
@@ -477,13 +530,17 @@ pub async fn start_kernel_with_state(
                         readiness.relay_ready = false;
                     });
 
-                    enable_kernel_guard(
-                        app_handle.clone(),
-                        resolved.api_port,
-                        resolved.proxy.tun_enabled,
-                    )
-                    .await;
+                    if reactivate_guard {
+                        enable_kernel_guard(
+                            app_handle.clone(),
+                            resolved.api_port,
+                            resolved.proxy.tun_enabled,
+                        )
+                        .await;
+                    }
 
+                    // 中继失败时手动构造 payload，relay_ready/websocket_ready 保持 false，
+                    // 不调 emit_kernel_started（它会按 relay_ready 参数同步状态）。
                     let started_payload = json!({
                         "process_running": true,
                         "api_ready": true,
@@ -601,6 +658,25 @@ pub async fn orchestrated_start_kernel(
     app_handle: AppHandle,
     overrides: ProxyOverrides,
 ) -> Result<serde_json::Value, String> {
+    // 去重：内核已在运行且调用方未传任何覆盖参数时，短路返回成功，避免无谓的 stop→start。
+    // 注意：传入了 overrides（如切换端口/模式）时不短路，需真正执行以应用变更。
+    let has_overrides = overrides.proxy_mode.is_some()
+        || overrides.api_port.is_some()
+        || overrides.proxy_port.is_some()
+        || overrides.prefer_ipv6.is_some()
+        || overrides.system_proxy_bypass.is_some()
+        || overrides.tun_options.is_some()
+        || overrides.system_proxy_enabled.is_some()
+        || overrides.tun_enabled.is_some()
+        || overrides.keep_alive.is_some();
+    if !has_overrides && KERNEL_STATE.get_state().is_running() {
+        info!("内核已在运行且无覆盖参数，跳过重复的启动请求");
+        return Ok(json!({
+            "success": true,
+            "message": "内核已在运行中".to_string()
+        }));
+    }
+
     let event_handle = app_handle.clone();
     execute_kernel_operation(
         event_handle,
@@ -615,6 +691,19 @@ pub async fn orchestrated_start_kernel(
 }
 
 pub async fn orchestrated_stop_kernel(app_handle: AppHandle) -> Result<serde_json::Value, String> {
+    // 去重：内核已处于停止/失败/崩溃态时短路返回成功，避免重复停止。
+    let state = KERNEL_STATE.get_state();
+    if matches!(
+        state,
+        KernelState::Stopped | KernelState::Failed | KernelState::Crashed
+    ) {
+        info!("内核当前状态为 {:?}，跳过重复的停止请求", state);
+        return Ok(json!({
+            "success": true,
+            "message": "内核已停止".to_string()
+        }));
+    }
+
     let event_handle = app_handle.clone();
     execute_kernel_operation(
         event_handle,

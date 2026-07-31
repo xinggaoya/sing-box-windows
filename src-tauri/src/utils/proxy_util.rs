@@ -3,6 +3,8 @@ use std::io;
 #[cfg(target_os = "windows")]
 use crate::app::constants::registry;
 #[cfg(target_os = "windows")]
+use tracing::warn;
+#[cfg(target_os = "windows")]
 use winreg::enums::*;
 #[cfg(target_os = "windows")]
 use winreg::RegKey;
@@ -81,6 +83,9 @@ fn disable_system_proxy_windows() -> io::Result<()> {
 
     // 清空代理服务器地址
     settings.set_value(registry::PROXY_SERVER, &"")?;
+
+    // 通知 WinINet 重新读取设置，使基于 WinINet 的应用（Edge/Chrome/IE 等）立即生效。
+    notify_wininet_change();
 
     Ok(())
 }
@@ -222,7 +227,53 @@ fn enable_system_proxy_windows(host: &str, port: u16, bypass: Option<&str>) -> i
     };
     settings.set_value(registry::PROXY_OVERRIDE, &override_value)?;
 
+    // 通知 WinINet 重新读取设置，使基于 WinINet 的应用（Edge/Chrome/IE 等）立即生效。
+    notify_wininet_change();
+
     Ok(())
+}
+
+/// 通知 WinINet 配置已变更并刷新，使系统代理设置即时生效。
+///
+/// 仅写注册表而不调用本函数时，基于 WinINet 的应用（Edge/Chrome/IE/资源管理器等）
+/// 不会主动重新读取代理设置，表现为“代理已写入但浏览器仍连不上”，需要手动重启才能恢复。
+///
+/// 这里调用两个选项：`INTERNET_OPTION_SETTINGS_CHANGED`（通知设置变更）+
+/// `INTERNET_OPTION_REFRESH`（强制重新读取）。任一失败仅记录警告，不阻断代理写入。
+///
+/// 实现说明：直接用 FFI 声明 + `#[link(name = "wininet")]` 链接系统库，
+/// 避免引入 `windows` crate 的庞大 Win32 feature（会拖慢甚至拖崩编译器）。
+#[cfg(target_os = "windows")]
+fn notify_wininet_change() {
+    // Win32 常量（来自 wininet.h）。
+    const INTERNET_OPTION_SETTINGS_CHANGED: u32 = 39;
+    const INTERNET_OPTION_REFRESH: u32 = 37;
+
+    #[link(name = "wininet")]
+    extern "system" {
+        fn InternetSetOptionW(
+            hinternet: *mut std::ffi::c_void,
+            option: u32,
+            buffer: *mut std::ffi::c_void,
+            buffer_length: u32,
+        ) -> i32;
+    }
+
+    // SAFETY: INTERNET_OPTION_SETTINGS_CHANGED / REFRESH 不需要 buffer
+    // （lpBuffer=NULL，dwBufferLength=0），是 Win32 API 文档允许的用法；
+    // hInternet 对这两个选项也必须为 NULL。函数无不可控副作用。
+    unsafe {
+        let hinternet = std::ptr::null_mut::<std::ffi::c_void>();
+        let buffer = std::ptr::null_mut::<std::ffi::c_void>();
+
+        if InternetSetOptionW(hinternet, INTERNET_OPTION_SETTINGS_CHANGED, buffer, 0) == 0 {
+            warn!("InternetSetOptionW(SETTINGS_CHANGED) 返回 0");
+        }
+
+        if InternetSetOptionW(hinternet, INTERNET_OPTION_REFRESH, buffer, 0) == 0 {
+            warn!("InternetSetOptionW(REFRESH) 返回 0");
+        }
+    }
 }
 
 #[cfg(target_os = "linux")]

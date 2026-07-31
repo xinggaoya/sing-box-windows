@@ -165,22 +165,35 @@ pub fn create_connection_event_relay(
     )
 }
 
-/// 启动事件中继器并在失败时按退避策略重试
+/// 启动事件中继器并在失败时按退避策略重试。
+///
+/// 重试策略分两段：
+/// 1. 前 8 次：指数退避（1s → 2s → 4s → … 封顶 10s），快速恢复瞬时抖动；
+/// 2. 之后：进入低频持续重连（每 30s 一次），只要内核在就一直尝试，避免
+///    "重试 8 次后永久放弃"导致前端丢失流量/日志/连接事件。
+///
+/// 通过 `events_should_stop` 控制退出（停止内核时置位）。
 pub async fn start_event_relay_with_retry(
     relay: EventDirectRelay<Value>,
     relay_type: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let mut retry_count = 0;
-    let max_retries = 8; // 增加重试次数
+    let mut retry_count = 0u32;
+    let max_retries = 8; // 快速退避阶段最大重试次数
     let mut retry_delay = std::time::Duration::from_secs(1);
     let max_retry_delay = std::time::Duration::from_secs(10);
+    let persistent_retry_delay = std::time::Duration::from_secs(30);
 
     info!(
-        "🔌 开始启动{}事件中继器，最大重试次数: {}",
+        "🔌 开始启动{}事件中继器，最大快速重试次数: {}",
         relay_type, max_retries
     );
 
     loop {
+        if crate::app::core::kernel_service::event::events_should_stop() {
+            info!("{}事件中继器收到停止信号，退出重试", relay_type);
+            break Ok(());
+        }
+
         match relay.start().await {
             Ok(_) => {
                 info!("✅ {}事件中继器启动成功并正常结束", relay_type);
@@ -189,31 +202,33 @@ pub async fn start_event_relay_with_retry(
             Err(e) => {
                 retry_count += 1;
 
-                if retry_count >= max_retries {
-                    error!(
-                        "❌ {}事件中继器重试{}次后仍然失败: {}",
-                        relay_type, max_retries, e
-                    );
-                    break Err(e);
-                }
-
-                // 根据重试次数调整延迟时间，但不超过最大延迟
+                // 根据重试次数调整延迟时间
                 if retry_count <= 3 {
                     retry_delay = std::time::Duration::from_secs(retry_count as u64);
                 } else {
                     retry_delay = min(retry_delay * 2, max_retry_delay);
                 }
 
-                warn!(
-                    "⚠️ {}事件中继器失败，{}秒后重试 ({}/{}): {}",
-                    relay_type,
-                    retry_delay.as_secs(),
-                    retry_count,
-                    max_retries,
-                    e
-                );
-
-                tokio::time::sleep(retry_delay).await;
+                if retry_count <= max_retries {
+                    warn!(
+                        "⚠️ {}事件中继器失败，{}秒后重试 ({}/{}): {}",
+                        relay_type,
+                        retry_delay.as_secs(),
+                        retry_count,
+                        max_retries,
+                        e
+                    );
+                    tokio::time::sleep(retry_delay).await;
+                } else {
+                    // 进入低频持续重连阶段：只要内核在就持续尝试，不再放弃。
+                    warn!(
+                        "⚠️ {}事件中继器进入持续重连模式，每{}秒重试一次: {}",
+                        relay_type,
+                        persistent_retry_delay.as_secs(),
+                        e
+                    );
+                    tokio::time::sleep(persistent_retry_delay).await;
+                }
             }
         }
     }

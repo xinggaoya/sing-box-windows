@@ -49,7 +49,8 @@ fn build_inbounds_for_state(state: &ProxyRuntimeState) -> Vec<config_model::Inbo
             TunProfile::from_options(&state.tun_options, None).to_inbounds(state.proxy_port);
         if let Some(mixed) = inbounds.get_mut(0) {
             mixed.listen = Some(resolve_proxy_listen_address(state).to_string());
-            mixed.set_system_proxy = Some(state.system_proxy_enabled);
+            // 系统代理由 app 侧统一管理（修复"双重写入"竞态），inbound 不再写 set_system_proxy。
+            mixed.set_system_proxy = None;
         }
         return inbounds;
     }
@@ -67,7 +68,8 @@ fn build_inbounds_for_state(state: &ProxyRuntimeState) -> Vec<config_model::Inbo
         mtu: None,
         route_address: None,
         route_exclude_address: None,
-        set_system_proxy: Some(state.system_proxy_enabled),
+        // 系统代理由 app 侧统一管理（修复"双重写入"竞态），inbound 不再写 set_system_proxy。
+        set_system_proxy: None,
     }]
 }
 
@@ -82,6 +84,19 @@ async fn load_allow_lan_access(app_handle: &AppHandle) -> bool {
 }
 
 pub async fn apply_proxy_runtime_state(
+    app_handle: &AppHandle,
+    state: &ProxyRuntimeState,
+) -> Result<(), String> {
+    write_inbounds_to_config(app_handle, state).await?;
+    apply_os_proxy(state);
+    Ok(())
+}
+
+/// 仅把 inbound 配置写入磁盘（不触碰 OS 系统代理设置）。
+///
+/// 供内核启动流程在 spawn 进程之前调用，避免在端口尚未监听时就开启 OS 代理，
+/// 形成"代理指向空端口"的窗口。OS 代理开关由 [`apply_os_proxy`] 在端口就绪后单独控制。
+pub async fn write_inbounds_to_config(
     app_handle: &AppHandle,
     state: &ProxyRuntimeState,
 ) -> Result<(), String> {
@@ -116,6 +131,14 @@ pub async fn apply_proxy_runtime_state(
         .save_to_file()
         .map_err(|e| format!("{}: {}", messages::ERR_CONFIG_READ_FAILED, e))?;
 
+    Ok(())
+}
+
+/// 仅应用/关闭 OS 系统代理（不写 inbound 配置）。
+///
+/// 在内核 proxy_port 真正监听后调用，避免代理指向尚未就绪的端口。
+/// 失败仅记录警告：OS 代理写入失败不应阻断内核启动流程。
+pub fn apply_os_proxy(state: &ProxyRuntimeState) {
     if state.system_proxy_enabled {
         let bypass = state.system_proxy_bypass.trim();
         let normalized_bypass = if bypass.is_empty() {
@@ -123,21 +146,20 @@ pub async fn apply_proxy_runtime_state(
         } else {
             bypass.to_string()
         };
-        enable_system_proxy(
+        match enable_system_proxy(
             network_config::DEFAULT_CLASH_API_ADDRESS,
             state.proxy_port,
             Some(normalized_bypass.as_str()),
-        )
-        .map_err(|e| format!("设置系统代理失败: {}", e))?;
-        info!(
-            "系统代理已启用，端口 {}，绕过列表: {}",
-            state.proxy_port, normalized_bypass
-        );
+        ) {
+            Ok(()) => info!(
+                "系统代理已启用，端口 {}，绕过列表: {}",
+                state.proxy_port, normalized_bypass
+            ),
+            Err(e) => warn!("设置系统代理失败: {}", e),
+        }
     } else if let Err(err) = disable_system_proxy() {
         warn!("关闭系统代理失败: {}", err);
     }
-
-    Ok(())
 }
 
 // 修改代理模式为系统代理

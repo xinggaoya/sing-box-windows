@@ -5,7 +5,7 @@
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::state_model::AppConfig;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -108,6 +108,19 @@ pub struct KernelReadinessSnapshot {
     pub relay_ready: bool,
 }
 
+/// 守护/自愈重启的可观测性统计，随内核状态事件一起上报，便于诊断内核抖动。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct RestartStats {
+    /// 累计自愈/守护重启次数（进程启动后不清零，用于长期观测）。
+    pub restart_count: u32,
+    /// 最近一次重启原因（如 "process-crashed"、"tun-connectivity"、"system-connectivity"）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_restart_reason: Option<String>,
+    /// 最近一次重启的时间戳（毫秒）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_restart_at: Option<u64>,
+}
+
 impl From<u8> for KernelState {
     fn from(v: u8) -> Self {
         match v {
@@ -169,6 +182,9 @@ pub struct KernelStateManager {
     startup_diagnosis: RwLock<Option<StartupDiagnosis>>,
     readiness: RwLock<KernelReadinessSnapshot>,
     current_attempt_id: RwLock<Option<String>>,
+    restart_count: AtomicU32,
+    last_restart_reason: RwLock<Option<String>>,
+    last_restart_at: RwLock<Option<u64>>,
 }
 
 impl KernelStateManager {
@@ -179,6 +195,9 @@ impl KernelStateManager {
             startup_diagnosis: RwLock::new(None),
             readiness: RwLock::new(KernelReadinessSnapshot::default()),
             current_attempt_id: RwLock::new(None),
+            restart_count: AtomicU32::new(0),
+            last_restart_reason: RwLock::new(None),
+            last_restart_at: RwLock::new(None),
         }
     }
 
@@ -338,6 +357,31 @@ impl KernelStateManager {
                     }
                 }
             }
+        }
+    }
+
+    /// 记录一次守护/自愈重启，累加计数并写入原因与时间戳。
+    pub fn record_restart(&self, reason: impl Into<String>) {
+        self.restart_count.fetch_add(1, Ordering::SeqCst);
+        let reason = reason.into();
+        if let Ok(mut guard) = self.last_restart_reason.write() {
+            *guard = Some(reason);
+        }
+        if let Ok(mut guard) = self.last_restart_at.write() {
+            *guard = Some(Self::now_millis());
+        }
+    }
+
+    /// 读取重启统计快照（供状态接口上报前端）。
+    pub fn get_restart_stats(&self) -> RestartStats {
+        RestartStats {
+            restart_count: self.restart_count.load(Ordering::SeqCst),
+            last_restart_reason: self
+                .last_restart_reason
+                .read()
+                .ok()
+                .and_then(|g| g.clone()),
+            last_restart_at: self.last_restart_at.read().ok().and_then(|g| *g),
         }
     }
 }

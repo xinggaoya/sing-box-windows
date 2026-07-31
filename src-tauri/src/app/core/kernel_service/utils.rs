@@ -150,26 +150,29 @@ pub fn emit_kernel_status(app_handle: &AppHandle, status: &KernelStatusPayload) 
 /// * `api_port` - API 端口
 /// * `proxy_port` - 代理端口
 /// * `auto_restarted` - 是否为自动重启（守护进程触发）
+/// * `relay_ready` - 事件中继（WebSocket）是否就绪；为 false 时不覆盖已记录的 relay_ready，
+///   payload 的 `websocket_ready` 也会同步反映，避免"中继失败却上报就绪"的不一致。
 pub fn emit_kernel_started(
     app_handle: &AppHandle,
     proxy_mode: &str,
     api_port: u16,
     proxy_port: u16,
     auto_restarted: bool,
+    relay_ready: bool,
 ) {
     KERNEL_STATE.update_readiness(|readiness| {
         readiness.config_validated = Some(true);
         readiness.process_spawned = Some(true);
         readiness.process_alive = true;
         readiness.api_ready = true;
-        readiness.relay_ready = true;
+        readiness.relay_ready = relay_ready;
     });
     KERNEL_STATE.clear_startup_diagnosis();
 
     let started_payload = json!({
         "process_running": true,
         "api_ready": true,
-        "websocket_ready": true,
+        "websocket_ready": relay_ready,
         "readiness": KERNEL_STATE.get_readiness(),
         "startup_diagnosis": KERNEL_STATE.get_startup_diagnosis(),
         "proxy_mode": proxy_mode,
@@ -181,7 +184,7 @@ pub fn emit_kernel_started(
     });
 
     let _ = app_handle.emit("kernel-started", started_payload);
-    emit_kernel_status(app_handle, &KernelStatusPayload::running());
+    emit_kernel_status(app_handle, &KernelStatusPayload::from_state());
     let _ = app_handle.emit("kernel-ready", ());
 }
 
