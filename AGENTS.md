@@ -90,5 +90,4 @@ pnpm tauri build
 ## NOTES
 
 - 当前前端测试文件极少，回归验证以类型检查 + Rust 测试 + 实机联调为主。
-- `src-tauri/src/lib.rs` 存在重复 websocket plugin 注册，改动此文件前先确认行为影响。
 - 分层 AGENTS 已在 `src/`、`src/stores/`、`src-tauri/`、`src-tauri/src/app/` 细化。

@@ -46,5 +46,5 @@ cd src-tauri && cargo test
 
 ## NOTES
 
-- 当前 `lib.rs` 存在 websocket plugin 重复注册，改动插件段时注意行为兼容。
-- `Cargo.toml` release profile 偏激进（LTO/strip/panic=abort），排障时注意与 dev 行为差异。
+- `tauri_plugin_websocket` 仅在 `lib.rs` 注册一次，无重复注册。
+- `Cargo.toml` 配置了激进的 release profile（LTO/codegen-units=1/strip=panic=abort），排障时注意 release 与 dev 行为差异（panic 直接 abort，不可恢复）。
