@@ -22,8 +22,11 @@ pub(super) async fn start_websocket_relay(
 ) -> Result<(), String> {
     let port = api_port.ok_or("API端口参数是必需的，请从前端传递正确的端口配置")?;
 
-    SHOULD_STOP_EVENTS.store(false, Ordering::Relaxed);
+    // 先清理上一轮中继任务（cleanup 内部会把 SHOULD_STOP_EVENTS 置 true 以通知旧任务退出）。
     cleanup_event_relay_tasks().await;
+    // 清理完成后，必须把停止标志复位为 false，否则紧接着 spawn 的新中继任务
+    // 会在 start_event_relay_with_retry 里读到 true 而立即退出，导致流量/连接/日志全部丢失。
+    SHOULD_STOP_EVENTS.store(false, Ordering::Relaxed);
 
     info!("?? 开始启动事件中继服务，端口: {}", port);
 

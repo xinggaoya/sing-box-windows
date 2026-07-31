@@ -172,7 +172,9 @@ pub fn create_connection_event_relay(
 /// 2. 之后：进入低频持续重连（每 30s 一次），只要内核在就一直尝试，避免
 ///    "重试 8 次后永久放弃"导致前端丢失流量/日志/连接事件。
 ///
-/// 通过 `events_should_stop` 控制退出（停止内核时置位）。
+/// 退出机制：停止内核时由 `cleanup_event_relay_tasks` 调用 `task.abort()`
+/// 强制终止本任务。这里不读取停止标志——曾经在此处检查 `events_should_stop()`
+/// 会导致 `start_websocket_relay` 在复位标志前的时序窗口里误退出，中继从未真正连接。
 pub async fn start_event_relay_with_retry(
     relay: EventDirectRelay<Value>,
     relay_type: &str,
@@ -189,11 +191,6 @@ pub async fn start_event_relay_with_retry(
     );
 
     loop {
-        if crate::app::core::kernel_service::event::events_should_stop() {
-            info!("{}事件中继器收到停止信号，退出重试", relay_type);
-            break Ok(());
-        }
-
         match relay.start().await {
             Ok(_) => {
                 info!("✅ {}事件中继器启动成功并正常结束", relay_type);
@@ -221,6 +218,9 @@ pub async fn start_event_relay_with_retry(
                     tokio::time::sleep(retry_delay).await;
                 } else {
                     // 进入低频持续重连阶段：只要内核在就持续尝试，不再放弃。
+                    // 退出由 cleanup_event_relay_tasks 的 task.abort() 保证（停止内核时触发），
+                    // 这里不检查 events_should_stop()，避免在 start_websocket_relay 复位标志
+                    // 之前的时序窗口里误退出，导致中继从未真正连接过。
                     warn!(
                         "⚠️ {}事件中继器进入持续重连模式，每{}秒重试一次: {}",
                         relay_type,
