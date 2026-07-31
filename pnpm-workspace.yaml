@@ -1,3 +1,14 @@
 allowBuilds:
   esbuild: true
   vue-demi: true
+minimumReleaseAgeExclude:
+  - vite@8.2.0
+# 强制提升第三方包钉死的旧传递依赖到已修复版本（漏洞均为开发/构建期，不影响运行时）
+overrides:
+  rollup: ^4.59.0
+  postcss: ^8.5.18
+  lodash: ^4.17.24
+  lodash-es: ^4.17.24
+  flatted: ^3.4.2
+  # picomatch 4.x 统一到已修复版本（4.0.5+）；2.x 由 micromatch@4.0.8 钉死，无法安全提升
+  picomatch: ^4.0.5
