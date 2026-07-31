@@ -983,23 +983,84 @@ async fn inject_into_active_config_inner(app_handle: &AppHandle) -> Result<(), S
         .map_err(|e| format!("读取自定义规则失败: {}", e))?
         .unwrap_or_default();
 
-    let content = std::fs::read_to_string(&config_path)
+    let default_outbound = normalize_default_outbound(&app_config);
+    inject_custom_rules_into_file(&config_path, &rules, default_outbound)?;
+    let enabled_count = rules.iter().filter(|r| r.enabled).count();
+    info!(
+        "已把 {} 条自定义规则注入活动配置: {:?}",
+        enabled_count, config_path
+    );
+    Ok(())
+}
+
+/// 把自定义规则注入活动配置文件的纯文件层逻辑（不依赖 Tauri 句柄/存储，便于单测）。
+///
+/// 采用“带外快照”策略：为活动配置维护一个 `.base` 旁路文件，保存**注入前**的干净副本。
+/// 每次注入都从 `.base` 读取 → 注入 → 写回活动配置，重新注入天然幂等，
+/// 因此 sing-box 配置里**不需要任何标记字段**（旧版把 `__custom_rule_start__` 写进
+/// `route.rules[0]`，而 sing-box 严格解码会拒绝未知字段，导致启动报错 `unknown field`）。
+///
+/// 另处理两种边界：
+/// - `.base` 不存在（首次运行 / 旧版升级）：用当前活动配置初始化快照，并清理可能残留的旧版脏标记。
+/// - 外部程序（订阅刷新）替换了活动配置：用新配置覆盖 `.base` 再注入。
+///
+/// 幂等性靠 `.base` 快照保证（每次从干净副本重新注入）；而“检测外部替换”靠 `.last` 旁路文件——
+/// 它记录本程序**上次写出**的活动配置内容。若当前活动配置与 `.last` 不一致，说明它被外部改写
+/// （例如订阅刷新），此时用新的活动配置 rebase `.base`。注意不能用 `.base` 本身做比较：
+/// 注入后的活动配置必然与 `.base` 不同，那样会把“已注入的脏配置”误当新基线，导致规则翻倍。
+fn inject_custom_rules_into_file(
+    config_path: &std::path::Path,
+    rules: &[CustomRule],
+    default_outbound: &str,
+) -> Result<(), String> {
+    let active_content = std::fs::read_to_string(config_path)
         .map_err(|e| format!("读取配置文件失败: {}", e))?;
-    let mut config: Value = serde_json::from_str(&content).map_err(|e| format!("解析配置失败: {}", e))?;
+    let snapshot_path = base_snapshot_path(config_path);
+    let last_path = last_injected_path(config_path);
 
-    // 先剔除上一次注入的自定义规则（通过 comment 标记识别），保证幂等。
-    strip_custom_rules(&mut config);
+    // 决定本次注入的基线 `.base`。
+    let mut base: Value = match std::fs::read_to_string(&snapshot_path) {
+        Ok(snapshot_content) => {
+            // `.base` 已存在。检测活动配置是否被外部（订阅刷新等）替换：与 `.last` 比较。
+            let last_content = std::fs::read_to_string(&last_path).unwrap_or_default();
+            if normalize_config_for_compare(&active_content)
+                != normalize_config_for_compare(&last_content)
+            {
+                // 活动配置已被外部改写 → 用新的活动配置 rebase `.base`（并清理旧版脏标记）。
+                let mut fresh: Value = serde_json::from_str(&active_content)
+                    .map_err(|e| format!("解析配置失败: {}", e))?;
+                strip_legacy_markers(&mut fresh);
+                let fresh_str = serde_json::to_string_pretty(&fresh)
+                    .map_err(|e| format!("序列化快照失败: {}", e))?;
+                std::fs::write(&snapshot_path, &fresh_str)
+                    .map_err(|e| format!("写入快照失败: {}", e))?;
+                fresh
+            } else {
+                // 活动配置就是本程序上次写出的那份 → 直接复用干净快照，注入天然幂等。
+                serde_json::from_str(&snapshot_content)
+                    .map_err(|e| format!("解析快照失败: {}", e))?
+            }
+        }
+        Err(_) => {
+            // 首次运行或旧版升级：用当前活动配置初始化快照，并清理可能残留的旧版脏标记。
+            let mut init: Value = serde_json::from_str(&active_content)
+                .map_err(|e| format!("解析配置失败: {}", e))?;
+            strip_legacy_markers(&mut init);
+            let init_str =
+                serde_json::to_string_pretty(&init).map_err(|e| format!("序列化快照失败: {}", e))?;
+            std::fs::write(&snapshot_path, &init_str)
+                .map_err(|e| format!("写入快照失败: {}", e))?;
+            init
+        }
+    };
 
-    if !rules.is_empty() {
-        let default_outbound = normalize_default_outbound(&app_config);
-        inject_custom_rules(&mut config, &rules, default_outbound);
-        mark_custom_rules_extent(&mut config);
-    }
+    inject_custom_rules(&mut base, rules, default_outbound);
 
-    let updated = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("序列化配置失败: {}", e))?;
-    std::fs::write(&config_path, updated).map_err(|e| format!("写入配置失败: {}", e))?;
-    info!("已把 {} 条自定义规则注入活动配置: {:?}", rules.len(), config_path);
+    let updated =
+        serde_json::to_string_pretty(&base).map_err(|e| format!("序列化配置失败: {}", e))?;
+    // 写回活动配置，并记录本次写出内容到 `.last`，供下次检测外部改写。
+    std::fs::write(config_path, &updated).map_err(|e| format!("写入配置失败: {}", e))?;
+    std::fs::write(&last_path, &updated).map_err(|e| format!("写入 last 记录失败: {}", e))?;
     Ok(())
 }
 
@@ -1021,66 +1082,50 @@ async fn is_active_config_use_original(
         .any(|s| s.config_path.as_deref() == Some(&path) && s.use_original_config)
 }
 
-/// 自定义规则在 route.rules 中的起止标记（用对象里的固定 marker 字段标识）。
-const CUSTOM_RULE_START_MARKER: &str = "__custom_rule_start__";
+/// 活动配置对应的“注入前快照”旁路文件路径。
+///
+/// 与活动配置同目录、同生命周期，仅追加 `.base` 后缀。
+/// 例如 `home-1784548482083.json` → `home-1784548482083.json.base`。
+fn base_snapshot_path(active_config_path: &std::path::Path) -> std::path::PathBuf {
+    let mut p = active_config_path.as_os_str().to_owned();
+    p.push(".base");
+    p.into()
+}
 
-/// 给自定义规则段打上起始标记，便于下次 strip。
-fn mark_custom_rules_extent(config: &mut Value) {
-    if let Some(arr) = config
+/// 本程序“上次写出”的活动配置内容旁路文件路径，用于检测外部（订阅刷新等）是否改写了活动配置。
+fn last_injected_path(active_config_path: &std::path::Path) -> std::path::PathBuf {
+    let mut p = active_config_path.as_os_str().to_owned();
+    p.push(".last");
+    p.into()
+}
+
+/// 旧版遗留的带内标记字段名（曾写进 `route.rules[0]`，sing-box 严格解码会拒绝）。
+const LEGACY_CUSTOM_RULE_MARKER: &str = "__custom_rule_start__";
+
+/// 一次性清理旧版写进配置的脏标记字段。
+///
+/// 旧实现会在 `route.rules[*]` 的对象里塞入 `__custom_rule_start__: true`，而 sing-box 对
+/// route rule 做严格 JSON 解码，遇到未知字段直接报 `unknown field` 导致启动失败。
+/// 本函数扫描并移除任何含该键的条目，仅在 `.base` 缺失、用活动配置初始化快照时调用一次，
+/// 让旧版本升级后立即摆脱脏标记。新代码不再向配置写入任何标记。
+fn strip_legacy_markers(config: &mut Value) {
+    let Some(arr) = config
         .get_mut("route")
         .and_then(|r| r.get_mut("rules"))
         .and_then(|rules| rules.as_array_mut())
-    {
-        if let Some(first) = arr.first_mut() {
-            if let Some(obj) = first.as_object_mut() {
-                obj.insert(CUSTOM_RULE_START_MARKER.to_string(), Value::Bool(true));
-            }
+    else {
+        return;
+    };
+    for rule in arr.iter_mut() {
+        if let Some(obj) = rule.as_object_mut() {
+            obj.remove(LEGACY_CUSTOM_RULE_MARKER);
         }
     }
 }
 
-/// 移除上一次注入的自定义规则段（从起始标记到下一个默认规则之前）。
-fn strip_custom_rules(config: &mut Value) {
-    let arr = match config
-        .get_mut("route")
-        .and_then(|r| r.get_mut("rules"))
-        .and_then(|rules| rules.as_array_mut())
-    {
-        Some(a) => a,
-        None => return,
-    };
-    // 找到起始标记位置。
-    let start = arr.iter().position(|rule| {
-        rule.as_object()
-            .map(|o| o.contains_key(CUSTOM_RULE_START_MARKER))
-            .unwrap_or(false)
-    });
-    let start = match start {
-        Some(i) => i,
-        None => return,
-    };
-    // 自定义规则段 = 从 start（含）到下一条“内置规则”（含 rule_set/ip_cidr/domain 且不带 marker）之前。
-    // 内置规则的判定：有 rule_set/ip_cidr/domain/domain_suffix 字段。
-    let end = arr[start..]
-        .iter()
-        .skip(1) // 跳过起始标记那条
-        .position(|rule| {
-            let obj = match rule.as_object() {
-                Some(o) => o,
-                None => return false,
-            };
-            (obj.contains_key("rule_set")
-                || obj.contains_key("ip_cidr")
-                || obj.contains_key("domain")
-                || obj.contains_key("domain_suffix"))
-                && !obj.contains_key(CUSTOM_RULE_START_MARKER)
-        });
-    let remove_end = match end {
-        Some(rel) => start + 1 + rel, // 保留 start 那条（去掉 marker 后它通常也是自定义规则，见下）
-        None => arr.len(),
-    };
-    // 移除 [start, remove_end)
-    arr.drain(start..remove_end);
+/// 规范化配置文本用于一致性比较（仅去除外层空白差异，避免格式抖动误判为订阅刷新）。
+fn normalize_config_for_compare(content: &str) -> String {
+    content.trim().to_string()
 }
 
 /// 生成简单 uuid（不引入 uuid crate 依赖：用时间戳 + 进程 id 组合）。
@@ -1091,4 +1136,342 @@ fn uuid_v4() -> String {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     format!("{:016x}-{:08x}", nanos, std::process::id())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::storage::custom_rule::{
+        CustomRule, CustomRuleAction, CustomRuleMatchType,
+    };
+    use chrono::Utc;
+    use serde_json::{json, Value};
+    use std::path::PathBuf;
+
+    /// sing-box route rule 允许的字段白名单（用于回归校验，防止再写入未知字段）。
+    /// 来源：https://sing-box.sagernet.org/configuration/route/rule/（默认规则 + logical 的 type）。
+    const KNOWN_ROUTE_RULE_FIELDS: &[&str] = &[
+        "type",
+        "inbound",
+        "ip_version",
+        "auth_user",
+        "protocol",
+        "client",
+        "network",
+        "domain",
+        "domain_suffix",
+        "domain_keyword",
+        "domain_regex",
+        "geosite",
+        "source_geoip",
+        "geoip",
+        "source_ip_cidr",
+        "ip_is_private",
+        "ip_cidr",
+        "source_ip_is_private",
+        "source_port",
+        "source_port_range",
+        "port",
+        "port_range",
+        "process_name",
+        "process_path",
+        "process_path_regex",
+        "package_name",
+        "package_name_regex",
+        "user",
+        "user_id",
+        "clash_mode",
+        "network_type",
+        "network_is_expensive",
+        "network_is_constrained",
+        "interface_address",
+        "network_interface_address",
+        "default_interface_address",
+        "wifi_ssid",
+        "wifi_bssid",
+        "preferred_by",
+        "source_mac_address",
+        "source_hostname",
+        "rule_set",
+        "rule_set_ip_cidr_match_source",
+        "invert",
+        "action",
+        "outbound",
+        "mode",
+        "rules",
+    ];
+
+    fn rule(id: &str, mt: CustomRuleMatchType, action: CustomRuleAction, payload: &str) -> CustomRule {
+        CustomRule {
+            id: id.to_string(),
+            enabled: true,
+            match_type: mt,
+            payload: payload.to_string(),
+            action,
+            outbound: None,
+            note: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    /// 一份干净的活动配置骨架：sniff → 私网直连 → CN 直连。
+    fn clean_config_json() -> Value {
+        json!({
+            "route": {
+                "rules": [
+                    { "action": "sniff" },
+                    { "rule_set": "geosite-private", "outbound": "direct" },
+                    { "ip_cidr": ["10.0.0.0/8"], "outbound": "direct" },
+                    { "rule_set": ["geosite-cn", "geoip-cn"], "outbound": "direct" }
+                ],
+                "final_outbound": "自动选择"
+            }
+        })
+    }
+
+    /// 进程内自增的原子计数器，用于生成并行单测间互不冲突的临时文件名。
+    fn unique_id() -> u64 {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        COUNTER.fetch_add(1, Ordering::SeqCst)
+    }
+
+    /// 拥有一个唯一活动配置 + .base 快照的测试夹具，支持在同一文件上多次重注入。
+    struct ConfigFixture {
+        active: PathBuf,
+    }
+
+    impl ConfigFixture {
+        /// 以一份干净配置初始化。
+        fn new_clean(tag: &str) -> Self {
+            Self::new_with(tag, clean_config_json())
+        }
+
+        /// 以自定义初始配置初始化（用于模拟脏数据 / 刷新后的新配置）。
+        fn new_with(tag: &str, initial: Value) -> Self {
+            let dir = std::env::temp_dir().join("singbox_custom_rule_tests");
+            std::fs::create_dir_all(&dir).unwrap();
+            let active = dir.join(format!("{}-{}-{}.json", tag, std::process::id(), unique_id()));
+            // 清理可能残留的同名产物（活动 / .base / .last）。
+            let _ = std::fs::remove_file(&active);
+            let _ = std::fs::remove_file(base_snapshot_path(&active));
+            let _ = std::fs::remove_file(last_injected_path(&active));
+            std::fs::write(&active, serde_json::to_string_pretty(&initial).unwrap()).unwrap();
+            Self { active }
+        }
+
+        fn snapshot(&self) -> PathBuf {
+            base_snapshot_path(&self.active)
+        }
+
+        fn last(&self) -> PathBuf {
+            last_injected_path(&self.active)
+        }
+
+        /// 跑一次注入（原地修改活动配置 + .base 快照 + .last 记录）。
+        fn inject(&self, rules: &[CustomRule]) {
+            inject_custom_rules_into_file(&self.active, rules, "自动选择").unwrap();
+        }
+
+        /// 用任意内容覆盖活动配置（模拟订阅刷新重写活动配置）。
+        fn overwrite_active(&self, content: Value) {
+            std::fs::write(&self.active, serde_json::to_string_pretty(&content).unwrap()).unwrap();
+        }
+
+        fn read_active(&self) -> Value {
+            serde_json::from_str(&std::fs::read_to_string(&self.active).unwrap()).unwrap()
+        }
+
+        fn read_snapshot(&self) -> Value {
+            serde_json::from_str(&std::fs::read_to_string(self.snapshot()).unwrap()).unwrap()
+        }
+    }
+
+    impl Drop for ConfigFixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.active);
+            let _ = std::fs::remove_file(self.snapshot());
+            let _ = std::fs::remove_file(self.last());
+        }
+    }
+
+    fn route_rules(config: &Value) -> &Vec<Value> {
+        config
+            .get("route")
+            .and_then(|r| r.get("rules"))
+            .and_then(|r| r.as_array())
+            .expect("route.rules 应存在")
+    }
+
+    fn assert_no_marker_anywhere(config: &Value) {
+        for rule in route_rules(config) {
+            if let Some(obj) = rule.as_object() {
+                assert!(
+                    !obj.contains_key(LEGACY_CUSTOM_RULE_MARKER),
+                    "配置里残留旧版标记字段: {:?}",
+                    rule
+                );
+            }
+        }
+    }
+
+    fn assert_rules_only_known_fields(config: &Value) {
+        for rule in route_rules(config) {
+            if let Some(obj) = rule.as_object() {
+                for key in obj.keys() {
+                    assert!(
+                        KNOWN_ROUTE_RULE_FIELDS.contains(&key.as_str()),
+                        "route rule 含未知字段 `{}`（sing-box 严格解码会拒绝）: {:?}",
+                        key,
+                        rule
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn inject_is_idempotent() {
+        let fixture = ConfigFixture::new_clean("idem");
+        let rules = vec![rule(
+            "a",
+            CustomRuleMatchType::DomainSuffix,
+            CustomRuleAction::Direct,
+            "example.com",
+        )];
+        // 在同一文件上连续注入两次（第二次复用第一次落盘的 .base）。
+        fixture.inject(&rules);
+        let after_first = fixture.read_active();
+        fixture.inject(&rules);
+        let after_second = fixture.read_active();
+
+        assert_eq!(
+            route_rules(&after_first).len(),
+            route_rules(&after_second).len(),
+            "重复注入不应导致规则翻倍"
+        );
+        assert_no_marker_anywhere(&after_second);
+        assert_rules_only_known_fields(&after_second);
+    }
+
+    #[test]
+    fn inject_then_update_reflects_latest() {
+        let fixture = ConfigFixture::new_clean("update");
+
+        // 第一条规则。
+        let r1 = rule(
+            "a",
+            CustomRuleMatchType::DomainSuffix,
+            CustomRuleAction::Direct,
+            "old.com",
+        );
+        fixture.inject(&[r1]);
+        let after_first = fixture.read_active();
+        assert_eq!(
+            route_rules(&after_first).len(),
+            route_rules(&clean_config_json()).len() + 1
+        );
+
+        // 改 payload 后重新注入，新规则应替换旧规则。
+        let r2 = rule(
+            "a",
+            CustomRuleMatchType::DomainSuffix,
+            CustomRuleAction::Direct,
+            "new.com",
+        );
+        fixture.inject(&[r2]);
+        let after_update = fixture.read_active();
+        let suffixes: Vec<&str> = route_rules(&after_update)
+            .iter()
+            .filter_map(|r| r.get("domain_suffix")?.as_array())
+            .flatten()
+            .filter_map(|v| v.as_str())
+            .collect();
+        assert!(suffixes.contains(&"new.com"), "应反映更新后的 payload");
+        assert!(!suffixes.contains(&"old.com"), "不应残留旧 payload");
+        assert_no_marker_anywhere(&after_update);
+        assert_rules_only_known_fields(&after_update);
+    }
+
+    #[test]
+    fn legacy_dirty_marker_is_cleaned() {
+        // 模拟旧版脏数据：route.rules[0] 带 __custom_rule_start__。
+        let mut dirty = clean_config_json();
+        if let Some(obj) = dirty
+            .get_mut("route")
+            .and_then(|r| r.get_mut("rules"))
+            .and_then(|r| r.as_array_mut())
+            .and_then(|a| a.first_mut())
+            .and_then(|r| r.as_object_mut())
+        {
+            obj.insert(LEGACY_CUSTOM_RULE_MARKER.to_string(), Value::Bool(true));
+        }
+        let fixture = ConfigFixture::new_with("legacy", dirty);
+
+        let rules = vec![rule(
+            "a",
+            CustomRuleMatchType::Domain,
+            CustomRuleAction::Proxy,
+            "openai.com",
+        )];
+        fixture.inject(&rules);
+
+        let result = fixture.read_active();
+        assert_no_marker_anywhere(&result);
+        assert_rules_only_known_fields(&result);
+    }
+
+    #[test]
+    fn subscribe_refresh_rebases_snapshot() {
+        let fixture = ConfigFixture::new_clean("refresh");
+
+        let rules = vec![rule(
+            "a",
+            CustomRuleMatchType::DomainSuffix,
+            CustomRuleAction::Direct,
+            "example.com",
+        )];
+        // 第一次注入建立 .base 快照。
+        fixture.inject(&rules);
+
+        // 模拟订阅刷新：活动配置被替换为一份不同的干净配置（多一条 ads reject 规则）。
+        let mut refreshed = clean_config_json();
+        refreshed
+            .get_mut("route")
+            .and_then(|r| r.get_mut("rules"))
+            .and_then(|r| r.as_array_mut())
+            .map(|a| a.push(json!({ "rule_set": "geosite-category-ads-all", "action": "reject" })));
+        fixture.overwrite_active(refreshed);
+
+        // 再次注入：应基于新配置 rebase .base，自定义规则挂在新配置上。
+        fixture.inject(&rules);
+        let result = fixture.read_active();
+        let snapshot_after = fixture.read_snapshot();
+
+        // 自定义规则仍应存在（注入生效）。
+        assert!(route_rules(&result)
+            .iter()
+            .any(|r| r.get("domain_suffix").is_some()));
+        // .base 应反映刷新后的干净配置（含新增的 ads reject 规则），且无自定义规则残留。
+        let snap_rules = route_rules(&snapshot_after);
+        assert!(
+            snap_rules
+                .iter()
+                .any(|r| r.get("rule_set").and_then(|v| v.as_str()) == Some("geosite-category-ads-all")),
+            ".base 快照应在订阅刷新后跟随更新"
+        );
+        assert!(
+            !snap_rules.iter().any(|r| r.get("domain_suffix").is_some()),
+            ".base 快照不应包含注入的自定义规则"
+        );
+        assert_no_marker_anywhere(&result);
+        assert_rules_only_known_fields(&result);
+    }
+
+    #[test]
+    fn base_snapshot_path_appends_base_suffix() {
+        let p: PathBuf = base_snapshot_path(std::path::Path::new("home-1784548482083.json"));
+        assert_eq!(p.to_str().unwrap(), "home-1784548482083.json.base");
+    }
 }
