@@ -72,9 +72,6 @@ which = "7.0"
 core-foundation = "0.9"
 security-framework = "2.9"
 
-[profile.release]
-# 生产构建优化：LTO + 单 codegen-unit + 符号裁剪 + panic 直接 abort
-lto = true
-codegen-units = 1
-strip = "symbols"
-panic = "abort"
+# release profile 沿用 cargo / tauri 默认设置（opt-level=3、codegen-units=16、
+# 无 LTO、无 strip、panic=unwind）。原先的自定义 profile 在 rustc 1.97.x 下触发
+# codegen bug 导致 STATUS_ACCESS_VIOLATION (0xc0000005)，dev 模式无该问题。

@@ -67,6 +67,10 @@ export default defineConfig(({ mode: _mode }) => ({
     host: '0.0.0.0',
     port: 6221,
     strictPort: true,
+    watch: {
+      // Rust 编译产物可能被 Windows 锁定，且不属于前端源码。
+      ignored: ['**/src-tauri/target/**'],
+    },
   },
   build: {
     rollupOptions: {
