@@ -1,27 +1,33 @@
 <template>
-  <div class="proxy-page">
-    <div class="proxy-top-bar">
-      <div class="top-bar-left">
+  <div class="page-shell proxy-page">
+    <ToolbarBar>
+      <template #tabs>
         <n-tabs v-model:value="proxyStore.viewTab" type="segment" size="small">
           <n-tab-pane name="groups" :tab="labels.groupsTab" />
           <n-tab-pane name="providers" :tab="labels.providersTab" />
         </n-tabs>
-      </div>
-      <div class="top-bar-right">
+      </template>
+      <template #filters>
         <n-button size="small" secondary @click="refresh">
           <template #icon>
             <n-icon><RefreshOutline /></n-icon>
           </template>
           {{ t('common.refresh') }}
         </n-button>
-        <n-button size="small" type="primary" secondary :loading="proxyStore.batchTesting" @click="batchTest">
+        <n-button
+          size="small"
+          type="primary"
+          secondary
+          :loading="proxyStore.batchTesting"
+          @click="batchTest"
+        >
           <template #icon>
             <n-icon><SpeedometerOutline /></n-icon>
           </template>
           {{ t('proxy.batchTest') }}
         </n-button>
-      </div>
-    </div>
+      </template>
+    </ToolbarBar>
 
     <div v-if="proxyStore.viewTab === 'groups'" class="split-view">
       <div class="group-sidebar">
@@ -43,10 +49,12 @@
               <span>{{ getDisplayNodeName(group.now) }}</span>
             </div>
           </div>
-          <div v-if="!filteredGroups.length" class="sidebar-empty">
-            <n-icon size="32"><GlobeOutline /></n-icon>
-            <span>{{ t('proxy.noProxyGroups') }}</span>
-          </div>
+          <EmptyState
+            v-if="!filteredGroups.length"
+            :title="t('proxy.noProxyGroups')"
+            :icon="GlobeOutline"
+            class="sidebar-empty"
+          />
         </div>
       </div>
 
@@ -142,15 +150,19 @@
           </div>
         </div>
 
-        <div v-else-if="activeGroup" class="node-empty">
-          <n-icon size="36"><GlobeOutline /></n-icon>
-          <span>{{ t('proxy.noProxyGroups') }}</span>
-        </div>
+        <EmptyState
+          v-else-if="activeGroup"
+          :title="t('proxy.noProxyGroups')"
+          :icon="GlobeOutline"
+          class="node-empty"
+        />
 
-        <div v-else class="node-empty">
-          <n-icon size="36"><GlobeOutline /></n-icon>
-          <span>{{ t('proxy.noProxyGroups') }}</span>
-        </div>
+        <EmptyState
+          v-else
+          :title="t('proxy.noProxyGroups')"
+          :icon="GlobeOutline"
+          class="node-empty"
+        />
       </div>
     </div>
 
@@ -185,10 +197,7 @@
           </div>
         </div>
       </div>
-      <div v-else class="node-empty">
-        <n-icon size="36"><GlobeOutline /></n-icon>
-        <span>{{ labels.noProviders }}</span>
-      </div>
+      <EmptyState v-else :title="labels.noProviders" :icon="GlobeOutline" class="node-empty" />
     </div>
   </div>
 </template>
@@ -207,6 +216,8 @@ import {
 import { useProxyStore, type ProxyGroup } from '@/stores/kernel/ProxyStore'
 import { useI18n } from 'vue-i18n'
 import type { ProxyProvider } from '@/types/controller'
+import ToolbarBar from '@/components/common/ToolbarBar.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 
 defineOptions({
   name: 'ProxyView',
@@ -509,30 +520,9 @@ if (!proxyStore.proxyGroups.length) {
 
 <style scoped>
 .proxy-page {
-  padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
-  max-width: var(--layout-page-max-width, 1400px);
+  max-width: var(--content-max-width, 1440px);
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
   height: 100%;
-}
-
-.proxy-top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.top-bar-left {
-  flex-shrink: 0;
-}
-
-.top-bar-right {
-  display: flex;
-  gap: 8px;
 }
 
 .split-view {
@@ -540,9 +530,10 @@ if (!proxyStore.proxyGroups.length) {
   gap: 0;
   flex: 1;
   min-height: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--panel-border);
   background: var(--panel-bg);
+  box-shadow: var(--panel-shadow);
   overflow: hidden;
 }
 
@@ -552,12 +543,12 @@ if (!proxyStore.proxyGroups.length) {
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--panel-border);
-  background: var(--bg-secondary);
+  background: var(--bg-surface-2);
 }
 
 .sidebar-title {
-  padding: 14px 16px 8px;
-  font-size: 11px;
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -567,33 +558,33 @@ if (!proxyStore.proxyGroups.length) {
 .sidebar-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0 8px 8px;
+  padding: 0 var(--space-2) var(--space-2);
 }
 
 .sidebar-item {
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background var(--transition-fast);
   margin-bottom: 2px;
 }
 
 .sidebar-item:hover {
-  background: var(--bg-tertiary);
+  background: var(--bg-elevated);
 }
 
 .sidebar-item.active {
-  background: rgba(99, 102, 241, 0.08);
+  background: var(--primary-soft);
 }
 
 .sidebar-item-main {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .sidebar-item-name {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-primary);
   flex: 1;
@@ -611,8 +602,8 @@ if (!proxyStore.proxyGroups.length) {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -620,14 +611,8 @@ if (!proxyStore.proxyGroups.length) {
 }
 
 .sidebar-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 16px;
-  gap: 12px;
-  color: var(--text-tertiary);
-  font-size: 13px;
+  margin: var(--space-4) var(--space-2);
+  padding: var(--space-6) var(--space-3);
 }
 
 .node-panel {
@@ -640,8 +625,8 @@ if (!proxyStore.proxyGroups.length) {
 .node-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--panel-border);
   flex-shrink: 0;
 }
@@ -649,12 +634,13 @@ if (!proxyStore.proxyGroups.length) {
 .node-summary {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  font-size: 12px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   border-bottom: 1px solid var(--panel-border);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .summary-text {
@@ -675,34 +661,37 @@ if (!proxyStore.proxyGroups.length) {
 .node-grid {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: var(--space-3);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
+  gap: var(--space-3);
   align-content: start;
 }
 
 .node-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 12px;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
   border: 1px solid var(--panel-border);
-  background: var(--bg-secondary);
+  background: var(--bg-elevated);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .node-card:hover {
   border-color: var(--border-hover);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 
 .node-card.active {
-  border-color: rgba(16, 185, 129, 0.45);
-  background: rgba(16, 185, 129, 0.04);
+  border-color: var(--success-color);
+  background: var(--success-soft);
 }
 
 .node-card-top {
@@ -721,7 +710,7 @@ if (!proxyStore.proxyGroups.length) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -729,13 +718,10 @@ if (!proxyStore.proxyGroups.length) {
 .node-fav-btn {
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--transition-fast);
 }
 
-.node-card:hover .node-fav-btn {
-  opacity: 1;
-}
-
+.node-card:hover .node-fav-btn,
 .node-card.active .node-fav-btn {
   opacity: 1;
 }
@@ -756,51 +742,46 @@ if (!proxyStore.proxyGroups.length) {
 }
 
 .node-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 16px;
-  gap: 12px;
-  color: var(--text-tertiary);
-  font-size: 13px;
+  margin: var(--space-6) var(--space-4);
+  padding: var(--space-12) var(--space-4);
 }
 
 .providers-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .providers-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .provider-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  padding: 16px;
+  box-shadow: var(--panel-shadow);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
 }
 
 .provider-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .provider-name {
-  font-size: 15px;
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .provider-meta {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
   margin-top: 2px;
 }
@@ -808,24 +789,24 @@ if (!proxyStore.proxyGroups.length) {
 .provider-node-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .provider-node-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: var(--bg-tertiary);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
 }
 
 .provider-node-name {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--text-primary);
   min-width: 0;
@@ -834,7 +815,7 @@ if (!proxyStore.proxyGroups.length) {
   white-space: nowrap;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 960px) {
   .split-view {
     flex-direction: column;
   }
@@ -843,12 +824,7 @@ if (!proxyStore.proxyGroups.length) {
     width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--panel-border);
-    max-height: 200px;
-  }
-
-  .proxy-top-bar {
-    flex-direction: column;
-    align-items: stretch;
+    max-height: 220px;
   }
 }
 </style>

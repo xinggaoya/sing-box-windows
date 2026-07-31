@@ -13,6 +13,8 @@ export default {
     export: '导出',
     refresh: '刷新',
     loading: '加载中...',
+    enabled: '已开启',
+    disabled: '已关闭',
   },
   nav: {
     home: '首页',
@@ -25,6 +27,8 @@ export default {
     navigation: '导航',
     expand: '展开',
     collapse: '收起',
+    switchToLight: '切换到亮色',
+    switchToDark: '切换到暗色',
   },
   status: {
     running: '运行中',
@@ -100,6 +104,11 @@ export default {
       rule: '规则模式',
       globalTip: '全部流量走代理',
       ruleTip: '根据规则智能分流',
+    },
+    quick: {
+      testAll: '一键测速',
+      nodeMode: '节点模式',
+      proxyAddr: '代理地址',
     },
     switchMode: '切换模式',
     tunConfirm: {

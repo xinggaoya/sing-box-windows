@@ -159,8 +159,8 @@ const versionBadgeClass = computed(() =>
 .kernel-status-row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 0;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
 }
 
 .kernel-version-badge {
@@ -168,20 +168,20 @@ const versionBadgeClass = computed(() =>
   align-items: center;
   gap: 5px;
   padding: 5px 12px;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
   font-weight: 700;
   flex-shrink: 0;
 }
 
 .kernel-version-badge.installed {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  background: var(--success-soft);
+  color: var(--success-color);
 }
 
 .kernel-version-badge.missing {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: var(--error-soft);
+  color: var(--error-color);
 }
 
 .kernel-status-info {
@@ -192,10 +192,10 @@ const versionBadgeClass = computed(() =>
 .download-progress-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  border-radius: 10px;
-  background: var(--bg-secondary);
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
   border: 1px solid var(--panel-border);
 }
 
@@ -206,19 +206,19 @@ const versionBadgeClass = computed(() =>
 }
 
 .progress-label {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-secondary);
 }
 
 .progress-value {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 700;
   color: var(--primary-color);
 }
 
 .progress-msg {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
   text-align: center;
 }
@@ -227,14 +227,14 @@ const versionBadgeClass = computed(() =>
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 4px 0 8px;
+  gap: var(--space-3);
+  padding: var(--space-1) 0 var(--space-2);
 }
 
 .sub-divider {
   width: 3px;
   height: 3px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--text-tertiary);
 }
 </style>

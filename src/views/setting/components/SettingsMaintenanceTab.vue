@@ -241,59 +241,59 @@ const props = defineProps<{
 .version-inline {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .version-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
 
 .version-number {
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .update-card {
-  margin: 4px 0;
-  padding: 14px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(6, 182, 212, 0.06));
-  border: 1px solid rgba(16, 185, 129, 0.15);
+  margin: var(--space-1) 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--success-soft), var(--info-soft));
+  border: 1px solid rgba(16, 185, 129, 0.18);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .update-card-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .update-card-item {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-overlay);
 }
 
 .update-card-label {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .update-card-value {
-  font-size: 16px;
+  font-size: var(--text-md);
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .update-card-value.highlight {
-  color: #10b981;
+  color: var(--success-color);
 }
 
 .release-notes {
@@ -303,24 +303,24 @@ const props = defineProps<{
 }
 
 .release-notes-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
 
 .release-notes-content {
   max-height: 120px;
   overflow: auto;
-  padding: 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  font-size: 12px;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-overlay);
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .update-card-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .progress-section {
@@ -332,7 +332,7 @@ const props = defineProps<{
 .progress-header {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
 }
 
@@ -342,72 +342,73 @@ const props = defineProps<{
 }
 
 .error-text {
-  font-size: 13px;
-  color: #ef4444;
+  font-size: var(--text-sm);
+  color: var(--error-color);
 }
 
 .backup-btns {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-shrink: 0;
 }
 
 .backup-preview {
-  padding: 12px;
+  padding: var(--space-3);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .preview-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .preview-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
 
 .preview-path {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-primary);
   word-break: break-all;
   text-align: right;
+  font-family: var(--font-mono);
 }
 
 .preview-value {
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .preview-row.warning .preview-value {
-  color: #f59e0b;
+  color: var(--warning-color);
 }
 
 .warning-list {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .warning-item {
-  font-size: 12px;
-  color: #f59e0b;
+  font-size: var(--text-xs);
+  color: var(--warning-color);
   line-height: 1.5;
 }
 
 .empty-hint {
-  padding: 4px 0 8px;
-  font-size: 12px;
+  padding: var(--space-1) 0 var(--space-2);
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container">
+  <div class="page-shell connections-page">
     <PageHeader :title="t('connections.title')" :subtitle="t('connections.subtitle')">
       <template #actions>
         <n-space>
@@ -33,8 +33,8 @@
       </template>
     </PageHeader>
 
-    <div class="toolbar-card">
-      <div class="toolbar-row">
+    <ToolbarBar>
+      <template #tabs>
         <n-tabs
           :value="connectionStore.activeTab"
           type="segment"
@@ -44,41 +44,42 @@
           <n-tab-pane name="active" :tab="proxyLabels.active" />
           <n-tab-pane name="closed" :tab="proxyLabels.closed" />
         </n-tabs>
-
+      </template>
+      <template #filters>
         <n-input
           v-model:value="connectionStore.searchQuery"
           :placeholder="t('connections.searchPlaceholder')"
           clearable
+          size="small"
           class="search-input"
         >
           <template #prefix>
             <n-icon><SearchOutline /></n-icon>
           </template>
         </n-input>
-
         <n-select
           v-model:value="connectionStore.sourceIPFilter"
           :options="sourceIpOptions"
           clearable
+          size="small"
           :placeholder="proxyLabels.sourceFilter"
           class="source-select"
         />
-
         <n-select
           v-model:value="connectionStore.sortKey"
           :options="sortOptions"
+          size="small"
           class="sort-select"
         />
-
         <n-select
           v-model:value="connectionStore.groupingKey"
           :options="groupingOptions"
           clearable
+          size="small"
           class="sort-select"
           :placeholder="proxyLabels.grouping"
         />
-
-        <n-button quaternary @click="connectionStore.sortDesc = !connectionStore.sortDesc">
+        <n-button size="small" quaternary @click="connectionStore.sortDesc = !connectionStore.sortDesc">
           <template #icon>
             <n-icon>
               <ArrowDownOutline v-if="connectionStore.sortDesc" />
@@ -87,9 +88,8 @@
           </template>
           {{ proxyLabels.sortOrder }}
         </n-button>
-      </div>
-
-      <div class="stats-row">
+      </template>
+      <template #stats>
         <n-tag size="small" round :bordered="false" type="primary">
           {{ t('connections.activeConnections') }}: {{ connectionStore.activeConnections.length }}
         </n-tag>
@@ -105,8 +105,8 @@
         <n-tag size="small" round :bordered="false" type="default">
           {{ proxyLabels.quickFilter }}: {{ connectionStore.quickFilterEnabled ? labelsOnOff.on : labelsOnOff.off }}
         </n-tag>
-      </div>
-    </div>
+      </template>
+    </ToolbarBar>
 
     <div v-if="groupedRows.length" class="table-card">
       <div class="connection-table-wrap">
@@ -179,14 +179,11 @@
       </div>
     </div>
 
-    <div v-else class="empty-state">
-      <div class="empty-icon">
-        <n-icon size="48"><LinkOutline /></n-icon>
-      </div>
-      <h3 class="empty-title">
-        {{ connectionStore.activeTab === 'active' ? t('connections.noActiveConnections') : proxyLabels.noClosed }}
-      </h3>
-    </div>
+    <EmptyState
+      v-else
+      :title="connectionStore.activeTab === 'active' ? t('connections.noActiveConnections') : proxyLabels.noClosed"
+      :icon="LinkOutline"
+    />
 
     <n-modal v-model:show="detailVisible" preset="card" :title="proxyLabels.detailTitle" style="width: 720px">
       <div v-if="selectedConnection" class="detail-grid">
@@ -225,6 +222,8 @@ import {
   SearchOutline,
 } from '@vicons/ionicons5'
 import PageHeader from '@/components/common/PageHeader.vue'
+import ToolbarBar from '@/components/common/ToolbarBar.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useI18n } from 'vue-i18n'
 import type { ConnectionItem } from '@/types/events'
@@ -465,41 +464,31 @@ watch(
 </script>
 
 <style scoped>
-.page-container {
-  padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
-  max-width: var(--layout-page-max-width, 1400px);
+.connections-page {
+  max-width: var(--content-max-width, 1440px);
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--layout-page-gap, 16px);
 }
 
-.toolbar-card,
+/* 工具栏内的输入/选择框固定宽度，避免 flex 布局下被挤压 */
+.search-input {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.source-select {
+  width: 160px;
+}
+
+.sort-select {
+  width: 150px;
+}
+
 .table-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  padding: 16px;
-}
-
-.toolbar-row {
-  display: grid;
-  grid-template-columns: auto minmax(220px, 1fr) 180px 180px 180px auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.search-input,
-.source-select,
-.sort-select {
-  width: 100%;
-}
-
-.stats-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--panel-shadow);
+  padding: var(--space-3) var(--space-4);
 }
 
 .connection-table-wrap {
@@ -514,19 +503,22 @@ watch(
 }
 
 .connection-table th {
-  padding: 0 12px 10px;
+  padding: 0 var(--space-3) var(--space-3);
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .connection-table td {
-  padding: 12px;
+  padding: var(--space-3);
   border-top: 1px solid var(--border-color);
   color: var(--text-secondary);
   vertical-align: middle;
+  font-size: var(--text-sm);
 }
 
 .connection-table th:nth-child(1),
@@ -560,7 +552,7 @@ watch(
 }
 
 .group-row td {
-  padding: 14px 12px 8px;
+  padding: var(--space-4) var(--space-3) var(--space-2);
   border-top: 0;
   background: transparent;
 }
@@ -568,20 +560,21 @@ watch(
 .group-title {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-weight: 600;
   color: var(--text-primary);
+  font-size: var(--text-sm);
 }
 
 .connection-row {
   cursor: pointer;
   outline: none;
-  transition: background-color 0.2s ease;
+  transition: background-color var(--transition-fast);
 }
 
 .connection-row:hover,
 .connection-row:focus-visible {
-  background: var(--hover-bg);
+  background: var(--bg-surface-2);
 }
 
 .destination-cell {
@@ -604,7 +597,8 @@ watch(
 .secondary-cell {
   margin-top: 3px;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
 }
 
 .truncate-cell {
@@ -618,48 +612,31 @@ watch(
   text-align: right;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 0;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-  color: var(--text-primary);
-}
-
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .detail-grid div {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
+}
+
+.detail-grid strong {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-weight: 600;
 }
 
 .detail-grid span {
   word-break: break-all;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
 }
 
 @media (max-width: 960px) {
-  .toolbar-row {
-    grid-template-columns: 1fr;
-  }
-
   .detail-grid {
     grid-template-columns: 1fr;
   }

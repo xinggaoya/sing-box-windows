@@ -1,14 +1,21 @@
 <template>
   <div class="traffic-chart-container" ref="chartContainer">
-    <canvas ref="chartCanvas" class="chart-canvas"></canvas>
+    <canvas
+      ref="chartCanvas"
+      class="chart-canvas"
+      @mousemove="onCanvasMove"
+      @mouseleave="onCanvasLeave"
+    ></canvas>
     <div class="chart-legend">
       <div class="legend-item upload">
         <div class="legend-color"></div>
         <span>{{ t('home.traffic.uploadSpeed') }}</span>
+        <span class="legend-value">{{ formatSpeed(uploadSpeed) }}</span>
       </div>
       <div class="legend-item download">
         <div class="legend-color"></div>
         <span>{{ t('home.traffic.downloadSpeed') }}</span>
+        <span class="legend-value">{{ formatSpeed(downloadSpeed) }}</span>
       </div>
     </div>
   </div>
@@ -17,7 +24,7 @@
 <script lang="ts" setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useThemeVars } from 'naive-ui'
-import { formatBandwidth } from '@/utils/index'
+import { formatBandwidth, formatSpeed } from '@/utils/index'
 import { useI18n } from 'vue-i18n'
 
 defineOptions({
@@ -46,14 +53,21 @@ const uploadData = ref<number[]>([])
 const downloadData = ref<number[]>([])
 const timeLabels = ref<string[]>([])
 
-// Colors
+// 鼠标悬停十字线
+const hoverIndex = ref<number | null>(null)
+const mousePos = ref<{ x: number; y: number } | null>(null)
+
+// 取色：优先读取语义 Token，兜底默认值
 const getColors = () => {
-  const style = getComputedStyle(document.body)
+  const style = getComputedStyle(document.documentElement)
+  const read = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback
   return {
-    upload: style.getPropertyValue('--success-color').trim() || '#10b981',
-    download: style.getPropertyValue('--primary-color').trim() || '#6366f1',
-    grid: style.getPropertyValue('--border-color').trim() || 'rgba(128, 128, 128, 0.2)',
-    text: style.getPropertyValue('--text-secondary').trim() || '#666',
+    upload: read('--success-color', '#10b981'),
+    download: read('--primary-color', '#6366f1'),
+    grid: read('--border-color', 'rgba(128, 128, 128, 0.2)'),
+    text: read('--text-secondary', '#64748b'),
+    tooltipBg: read('--bg-elevated', '#ffffff'),
+    tooltipBorder: read('--border-color', 'rgba(148,163,184,0.3)'),
   }
 }
 
@@ -98,9 +112,9 @@ const drawChart = () => {
 
   const padding = {
     top: 24 * dpr,
-    right: 15 * dpr,
+    right: 16 * dpr,
     bottom: 28 * dpr,
-    left: 65 * dpr,
+    left: 64 * dpr,
   }
 
   ctx.clearRect(0, 0, width, height)
@@ -108,12 +122,12 @@ const drawChart = () => {
   const chartWidth = width - padding.left - padding.right
   const chartHeight = height - padding.top - padding.bottom
 
-  ctx.font = `${11 * dpr}px sans-serif`
+  // Y 轴网格 + 刻度
+  ctx.font = `${11 * dpr}px ${getComputedStyle(document.body).fontFamily}`
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = colors.text
 
-  // Y Axis
   const yAxisSteps = 4
   for (let i = 0; i <= yAxisSteps; i++) {
     const y = padding.top + chartHeight - (i / yAxisSteps) * chartHeight
@@ -137,7 +151,7 @@ const drawChart = () => {
     ctx.fillText(speedLabel, padding.left - 10 * dpr, y)
   }
 
-  // X Axis
+  // X 轴基线
   ctx.beginPath()
   ctx.strokeStyle = colors.grid
   ctx.lineWidth = 0.8 * dpr
@@ -145,8 +159,9 @@ const drawChart = () => {
   ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight)
   ctx.stroke()
 
+  // X 轴时间刻度
   const labelInterval = Math.ceil(MAX_DATA_POINTS / 5)
-  ctx.font = `${10 * dpr}px sans-serif`
+  ctx.font = `${10 * dpr}px ${getComputedStyle(document.body).fontFamily}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   for (let i = MAX_DATA_POINTS - 1; i >= 0; i -= labelInterval) {
@@ -163,6 +178,11 @@ const drawChart = () => {
   if (downloadData.value.some((v) => v > 0)) {
     drawCurve(ctx, downloadData.value, colors.download, padding, chartWidth, chartHeight, dpr)
   }
+
+  // 悬停十字线 + tooltip
+  if (hoverIndex.value !== null && mousePos.value) {
+    drawHoverGuide(ctx, hoverIndex.value, padding, chartWidth, chartHeight, dpr, colors)
+  }
 }
 
 const drawCurve = (
@@ -176,6 +196,7 @@ const drawCurve = (
 ) => {
   const max = maxValue.value || 0.1
 
+  // 填充区域
   ctx.beginPath()
   const firstX = padding.left
   const firstY = padding.top + chartHeight - (data[0] / max) * chartHeight
@@ -201,6 +222,7 @@ const drawCurve = (
   ctx.fillStyle = gradient
   ctx.fill()
 
+  // 描边曲线
   ctx.beginPath()
   ctx.strokeStyle = color
   ctx.lineWidth = 2.5 * dpr
@@ -219,6 +241,7 @@ const drawCurve = (
   }
   ctx.stroke()
 
+  // 末端高亮点
   const lastIndex = data.length - 1
   const lastX = padding.left + (lastIndex / (MAX_DATA_POINTS - 1)) * chartWidth
   const lastY = padding.top + chartHeight - (data[lastIndex] / max) * chartHeight
@@ -232,6 +255,68 @@ const drawCurve = (
   ctx.fillStyle = color
   ctx.arc(lastX, lastY, 3 * dpr, 0, Math.PI * 2)
   ctx.fill()
+}
+
+const drawHoverGuide = (
+  ctx: CanvasRenderingContext2D,
+  index: number,
+  padding: { top: number; right: number; bottom: number; left: number },
+  chartWidth: number,
+  chartHeight: number,
+  dpr: number,
+  colors: ReturnType<typeof getColors>,
+) => {
+  const x = padding.left + (index / (MAX_DATA_POINTS - 1)) * chartWidth
+
+  // 垂直辅助线
+  ctx.beginPath()
+  ctx.strokeStyle = colors.grid
+  ctx.lineWidth = 1 * dpr
+  ctx.setLineDash([3 * dpr, 3 * dpr])
+  ctx.moveTo(x, padding.top)
+  ctx.lineTo(x, padding.top + chartHeight)
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  // 上行/下行数据点高亮
+  const max = maxValue.value || 0.1
+  const drawPoint = (data: number[], color: string) => {
+    const y = padding.top + chartHeight - (data[index] / max) * chartHeight
+    ctx.beginPath()
+    ctx.fillStyle = color
+    ctx.arc(x, y, 4 * dpr, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.strokeStyle = colors.tooltipBg
+    ctx.lineWidth = 2 * dpr
+    ctx.arc(x, y, 4 * dpr, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+
+  if (uploadData.value[index] > 0) drawPoint(uploadData.value, colors.upload)
+  if (downloadData.value[index] > 0) drawPoint(downloadData.value, colors.download)
+}
+
+// 鼠标交互
+const onCanvasMove = (e: MouseEvent) => {
+  if (!chartCanvas.value) return
+  const rect = chartCanvas.value.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const dpr = window.devicePixelRatio || 1
+  const padding = { left: 64 * dpr, right: 16 * dpr }
+  const width = rect.width * dpr
+  const chartWidth = width - padding.left - padding.right
+  const relX = x * dpr - padding.left
+  const index = Math.round((relX / chartWidth) * (MAX_DATA_POINTS - 1))
+  hoverIndex.value = Math.max(0, Math.min(MAX_DATA_POINTS - 1, index))
+  mousePos.value = { x, y: e.clientY - rect.top }
+  drawChart()
+}
+
+const onCanvasLeave = () => {
+  hoverIndex.value = null
+  mousePos.value = null
+  drawChart()
 }
 
 const updateData = () => {
@@ -261,34 +346,35 @@ const startUpdates = () => {
   updateTimer = setInterval(() => updateData(), 1000) as unknown as number
 }
 
+let resizeTimeout: number | null = null
+const handleResize = () => {
+  if (resizeTimeout) clearTimeout(resizeTimeout)
+  resizeTimeout = window.setTimeout(() => {
+    if (chartContainer.value && chartCanvas.value) {
+      const { width, height } = chartContainer.value.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      chartCanvas.value.width = width * dpr
+      chartCanvas.value.height = height * dpr
+      chartCanvas.value.style.width = `${width}px`
+      chartCanvas.value.style.height = `${height}px`
+      drawChart()
+    }
+    resizeTimeout = null
+  }, 100) as unknown as number
+}
+
 onMounted(() => {
   requestAnimationFrame(() => {
     initChart()
     startUpdates()
   })
-
-  let resizeTimeout: number | null = null
-  const handleResize = () => {
-    if (resizeTimeout) clearTimeout(resizeTimeout)
-    resizeTimeout = window.setTimeout(() => {
-      if (chartContainer.value && chartCanvas.value) {
-        const { width, height } = chartContainer.value.getBoundingClientRect()
-        const dpr = window.devicePixelRatio || 1
-        chartCanvas.value.width = width * dpr
-        chartCanvas.value.height = height * dpr
-        chartCanvas.value.style.width = `${width}px`
-        chartCanvas.value.style.height = `${height}px`
-        drawChart()
-      }
-      resizeTimeout = null
-    }, 100) as unknown as number
-  }
   window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
   if (updateTimer !== null) clearInterval(updateTimer)
-  // Cleanup logic...
+  if (resizeTimeout) clearTimeout(resizeTimeout)
+  window.removeEventListener('resize', handleResize)
 })
 
 watch(themeVars, () => drawChart())
@@ -307,20 +393,21 @@ watch(themeVars, () => drawChart())
   flex-grow: 1;
   width: 100%;
   height: 100%;
+  cursor: crosshair;
 }
 
 .chart-legend {
   position: absolute;
-  top: 12px;
-  right: 16px;
+  top: var(--space-3);
+  right: var(--space-4);
   display: flex;
-  gap: 16px;
+  gap: var(--space-4);
   z-index: 1;
-  background-color: var(--glass-bg);
-  border-radius: 10px;
-  padding: 8px 14px;
-  backdrop-filter: blur(8px);
-  box-shadow: var(--glass-shadow);
+  background: var(--glass-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  backdrop-filter: blur(var(--glass-blur, 18px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px));
   border: 1px solid var(--glass-border);
 }
 
@@ -328,15 +415,20 @@ watch(themeVars, () => drawChart())
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.legend-value {
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
 }
 
 .legend-color {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
 }
 
 .upload .legend-color {

@@ -1,30 +1,20 @@
 <template>
-  <div class="home-page">
-    <div class="hero-section" :class="statusClass">
-      <div class="hero-bg-glow"></div>
-      <div class="hero-content">
-        <div class="hero-row-top">
+  <div class="page-shell home-page">
+    <!-- Hero 状态卡（精简：状态 + 重启，不再重复速度与统计） -->
+    <section class="hero-card" :class="statusClass">
+      <div class="hero-glow"></div>
+      <div class="hero-inner">
+        <div class="hero-top">
           <div class="hero-left">
             <div class="hero-status-dot"></div>
             <div class="hero-info">
-              <div class="hero-title-row">
-                <h2 class="hero-title">{{ statusTitle }}</h2>
-                <span class="hero-speed-item">
-                  <span class="meta-arrow up">↑</span>
-                  {{ formatSpeed(trafficStore.traffic.up) }}
-                </span>
-                <span class="hero-speed-item">
-                  <span class="meta-arrow down">↓</span>
-                  {{ formatSpeed(trafficStore.traffic.down) }}
-                </span>
-              </div>
+              <h2 class="hero-title">{{ statusTitle }}</h2>
+              <p class="hero-subtitle">{{ statusDescription }}</p>
             </div>
           </div>
           <div class="hero-actions">
             <n-button
               :type="kernelRunning ? 'error' : 'primary'"
-              size="large"
-              round
               :loading="kernelLoading"
               @click="restartKernel"
             >
@@ -35,13 +25,7 @@
             </n-button>
             <n-tooltip v-if="isWindowsPlatform && !isAdmin" trigger="hover">
               <template #trigger>
-                <n-button
-                  size="large"
-                  round
-                  secondary
-                  type="warning"
-                  @click="restartAsAdmin"
-                >
+                <n-button secondary type="warning" @click="restartAsAdmin">
                   <template #icon>
                     <n-icon><ShieldCheckmarkOutline /></n-icon>
                   </template>
@@ -51,36 +35,10 @@
             </n-tooltip>
           </div>
         </div>
-
-        <div class="hero-row-stats" v-if="kernelRunning">
-          <div class="hero-stat">
-            <span class="hero-stat-label">HTTP</span>
-            <code class="hero-stat-value">{{ proxyAddress }}</code>
-          </div>
-          <div class="hero-stat-sep"></div>
-          <div class="hero-stat">
-            <span class="hero-stat-label">SOCKS5</span>
-            <code class="hero-stat-value">{{ proxyAddress }}</code>
-          </div>
-          <div class="hero-stat-sep"></div>
-          <div class="hero-stat">
-            <span class="hero-stat-label">{{ t('nav.connections') }}</span>
-            <code class="hero-stat-value">{{ connectionStore.connections.length }}</code>
-          </div>
-          <div class="hero-stat-sep"></div>
-          <div class="hero-stat">
-            <span class="hero-stat-label">{{ t('proxy.title') }}</span>
-            <code class="hero-stat-value">{{ currentNodeProxyMode === 'global' ? t('home.nodeMode.global') : t('home.nodeMode.rule') }}</code>
-          </div>
-          <div class="hero-stat-sep"></div>
-          <div class="hero-stat">
-            <span class="hero-stat-label">{{ t('home.traffic.total') }}</span>
-            <code class="hero-stat-value">{{ formatBytes(trafficStore.traffic.totalUp + trafficStore.traffic.totalDown) }}</code>
-          </div>
-        </div>
       </div>
-    </div>
+    </section>
 
+    <!-- 启动诊断告警 -->
     <n-alert
       v-if="kernelStore.startupDiagnosis"
       type="error"
@@ -104,50 +62,136 @@
       </div>
     </n-alert>
 
-    <div class="main-grid">
-      <div class="chart-panel">
-        <TrafficChart
-          :upload-speed="trafficStore.traffic.up"
-          :download-speed="trafficStore.traffic.down"
-        />
-      </div>
+    <!-- 快捷操作区（常用功能一键直达） -->
+    <div class="quick-actions">
+      <button class="quick-btn" :disabled="quickTesting" @click="quickTestAll">
+        <div class="quick-icon purple">
+          <n-icon :size="20"><SpeedometerOutline /></n-icon>
+        </div>
+        <span class="quick-label">{{ t('home.quick.testAll') }}</span>
+      </button>
+      <button
+        class="quick-btn"
+        :class="{ on: systemProxyEnabled }"
+        :disabled="modeSwitchPending"
+        @click="toggleSystemProxy(!systemProxyEnabled)"
+      >
+        <div class="quick-icon" :class="systemProxyEnabled ? 'green' : 'gray'">
+          <n-icon :size="20"><GlobeOutline /></n-icon>
+        </div>
+        <span class="quick-label">{{ t('home.proxyMode.system') }}</span>
+        <span class="quick-state" :class="systemProxyEnabled ? 'on' : 'off'">
+          {{ systemProxyEnabled ? t('common.enabled') : t('common.disabled') }}
+        </span>
+      </button>
+      <button
+        class="quick-btn"
+        :class="{ on: tunProxyEnabled }"
+        :disabled="modeSwitchPending"
+        @click="toggleTunProxy(!tunProxyEnabled)"
+      >
+        <div class="quick-icon" :class="tunProxyEnabled ? 'green' : 'gray'">
+          <n-icon :size="20"><FlashOutline /></n-icon>
+        </div>
+        <span class="quick-label">{{ t('home.proxyMode.tun') }}</span>
+        <span class="quick-state" :class="tunProxyEnabled ? 'on' : 'off'">
+          {{ tunProxyEnabled ? t('common.enabled') : t('common.disabled') }}
+        </span>
+      </button>
+      <button class="quick-btn" @click="cycleNodeProxyMode">
+        <div class="quick-icon blue">
+          <n-icon :size="20"><RadioOutline /></n-icon>
+        </div>
+        <span class="quick-label">{{ t('home.quick.nodeMode') }}</span>
+        <span class="quick-state">{{
+          currentNodeProxyMode === 'global'
+            ? t('home.nodeMode.global')
+            : t('home.nodeMode.rule')
+        }}</span>
+      </button>
+    </div>
 
-      <div class="side-panels">
-        <div class="mode-panel">
-          <div class="panel-header">
-            <span class="panel-title">{{ t('home.proxyHeader.flowMode') }}</span>
-            <n-button size="tiny" quaternary @click="showPortModal = true">
-              {{ t('common.edit') }}
-            </n-button>
+    <!-- 主网格：流量图 + 运行信息 -->
+    <div class="main-grid">
+      <SectionCard flush class="chart-panel">
+        <div class="chart-inner">
+          <TrafficChart
+            :upload-speed="trafficStore.traffic.up"
+            :download-speed="trafficStore.traffic.down"
+          />
+        </div>
+      </SectionCard>
+
+      <!-- 运行信息卡（精简不重复：代理地址 / 连接数 / 总流量 / 内存） -->
+      <SectionCard class="info-panel">
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">{{ t('home.quick.proxyAddr') }}</span>
+            <code class="info-value">{{ proxyAddress }}</code>
           </div>
-          <div class="toggle-list">
-            <div class="toggle-item" :class="{ active: systemProxyEnabled }">
-              <div class="toggle-icon">
-                <n-icon :size="18"><GlobeOutline /></n-icon>
-              </div>
-              <div class="toggle-info">
-                <span class="toggle-name">{{ t('home.proxyMode.system') }}</span>
-                <code class="toggle-port">{{ proxyAddress }}</code>
-              </div>
-              <n-switch :value="systemProxyEnabled" size="small" :disabled="modeSwitchPending" @update:value="(v: boolean) => toggleSystemProxy(v)" />
-            </div>
-            <div class="toggle-item" :class="{ active: tunProxyEnabled }">
-              <div class="toggle-icon">
-                <n-icon :size="18"><FlashOutline /></n-icon>
-              </div>
-              <div class="toggle-info">
-                <span class="toggle-name">{{ t('home.proxyMode.tun') }}</span>
-                <span class="toggle-desc">{{ t('home.proxyMode.tunTip') }}</span>
-              </div>
-              <n-switch :value="tunProxyEnabled" size="small" :disabled="modeSwitchPending" @update:value="(v: boolean) => toggleTunProxy(v)" />
-            </div>
+          <div class="info-item">
+            <span class="info-label">{{ t('nav.connections') }}</span>
+            <code class="info-value">{{ connectionStore.connections.length }}</code>
+          </div>
+          <div class="info-item">
+            <span class="info-label">{{ t('home.traffic.total') }}</span>
+            <code class="info-value">{{
+              formatBytes(trafficStore.traffic.totalUp + trafficStore.traffic.totalDown)
+            }}</code>
+          </div>
+          <div class="info-item">
+            <span class="info-label">{{ t('home.memory') }}</span>
+            <code class="info-value">{{ formatBytes(connectionStore.memory.inuse) }}</code>
           </div>
         </div>
+      </SectionCard>
+    </div>
 
-        <div class="proxy-mode-panel">
-          <div class="panel-header">
-            <span class="panel-title">{{ t('home.proxyHeader.nodeMode') }}</span>
+    <!-- 代理模式详细开关区 -->
+    <div class="bottom-grid">
+      <SectionCard>
+        <template #actions>
+          <n-button size="tiny" quaternary @click="showPortModal = true">
+            {{ t('common.edit') }}
+          </n-button>
+        </template>
+        <div class="toggle-list">
+          <div class="toggle-item" :class="{ active: systemProxyEnabled }">
+            <div class="toggle-icon">
+              <n-icon :size="18"><GlobeOutline /></n-icon>
+            </div>
+            <div class="toggle-info">
+              <span class="toggle-name">{{ t('home.proxyMode.system') }}</span>
+              <code class="toggle-port">{{ proxyAddress }}</code>
+            </div>
+            <n-switch
+              :value="systemProxyEnabled"
+              size="small"
+              :disabled="modeSwitchPending"
+              @update:value="(v: boolean) => toggleSystemProxy(v)"
+            />
           </div>
+          <div class="toggle-item" :class="{ active: tunProxyEnabled }">
+            <div class="toggle-icon">
+              <n-icon :size="18"><FlashOutline /></n-icon>
+            </div>
+            <div class="toggle-info">
+              <span class="toggle-name">{{ t('home.proxyMode.tun') }}</span>
+              <span class="toggle-desc">{{ t('home.proxyMode.tunTip') }}</span>
+            </div>
+            <n-switch
+              :value="tunProxyEnabled"
+              size="small"
+              :disabled="modeSwitchPending"
+              @update:value="(v: boolean) => toggleTunProxy(v)"
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard>
+        <div class="mode-chips-wrap">
+          <div class="mode-chips-title">{{ t('home.proxyHeader.nodeMode') }}</div>
           <div class="mode-chips">
             <div
               v-for="mode in nodeProxyModes"
@@ -161,25 +205,7 @@
             </div>
           </div>
         </div>
-
-        <div class="traffic-info">
-          <div class="traffic-row">
-            <span class="traffic-label">
-              <span class="traffic-dot upload"></span>
-              {{ t('home.traffic.up') }}
-            </span>
-            <span class="traffic-val">{{ formatBytes(trafficStore.traffic.totalUp) }}</span>
-          </div>
-          <div class="traffic-divider"></div>
-          <div class="traffic-row">
-            <span class="traffic-label">
-              <span class="traffic-dot download"></span>
-              {{ t('home.traffic.down') }}
-            </span>
-            <span class="traffic-val">{{ formatBytes(trafficStore.traffic.totalDown) }}</span>
-          </div>
-        </div>
-      </div>
+      </SectionCard>
     </div>
 
     <PortSettingsDialog v-model:show="showPortModal" />
@@ -196,6 +222,7 @@ import {
   GlobeOutline,
   FlashOutline,
   RadioOutline,
+  SpeedometerOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -208,9 +235,10 @@ import { sudoService } from '@/services/sudo-service'
 import { systemService } from '@/services/system-service'
 import PortSettingsDialog from '@/components/common/PortSettingsDialog.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
+import SectionCard from '@/components/common/SectionCard.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
 import { useSudoStore } from '@/stores'
-import { formatBytes, formatSpeed } from '@/utils'
+import { formatBytes } from '@/utils'
 
 defineOptions({
   name: 'HomeView',
@@ -238,6 +266,7 @@ const platform = ref<'windows' | 'linux' | 'macos' | 'unknown'>('unknown')
 const currentNodeProxyMode = ref('rule')
 const modeSwitchPending = ref(false)
 const showPortModal = ref(false)
+const quickTesting = ref(false)
 
 const isWindowsPlatform = computed(() => platform.value === 'windows')
 const isUnixPlatform = computed(() => platform.value === 'linux' || platform.value === 'macos')
@@ -258,6 +287,26 @@ const statusTitle = computed(() => {
       return t('status.crashed')
     default:
       return t('status.stopped')
+  }
+})
+
+// 状态描述（替代重复的统计条，提供更有价值的状态说明）
+const statusDescription = computed(() => {
+  switch (statusState.value) {
+    case 'running':
+      return t('home.statusDescriptions.runningDesc')
+    case 'disconnected':
+      return t('home.statusDescriptions.disconnectedDesc')
+    case 'starting':
+      return t('home.kernelStatusDescriptions.startingDesc')
+    case 'stopping':
+      return t('home.kernelStatusDescriptions.stoppingDesc')
+    case 'stopped':
+    case 'failed':
+    case 'crashed':
+      return t('home.kernelStatusDescriptions.stoppedDesc')
+    default:
+      return t('home.kernelStatusDescriptions.stoppedDesc')
   }
 })
 
@@ -291,6 +340,27 @@ const syncCurrentNodeProxyMode = async () => {
     }
   } catch {
   }
+}
+
+// 快捷操作：一键全部测速
+const quickTestAll = async () => {
+  if (quickTesting.value) return
+  try {
+    quickTesting.value = true
+    await proxyStore.fetchProxies()
+    await proxyStore.testAllGroups()
+    message.success(t('proxy.batchTestComplete'))
+  } catch {
+    message.error(t('proxy.testErrorMessage'))
+  } finally {
+    quickTesting.value = false
+  }
+}
+
+// 快捷操作：循环切换节点模式 global <-> rule
+const cycleNodeProxyMode = async () => {
+  const next = currentNodeProxyMode.value === 'global' ? 'rule' : 'global'
+  await handleNodeProxyModeChange(next)
 }
 
 const toggleSystemProxy = async (value: boolean) => {
@@ -561,225 +631,162 @@ onMounted(async () => {
 
 <style scoped>
 .home-page {
-  padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
-  max-width: var(--layout-page-max-width, 1200px);
+  max-width: var(--content-max-width, 1440px);
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
-.hero-section {
+/* ============ Hero 卡 ============ */
+.hero-card {
   position: relative;
-  border-radius: 20px;
-  padding: 24px 28px;
+  border-radius: var(--radius-xl);
+  padding: clamp(18px, 2vw, 24px);
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 
-.hero-bg-glow {
+.hero-glow {
   position: absolute;
-  top: -40px;
-  right: -40px;
-  width: 200px;
-  height: 200px;
+  top: -60px;
+  right: -60px;
+  width: 220px;
+  height: 220px;
   border-radius: 50%;
   opacity: 0;
-  transition: opacity 0.5s ease;
+  transition: opacity var(--transition-slow);
   pointer-events: none;
 }
 
-.hero-section.running .hero-bg-glow {
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.12), transparent 70%);
+.hero-card.running .hero-glow {
+  background: radial-gradient(circle, var(--green-500-soft), transparent 70%);
   opacity: 1;
 }
 
-.hero-section.failed .hero-bg-glow,
-.hero-section.stopped .hero-bg-glow {
-  background: radial-gradient(circle, rgba(239, 68, 68, 0.08), transparent 70%);
+.hero-card.failed .hero-glow,
+.hero-card.stopped .hero-glow {
+  background: radial-gradient(circle, var(--red-500-soft), transparent 70%);
   opacity: 1;
 }
 
-.hero-section.pending .hero-bg-glow,
-.hero-section.disconnected .hero-bg-glow {
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.08), transparent 70%);
+.hero-card.pending .hero-glow,
+.hero-card.disconnected .hero-glow {
+  background: radial-gradient(circle, var(--amber-500-soft), transparent 70%);
   opacity: 1;
 }
 
-.hero-content {
+.hero-inner {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
-.hero-row-top {
+.hero-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: var(--space-4);
+  flex-wrap: wrap;
 }
 
 .hero-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 .hero-status-dot {
   width: 14px;
   height: 14px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--text-tertiary);
   flex-shrink: 0;
-  transition: all 0.4s ease;
+  transition: all var(--transition-base);
 }
 
-.hero-section.running .hero-status-dot {
-  background: #10b981;
-  box-shadow: 0 0 16px rgba(16, 185, 129, 0.5), 0 0 4px rgba(16, 185, 129, 0.8);
+.hero-card.running .hero-status-dot {
+  background: var(--success-color);
+  box-shadow: 0 0 16px var(--success-color), 0 0 4px var(--success-color);
   animation: pulse-green 2s ease-in-out infinite;
 }
 
-.hero-section.pending .hero-status-dot,
-.hero-section.disconnected .hero-status-dot {
-  background: #f59e0b;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+.hero-card.pending .hero-status-dot,
+.hero-card.disconnected .hero-status-dot {
+  background: var(--warning-color);
+  box-shadow: 0 0 12px var(--warning-color);
 }
 
-.hero-section.stopped .hero-status-dot,
-.hero-section.failed .hero-status-dot {
-  background: #ef4444;
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+.hero-card.stopped .hero-status-dot,
+.hero-card.failed .hero-status-dot {
+  background: var(--error-color);
+  box-shadow: 0 0 12px var(--error-color);
 }
 
-.hero-section.crashed .hero-status-dot {
-  background: #f97316;
-  box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+.hero-card.crashed .hero-status-dot {
+  background: var(--orange-500);
+  box-shadow: 0 0 12px var(--orange-500);
 }
 
 @keyframes pulse-green {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 
 .hero-info {
   display: flex;
   flex-direction: column;
-  gap: 0;
-}
-
-.hero-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .hero-title {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--text-xl);
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
-.hero-section.running .hero-title {
-  color: #10b981;
+.hero-card.running .hero-title {
+  color: var(--success-color);
 }
 
-.hero-section.failed .hero-title,
-.hero-section.stopped .hero-title {
-  color: #ef4444;
+.hero-card.failed .hero-title,
+.hero-card.stopped .hero-title {
+  color: var(--error-color);
 }
 
-.hero-speed-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.meta-arrow {
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.meta-arrow.up {
-  color: #10b981;
-}
-
-.meta-arrow.down {
-  color: var(--primary-color);
-}
-
-.meta-dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
+.hero-subtitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
 }
 
 .hero-actions {
   display: flex;
-  gap: 10px;
+  gap: var(--space-2);
   flex-shrink: 0;
 }
 
-.hero-row-stats {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--bg-tertiary);
-  flex-wrap: wrap;
-}
-
-.hero-stat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.hero-stat-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.hero-stat-value {
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.hero-stat-sep {
-  width: 1px;
-  height: 14px;
-  background: var(--border-color);
-  flex-shrink: 0;
-}
-
+/* ============ 诊断告警 ============ */
 .diagnosis-alert {
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
 }
 
 .diagnosis-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .diagnosis-meta {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -793,87 +800,185 @@ onMounted(async () => {
   padding-left: 18px;
 }
 
+/* ============ 快捷操作区 ============ */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.quick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+  text-align: left;
+}
+
+.quick-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.quick-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.quick-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.quick-icon.purple {
+  background: linear-gradient(135deg, var(--indigo-400), var(--indigo-600));
+}
+
+.quick-icon.green {
+  background: linear-gradient(135deg, var(--green-400), var(--green-600));
+}
+
+.quick-icon.blue {
+  background: linear-gradient(135deg, var(--blue-400), var(--blue-600));
+}
+
+.quick-icon.gray {
+  background: var(--bg-surface-2);
+  color: var(--text-tertiary);
+}
+
+.quick-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.quick-state {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.quick-state.on {
+  color: var(--success-color);
+}
+
+.quick-state.off {
+  color: var(--text-tertiary);
+}
+
+/* ============ 主网格：流量图 + 运行信息 ============ */
 .main-grid {
   display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 16px;
+  grid-template-columns: 1fr 300px;
+  gap: var(--space-4);
   min-height: 0;
 }
 
 .chart-panel {
-  min-height: 280px;
-  border-radius: 16px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  overflow: hidden;
-  padding: 14px;
+  min-height: 0;
 }
 
-.side-panels {
+.chart-inner {
+  height: 220px;
+  padding: var(--space-3);
+}
+
+/* 运行信息卡 */
+.info-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
-.mode-panel,
-.proxy-mode-panel {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  padding: 14px 16px;
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  flex: 1;
+  align-content: center;
 }
 
-.panel-header {
+.info-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
 }
 
-.panel-title {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.info-label {
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.info-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ============ 底部网格：代理开关 + 节点模式 ============ */
+.bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
 }
 
 .toggle-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .toggle-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--bg-tertiary);
-  transition: all 0.2s ease;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
+  transition: background var(--transition-fast);
 }
 
 .toggle-item.active {
-  background: rgba(99, 102, 241, 0.06);
+  background: var(--primary-soft);
 }
 
 .toggle-icon {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-secondary);
+  background: var(--bg-elevated);
   color: var(--text-secondary);
   flex-shrink: 0;
 }
 
 .toggle-item.active .toggle-icon {
   background: var(--primary-color);
-  color: white;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  color: var(--primary-contrast);
+  box-shadow: 0 2px 8px var(--primary-soft-strong);
 }
 
 .toggle-info {
@@ -885,24 +990,39 @@ onMounted(async () => {
 }
 
 .toggle-name {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .toggle-desc,
 .toggle-port {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
 
 .toggle-port {
-  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--font-mono);
+}
+
+/* 节点模式 */
+.mode-chips-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mode-chips-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .mode-chips {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .mode-chip {
@@ -911,14 +1031,14 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--bg-tertiary);
-  font-size: 13px;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .mode-chip:hover {
@@ -927,75 +1047,14 @@ onMounted(async () => {
 
 .mode-chip.active {
   background: var(--primary-color);
-  color: white;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  color: var(--primary-contrast);
+  box-shadow: 0 2px 8px var(--primary-soft-strong);
 }
 
-.traffic-info {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.traffic-divider {
-  width: 1px;
-  height: 14px;
-  background: var(--border-color);
-  flex-shrink: 0;
-}
-
-.traffic-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-}
-
-.traffic-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.traffic-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.traffic-dot.upload {
-  background: #10b981;
-}
-
-.traffic-dot.download {
-  background: var(--primary-color);
-}
-
-.traffic-val {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 900px) {
-  .main-grid {
+@media (max-width: 960px) {
+  .main-grid,
+  .bottom-grid {
     grid-template-columns: 1fr;
-  }
-
-  .chart-panel {
-    min-height: 200px;
-  }
-
-  .hero-content {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 </style>

@@ -37,3 +37,6 @@ components.d.ts
 
 target
 .worktrees/
+
+# ZCode 工具临时产物
+.zcode/

@@ -14,6 +14,8 @@ export default {
     export: 'エクスポート',
     refresh: '更新',
     loading: '読み込み中...',
+    enabled: 'オン',
+    disabled: 'オフ',
   },
 
   // 导航菜单
@@ -28,6 +30,8 @@ export default {
     settings: '設定',
     expand: '展開',
     collapse: '折りたたみ',
+    switchToLight: 'ライトに切替',
+    switchToDark: 'ダークに切替',
   },
 
   // 状态相关
@@ -118,6 +122,11 @@ export default {
       rule: 'ルールモード',
       globalTip: 'すべてのトラフィックをプロキシ経由',
       ruleTip: 'ルールに基づくインテリジェントなトラフィックルーティング',
+    },
+    quick: {
+      testAll: '全測速',
+      nodeMode: 'ノードモード',
+      proxyAddr: 'プロキシアドレス',
     },
 
     // 切换模式

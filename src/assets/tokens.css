@@ -1,0 +1,263 @@
+/**
+ * Design Tokens — 精致 Indigo 设计系统
+ *
+ * 分层结构：
+ *   1. 原始色板（Primitive，固定值，不随主题变化）
+ *   2. 语义 Token（Semantic，随明暗主题切换）
+ *   3. 尺寸 Token（Radius / Shadow / Space / Typography / Z-index / Motion）
+ *
+ * 所有页面/组件只引用语义 Token 与尺寸 Token，不应直接使用原始色板。
+ * ThemeStore 的 applyAccentVariables 会覆盖 --primary-* 与部分强调相关变量。
+ */
+
+:root {
+  /* ============================================================
+   * 1. 原始色板（Primitive Palette）
+   * ============================================================ */
+
+  /* Indigo 强调色阶（主品牌色） */
+  --indigo-50: #eef2ff;
+  --indigo-100: #e0e7ff;
+  --indigo-200: #c7d2fe;
+  --indigo-300: #a5b4fc;
+  --indigo-400: #818cf8;
+  --indigo-500: #6366f1;
+  --indigo-600: #4f46e5;
+  --indigo-700: #4338ca;
+  --indigo-800: #3730a3;
+  --indigo-900: #312e81;
+
+  /* 中性灰阶（Slate） */
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --slate-950: #020617;
+
+  /* 语义功能色阶 */
+  --green-400: #34d399;
+  --green-500: #10b981;
+  --green-600: #059669;
+  --green-50: #ecfdf5;
+  --green-500-soft: rgba(16, 185, 129, 0.12);
+
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
+  --amber-50: #fffbeb;
+  --amber-500-soft: rgba(245, 158, 11, 0.14);
+
+  --red-400: #f87171;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --red-50: #fef2f2;
+  --red-500-soft: rgba(239, 68, 68, 0.12);
+
+  --blue-400: #60a5fa;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --blue-50: #eff6ff;
+  --blue-500-soft: rgba(59, 130, 246, 0.12);
+
+  --orange-500: #f97316;
+  --orange-500-soft: rgba(249, 115, 22, 0.12);
+
+  /* ============================================================
+   * 3. 尺寸 Token（Size Tokens） — 不随主题变化
+   * ============================================================ */
+
+  /* 圆角层级 */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-pill: 9999px;
+
+  /* 阴影（柔光统一） */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.1);
+  --shadow-xl: 0 20px 48px rgba(15, 23, 42, 0.14);
+  --shadow-focus: 0 0 0 3px rgba(99, 102, 241, 0.18);
+
+  /* 间距（4px 网格） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* 排版 */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Fira Code', 'JetBrains Mono', ui-monospace, SFMono-Regular,
+    'SF Mono', Menlo, Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+
+  /* 层级 */
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-header: 200;
+  --z-sider: 100;
+  --z-modal: 2000;
+  --z-popover: 1500;
+
+  /* 动效 */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 布局尺寸 */
+  --header-height: 48px;
+  --sider-width: 220px;
+  --sider-collapsed-width: 64px;
+  --content-max-width: 1440px;
+
+  /* ============================================================
+   * 2. 语义 Token（Semantic Tokens）— 亮色模式（默认）
+   * ============================================================ */
+
+  /* 强调色（可被 ThemeStore.applyAccentVariables 覆盖） */
+  --primary-color: var(--indigo-500);
+  --primary-hover: var(--indigo-400);
+  --primary-active: var(--indigo-600);
+  --primary-soft: rgba(99, 102, 241, 0.1);
+  --primary-soft-strong: rgba(99, 102, 241, 0.16);
+  --primary-contrast: #ffffff;
+
+  /* 功能语义色 */
+  --success-color: var(--green-500);
+  --success-soft: var(--green-500-soft);
+  --warning-color: var(--amber-500);
+  --warning-soft: var(--amber-500-soft);
+  --error-color: var(--red-500);
+  --error-soft: var(--red-500-soft);
+  --info-color: var(--blue-500);
+  --info-soft: var(--blue-500-soft);
+
+  /* 文本层级 */
+  --text-primary: var(--slate-900);
+  --text-secondary: var(--slate-600);
+  --text-tertiary: var(--slate-400);
+  --text-disabled: var(--slate-300);
+  --text-on-primary: #ffffff;
+
+  /* 背景层级 */
+  --bg-base: var(--slate-50);
+  --bg-surface: #ffffff;
+  --bg-surface-2: var(--slate-100);
+  --bg-elevated: #ffffff;
+  --bg-overlay: rgba(255, 255, 255, 0.72);
+
+  /* 毛玻璃 */
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-blur: 18px;
+
+  /* 边框 */
+  --border-color: rgba(148, 163, 184, 0.22);
+  --border-strong: rgba(148, 163, 184, 0.4);
+  --border-hover: rgba(99, 102, 241, 0.4);
+
+  /* 页面/卡片背景（向下兼容旧变量名） */
+  --page-bg: var(--slate-50);
+  --hero-bg: #ffffff;
+  --hero-border: var(--border-color);
+  --hero-shadow: var(--shadow-md);
+  --panel-bg: #ffffff;
+  --panel-border: var(--border-color);
+  --panel-shadow: var(--shadow-sm);
+
+  /* Chip / 标签 */
+  --chip-bg: rgba(99, 102, 241, 0.1);
+  --chip-text: var(--indigo-700);
+  --chip-border: transparent;
+
+  /* 滚动条 */
+  --scrollbar-thumb: rgba(148, 163, 184, 0.35);
+  --scrollbar-thumb-hover: var(--slate-400);
+
+  /* 表格 */
+  --table-row-hover: var(--slate-50);
+  --table-border: var(--border-color);
+}
+
+/* ============================================================
+ * 暗色模式语义覆盖
+ * ============================================================ */
+.dark,
+[data-theme='dark'] {
+  --primary-color: var(--indigo-400);
+  --primary-hover: var(--indigo-300);
+  --primary-active: var(--indigo-500);
+  --primary-soft: rgba(129, 140, 248, 0.16);
+  --primary-soft-strong: rgba(129, 140, 248, 0.24);
+  --primary-contrast: #ffffff;
+
+  --success-color: var(--green-400);
+  --warning-color: var(--amber-400);
+  --error-color: var(--red-400);
+  --info-color: var(--blue-400);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #64748b;
+  --text-disabled: #475569;
+
+  --bg-base: var(--slate-900);
+  --bg-surface: var(--slate-800);
+  --bg-surface-2: var(--slate-700);
+  --bg-elevated: #1a2438;
+  --bg-overlay: rgba(15, 23, 42, 0.72);
+
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --border-hover: rgba(129, 140, 248, 0.5);
+
+  --page-bg: var(--slate-900);
+  --hero-bg: var(--slate-800);
+  --hero-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --panel-bg: var(--slate-800);
+  --panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+
+  --chip-bg: rgba(129, 140, 248, 0.18);
+  --chip-text: #e0e7ff;
+
+  --scrollbar-thumb: rgba(148, 163, 184, 0.28);
+  --scrollbar-thumb-hover: var(--slate-400);
+
+  --table-row-hover: rgba(255, 255, 255, 0.03);
+
+  /* 暗色阴影加深 */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.32);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.42);
+  --shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.5);
+  --shadow-focus: 0 0 0 3px rgba(129, 140, 248, 0.28);
+}

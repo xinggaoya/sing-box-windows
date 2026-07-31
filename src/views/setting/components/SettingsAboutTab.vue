@@ -84,32 +84,32 @@ const props = defineProps<{
 .about-hero {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px 0;
+  gap: var(--space-4);
+  padding: var(--space-5) 0;
   border-bottom: 1px solid var(--border-color);
 }
 
 .about-logo {
   width: 48px;
   height: 48px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-  color: white;
+  color: var(--primary-contrast);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.25);
+  box-shadow: 0 6px 20px var(--primary-soft-strong);
 }
 
 .about-name {
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .about-tagline {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-tertiary);
   margin-top: 2px;
 }
@@ -120,7 +120,7 @@ const props = defineProps<{
 }
 
 .setting-value {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -128,6 +128,6 @@ const props = defineProps<{
 .about-footer {
   display: flex;
   justify-content: center;
-  padding: 16px 0 8px;
+  padding: var(--space-4) 0 var(--space-2);
 }
 </style>

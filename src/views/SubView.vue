@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container">
+  <div class="page-shell sub-page">
     <PageHeader :title="t('sub.title')" :subtitle="t('sub.subtitle')">
       <template #actions>
         <n-button type="primary" @click="showAddModal = true" round>
@@ -10,7 +10,6 @@
         </n-button>
       </template>
     </PageHeader>
-
 
     <!-- Subscription List -->
     <div class="subscription-section">
@@ -111,16 +110,13 @@
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-state">
-        <div class="empty-icon">
-          <n-icon size="48"><LinkOutline /></n-icon>
-        </div>
-        <h3 class="empty-title">{{ t('sub.noSubs') }}</h3>
-        <p class="empty-desc">{{ t('sub.noSubscriptionsYet') }}</p>
-        <n-button type="primary" @click="showAddModal = true">
-          {{ t('sub.addFirstSubscription') }}
-        </n-button>
-      </div>
+      <EmptyState v-else :title="t('sub.noSubs')" :description="t('sub.noSubscriptionsYet')" :icon="LinkOutline">
+        <template #action>
+          <n-button type="primary" @click="showAddModal = true">
+            {{ t('sub.addFirstSubscription') }}
+          </n-button>
+        </template>
+      </EmptyState>
     </div>
 
     <!-- Add/Edit Modal -->
@@ -285,6 +281,7 @@ import {
 } from '@vicons/ionicons5'
 import type { FormInst, FormRules, DropdownOption } from 'naive-ui'
 import PageHeader from '@/components/common/PageHeader.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 
 defineOptions({
   name: 'SubView'
@@ -820,65 +817,66 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.page-container {
-  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
-  max-width: var(--layout-page-max-width, 1400px);
+.sub-page {
+  max-width: var(--content-max-width, 1440px);
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--layout-page-gap, 24px);
 }
-
 
 .subscription-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--layout-subscription-gap, 20px);
+  gap: var(--space-4);
 }
 
 .sub-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  transition: all 0.2s ease;
+  gap: var(--space-4);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .sub-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--panel-shadow);
+  box-shadow: var(--shadow-md);
   border-color: var(--border-hover);
 }
 
 .sub-card.active {
   border-color: var(--primary-color);
-  background: var(--bg-secondary);
+  box-shadow: 0 0 0 1px var(--primary-color), var(--shadow-md);
 }
 
 .sub-card-header {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: flex-start;
 }
 
 .sub-icon {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
   flex-shrink: 0;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .sub-icon.active {
   background: var(--primary-color);
-  color: white;
+  color: var(--primary-contrast);
 }
 
 .sub-info {
@@ -891,7 +889,7 @@ onUnmounted(() => {
 
 .sub-name {
   font-weight: 600;
-  font-size: 16px;
+  font-size: var(--text-md);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -901,6 +899,7 @@ onUnmounted(() => {
 .sub-tags {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .more-btn {
@@ -914,22 +913,22 @@ onUnmounted(() => {
 .sub-card-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: var(--bg-tertiary);
-  border-radius: 8px;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--bg-surface-2);
+  border-radius: var(--radius-sm);
 }
 
 .info-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .info-row.warn {
-  color: #f59e0b;
+  color: var(--warning-color);
 }
 
 .info-text {
@@ -942,67 +941,41 @@ onUnmounted(() => {
   margin-top: auto;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 0;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 8px;
-  color: var(--text-primary);
-}
-
-.empty-desc {
-  margin-bottom: 24px;
-  color: var(--text-tertiary);
-}
-
 .form-switch {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
-  background: var(--bg-tertiary);
-  border-radius: 8px;
-  margin-top: 16px;
+  padding: var(--space-3);
+  background: var(--bg-surface-2);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-4);
 }
 
 .form-hint {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
 
 .form-hint.warning {
-  color: #f59e0b;
+  color: var(--warning-color);
 }
 
 .switch-label {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--text-primary);
 }
 
 .switch-desc {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
 
 .code-input {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 /* Dropdown Icon Styles */
@@ -1013,6 +986,6 @@ onUnmounted(() => {
 }
 
 :deep(.icon.delete) {
-  color: #ef4444;
+  color: var(--error-color);
 }
 </style>

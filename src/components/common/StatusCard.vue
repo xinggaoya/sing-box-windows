@@ -33,32 +33,35 @@ withDefaults(defineProps<StatusCardProps>(), {
 .status-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
   display: flex;
   align-items: center;
-  gap: 16px;
-  transition: all 0.3s ease;
+  gap: var(--space-4);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
   position: relative;
   overflow: hidden;
 }
 
 .status-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--panel-shadow);
+  box-shadow: var(--shadow-md);
   border-color: var(--border-hover);
 }
 
 .card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-tertiary);
+  background: var(--bg-surface-2);
   color: var(--text-secondary);
-  font-size: 24px;
+  font-size: 22px;
   flex-shrink: 0;
 }
 
@@ -70,23 +73,23 @@ withDefaults(defineProps<StatusCardProps>(), {
 }
 
 .status-card.primary .card-icon {
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--primary-soft);
   color: var(--primary-color);
 }
 
 .status-card.success .card-icon {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  background: var(--success-soft);
+  color: var(--success-color);
 }
 
 .status-card.warning .card-icon {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  background: var(--warning-soft);
+  color: var(--warning-color);
 }
 
 .status-card.error .card-icon {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: var(--error-soft);
+  color: var(--error-color);
 }
 
 .card-content {
@@ -95,23 +98,23 @@ withDefaults(defineProps<StatusCardProps>(), {
 }
 
 .card-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
   color: var(--text-tertiary);
   letter-spacing: 0.05em;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .card-value {
-  font-size: 20px;
+  font-size: var(--text-xl);
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.2;
 }
 
 .card-desc {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   margin-top: 2px;
 }

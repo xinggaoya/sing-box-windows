@@ -61,7 +61,7 @@
         "paddingSmall": "16px",
         "paddingHuge": "40px",
         "titleFontWeight": "700",
-        "borderColor": "rgba(255, 255, 255, 0.08)"
+        "borderColor": "rgba(148, 163, 184, 0.22)"
     },
     "Input": {
         "borderRadius": "10px",
@@ -102,7 +102,7 @@
         "thPaddingMedium": "12px 16px",
         "tdPaddingMedium": "12px 16px",
         "thFontWeight": "600",
-        "borderColor": "rgba(255, 255, 255, 0.06)"
+        "borderColor": "rgba(148, 163, 184, 0.22)"
     },
     "Modal": {
         "borderRadius": "20px",
@@ -133,6 +133,6 @@
         "boxShadow": "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
     },
     "Layout": {
-        "headerHeight": "64px"
+        "headerHeight": "48px"
     }
 }

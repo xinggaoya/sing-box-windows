@@ -13,6 +13,8 @@ export default {
     export: 'Export',
     refresh: 'Refresh',
     loading: 'Loading...',
+    enabled: 'On',
+    disabled: 'Off',
   },
   nav: {
     home: 'Home',
@@ -25,6 +27,8 @@ export default {
     navigation: 'Navigation',
     expand: 'Expand',
     collapse: 'Collapse',
+    switchToLight: 'Switch to Light',
+    switchToDark: 'Switch to Dark',
   },
   status: {
     running: 'Running',
@@ -101,6 +105,11 @@ export default {
       rule: 'Rule Mode',
       globalTip: 'Route all traffic through proxy',
       ruleTip: 'Intelligent traffic routing based on rules',
+    },
+    quick: {
+      testAll: 'Test All',
+      nodeMode: 'Node Mode',
+      proxyAddr: 'Proxy Address',
     },
     switchMode: 'Switch Mode',
     tunConfirm: {

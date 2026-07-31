@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page">
+  <div class="page-shell settings-page">
     <div class="settings-tabs">
       <button
         v-for="item in navItems"
@@ -9,7 +9,7 @@
         @click="activeTab = item.key"
       >
         <n-icon :size="16"><component :is="item.icon" /></n-icon>
-        <span>{{ item.label }}</span>
+        <span class="settings-tab-label">{{ item.label }}</span>
         <span v-if="item.key === 'kernel' && hasNewVersion" class="tab-dot"></span>
         <span v-if="item.key === 'maintenance' && updateStore.hasUpdate" class="tab-dot"></span>
       </button>
@@ -702,58 +702,57 @@ onUnmounted(() => {
 
 <style scoped>
 .settings-page {
-  padding: var(--layout-page-padding-y, 24px) var(--layout-page-padding-x, 32px);
-  max-width: var(--layout-page-max-width, 1400px);
+  max-width: var(--content-max-width, 1440px);
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  height: 100%;
 }
 
 .settings-tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  padding: 4px;
+  box-shadow: var(--panel-shadow);
+  border-radius: var(--radius-lg);
+  padding: var(--space-1);
+  flex-wrap: wrap;
 }
 
 .settings-tab {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
   position: relative;
   white-space: nowrap;
 }
 
 .settings-tab:hover {
   color: var(--text-primary);
-  background: var(--bg-tertiary);
+  background: var(--bg-surface-2);
 }
 
 .settings-tab.active {
   background: var(--primary-color);
-  color: white;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+  color: var(--primary-contrast);
+  box-shadow: 0 2px 8px var(--primary-soft-strong);
 }
 
 .tab-dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
-  background: #f59e0b;
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+  border-radius: var(--radius-pill);
+  background: var(--warning-color);
+  box-shadow: 0 0 6px var(--warning-color);
   flex-shrink: 0;
 }
 
@@ -764,12 +763,19 @@ onUnmounted(() => {
 }
 
 .settings-content {
-  max-width: 720px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--panel-shadow);
+  /* 提供统一的水平内边距，所有子组件内容据此对齐 */
+  padding: var(--space-2) var(--space-5) var(--space-4);
 }
 
 .section-fade-enter-active,
 .section-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .section-fade-enter-from {
@@ -785,20 +791,20 @@ onUnmounted(() => {
 .manual-import-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .manual-import-desc {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .manual-drop-zone {
-  border: 1px dashed var(--panel-border);
-  border-radius: 10px;
-  background: var(--bg-tertiary);
-  padding: 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
+  padding: var(--space-4);
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -806,55 +812,53 @@ onUnmounted(() => {
   gap: 6px;
   color: var(--text-secondary);
   transition:
-    border-color 0.2s ease,
-    background 0.2s ease;
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .manual-drop-zone.active {
   border-color: var(--primary-color);
-  background: rgba(59, 130, 246, 0.12);
+  background: var(--primary-soft);
 }
 
 .manual-drop-sub {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
 
 .manual-selected {
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  background: var(--bg-surface-2);
 }
 
 .manual-selected-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .manual-selected-path {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-primary);
   word-break: break-all;
   line-height: 1.45;
+  font-family: var(--font-mono);
 }
 
 @media (max-width: 768px) {
-  .settings-page {
-    padding: 14px;
-  }
-
   .settings-tabs {
     overflow-x: auto;
+    flex-wrap: nowrap;
   }
 
-  .settings-tab span:not(.tab-dot) {
+  .settings-tab-label {
     display: none;
   }
 
   .settings-tab {
-    padding: 8px 12px;
+    padding: var(--space-2) var(--space-3);
   }
 }
 </style>

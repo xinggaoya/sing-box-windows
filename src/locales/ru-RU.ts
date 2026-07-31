@@ -14,6 +14,8 @@ export default {
     export: 'Экспорт',
     refresh: 'Обновить',
     loading: 'Загрузка...',
+    enabled: 'Вкл',
+    disabled: 'Выкл',
   },
 
   // 导航菜单
@@ -28,6 +30,8 @@ export default {
     settings: 'Настройки',
     expand: 'Развернуть',
     collapse: 'Свернуть',
+    switchToLight: 'Светлая тема',
+    switchToDark: 'Тёмная тема',
   },
 
   // 状态相关
@@ -122,6 +126,11 @@ export default {
       rule: 'Режим правил',
       globalTip: 'Весь трафик идет через прокси',
       ruleTip: 'Умная маршрутизация трафика на основе правил',
+    },
+    quick: {
+      testAll: 'Тест всех',
+      nodeMode: 'Режим узла',
+      proxyAddr: 'Адрес прокси',
     },
 
     // 切换模式

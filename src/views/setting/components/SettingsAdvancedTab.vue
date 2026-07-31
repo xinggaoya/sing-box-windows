@@ -401,25 +401,28 @@ const proxyDisplayOptions = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: var(--space-3) 0;
   cursor: pointer;
   user-select: none;
   border-top: 1px solid var(--border-color);
 }
 
-.collapsible-header:hover {
+.collapsible-header:hover .collapsible-label {
   color: var(--primary-color);
 }
 
 .collapsible-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: color var(--transition-fast);
 }
 
 .collapse-arrow {
   color: var(--text-tertiary);
-  transition: transform 0.2s ease;
+  transition: transform var(--transition-fast);
   flex-shrink: 0;
 }
 
@@ -428,34 +431,34 @@ const proxyDisplayOptions = computed(() => {
 }
 
 .collapsible-body {
-  padding: 0 0 16px;
+  padding: 0 0 var(--space-4);
 }
 
 .form-section-title {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 16px 0 8px;
-  padding-bottom: 8px;
+  letter-spacing: 0.05em;
+  margin: var(--space-4) 0 var(--space-2);
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--border-color);
 }
 
 .form-section-title:first-child {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .setting-hint {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
   line-height: 1.5;
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
 }
 
 .collapse-enter-active,
 .collapse-leave-active {
-  transition: all 0.25s ease;
+  transition: all var(--transition-base);
   overflow: hidden;
 }
 

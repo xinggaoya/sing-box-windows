@@ -1,105 +1,26 @@
+@import './tokens.css';
 @import './base.css';
 @import './page-layout.css';
 @import 'vfonts/Lato.css';
 @import 'vfonts/FiraCode.css';
 
-:root {
-  /* Light Mode Variables */
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f1f5f9;
-  
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary: #94a3b8;
-  
-  --border-color: rgba(148, 163, 184, 0.2);
-  --border-hover: rgba(99, 102, 241, 0.3);
-  
-  --primary-color: #6366f1;
-  --primary-hover: #818cf8;
-  --primary-active: #4f46e5;
-  
-  /* Glassmorphism */
-  --glass-bg: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(255, 255, 255, 0.5);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-  
-  /* Page Layout specific */
-  --page-bg: #f8fafc;
-  --hero-bg: rgba(255, 255, 255, 0.9);
-  --hero-border: rgba(148, 163, 184, 0.1);
-  --hero-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.05);
-  
-  --panel-bg: rgba(255, 255, 255, 0.9);
-  --panel-border: rgba(148, 163, 184, 0.1);
-  --panel-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
-  
-  --chip-bg: rgba(99, 102, 241, 0.1);
-  --chip-text: #4338ca;
-
-}
-
-.dark, [data-theme='dark'] {
-  /* Dark Mode Variables */
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-tertiary: #64748b;
-  
-  --border-color: rgba(255, 255, 255, 0.1);
-  --border-hover: rgba(99, 102, 241, 0.4);
-  
-  --primary-color: #818cf8;
-  --primary-hover: #a5b4fc;
-  --primary-active: #6366f1;
-  
-  /* Glassmorphism */
-  --glass-bg: rgba(30, 41, 59, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-  
-  /* Page Layout specific */
-  --page-bg: #0f172a;
-  --hero-bg: rgba(30, 41, 59, 0.6);
-  --hero-border: rgba(255, 255, 255, 0.08);
-  --hero-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
-  
-  --panel-bg: rgba(30, 41, 59, 0.6);
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --panel-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
-  
-  --chip-bg: rgba(99, 102, 241, 0.2);
-  --chip-text: #e0e7ff;
-}
-
-:root.compact-mode,
-.compact-mode {
-  /* Compact layout variables */
-  --layout-page-padding-x: 20px;
-  --layout-page-padding-y: 14px;
-  --layout-page-gap: 16px;
-  --layout-grid-gap: 16px;
-  --layout-page-max-width: 1100px;
-  --layout-card-padding: 14px;
-  --layout-card-radius: 12px;
-  --layout-row-gap: 12px;
-  --layout-inline-gap: 10px;
-  --layout-inline-gap-tight: 6px;
-  --layout-subscription-gap: 14px;
-}
+/* ============================================================
+ * 全局基础元素（语义 Token 已在 tokens.css 定义）
+ * main.css 仅保留 #app 容器与全局滚动条等基础样式。
+ * 旧的 :root / .dark / .compact-mode 变量定义已迁移至 tokens.css。
+ * ============================================================ */
 
 #app {
   height: 100vh;
-  background-color: var(--bg-primary);
+  background-color: var(--bg-base);
   color: var(--text-primary);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: var(--font-sans);
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
-/* Global Scrollbar */
+/* 全局滚动条 */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -110,10 +31,24 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-pill);
+  transition: background var(--transition-fast);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* 文本选区跟随主色 */
+::selection {
+  background: var(--primary-soft-strong);
+  color: var(--text-primary);
+}
+
+/* 聚焦态统一轮廓（无障碍） */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-radius: var(--radius-sm);
 }

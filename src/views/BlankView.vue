@@ -41,23 +41,23 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--n-card-color);
-  color: var(--n-text-color-disabled);
+  background: var(--bg-base);
+  color: var(--text-tertiary);
 }
 
 .tray-indicator {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  opacity: 0.55;
+  gap: var(--space-3);
+  opacity: 0.6;
 }
 
 .tray-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--n-text-color-disabled);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--text-tertiary);
   position: relative;
 }
 
@@ -67,15 +67,15 @@ onBeforeUnmount(() => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--n-success-color);
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-pill);
+  background: var(--success-color);
 }
 
 .tray-text {
-  font-size: 12px;
-  color: var(--n-text-color-disabled);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
   font-weight: 500;
   text-rendering: optimizeSpeed;
   -webkit-font-smoothing: antialiased;

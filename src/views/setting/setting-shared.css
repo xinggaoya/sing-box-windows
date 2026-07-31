@@ -1,34 +1,44 @@
+/**
+ * 设置页共享原子样式（setting-shared）
+ * 被 5 个设置子组件（Basic/Kernel/Advanced/Maintenance/About）共用。
+ * 统一引用设计 Token，保证视觉一致。
+ */
+
 .setting-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-width: 720px;
+  gap: var(--space-1);
 }
 
 .setting-section-title {
-  font-size: 13px;
+  font-size: var(--text-xs);
   font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 16px 0 8px;
+  padding: var(--space-4) 0 var(--space-2);
   margin: 0;
 }
 
 .setting-section-title:first-child {
-  padding-top: 0;
+  padding-top: var(--space-4);
 }
 
 .setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
-  gap: 16px;
+  /* 水平内边距由 .settings-content 容器统一提供，这里不再重复 */
+  padding: var(--space-3) 0;
+  gap: var(--space-4);
 }
 
 .setting-row + .setting-row {
   border-top: 1px solid var(--border-color);
+}
+
+.setting-row.top-align {
+  align-items: flex-start;
 }
 
 .setting-info {
@@ -37,15 +47,22 @@
 }
 
 .setting-label {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-primary);
 }
 
 .setting-desc {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
   margin-top: 2px;
+  line-height: 1.5;
+}
+
+.setting-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: var(--space-1);
   line-height: 1.5;
 }
 
@@ -56,29 +73,50 @@
 .setting-divider {
   height: 1px;
   background: var(--border-color);
-  margin: 8px 0;
+  margin: var(--space-2) 0;
 }
 
-.setting-card {
-  background: var(--bg-secondary);
+/**
+ * 设置分组卡片：在主内容卡片内部进一步分组，形成两级层次。
+ * 使用更浅的背景与主卡片区分，用于聚合相关设置项。
+ * 卡片自身撑满容器宽度，内部 .setting-row 用 padding 做水平缩进。
+ */
+.setting-group-card {
+  background: var(--bg-surface-2);
   border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: var(--radius-md);
+  margin: 0 0 var(--space-3);
+}
+
+.setting-group-card .setting-row {
+  padding: var(--space-3) var(--space-4);
+}
+
+.setting-group-card .setting-row + .setting-row {
+  border-top: 1px solid var(--border-color);
+}
+
+/* 卡片容器 */
+.setting-card {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .setting-card-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .setting-card-icon {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -86,70 +124,126 @@
 }
 
 .setting-card-title {
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .setting-card-desc {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
   margin-top: 1px;
 }
 
+/* 告警条 */
 .setting-alert {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 13px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
 .setting-alert.info {
-  background: rgba(14, 165, 233, 0.08);
-  border: 1px solid rgba(14, 165, 233, 0.15);
+  background: var(--info-soft);
+  border: 1px solid rgba(59, 130, 246, 0.18);
   color: var(--text-secondary);
 }
 
 .setting-alert.warning {
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+  background: var(--warning-soft);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  color: var(--warning-color);
 }
 
 .setting-alert.install {
-  background: rgba(14, 165, 233, 0.08);
-  border: 1px solid rgba(14, 165, 233, 0.2);
-  color: #0ea5e9;
+  background: var(--info-soft);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  color: var(--info-color);
 }
 
+/* 表单网格 */
 .setting-form-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .setting-toggles-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  padding: 10px 14px;
-  background: var(--bg-tertiary);
-  border-radius: 10px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface-2);
+  border-radius: var(--radius-sm);
 }
 
 .setting-toggle-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .setting-toggle-label {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
+}
+
+/* 表单区块小标题（表单内的子标题） */
+.form-section-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: var(--space-2) 0 var(--space-1);
+}
+
+/* 折叠区块 */
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  cursor: pointer;
+  user-select: none;
+  border-top: 1px solid var(--border-color);
+}
+
+.collapsible-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.collapse-arrow {
+  transition: transform var(--transition-fast);
+  color: var(--text-tertiary);
+}
+
+.collapse-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+.collapsible-body {
+  padding-bottom: var(--space-3);
+}
+
+.collapse-enter-active,
+.collapse-leave-active {
+  transition: all var(--transition-fast);
+  overflow: hidden;
+}
+
+.collapse-enter-from,
+.collapse-leave-to {
+  opacity: 0;
+  max-height: 0;
 }
 
 @media (max-width: 768px) {

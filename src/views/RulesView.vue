@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container">
+  <div class="page-shell rules-page">
     <PageHeader :title="t('rules.title')" :subtitle="t('rules.subtitle')">
       <template #actions>
         <n-space>
@@ -33,29 +33,37 @@
       </template>
     </PageHeader>
 
-    <div class="toolbar-card">
-      <n-tabs v-model:value="activeTab" type="segment" size="small">
-        <n-tab-pane name="rules" :tab="providerLabels.rulesTab" />
-        <n-tab-pane name="providers" :tab="providerLabels.providersTab" />
-        <n-tab-pane name="custom" :tab="customLabels.tab" />
-      </n-tabs>
-
-      <div class="toolbar-row">
-        <n-input v-model:value="searchQuery" :placeholder="t('rules.searchPlaceholder')" clearable>
+    <ToolbarBar>
+      <template #tabs>
+        <n-tabs v-model:value="activeTab" type="segment" size="small">
+          <n-tab-pane name="rules" :tab="providerLabels.rulesTab" />
+          <n-tab-pane name="providers" :tab="providerLabels.providersTab" />
+          <n-tab-pane name="custom" :tab="customLabels.tab" />
+        </n-tabs>
+      </template>
+      <template #filters>
+        <n-input
+          v-model:value="searchQuery"
+          :placeholder="t('rules.searchPlaceholder')"
+          clearable
+          size="small"
+          class="search-input"
+        >
           <template #prefix>
             <n-icon><SearchOutline /></n-icon>
           </template>
         </n-input>
-
         <n-select
           v-if="activeTab === 'rules'"
           v-model:value="typeFilter"
           :options="typeOptions"
           clearable
+          size="small"
           :placeholder="t('rules.type')"
+          class="type-select"
         />
-      </div>
-    </div>
+      </template>
+    </ToolbarBar>
 
     <div v-if="activeTab === 'rules'" class="card-list">
       <div v-if="filteredRules.length" class="rules-grid">
@@ -86,12 +94,7 @@
         </div>
       </div>
 
-      <div v-else class="empty-state">
-        <div class="empty-icon">
-          <n-icon size="48"><FilterOutline /></n-icon>
-        </div>
-        <h3 class="empty-title">{{ t('rules.noRulesData') }}</h3>
-      </div>
+      <EmptyState v-else :title="t('rules.noRulesData')" :icon="FilterOutline" />
     </div>
 
     <div v-else class="card-list">
@@ -124,12 +127,7 @@
         </div>
       </div>
 
-      <div v-else class="empty-state">
-        <div class="empty-icon">
-          <n-icon size="48"><FilterOutline /></n-icon>
-        </div>
-        <h3 class="empty-title">{{ providerLabels.noProviders }}</h3>
-      </div>
+      <EmptyState v-else :title="providerLabels.noProviders" :icon="FilterOutline" />
     </div>
 
     <div v-if="activeTab === 'custom'" class="card-list">
@@ -173,15 +171,13 @@
         </div>
       </div>
 
-      <div v-else class="empty-state">
-        <div class="empty-icon">
-          <n-icon size="48"><AddOutline /></n-icon>
-        </div>
-        <h3 class="empty-title">{{ customLabels.empty }}</h3>
-        <n-button type="primary" secondary style="margin-top: 16px" @click="openCreateCustomRule">
-          {{ customLabels.add }}
-        </n-button>
-      </div>
+      <EmptyState v-else :title="customLabels.empty" :icon="AddOutline">
+        <template #action>
+          <n-button type="primary" secondary @click="openCreateCustomRule">
+            {{ customLabels.add }}
+          </n-button>
+        </template>
+      </EmptyState>
     </div>
 
     <!-- 自定义规则编辑表单 -->
@@ -227,6 +223,8 @@ import { computed, reactive, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import { AddOutline, FilterOutline, RefreshOutline, SearchOutline } from '@vicons/ionicons5'
 import PageHeader from '@/components/common/PageHeader.vue'
+import ToolbarBar from '@/components/common/ToolbarBar.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { useRulesStore } from '@/stores/kernel/RulesStore'
 import { useI18n } from 'vue-i18n'
 import type { RuleItem } from '@/types/controller'
@@ -493,32 +491,18 @@ if (!rulesStore.rules.length && !rulesStore.providers.length && !rulesStore.cust
 </script>
 
 <style scoped>
-.page-container {
-  padding: var(--layout-page-padding-y, 16px) var(--layout-page-padding-x, 24px);
-  max-width: var(--layout-page-max-width, 1400px);
+.rules-page {
+  max-width: var(--content-max-width, 1440px);
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--layout-page-gap, 16px);
 }
 
-.toolbar-card,
-.rule-card,
-.provider-card {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 16px;
+.search-input {
+  flex: 1 1 240px;
+  min-width: 200px;
 }
 
-.toolbar-card {
-  padding: 16px;
-}
-
-.toolbar-row {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) 220px;
-  gap: 12px;
+.type-select {
+  width: 180px;
 }
 
 .card-list {
@@ -529,13 +513,26 @@ if (!rulesStore.rules.length && !rulesStore.providers.length && !rulesStore.cust
 .rules-grid,
 .providers-grid {
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
 .rule-card,
 .provider-card {
-  padding: 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.rule-card:hover,
+.provider-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .rule-head,
@@ -544,72 +541,57 @@ if (!rulesStore.rules.length && !rulesStore.providers.length && !rulesStore.cust
 .provider-row {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
 }
 
 .rule-meta {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .rule-payload {
-  margin: 14px 0;
+  margin: var(--space-4) 0;
   color: var(--text-primary);
+  font-size: var(--text-sm);
   line-height: 1.5;
   word-break: break-word;
+  font-family: var(--font-mono);
 }
 
 .custom-note {
-  margin: -8px 0 14px;
-  font-size: 12px;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
   word-break: break-word;
 }
 
 .custom-hint {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
-  line-height: 1.5;
-  margin-bottom: 12px;
+  line-height: 1.6;
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-surface-2);
+  border-radius: var(--radius-md);
 }
 
 .rule-footer,
 .provider-meta,
 .provider-row {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .provider-name {
   font-weight: 600;
   color: var(--text-primary);
+  font-size: var(--text-md);
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 0;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-title {
-  margin: 0;
-  font-size: 18px;
-  color: var(--text-primary);
-}
-
-@media (max-width: 900px) {
-  .toolbar-row {
-    grid-template-columns: 1fr;
-  }
+.provider-meta {
+  margin-top: 2px;
+  font-size: var(--text-xs);
 }
 </style>
