@@ -159,27 +159,13 @@ export const useAppStore = defineStore(
         // 检查系统实际的自启状态
         const systemEnabled = await isEnabled()
 
-        console.log('🔍 系统自启状态检查:', {
-          databaseSetting: autoStartApp.value,
-          autoHideToTrayOnAutostart: autoHideToTrayOnAutostart.value,
-          systemActual: systemEnabled,
-        })
-
         // 如果数据库中设置为启用，但系统未注册，则重新注册
         if (autoStartApp.value && !systemEnabled) {
-          console.log('⚠️ 检测到数据库自启设置为true但系统未注册，正在重新注册...')
           await enable()
-          console.log('✅ 系统开机自启已重新注册')
         }
         // 如果数据库中设置为禁用，但系统已注册，则取消注册
         else if (!autoStartApp.value && systemEnabled) {
-          console.log('⚠️ 检测到数据库自启设置为false但系统已注册，正在取消注册...')
           await disable()
-          console.log('✅ 系统开机自启已取消注册')
-        }
-        // 两者一致，无需操作
-        else {
-          console.log('✅ 数据库设置与系统状态一致，无需同步')
         }
       } catch (error) {
         console.error('同步开机自启状态失败:', error)
@@ -193,20 +179,9 @@ export const useAppStore = defineStore(
 
       try {
         await loadFromBackend()
-        console.log('📋 AppStore 数据恢复完成，配置：', {
-          proxyPort: proxyPort.value,
-          apiPort: apiPort.value,
-          autoStartKernel: autoStartKernel.value,
-          autoStartApp: autoStartApp.value,
-          autoHideToTrayOnAutostart: autoHideToTrayOnAutostart.value,
-          trayCloseBehavior: trayCloseBehavior.value,
-          allowLanAccess: allowLanAccess.value,
-        })
 
         // 同步开机自启设置与系统状态（修复更新后设置丢失的问题）
         await syncAutoStartWithSystem()
-
-        console.log('✅ AppStore初始化完成 - 使用数据库存储')
 
         // 注意：自动启动内核的逻辑现在由 App.vue 统一处理
         // 这里只加载数据，不执行启动逻辑，避免重复
@@ -233,7 +208,6 @@ export const useAppStore = defineStore(
         }
 
         // 进程状态变更现在通过Pinia响应式系统处理
-        console.log('进程状态已变更:', state)
       }
     }
 
@@ -241,7 +215,6 @@ export const useAppStore = defineStore(
     const setConnectingState = (state: boolean) => {
       isConnecting.value = state
       // 连接状态变更现在通过Pinia响应式系统处理
-      console.log('连接状态已变更:', state)
     }
 
     // 切换系统开机自启
@@ -271,7 +244,7 @@ export const useAppStore = defineStore(
           errorMessage.includes('No such file or directory')
 
         if (isHarmlessError) {
-          console.log('Autostart 插件已知的无害错误，功能已生效:', error)
+          console.warn('Autostart 插件已知的无害错误，功能已生效:', error)
           // 仍然抛出错误，因为调用者需要知道操作完成了
           // 但在上层UI中已经被处理为不显示错误
         }
@@ -286,7 +259,6 @@ export const useAppStore = defineStore(
         // 只更新 autoStartKernel 设置
         autoStartKernel.value = enabled
         await waitForSaveCompletion()
-        console.log(`自动启动内核设置已${enabled ? '启用' : '禁用'}`)
       } catch (error) {
         console.error('切换自动启动内核设置失败:', error)
         throw error
@@ -296,27 +268,23 @@ export const useAppStore = defineStore(
     const setTrayCloseBehavior = async (behavior: TrayCloseBehavior) => {
       trayCloseBehavior.value = behavior
       await waitForSaveCompletion()
-      console.log('关闭到托盘行为已切换为:', behavior)
     }
 
     const setAutoHideToTrayOnAutostart = async (enabled: boolean) => {
       autoHideToTrayOnAutostart.value = enabled
       await waitForSaveCompletion()
-      console.log('开机自启后自动隐藏到托盘已切换为:', enabled)
     }
 
     // 切换系统代理
     const toggleSystemProxy = async (enabled: boolean) => {
       systemProxyEnabled.value = enabled
       await waitForSaveCompletion()
-      console.log('系统代理已', enabled ? '启用' : '禁用')
     }
 
     // 切换TUN模式
     const toggleTun = async (enabled: boolean) => {
       tunEnabled.value = enabled
       await waitForSaveCompletion()
-      console.log('TUN模式已', enabled ? '启用' : '禁用')
     }
 
     // 向后兼容：代理模式切换（已弃用，使用toggleSystemProxy和toggleTun）
@@ -336,7 +304,6 @@ export const useAppStore = defineStore(
           break
       }
       await waitForSaveCompletion()
-      console.log('代理模式已切换到:', targetMode)
     }
 
     // 向后兼容：设置代理模式（已弃用）
@@ -407,7 +374,6 @@ export const useAppStore = defineStore(
     const syncPortsToSingbox = async () => {
       try {
         await kernelService.updateSingboxPorts(proxyPort.value, apiPort.value)
-        console.log('端口配置已同步到sing-box配置文件')
       } catch (error) {
         console.error('同步端口配置到sing-box失败:', error)
         throw error

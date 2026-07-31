@@ -23,14 +23,11 @@ export class InitializationService {
       return
     }
 
-    console.log('🚀 开始初始化应用...')
-
     try {
       // 在这里可以放置未来可能需要的一次性初始化逻辑
       // 例如：加载远程配置、检查数据库等
 
       this.isInitialized = true
-      console.log('✅ 应用初始化完成')
 
     } catch (error) {
       console.error('❌ 应用初始化失败:', error)

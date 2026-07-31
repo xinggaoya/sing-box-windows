@@ -1,7 +1,7 @@
 use super::DatabaseService;
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::tun_profile::normalize_tun_route_exclude_address;
-use crate::app::storage::error::StorageResult;
+use crate::app::storage::error::{StorageError, StorageResult};
 use crate::app::storage::state_model::{
     AppConfig, LocaleConfig, StartupPreferences, Subscription, ThemeConfig, UpdateConfig,
     WindowConfig,
@@ -158,7 +158,13 @@ impl EnhancedStorageService {
         std::fs::create_dir_all(&app_data_dir)?;
 
         let database_path = app_data_dir.join("app_data.db");
-        let database = Arc::new(DatabaseService::new(database_path.to_str().unwrap()).await?);
+        let database_path_str = database_path.to_str().ok_or_else(|| {
+            StorageError::Invalid(format!(
+                "数据库路径包含非 UTF-8 字符: {:?}",
+                database_path.display()
+            ))
+        })?;
+        let database = Arc::new(DatabaseService::new(database_path_str).await?);
 
         Ok(Self { database })
     }
@@ -304,7 +310,7 @@ fn resolve_app_data_dir<R: tauri::Runtime>(app_handle: &AppHandle<R>) -> std::pa
     app_handle
         .path()
         .app_data_dir()
-        .unwrap_or_else(|_| std::env::current_dir().unwrap())
+        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")))
 }
 
 fn resolve_startup_preferences_path<R: tauri::Runtime>(

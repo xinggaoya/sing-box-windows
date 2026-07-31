@@ -154,8 +154,8 @@ export function useAppBootstrap(deps: AppBootstrapDeps) {
 
     // 内核健康事件 - 仅记录日志，不向用户弹窗（在 Linux 上检测不准确）
     eventService
-      .on(APP_EVENTS.kernelHealth, (payload) => {
-        console.log('收到内核健康状态:', payload)
+      .on(APP_EVENTS.kernelHealth, () => {
+        // 仅记录日志，不向用户弹窗（在 Linux 上检测不准确）
       })
       .then((unlisten) => cleanupFns.push(unlisten))
       .catch((error) => {

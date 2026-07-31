@@ -15,7 +15,6 @@ const vendorChunkGroups: Array<[string, string[]]> = [
       '/node_modules/vue-router/',
       '/node_modules/vue-i18n/',
       '/node_modules/pinia/',
-      '/node_modules/pinia-plugin-persistedstate/',
       '/node_modules/@vueuse/',
       '/node_modules/mitt/',
     ],

@@ -183,7 +183,6 @@ export class EventService {
    */
   public destroy() {
     this.removeAllEventListeners()
-    console.log('🧹 事件服务已销毁')
   }
 }
 

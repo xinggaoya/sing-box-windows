@@ -22,14 +22,11 @@ export const useLocaleStore = defineStore(
     // 从数据库加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('🌐 从数据库加载语言配置...')
         const localeConfig = await DatabaseService.getLocaleConfig()
         const nextLocale = isLocaleValue(localeConfig.locale) ? localeConfig.locale : 'auto'
 
         // 更新响应式状态，自动回退到受支持值
         locale.value = nextLocale
-
-        console.log('🌐 语言配置加载完成：', { locale: locale.value })
       } catch (error) {
         console.error('从数据库加载语言配置失败:', error)
         // 加载失败时使用默认值
@@ -42,7 +39,6 @@ export const useLocaleStore = defineStore(
       try {
         const config: LocaleConfig = { locale: locale.value }
         await DatabaseService.saveLocaleConfig(config)
-        console.log('✅ 语言配置已保存到数据库')
       } catch (error) {
         console.error('保存语言配置到数据库失败:', error)
       }
@@ -66,7 +62,6 @@ export const useLocaleStore = defineStore(
       }
       locale.value = newLocale
       // 保存会在 watch 中自动处理
-      console.log('语言已切换到:', newLocale)
     }
 
     // 获取当前语言名称

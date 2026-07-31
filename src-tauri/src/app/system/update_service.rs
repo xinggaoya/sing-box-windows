@@ -674,7 +674,7 @@ pub async fn download_and_install_update(
     // 使用fallback下载函数
     if let Err(e) = crate::utils::file_util::download_with_fallback(
         &download_url,
-        download_path.to_str().unwrap(),
+        download_path.to_str().unwrap_or("<non-utf8-path>"),
         move |progress| {
             let _ = window_clone.emit(
                 "update-progress",

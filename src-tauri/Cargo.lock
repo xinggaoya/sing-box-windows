@@ -4423,7 +4423,6 @@ dependencies = [
  "dirs 5.0.1",
  "flate2",
  "futures",
- "futures-util",
  "lazy_static",
  "nix 0.29.0",
  "rand 0.8.5",
@@ -4456,7 +4455,6 @@ dependencies = [
  "urlencoding",
  "walkdir",
  "which",
- "winapi",
  "winreg 0.52.0",
  "zip",
 ]

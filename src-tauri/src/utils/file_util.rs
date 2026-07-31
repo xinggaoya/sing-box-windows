@@ -1,5 +1,5 @@
 use crate::app::constants::{messages, network_config};
-use futures_util::StreamExt;
+use futures::StreamExt;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -16,7 +16,7 @@ where
         "{}: {} -> {}",
         messages::INFO_DOWNLOAD_STARTED,
         url,
-        file_path.to_str().unwrap()
+        file_path.to_str().unwrap_or("<non-utf8-path>")
     );
 
     let client = reqwest::Client::builder()

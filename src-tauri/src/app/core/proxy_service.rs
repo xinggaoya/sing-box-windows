@@ -5,7 +5,7 @@ use crate::entity::config_model;
 use crate::utils::config_util::ConfigUtil;
 use crate::utils::http_client;
 use crate::utils::proxy_util::{disable_system_proxy, enable_system_proxy, DEFAULT_BYPASS_LIST};
-use futures_util::stream::{self, StreamExt};
+use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs;

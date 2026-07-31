@@ -31,9 +31,8 @@ export const useWindowStore = defineStore(
     // 从数据库加载数据
     const loadFromBackend = async () => {
       try {
-        console.log('?? 从数据库加载窗口配置...')
         const windowConfig = await DatabaseService.getWindowConfig()
-        
+
         // 更新响应式状态
         windowState.value = {
           isVisible: true, // 数据库没有is_visible，默认为true
@@ -41,8 +40,6 @@ export const useWindowStore = defineStore(
           isMaximized: windowConfig.is_maximized,
           lastVisiblePath: '/', // 数据库没有last_visible_path，使用默认值
         }
-        
-        console.log('?? 窗口配置加载完成：', windowState.value)
       } catch (error) {
         console.error('从数据库加载窗口配置失败:', error)
         // 加载失败时使用默认值
@@ -69,7 +66,6 @@ export const useWindowStore = defineStore(
           height,
         }
         await DatabaseService.saveWindowConfig(config)
-        console.log('? 窗口配置已保存到数据库')
       } catch (error) {
         console.error('保存窗口配置到数据库失败:', error)
       }
@@ -83,7 +79,6 @@ export const useWindowStore = defineStore(
       const appWindow = getAppWindow()
       await appWindow.minimize()
       // 窗口最小化事件现在通过Pinia响应式系统处理
-      console.log('窗口已最小化')
     }
 
     // 隐藏窗口并保存路由状态
@@ -136,9 +131,8 @@ export const useWindowStore = defineStore(
       
       // 保存到数据库
       await saveToBackend()
-      
+
       // 窗口显示事件现在通过Pinia响应式系统处理
-      console.log('窗口已显示')
     }
 
     // 设置窗口置顶
@@ -178,9 +172,8 @@ export const useWindowStore = defineStore(
       
       // 保存到数据库
       await saveToBackend()
-      
+
       // 窗口最大化事件现在通过Pinia响应式系统处理
-      console.log('窗口已最大化')
     }
 
     // 还原窗口
@@ -188,12 +181,11 @@ export const useWindowStore = defineStore(
       const appWindow = getAppWindow()
       await appWindow.unmaximize()
       windowState.value.isMaximized = false
-      
+
       // 保存到数据库
       await saveToBackend()
-      
+
       // 窗口还原事件现在通过Pinia响应式系统处理
-      console.log('窗口已还原')
     }
 
     // 切换最大化状态

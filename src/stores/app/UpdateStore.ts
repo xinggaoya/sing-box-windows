@@ -82,7 +82,6 @@ export const useUpdateStore = defineStore('update', () => {
 
   const loadFromBackend = async () => {
     try {
-      console.log('?? 从数据库加载更新配置...')
       const updateConfig = await DatabaseService.getUpdateConfig()
 
       autoCheckUpdate.value = updateConfig.auto_check
@@ -94,13 +93,6 @@ export const useUpdateStore = defineStore('update', () => {
       lastCheck.value = updateConfig.last_check ?? 0
 
       await fetchAppVersion(false)
-
-      console.log('?? 更新配置加载完成：', {
-        appVersion: appVersion.value,
-        autoCheckUpdate: autoCheckUpdate.value,
-        skipVersion: skipVersion.value,
-        lastCheck: lastCheck.value,
-      })
     } catch (error) {
       console.error('从数据库加载更新配置失败:', error)
       await fetchAppVersion(false)
@@ -122,7 +114,6 @@ export const useUpdateStore = defineStore('update', () => {
         update_channel: updateChannel.value,
       }
       await DatabaseService.saveUpdateConfig(config)
-      console.log('? 更新配置已保存到数据库')
     } catch (error) {
       console.error('保存更新配置到数据库失败:', error)
     }
@@ -202,7 +193,6 @@ export const useUpdateStore = defineStore('update', () => {
       if (updateInfo && updateInfo.has_update) {
         const versionType = updateInfo.is_prerelease ? '测试版本' : '正式版本'
         updateState.value.message = `发现新${versionType} ${updateInfo.latest_version}`
-        console.log('发现新版本:', updateInfo.latest_version)
         return updateInfo
       }
 
@@ -241,12 +231,6 @@ export const useUpdateStore = defineStore('update', () => {
       updateState.value.status = 'downloading'
       updateState.value.progress = 0
       updateState.value.error = null
-
-      console.log('开始下载更新:', {
-        status: 'downloading',
-        progress: 0,
-        message: '准备下载更新...',
-      })
 
       const result = await systemService.downloadAndInstallUpdate(downloadUrl.value)
       return result

@@ -60,7 +60,7 @@ impl HttpClientManager {
         url: &str,
         file_path: &str,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        use futures_util::StreamExt;
+        use futures::StreamExt;
         use tokio::fs::File;
         use tokio::io::AsyncWriteExt;
 

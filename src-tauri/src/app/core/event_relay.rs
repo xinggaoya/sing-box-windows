@@ -1,4 +1,4 @@
-use futures_util::StreamExt;
+use futures::StreamExt;
 use serde::Serialize;
 use serde_json::Value;
 use std::cmp::min;

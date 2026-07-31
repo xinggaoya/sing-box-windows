@@ -36,7 +36,6 @@ tauri = { version = "2.10.2", features = ["tray-icon", "unstable", "devtools"] }
 reqwest = { version = "0.12", features = ["json", "stream", "native-tls-vendored"] }
 dirs = "5.0.1"
 tokio = { version = "1.48", features = ["full"] }
-futures-util = "0.3"
 futures = "0.3"
 tokio-tungstenite = { version = "0.28", features = ["native-tls"] }
 url = "2.5"
@@ -56,7 +55,6 @@ rand = "0.8"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52.0"
-winapi = { version = "0.3", features = ["wininet"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2.3"
@@ -73,3 +71,10 @@ which = "7.0"
 # macOS特定依赖
 core-foundation = "0.9"
 security-framework = "2.9"
+
+[profile.release]
+# 生产构建优化：LTO + 单 codegen-unit + 符号裁剪 + panic 直接 abort
+lto = true
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

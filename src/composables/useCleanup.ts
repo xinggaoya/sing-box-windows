@@ -57,7 +57,7 @@ export const useMemoryMonitor = () => {
     if (perf.memory) {
       const { usedJSHeapSize, totalJSHeapSize } = perf.memory
       const usage = ((usedJSHeapSize / totalJSHeapSize) * 100).toFixed(2)
-      console.log(`[${label}] Memory: ${usage}% (${(usedJSHeapSize / 1024 / 1024).toFixed(2)}MB)`)
+      void `[${label}] Memory: ${usage}% (${(usedJSHeapSize / 1024 / 1024).toFixed(2)}MB)`
     }
   }
   

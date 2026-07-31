@@ -404,7 +404,7 @@ async fn download_file(
     path: &Path,
     window: &WebviewWindow,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use futures_util::StreamExt;
+    use futures::StreamExt;
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
 

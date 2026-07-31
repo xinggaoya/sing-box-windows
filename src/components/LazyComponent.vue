@@ -89,7 +89,6 @@ async function loadComponent() {
     const component = await Promise.race([props.loader(), timeoutPromise])
 
     loadedComponent.value = component
-    console.log('懒加载组件加载成功')
   } catch (err) {
     console.error('懒加载组件加载失败:', err)
     error.value = err instanceof Error ? err : new Error('组件加载失败')
@@ -107,7 +106,6 @@ async function retryLoad() {
   }
 
   retryCount.value++
-  console.log(`重试加载组件，第 ${retryCount.value} 次`)
   await loadComponent()
 }
 
