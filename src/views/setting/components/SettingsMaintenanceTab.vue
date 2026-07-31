@@ -198,10 +198,8 @@
 
 <script setup lang="ts">
 import {
-  ArchiveOutline,
   DownloadOutline,
   OpenOutline,
-  RefreshOutline,
 } from '@vicons/ionicons5'
 import type { UpdateChannel } from '@/stores/app/UpdateStore'
 import type { useUpdateStore } from '@/stores'

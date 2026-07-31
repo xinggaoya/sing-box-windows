@@ -304,8 +304,6 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
 import {
-  GlobeOutline,
-  OptionsOutline,
   SettingsOutline,
   InformationCircleOutline,
   ChevronDownOutline,

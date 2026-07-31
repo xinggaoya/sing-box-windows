@@ -306,7 +306,7 @@ const toggleSystemProxy = async (value: boolean) => {
     } else {
       message.error(getKernelFailureText(t('notification.proxyModeChangeFailed')))
     }
-  } catch (error) {
+  } catch {
     message.error(t('notification.proxyModeChangeFailed'))
   } finally {
     modeSwitchPending.value = false
@@ -403,7 +403,7 @@ const enableTunWithKernelRestart = async (options?: { allowSudoRetry?: boolean }
 
     message.error(t('home.restartFailed'))
     return false
-  } catch (error) {
+  } catch {
     await appStore.toggleTun(false)
     message.error(t('notification.proxyModeChangeFailed'))
     return false
@@ -455,9 +455,9 @@ const toggleTunProxy = async (value: boolean) => {
         message.success(t('notification.proxyModeChanged'))
       } else {
         await appStore.toggleTun(true)
-        message.error(t('home.restartFailed'))
+        message.error(t('notification.proxyModeChangeFailed'))
       }
-    } catch (error) {
+    } catch {
       await appStore.toggleTun(true)
       message.error(t('notification.proxyModeChangeFailed'))
     } finally {
@@ -476,7 +476,7 @@ const restartKernel = async () => {
     } else {
       message.error(getKernelFailureText(t('home.restartFailed')))
     }
-  } catch (error) {
+  } catch {
     message.error(t('home.restartFailed'))
   }
 }
@@ -532,7 +532,7 @@ const handleNodeProxyModeChange = async (mode: string) => {
     }
 
     message.success(t('home.nodeModeChangeSuccess'))
-  } catch (error) {
+  } catch {
     message.error(t('home.nodeModeChangeFailed'))
   }
 }
@@ -540,7 +540,7 @@ const handleNodeProxyModeChange = async (mode: string) => {
 const checkAdmin = async () => {
   try {
     isAdmin.value = await systemService.checkAdmin()
-  } catch (error) {
+  } catch {
     isAdmin.value = false
   }
 }
@@ -549,7 +549,7 @@ onMounted(async () => {
   try {
     const raw = await systemService.getPlatformInfo()
     platform.value = raw === 'windows' || raw === 'linux' || raw === 'macos' ? raw : 'unknown'
-  } catch (error) {
+  } catch {
     platform.value = 'unknown'
   }
   checkAdmin()

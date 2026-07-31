@@ -384,7 +384,7 @@ const refresh = async () => {
   try {
     await proxyStore.fetchProxies()
     message.success(t('proxy.loadSuccess'))
-  } catch (error) {
+  } catch {
     message.error(t('proxy.loadFailedCheck'))
   }
 }
@@ -393,7 +393,7 @@ const changeProxy = async (groupName: string, proxyName: string) => {
   try {
     await proxyStore.changeProxy(groupName, proxyName)
     message.success(t('proxy.switchSuccess', { group: groupName, proxy: proxyName }))
-  } catch (error) {
+  } catch {
     message.error(t('proxy.switchErrorMessage'))
   }
 }
@@ -401,7 +401,7 @@ const changeProxy = async (groupName: string, proxyName: string) => {
 const testNode = async (proxyName: string) => {
   try {
     await proxyStore.testNodeDelay(proxyName)
-  } catch (error) {
+  } catch {
     message.error(t('proxy.testFailed'))
   }
 }
@@ -411,7 +411,7 @@ const testActiveGroup = async () => {
   try {
     await proxyStore.testGroupDelay(activeGroup.value.name)
     message.success(t('proxy.groupTestComplete'))
-  } catch (error) {
+  } catch {
     message.error(t('proxy.testErrorMessage'))
   }
 }
@@ -420,7 +420,7 @@ const batchTest = async () => {
   try {
     await proxyStore.testAllGroups()
     message.success(t('proxy.batchTestComplete'))
-  } catch (error) {
+  } catch {
     message.error(t('proxy.testErrorMessage'))
   }
 }
@@ -431,7 +431,7 @@ const switchRecommended = async (group: ProxyGroup) => {
     if (recommended) {
       message.success(t('proxy.switchSuccess', { group: group.name, proxy: recommended }))
     }
-  } catch (error) {
+  } catch {
     message.error(t('proxy.switchErrorMessage'))
   }
 }

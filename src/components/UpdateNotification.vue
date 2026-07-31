@@ -9,12 +9,10 @@ import { useI18n } from 'vue-i18n'
 import { useNotification, NButton } from 'naive-ui'
 import type { NotificationReactive } from 'naive-ui'
 import mitt from '@/utils/mitt'
-import { useUpdateStore } from '@/stores/app/UpdateStore'
 import { useRouter } from 'vue-router'
 
 const { t } = useI18n()
 const notification = useNotification()
-const updateStore = useUpdateStore()
 const router = useRouter()
 
 // 当前活跃的通知实例

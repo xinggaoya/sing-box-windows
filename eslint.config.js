@@ -1,9 +1,11 @@
 import pluginVue from 'eslint-plugin-vue'
-import vueTsEslintConfig from '@vue/eslint-config-typescript'
+import { withVueTs, vueTsConfigs } from '@vue/eslint-config-typescript'
 import oxlint from 'eslint-plugin-oxlint'
 import skipFormatting from '@vue/eslint-config-prettier/skip-formatting'
 
-export default [
+// withVueTs 组合 Vue + TypeScript 配置并返回一个 thenable（ESLint 10 会自动 await）。
+// 所有自定义配置块作为参数传入，由 withVueTs 统一组装为 flat config 数组。
+export default withVueTs(
   {
     name: 'app/files-to-lint',
     files: ['**/*.{ts,mts,tsx,vue}'],
@@ -12,8 +14,8 @@ export default [
   {
     name: 'app/files-to-ignore',
     ignores: [
-      '**/dist/**', 
-      '**/dist-ssr/**', 
+      '**/dist/**',
+      '**/dist-ssr/**',
       '**/coverage/**',
       '**/src-tauri/target/**',
       '**/node_modules/**',
@@ -39,8 +41,23 @@ export default [
     ],
   },
 
-  ...pluginVue.configs['flat/essential'],
-  ...vueTsEslintConfig(),
+  pluginVue.configs['flat/essential'],
+  vueTsConfigs.recommended,
+  {
+    name: 'app/no-unused-vars-policy',
+    rules: {
+      // 允许用 rest 解构排除 sibling 字段（如 const { uriContent, ...base } = form），
+      // 并允许以 _ 前缀标记故意忽略的参数/变量。
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
   oxlint.configs['flat/recommended'],
   skipFormatting,
-]
+)

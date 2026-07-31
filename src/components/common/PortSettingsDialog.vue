@@ -71,7 +71,7 @@ const savePortSettings = async () => {
     message.success(t('common.saveSuccess'))
     show.value = false
     emit('saved')
-  } catch (error) {
+  } catch {
     message.error(t('common.saveFailed'))
   } finally {
     portSettingsLoading.value = false

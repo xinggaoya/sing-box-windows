@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed, type Component, type PropType } from 'vue'
+import { ref, onMounted, computed, type Component } from 'vue'
 import { NSpin, NResult, NButton } from 'naive-ui'
 
 interface Props {

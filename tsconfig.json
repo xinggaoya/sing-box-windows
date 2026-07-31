@@ -23,10 +23,9 @@
     /* Type Declarations */
     "typeRoots": ["./node_modules/@types"],
 
-    /* Path Aliases */
-    "baseUrl": ".",
+    /* Path Aliases (baseUrl removed in TS 6.0; paths resolved relative to tsconfig) */
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "vite.config.ts"]

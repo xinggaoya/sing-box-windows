@@ -15,11 +15,10 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, defineProps, onMounted, onUnmounted, onBeforeUnmount, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useThemeVars } from 'naive-ui'
 import { formatBandwidth } from '@/utils/index'
 import { useI18n } from 'vue-i18n'
-import mitt from '@/utils/mitt'
 
 defineOptions({
   name: 'TrafficChart',

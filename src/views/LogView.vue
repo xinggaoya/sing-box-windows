@@ -225,7 +225,7 @@ const copyLogs = async () => {
   try {
     await navigator.clipboard.writeText(sortedLogs.value.map((log) => `${formatTime(log.timestamp)} [${log.type}] ${log.payload}`).join('\n'))
     message.success(t('log.copiedSuccess'))
-  } catch (error) {
+  } catch {
     message.error(t('log.copyFailed'))
   }
 }

@@ -331,7 +331,7 @@ const onAutoStartChange = async (value: boolean) => {
   try {
     await appStore.toggleAutoStart(value)
     message.success(t('common.saveSuccess'))
-  } catch (error) {
+  } catch {
     message.error(t('common.saveFailed'))
     autoStart.value = !value
   }

@@ -133,8 +133,6 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useThemeStore } from '@/stores/app/ThemeStore'
-import { useLocaleStore } from '@/stores/app/LocaleStore'
-import { useAppStore } from '@/stores'
 import { useWindowStore } from '@/stores/app/WindowStore'
 import { useUpdateStore } from '@/stores/app/UpdateStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -173,8 +171,6 @@ const mittInstance = mitt()
 
 // Stores
 const themeStore = useThemeStore()
-const localeStore = useLocaleStore()
-const appStore = useAppStore()
 const windowStore = useWindowStore()
 const updateStore = useUpdateStore()
 const kernelStore = useKernelStore()
