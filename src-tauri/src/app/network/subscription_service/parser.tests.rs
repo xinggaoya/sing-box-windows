@@ -87,6 +87,32 @@ fn parse_uri_list_hysteria2() {
 }
 
 #[test]
+fn parse_uri_list_hysteria2_with_obfs() {
+    let content = concat!(
+        "hysteria2://password123@example.com:443",
+        "?obfs=salamander&obfs-password=obfs-secret",
+        "&sni=example.com&alpn=h3,h2,http/1.1",
+        "&insecure=0&upmbps=100&downmbps=200",
+        "&fastopen=1&mport=443,8443#hy2-obfs"
+    );
+    let nodes = extract_nodes_from_subscription(content).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0]["type"].as_str().unwrap(), "hysteria2");
+    assert_eq!(nodes[0]["password"].as_str().unwrap(), "password123");
+    assert_eq!(nodes[0]["server"].as_str().unwrap(), "example.com");
+    assert_eq!(nodes[0]["server_port"].as_u64().unwrap(), 443);
+    assert_eq!(nodes[0]["tls"]["server_name"].as_str().unwrap(), "example.com");
+    assert_eq!(nodes[0]["tls"]["alpn"][0].as_str().unwrap(), "h3");
+    assert_eq!(nodes[0]["obfs"]["type"].as_str().unwrap(), "salamander");
+    assert_eq!(nodes[0]["obfs"]["password"].as_str().unwrap(), "obfs-secret");
+    assert_eq!(nodes[0]["up_mbps"].as_u64().unwrap(), 100);
+    assert_eq!(nodes[0]["down_mbps"].as_u64().unwrap(), 200);
+    assert!(nodes[0]["tcp_fast_open"].as_bool().unwrap());
+    assert_eq!(nodes[0]["server_ports"][0].as_str().unwrap(), "443");
+    assert_eq!(nodes[0]["server_ports"][1].as_str().unwrap(), "8443");
+}
+
+#[test]
 fn parse_uri_list_tuic_basic() {
     let content = "tuic://2DD61D93-75D8-4DA4-AC0E-6AECE7EAC365:hello@example.com:10443#TUIC";
     let nodes = extract_nodes_from_subscription(content).expect("should parse");
@@ -239,6 +265,8 @@ proxies:
     down: 50
     skip-cert-verify: true
     password: "secret-pass"
+    obfs: salamander
+    obfs-password: "obfs-secret-pass"
 "#;
     let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
     assert_eq!(nodes.len(), 1);
@@ -254,6 +282,8 @@ proxies:
     assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
     assert_eq!(nodes[0]["up_mbps"].as_u64().unwrap(), 50);
     assert_eq!(nodes[0]["down_mbps"].as_u64().unwrap(), 50);
+    assert_eq!(nodes[0]["obfs"]["type"].as_str().unwrap(), "salamander");
+    assert_eq!(nodes[0]["obfs"]["password"].as_str().unwrap(), "obfs-secret-pass");
 }
 
 #[test]
