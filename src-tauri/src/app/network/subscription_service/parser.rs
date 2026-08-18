@@ -512,6 +512,23 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
                 node["down_mbps"] = json!(down);
             }
 
+            // Clash hysteria2 的 salamander 混淆：obfs / obfs-password
+            if let Some(obfs_type) = clash_node
+                .get("obfs")
+                .and_then(|o| o.as_str())
+                .filter(|s| !s.is_empty())
+            {
+                let mut obfs = json!({ "type": obfs_type });
+                if let Some(obfs_password) = clash_node
+                    .get("obfs-password")
+                    .and_then(|p| p.as_str())
+                    .filter(|s| !s.is_empty())
+                {
+                    obfs["password"] = json!(obfs_password);
+                }
+                node["obfs"] = obfs;
+            }
+
             Some(node)
         }
         "tuic" => {
@@ -947,14 +964,65 @@ fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
         tls["alpn"] = alpn;
     }
 
-    Some(json!({
+    let mut node = json!({
         "tag": tag,
         "type": "hysteria2",
         "server": server,
         "server_port": server_port,
         "password": password,
         "tls": tls
-    }))
+    });
+
+    // Parse optional hysteria2 obfuscation (salamander) parameters:
+    //   obfs=<type>&obfs-password=<password>
+    if let Some(obfs_type) = query
+        .get("obfs")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        let mut obfs = serde_json::Map::new();
+        obfs.insert("type".to_string(), json!(obfs_type));
+        if let Some(obfs_password) = query
+            .get("obfs-password")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            obfs.insert("password".to_string(), json!(obfs_password));
+        }
+        node["obfs"] = json!(obfs);
+    }
+
+    // upmbps/downmbps 是 hysteria2 URI 的客户端带宽声明（MBps）
+    if let Some(up) = query.get("upmbps").and_then(|s| s.trim().parse::<u64>().ok()) {
+        node["up_mbps"] = json!(up);
+    }
+    if let Some(down) = query.get("downmbps").and_then(|s| s.trim().parse::<u64>().ok()) {
+        node["down_mbps"] = json!(down);
+    }
+
+    // fastopen 参数（0/1）
+    if let Some(fast_open) = query
+        .get("fastopen")
+        .map(|s| s.as_str())
+        .and_then(parse_boolish)
+    {
+        node["tcp_fast_open"] = json!(fast_open);
+    }
+
+    // mport 多端口参数（逗号分隔），映射到 server_ports
+    if let Some(mport) = query.get("mport").map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        let ports: Vec<Value> = mport
+            .split(',')
+            .map(|p| p.trim())
+            .filter(|p| !p.is_empty())
+            .map(|p| Value::String(p.to_string()))
+            .collect();
+        if !ports.is_empty() {
+            node["server_ports"] = json!(ports);
+        }
+    }
+
+    Some(node)
 }
 
 fn parse_tuic_uri(uri: &str) -> Option<Value> {
