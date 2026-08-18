@@ -1,5 +1,11 @@
 # 更新日志
 
+## [未发布]
+
+### 🐛 问题修复
+
+- **Hysteria2 订阅节点字段丢失修复（#65）** - `hysteria2://` URI 解析补齐 `obfs` / `obfs-password`（salamander 混淆）、`upmbps` / `downmbps`（带宽声明）、`fastopen` 与 `mport`（多端口，映射为 `server_ports`）参数；Clash YAML 的 hysteria2 节点同步补上混淆字段映射，修复带混淆或带宽/端口参数的节点导入后字段缺失导致无法连接的问题
+
 ## [v2.3.1] - 2026-06-17
 
 ### 🐛 问题修复
