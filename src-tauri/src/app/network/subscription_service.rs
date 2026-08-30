@@ -7,6 +7,7 @@ use crate::app::constants::{messages, paths};
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::proxy_service::apply_proxy_runtime_state;
 use crate::app::singbox::config_generator;
+use crate::app::singbox::config_validator::{self, ValidationOutcome};
 use crate::app::singbox::settings_patch::apply_port_settings_only;
 use crate::app::storage::enhanced_storage_service::{
     apply_runtime_config_update, db_get_app_config, db_get_subscriptions,
@@ -21,8 +22,6 @@ use reqwest::header::{HeaderMap, USER_AGENT};
 use serde::Serialize;
 use serde_json::Value;
 use std::error::Error;
-use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 use tracing::{error, info, warn};
@@ -56,6 +55,17 @@ pub struct SubscriptionPersistResult {
     pub subscription_download: Option<u64>,
     pub subscription_total: Option<u64>,
     pub subscription_expire: Option<u64>,
+    /// 配置是否经过了 sing-box 内核的 `check` 校验。
+    ///
+    /// - `true`  = 已通过 `sing-box check --config` 真正校验
+    /// - `false` = 因内核缺失 / 跳过等降级路径，**未**经过内核校验
+    ///
+    /// 用于前端 UI 区分"严格校验通过"和"降级写入"。
+    #[serde(default)]
+    pub validated: bool,
+    /// 校验被跳过时的原因（仅在 `validated = false` 时有意义）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_skip_reason: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +74,20 @@ struct SubscriptionUserInfo {
     download: Option<u64>,
     total: Option<u64>,
     expire: Option<u64>,
+}
+
+/// 把内部 `ValidationOutcome` 折叠成给前端的 `(validated, skip_reason)`。
+///
+/// - `Valid`     → `(true, None)`
+/// - `Skipped`   → `(false, Some(reason))`：告诉前端"未经过内核校验"
+/// - `Invalid`   → 永远走不到这里，因为 `Invalid` 在 `validate_singbox_config_inline` 内部就 `Err` 返回了
+fn summarize_validation(outcome: &ValidationOutcome) -> (bool, Option<String>) {
+    match outcome {
+        ValidationOutcome::Valid => (true, None),
+        ValidationOutcome::Skipped { reason } => (false, Some(reason.clone())),
+        // Invalid 不会到这里
+        ValidationOutcome::Invalid { summary, .. } => (false, Some(summary.clone())),
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -297,7 +321,7 @@ pub async fn download_subscription(
 
     let target_path = resolve_target_config_path(file_name, config_path)?;
     let trimmed_url = url.trim();
-    let userinfo = download_and_process_subscription(
+    let (userinfo, validation_outcome) = download_and_process_subscription(
         trimmed_url,
         use_original_config,
         app_handle,
@@ -331,12 +355,16 @@ pub async fn download_subscription(
         warn!("同步订阅信息失败: {}", e);
     }
 
+    let (validated, validation_skip_reason) = summarize_validation(&validation_outcome);
+
     Ok(SubscriptionPersistResult {
         config_path: target_path.to_string_lossy().to_string(),
         subscription_upload: userinfo.as_ref().and_then(|info| info.upload),
         subscription_download: userinfo.as_ref().and_then(|info| info.download),
         subscription_total: userinfo.as_ref().and_then(|info| info.total),
         subscription_expire: userinfo.as_ref().and_then(|info| info.expire),
+        validated,
+        validation_skip_reason,
     })
 }
 
@@ -368,7 +396,7 @@ pub async fn add_manual_subscription(
 
     let target_path = resolve_target_config_path(file_name, config_path)?;
 
-    process_subscription_content(
+    let validation_outcome = process_subscription_content(
         content,
         use_original_config,
         app_handle,
@@ -395,12 +423,16 @@ pub async fn add_manual_subscription(
         auto_manage_with_saved_config(app_handle, true, "subscription-manual").await;
     }
 
+    let (validated, validation_skip_reason) = summarize_validation(&validation_outcome);
+
     Ok(SubscriptionPersistResult {
         config_path: target_path.to_string_lossy().to_string(),
         subscription_upload: None,
         subscription_download: None,
         subscription_total: None,
         subscription_expire: None,
+        validated,
+        validation_skip_reason,
     })
 }
 
@@ -504,7 +536,7 @@ async fn download_and_process_subscription(
     _app_handle: &AppHandle,
     app_config: &AppConfig,
     target_path: &Path,
-) -> Result<Option<SubscriptionUserInfo>, Box<dyn Error>> {
+) -> Result<(Option<SubscriptionUserInfo>, ValidationOutcome), Box<dyn Error>> {
     let work_dir = crate::utils::app_util::get_work_dir_sync();
     let sing_box_dir = Path::new(&work_dir).join("sing-box");
 
@@ -527,8 +559,8 @@ async fn download_and_process_subscription(
 
     if use_original_config {
         info!("使用原始订阅内容，仅修改必要的端口和地址");
-        process_original_config(&response_text, app_config, target_path)?;
-        return Ok(userinfo);
+        let outcome = process_original_config(&response_text, app_config, target_path)?;
+        return Ok((userinfo, outcome));
     }
 
     let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
@@ -607,12 +639,15 @@ async fn download_and_process_subscription(
     let _backup = backup_existing_config(target_path);
 
     let config_str = serde_json::to_string_pretty(&config)?;
-    let mut file = File::create(target_path)?;
-    file.write_all(config_str.as_bytes())?;
 
-    info!("配置已成功保存到: {:?}", target_path);
+    // 写前让 sing-box 真正校验一次，失败时回退到原配置；通过/降级都做原子 rename。
+    let outcome = config_validator::validate_singbox_config_inline(target_path, &config_str)?;
+    info!(
+        "订阅配置已写入 {:?}（校验结果: {:?}）",
+        target_path, outcome
+    );
     info!("订阅已更新并应用到模板，配置已保存");
-    Ok(userinfo)
+    Ok((userinfo, outcome))
 }
 
 fn process_subscription_content(
@@ -621,11 +656,10 @@ fn process_subscription_content(
     _app_handle: &AppHandle,
     app_config: &AppConfig,
     target_path: &Path,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<ValidationOutcome, Box<dyn Error>> {
     if use_original_config {
         info!("使用原始配置内容，仅调整端口和地址");
-        process_original_config(&content, app_config, target_path)?;
-        return Ok(());
+        return process_original_config(&content, app_config, target_path);
     }
 
     let mut extracted_nodes = extract_nodes_from_subscription(&content)?;
@@ -658,18 +692,19 @@ fn process_subscription_content(
     let _backup = backup_existing_config(target_path);
 
     let config_str = serde_json::to_string_pretty(&config)?;
-    let mut file = File::create(target_path)?;
-    file.write_all(config_str.as_bytes())?;
-
-    info!("手动配置已保存");
-    Ok(())
+    let outcome = config_validator::validate_singbox_config_inline(target_path, &config_str)?;
+    info!(
+        "手动配置已写入 {:?}（校验结果: {:?}）",
+        target_path, outcome
+    );
+    Ok(outcome)
 }
 
 fn process_original_config(
     content: &str,
     app_config: &AppConfig,
     target_path: &Path,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<ValidationOutcome, Box<dyn Error>> {
     info!("处理原始订阅配置，仅调整端口");
 
     let mut config: Value = serde_json::from_str(content)?;
@@ -692,11 +727,14 @@ fn process_original_config(
 
     let _backup = backup_existing_config(target_path);
 
-    let mut file = File::create(target_path)?;
-    file.write_all(config_str.as_bytes())?;
+    let outcome = config_validator::validate_singbox_config_inline(target_path, &config_str)?;
+    info!(
+        "原始订阅配置已写入 {:?}（校验结果: {:?}）",
+        target_path, outcome
+    );
 
     info!("原始订阅配置（修改端口后）已成功保存");
-    Ok(())
+    Ok(outcome)
 }
 
 #[cfg(test)]

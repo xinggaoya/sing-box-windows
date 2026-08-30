@@ -16,6 +16,10 @@ interface BackendSubscriptionPersistResult {
   subscription_download?: number | null
   subscription_total?: number | null
   subscription_expire?: number | null
+  /** 是否经过 sing-box 内核的 `check` 校验；缺省视为已校验（兼容老后端） */
+  validated?: boolean
+  /** 校验被跳过时的原因（仅在 `validated = false` 时有意义） */
+  validation_skip_reason?: string | null
 }
 
 export interface SubscriptionPersistResult {
@@ -24,6 +28,10 @@ export interface SubscriptionPersistResult {
   subscriptionDownload?: number
   subscriptionTotal?: number
   subscriptionExpire?: number
+  /** 是否经过 sing-box 内核的 `check` 校验 */
+  validated: boolean
+  /** 校验被跳过时的原因（仅在 `validated = false` 时有意义） */
+  validationSkipReason?: string
 }
 
 const mapPersistResult = (result: BackendSubscriptionPersistResult): SubscriptionPersistResult => ({
@@ -32,6 +40,8 @@ const mapPersistResult = (result: BackendSubscriptionPersistResult): Subscriptio
   subscriptionDownload: result.subscription_download ?? undefined,
   subscriptionTotal: result.subscription_total ?? undefined,
   subscriptionExpire: result.subscription_expire ?? undefined,
+  validated: result.validated ?? true,
+  validationSkipReason: result.validation_skip_reason ?? undefined,
 })
 
 export const subscriptionService = {
