@@ -5,6 +5,13 @@
 ### 🐛 问题修复
 
 - **Hysteria2 订阅节点字段丢失修复（#65）** - `hysteria2://` URI 解析补齐 `obfs` / `obfs-password`（salamander 混淆）、`upmbps` / `downmbps`（带宽声明）、`fastopen` 与 `mport`（多端口，映射为 `server_ports`）参数；Clash YAML 的 hysteria2 节点同步补上混淆字段映射，修复带混淆或带宽/端口参数的节点导入后字段缺失导致无法连接的问题
+- **vless / vmess / trojan 订阅节点 TLS 字段透传修复** - 修复 parser 长期漏写 `tls.insecure` 与 `tls.alpn`，导致机场 vless / vmess + ws + tls 伪装节点 100% 在 sing-box 客户端报 `CRYPTO_ERROR 0x12a` 或 `x509: certificate is valid for xxx, not <伪装 SNI>` 错误。具体修复：
+  - `vless://` / `vmess://` / `trojan://` URI 路径补读 `allowInsecure` / `insecure` query 与 `alpn` query
+  - Clash YAML 的 vless / vmess / trojan 分支补读 `skip-cert-verify` 与 `alpn`
+  - `vless` 的 REALITY 分支独立构造 TLS（REALITY 用 x25519 公钥认证，**不**带 `insecure` / `alpn`），避免 utls 字段造成语义混淆
+  - `parse_trojan_uri` 去掉 "先 build 再覆盖" 写法，统一直调新签名
+  - 抽出 `read_insecure_from_query` / `read_alpn_from_query` / `read_clash_tls_flags` 三个 helper，消 ~40 行重复
+  - 覆盖 6 个老协议 URI 路径 + 3 个 Clash 内嵌分支；不破坏 hysteria2 / tuic / anytls / REALITY 已通过的回归测试；新增 10 个测试用例
 
 ## [v2.3.1] - 2026-06-17
 

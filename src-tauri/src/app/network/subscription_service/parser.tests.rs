@@ -362,3 +362,208 @@ proxies:
     assert!(types.contains(&"tuic"));
     assert!(types.contains(&"shadowsocks"));
 }
+
+// -----------------------------------------------------------------------------
+// 回归 #66：vless / vmess / trojan URI 与 Clash YAML 必须正确透传
+//   tls.insecure (allowInsecure / skip-cert-verify) + tls.alpn。
+// 之前 parser 漏读这些字段，机场 vless+ws+tls 伪装节点会触发 sing-box 客户端
+// CRYPTO_ERROR 0x12a / SAN 不匹配。
+// -----------------------------------------------------------------------------
+
+#[test]
+fn parse_vless_uri_tls_propagates_insecure_and_alpn() {
+    // 模拟用户当前订阅：vless + ws + tls 伪装，URI 里没显式 allowInsecure。
+    // 修复后我们必须把 allowInsecure / alpn 写入生成的 tls JSON。
+    let content = "vless://26a1d547-b031-4139-9fc5-6671e1d0408a@hk1.example.com:443?type=ws&security=tls&sni=update.microsoft.com&alpn=h2,h3&allowInsecure=1&path=/&host=hk1.example.com#HK01";
+    let nodes = extract_nodes_from_subscription(content).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0]["type"].as_str().unwrap(), "vless");
+    assert_eq!(nodes[0]["tls"]["server_name"].as_str().unwrap(), "update.microsoft.com");
+    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap(), "insecure must be true");
+    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    assert_eq!(alpn[0].as_str().unwrap(), "h2");
+    assert_eq!(alpn[1].as_str().unwrap(), "h3");
+}
+
+#[test]
+fn parse_vless_uri_tls_defaults_insecure_false() {
+    // 不带 allowInsecure 时，insecure 必须显式为 false（不是缺失）。
+    let content = "vless://26a1d547-b031-4139-9fc5-6671e1d0408a@a.com:443?security=tls&sni=example.com#V";
+    let nodes = extract_nodes_from_subscription(content).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert!(!nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    // 没 alpn query 就不应写 alpn 字段
+    assert!(nodes[0]["tls"].get("alpn").is_none());
+}
+
+#[test]
+fn parse_vless_uri_reality_has_no_insecure_and_no_utls() {
+    // REALITY 不依赖证书验证：必须没有 insecure 字段（或 false），且不应有 alpn。
+    let content = "vless://26a1d547-b031-4139-9fc5-6671e1d0408a@a.com:443?security=reality&pbk=PK&sid=SID&sni=www.example.com&fp=firefox#R";
+    let nodes = extract_nodes_from_subscription(content).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    let tls = &nodes[0]["tls"];
+    assert!(tls["reality"]["enabled"].as_bool().unwrap());
+    // 修复后 reality 分支独立构造，不再走 build_tls_config，因此不应有 insecure 字段
+    assert!(tls.get("insecure").is_none(), "reality must not emit insecure field");
+    assert!(tls.get("alpn").is_none(), "reality must not emit alpn field");
+}
+
+#[test]
+fn parse_vmess_uri_propagates_allow_insecure_and_alpn() {
+    // vmess URI 是 base64(json)；构造一个含 allowInsecure + alpn 数组的 JSON
+    // 然后 base64 编码。
+    let inner = r#"{"v":"2","ps":"vm","add":"a.com","port":"443","id":"00000000-0000-0000-0000-000000000000","aid":"0","net":"ws","tls":"tls","sni":"example.com","alpn":["h2","h3"],"allowInsecure":true}"#;
+    let payload = base64_encode(inner);
+    let content = format!("vmess://{}", payload);
+    let nodes = extract_nodes_from_subscription(&content).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    assert_eq!(alpn.len(), 2);
+    assert_eq!(alpn[0].as_str().unwrap(), "h2");
+}
+
+#[test]
+fn parse_vmess_uri_defaults_insecure_false() {
+    let inner = r#"{"v":"2","ps":"vm","add":"a.com","port":"443","id":"00000000-0000-0000-0000-000000000000","aid":"0","tls":"tls","sni":"example.com"}"#;
+    let content = format!("vmess://{}", base64_encode(inner));
+    let nodes = extract_nodes_from_subscription(&content).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert!(!nodes[0]["tls"]["insecure"].as_bool().unwrap());
+}
+
+#[test]
+fn parse_trojan_uri_propagates_allow_insecure_and_alpn() {
+    let content = "trojan://pw@a.com:443?allowInsecure=1&sni=example.com&alpn=h2,h3#T";
+    let nodes = extract_nodes_from_subscription(content).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    assert_eq!(alpn[0].as_str().unwrap(), "h2");
+    assert_eq!(alpn[1].as_str().unwrap(), "h3");
+}
+
+#[test]
+fn parse_clash_yaml_vless_propagates_skip_cert_verify_and_alpn() {
+    let yaml = r#"
+proxies:
+  - name: "vless-tls"
+    type: vless
+    server: hk.example.com
+    port: 443
+    uuid: 26a1d547-b031-4139-9fc5-6671e1d0408a
+    tls: true
+    servername: update.microsoft.com
+    skip-cert-verify: true
+    alpn: [h2, h3]
+"#;
+    let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    assert_eq!(alpn[0].as_str().unwrap(), "h2");
+    assert_eq!(alpn[1].as_str().unwrap(), "h3");
+}
+
+#[test]
+fn parse_clash_yaml_vmess_propagates_skip_cert_verify_and_alpn() {
+    let yaml = r#"
+proxies:
+  - name: "vmess-tls"
+    type: vmess
+    server: hk.example.com
+    port: 443
+    uuid: 26a1d547-b031-4139-9fc5-6671e1d0408a
+    cipher: auto
+    alterId: 0
+    tls: true
+    servername: update.microsoft.com
+    skip-cert-verify: true
+    alpn:
+      - h2
+      - h3
+"#;
+    let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    assert_eq!(alpn.len(), 2);
+    assert_eq!(alpn[0].as_str().unwrap(), "h2");
+    assert_eq!(alpn[1].as_str().unwrap(), "h3");
+}
+
+#[test]
+fn parse_clash_yaml_trojan_propagates_skip_cert_verify_and_alpn() {
+    let yaml = r#"
+proxies:
+  - name: "trojan-tls"
+    type: trojan
+    server: hk.example.com
+    port: 443
+    password: "pw"
+    sni: update.microsoft.com
+    skip-cert-verify: true
+    alpn: "h2,h3"
+"#;
+    let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    assert_eq!(alpn[0].as_str().unwrap(), "h2");
+    assert_eq!(alpn[1].as_str().unwrap(), "h3");
+}
+
+#[test]
+fn parse_clash_yaml_hysteria2_regression_still_works() {
+    // 之前 #65 修过的 hysteria2 解析补全不能被这次改动破坏。
+    let yaml = r#"
+proxies:
+  - name: "hy2"
+    type: hysteria2
+    server: hk.example.com
+    port: 443
+    password: "pw"
+    sni: example.com
+    skip-cert-verify: true
+    alpn:
+      - h3
+    obfs: salamander
+    obfs-password: "obf"
+"#;
+    let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0]["type"].as_str().unwrap(), "hysteria2");
+    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    assert_eq!(
+        nodes[0]["tls"]["alpn"][0].as_str().unwrap(),
+        "h3"
+    );
+    assert_eq!(nodes[0]["obfs"]["type"].as_str().unwrap(), "salamander");
+    assert_eq!(nodes[0]["obfs"]["password"].as_str().unwrap(), "obf");
+}
+
+#[test]
+fn parse_clash_yaml_vless_default_insecure_false_and_no_alpn() {
+    // 没 skip-cert-verify / alpn 时，insecure 必须为 false，alpn 字段不出现。
+    let yaml = r#"
+proxies:
+  - name: "vless-default"
+    type: vless
+    server: hk.example.com
+    port: 443
+    uuid: 26a1d547-b031-4139-9fc5-6671e1d0408a
+    tls: true
+    servername: example.com
+"#;
+    let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert!(!nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    assert!(nodes[0]["tls"].get("alpn").is_none());
+}
+
+// vmess URI 的 base64 编码辅助（保持测试文件自包含）
+fn base64_encode(input: &str) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::STANDARD.encode(input.as_bytes())
+}

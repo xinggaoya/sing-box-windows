@@ -329,30 +329,63 @@ fn build_tls_from_clash(clash_node: &Value, server: &str) -> Value {
         .get("sni")
         .and_then(|s| s.as_str())
         .unwrap_or("");
+    let (insecure, alpn) = read_clash_tls_flags(clash_node);
+    let mut tls = build_basic_tls_config(server, sni, insecure, None);
+    if let Some(alpn_value) = alpn {
+        tls["alpn"] = alpn_value;
+    }
+    tls
+}
+
+/// 从 URL query 中读取 insecure 开关。兼容 `allowInsecure` (clash/v2rayN 命名)
+/// 和 `insecure` (sing-box 命名) 两种 query key。接受 `1` / `true` / `yes`
+/// 这类"真值"字符串，统一通过 `parse_boolish` 解析；缺省为 `false`。
+///
+/// 机场的 vless+ws+tls 伪装节点 100% 需要 `insecure: true`（真实 SNI 域
+/// 跟机场入口的 TLS 证书 SAN 不一致），如果 URI 里 `allowInsecure=1` 没传
+/// 下去，sing-box 客户端会立刻 `CRYPTO_ERROR 0x12a` / SAN 不匹配。
+fn read_insecure_from_query(query: &HashMap<String, String>) -> bool {
+    query
+        .get("allowInsecure")
+        .or_else(|| query.get("insecure"))
+        .and_then(|v| parse_boolish(v))
+        .unwrap_or(false)
+}
+
+/// 从 URL query 中读取 `alpn`（CSV 字符串，如 `h2,h3`），并解析为 JSON 数组。
+/// 缺省返回 `None`（调用方不应向 TLS 配置里塞 `alpn: null`）。
+fn read_alpn_from_query(query: &HashMap<String, String>) -> Option<String> {
+    query
+        .get("alpn")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
+
+/// 从 Clash 节点读取 `skip-cert-verify` + `alpn` 两个 TLS 标志，
+/// 一次性返回 `(insecure, alpn_json)`。alpn 兼容数组 `[h3]` 和
+/// 逗号字符串 `"h3,h2"` 两种 YAML 写法。
+fn read_clash_tls_flags(clash_node: &Value) -> (bool, Option<Value>) {
     let insecure = clash_node
         .get("skip-cert-verify")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    let mut tls = build_basic_tls_config(server, sni, insecure);
-
-    // alpn 在 Clash YAML 里通常是数组（[h3]），偶尔是逗号字符串，这里都兼容。
-    if let Some(alpn) = clash_node.get("alpn") {
-        if let Some(arr) = alpn.as_array() {
+    let alpn = if let Some(alpn_value) = clash_node.get("alpn") {
+        if let Some(arr) = alpn_value.as_array() {
             let list: Vec<Value> = arr
                 .iter()
                 .filter_map(|v| v.as_str().map(|s| Value::String(s.to_string())))
                 .collect();
-            if !list.is_empty() {
-                tls["alpn"] = Value::Array(list);
-            }
-        } else if let Some(s) = alpn.as_str() {
-            if let Some(parsed) = parse_csv_string_array(Some(s)) {
-                tls["alpn"] = parsed;
-            }
+            if list.is_empty() { None } else { Some(Value::Array(list)) }
+        } else if let Some(s) = alpn_value.as_str() {
+            parse_csv_string_array(Some(s))
+        } else {
+            None
         }
-    }
-
-    tls
+    } else {
+        None
+    };
+    (insecure, alpn)
 }
 
 fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
@@ -378,24 +411,17 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
             });
 
             if let Some(true) = clash_node.get("tls").and_then(|t| t.as_bool()) {
-                let mut tls = json!({
-                    "enabled": true
+                let sni = clash_node.get("servername").and_then(|s| s.as_str()).unwrap_or("");
+                let (insecure, alpn_value) = read_clash_tls_flags(clash_node);
+                let alpn_csv = alpn_value.and_then(|v| {
+                    v.as_array().map(|arr| {
+                        arr.iter()
+                            .filter_map(|x| x.as_str())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    })
                 });
-
-                if let Some(sni) = clash_node.get("servername").and_then(|s| s.as_str()) {
-                    tls["server_name"] = json!(sni);
-                }
-
-                if let Some(obj) = tls.as_object_mut() {
-                    obj.insert(
-                        "utls".to_string(),
-                        json!({
-                            "enabled": true,
-                            "fingerprint": "chrome"
-                        }),
-                    );
-                }
-
+                let tls = build_tls_config(server, sni, "chrome", insecure, alpn_csv.as_deref());
                 if let Some(obj) = node.as_object_mut() {
                     obj.insert("tls".to_string(), tls);
                 }
@@ -438,24 +464,17 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
             });
 
             if let Some(true) = clash_node.get("tls").and_then(|t| t.as_bool()) {
-                let mut tls = json!({
-                    "enabled": true
+                let sni = clash_node.get("servername").and_then(|s| s.as_str()).unwrap_or("");
+                let (insecure, alpn_value) = read_clash_tls_flags(clash_node);
+                let alpn_csv = alpn_value.and_then(|v| {
+                    v.as_array().map(|arr| {
+                        arr.iter()
+                            .filter_map(|x| x.as_str())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    })
                 });
-
-                if let Some(sni) = clash_node.get("servername").and_then(|s| s.as_str()) {
-                    tls["server_name"] = json!(sni);
-                }
-
-                if let Some(obj) = tls.as_object_mut() {
-                    obj.insert(
-                        "utls".to_string(),
-                        json!({
-                            "enabled": true,
-                            "fingerprint": "chrome"
-                        }),
-                    );
-                }
-
+                let tls = build_tls_config(server, sni, "chrome", insecure, alpn_csv.as_deref());
                 if let Some(obj) = node.as_object_mut() {
                     obj.insert("tls".to_string(), tls);
                 }
@@ -465,16 +484,30 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
         }
         "trojan" => {
             let password = clash_node.get("password").and_then(|p| p.as_str())?;
+            // 与 hysteria2 / tuic / anytls 统一走 build_basic_tls_config（不带 utls），
+            // 完整透传 skip-cert-verify + alpn，避免漏 insecure。
+            let sni = clash_node.get("sni").and_then(|s| s.as_str()).unwrap_or(server);
+            let tls_enabled = clash_node.get("tls").and_then(|t| t.as_bool()).unwrap_or(true);
+            let (insecure, alpn_value) = read_clash_tls_flags(clash_node);
+            let alpn_csv = alpn_value.and_then(|v| {
+                v.as_array().map(|arr| {
+                    arr.iter()
+                        .filter_map(|x| x.as_str())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                })
+            });
+            let mut tls = build_basic_tls_config(sni, sni, insecure, alpn_csv.as_deref());
+            if let Some(obj) = tls.as_object_mut() {
+                obj.insert("enabled".to_string(), json!(tls_enabled));
+            }
             Some(json!({
                 "tag": name,
                 "type": "trojan",
                 "server": server,
                 "server_port": port,
                 "password": password,
-                "tls": {
-                    "enabled": clash_node.get("tls").and_then(|t| t.as_bool()).unwrap_or(true),
-                    "server_name": clash_node.get("sni").and_then(|s| s.as_str()).unwrap_or(server)
-                }
+                "tls": tls
             }))
         }
         "ss" => {
@@ -736,23 +769,47 @@ fn parse_csv_string_array(value: Option<&str>) -> Option<Value> {
     }
 }
 
-fn build_tls_config(server: &str, server_name: &str, fingerprint: &str) -> Value {
-    json!({
+fn build_tls_config(
+    server: &str,
+    server_name: &str,
+    fingerprint: &str,
+    insecure: bool,
+    alpn: Option<&str>,
+) -> Value {
+    let mut tls = json!({
         "enabled": true,
         "server_name": if server_name.is_empty() { server.to_string() } else { server_name.to_string() },
+        "insecure": insecure,
         "utls": {
             "enabled": true,
             "fingerprint": normalize_fingerprint(Some(fingerprint))
         }
-    })
+    });
+    if let Some(csv) = alpn {
+        if let Some(parsed) = parse_csv_string_array(Some(csv)) {
+            tls["alpn"] = parsed;
+        }
+    }
+    tls
 }
 
-fn build_basic_tls_config(server: &str, server_name: &str, insecure: bool) -> Value {
-    json!({
+fn build_basic_tls_config(
+    server: &str,
+    server_name: &str,
+    insecure: bool,
+    alpn: Option<&str>,
+) -> Value {
+    let mut tls = json!({
         "enabled": true,
         "server_name": if server_name.is_empty() { server.to_string() } else { server_name.to_string() },
         "insecure": insecure
-    })
+    });
+    if let Some(csv) = alpn {
+        if let Some(parsed) = parse_csv_string_array(Some(csv)) {
+            tls["alpn"] = parsed;
+        }
+    }
+    tls
 }
 
 fn parse_vless_uri(uri: &str) -> Option<Value> {
@@ -803,11 +860,18 @@ fn parse_vless_uri(uri: &str) -> Option<Value> {
     let fingerprint = normalize_fingerprint(query.get("fp").map(|s| s.as_str()));
 
     if security == "tls" || security == "reality" || !sni.is_empty() {
-        let mut tls = build_tls_config(&server, sni, &fingerprint);
         if security == "reality" {
-            let mut reality = json!({
-                "enabled": true
+            // REALITY 用 x25519 公钥做认证，不依赖 TLS 证书，因此不需要 insecure / alpn。
+            // 单独构造，避免 `utls` 出现在 reality 分支下造成混淆。
+            let mut tls = json!({
+                "enabled": true,
+                "server_name": if sni.is_empty() { server.clone() } else { sni.to_string() },
+                "utls": {
+                    "enabled": true,
+                    "fingerprint": fingerprint.clone()
+                }
             });
+            let mut reality = json!({ "enabled": true });
             if let Some(public_key) = query.get("pbk").map(|s| s.trim()).filter(|s| !s.is_empty()) {
                 reality["public_key"] = json!(public_key);
             }
@@ -815,8 +879,19 @@ fn parse_vless_uri(uri: &str) -> Option<Value> {
                 reality["short_id"] = json!(short_id);
             }
             tls["reality"] = reality;
+            node["tls"] = tls;
+        } else {
+            // tls: 必须显式读 allowInsecure / alpn，机场伪装节点 100% 需要 insecure: true。
+            let insecure = read_insecure_from_query(&query);
+            let alpn = read_alpn_from_query(&query);
+            node["tls"] = build_tls_config(
+                &server,
+                sni,
+                &fingerprint,
+                insecure,
+                alpn.as_deref(),
+            );
         }
-        node["tls"] = tls;
     }
 
     // 传输层（最常见：ws）
@@ -878,12 +953,8 @@ fn parse_trojan_uri(uri: &str) -> Option<Value> {
         .map(|s| s.trim())
         .unwrap_or("");
 
-    let insecure = query
-        .get("allowInsecure")
-        .or_else(|| query.get("insecure"))
-        .map(|v| v.as_str())
-        .and_then(parse_boolish)
-        .unwrap_or(false);
+    let insecure = read_insecure_from_query(&query);
+    let alpn = read_alpn_from_query(&query);
 
     let mut node = json!({
         "tag": tag,
@@ -891,9 +962,8 @@ fn parse_trojan_uri(uri: &str) -> Option<Value> {
         "server": server,
         "server_port": server_port,
         "password": password,
-        "tls": build_tls_config(&server, sni, "chrome")
+        "tls": build_tls_config(&server, sni, "chrome", insecure, alpn.as_deref())
     });
-    node["tls"]["insecure"] = json!(insecure);
 
     // 传输层（最常见：ws）
     let network = query
@@ -959,10 +1029,8 @@ fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
         .and_then(parse_boolish)
         .unwrap_or(false);
 
-    let mut tls = build_basic_tls_config(&server, sni, insecure);
-    if let Some(alpn) = parse_csv_string_array(query.get("alpn").map(|s| s.as_str())) {
-        tls["alpn"] = alpn;
-    }
+    let alpn = read_alpn_from_query(&query);
+    let tls = build_basic_tls_config(&server, sni, insecure, alpn.as_deref());
 
     let mut node = json!({
         "tag": tag,
@@ -1056,13 +1124,15 @@ fn parse_tuic_uri(uri: &str) -> Option<Value> {
         .and_then(parse_boolish)
         .unwrap_or(false);
 
+    let alpn = read_alpn_from_query(&query);
+
     let mut node = json!({
         "tag": tag,
         "type": "tuic",
         "server": server,
         "server_port": server_port,
         "uuid": uuid,
-        "tls": build_basic_tls_config(&server, sni, insecure)
+        "tls": build_basic_tls_config(&server, sni, insecure, alpn.as_deref())
     });
 
     if let Some(password) = password {
@@ -1149,18 +1219,16 @@ fn parse_anytls_uri(uri: &str) -> Option<Value> {
         .and_then(parse_boolish)
         .unwrap_or(false);
 
+    let alpn = read_alpn_from_query(&query);
+
     let mut node = json!({
         "tag": tag,
         "type": "anytls",
         "server": server,
         "server_port": server_port,
         "password": password,
-        "tls": build_basic_tls_config(&server, sni, insecure)
+        "tls": build_basic_tls_config(&server, sni, insecure, alpn.as_deref())
     });
-
-    if let Some(alpn) = parse_csv_string_array(query.get("alpn").map(|s| s.as_str())) {
-        node["tls"]["alpn"] = alpn;
-    }
     if let Some(idle_session_check_interval) = query
         .get("idle_session_check_interval")
         .map(|s| s.trim())
@@ -1238,7 +1306,32 @@ fn parse_vmess_uri(uri: &str) -> Option<Value> {
         .unwrap_or("");
 
     if tls.eq_ignore_ascii_case("tls") {
-        node["tls"] = build_tls_config(node["server"].as_str().unwrap_or(""), sni, "chrome");
+        // vmess JSON 里 `allowInsecure` 字段（v2rayN / v2rayNG 客户端）映射到 tls.insecure。
+        // `alpn` 字段（数组 / CSV 字符串）一并透传；缺省为 None。
+        let insecure = v
+            .get("allowInsecure")
+            .and_then(|x| x.as_bool())
+            .or_else(|| v.get("insecure").and_then(|x| x.as_bool()))
+            .unwrap_or(false);
+        let alpn_csv: Option<String> = if let Some(arr) = v.get("alpn").and_then(|x| x.as_array()) {
+            let csv: Vec<String> = arr
+                .iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect();
+            if csv.is_empty() { None } else { Some(csv.join(",")) }
+        } else {
+            v.get("alpn")
+                .and_then(|x| x.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        };
+        node["tls"] = build_tls_config(
+            node["server"].as_str().unwrap_or(""),
+            sni,
+            "chrome",
+            insecure,
+            alpn_csv.as_deref(),
+        );
     }
 
     let network = v.get("net").and_then(|s| s.as_str()).unwrap_or("");
