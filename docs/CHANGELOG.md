@@ -4,70 +4,34 @@
 
 ### 🐛 问题修复
 
-- **订阅切换后代理节点列表不更新修复** - 用户反馈"切完订阅进代理页，仍然显示旧订阅的节点"。根因是 `ProxyStore` 完全依赖一次性 `getGroups()` 快照 + `kernel-ready` 事件，但事件时序不可靠。具体三层兜底：
-  - 进入代理页（`setupGroupsDataListener`）时自检 `activeConfigPath`：与 `lastFetchedConfigPath` 不一致 → 主动 `fetchProxies`，覆盖"切订阅→立即进代理页错过 `kernel-ready`"的竞态
-  - 监听 gRPC `SubscribeGroups` 服务端推送（`groups-data` 事件），节点测速完成 / `SelectOutbound` 切换 / `SetGroupExpand` 折叠时延迟自动回写
-  - 监听 `kernel-ready` 事件，订阅切换 / 代理模式切换 / 端口变更触发内核重启后重新拉取代理组
-- **gRPC `URLTest` 测速完成后延迟不刷新修复** - sing-box 1.14 `URLTest` 完成后**不会**自动推 `SubscribeGroups` frame（实测 8 秒内 0 帧）。`ProxyStore::testGroupDelay` / `testNodeDelay` / `testAllGroups` 在 `urlTest` 返回后等 3 秒主动 `fetchProxies` 拉最新 `url_test_delay`；`testAllGroups` 改为一次性等 + 整批并行，避免 N×3 秒串行等待
-- **内核状态运行期不刷新修复** - 之前完全依赖 `kernel-status-changed` 事件推送，但该事件只在 `kernel_start/stop/restart` 状态点 emit，运行期间不 emit，导致 status 不实时反映最新状态。`KernelStore` 改为 3 秒 polling + 事件双管齐下，窗口不可见时跳过减少无意义请求
-- **Hysteria2 订阅节点字段丢失修复（#65）** - `hysteria2://` URI 解析补齐 `obfs` / `obfs-password`（salamander 混淆）、`upmbps` / `downmbps`（带宽声明）、`fastopen` 与 `mport`（多端口，映射为 `server_ports`）参数；Clash YAML 的 hysteria2 节点同步补上混淆字段映射，修复带混淆或带宽/端口参数的节点导入后字段缺失导致无法连接的问题
-- **vless / vmess / trojan 订阅节点 TLS 字段透传修复** - 修复 parser 长期漏写 `tls.insecure` 与 `tls.alpn`，导致机场 vless / vmess + ws + tls 伪装节点 100% 在 sing-box 客户端报 `CRYPTO_ERROR 0x12a` 或 `x509: certificate is valid for xxx, not <伪装 SNI>` 错误。具体修复：
-  - `vless://` / `vmess://` / `trojan://` URI 路径补读 `allowInsecure` / `insecure` query 与 `alpn` query
-  - Clash YAML 的 vless / vmess / trojan 分支补读 `skip-cert-verify` 与 `alpn`
-  - `vless` 的 REALITY 分支独立构造 TLS（REALITY 用 x25519 公钥认证，**不**带 `insecure` / `alpn`），避免 utls 字段造成语义混淆
-  - `parse_trojan_uri` 去掉 "先 build 再覆盖" 写法，统一直调新签名
-  - 抽出 `read_insecure_from_query` / `read_alpn_from_query` / `read_clash_tls_flags` 三个 helper，消 ~40 行重复
-  - 覆盖 6 个老协议 URI 路径 + 3 个 Clash 内嵌分支；不破坏 hysteria2 / tuic / anytls / REALITY 已通过的回归测试；新增 10 个测试用例
+- 修复订阅切换后代理节点列表不更新
+- 修复 gRPC `URLTest` 测速完成后延迟不刷新
+- 修复内核状态运行期不刷新
+- 修复 Hysteria2 订阅节点字段丢失（#65）
+- 修复 vless / vmess / trojan 订阅节点 TLS 字段透传
 
 ### ✨ 新功能
 
-- **sing-box 内核升级到 1.14.0** - 全部 5 平台/架构（windows/amd64+arm64、linux/amd64、macos/amd64+arm64）二进制已就位；包含 1.14 全特性（Hysteria2 Chrome QUIC 抗指纹 / Snell / OpenVPN / OpenConnect / Tailscale SSH+Taildrop / TLS spoof / pre-match sniff / evaluate-match_response DNS / 乐观 DNS 缓存 / mDNS / preferred_by / bridge outbound / network namespace / L3 转发 / USB/IP service / CCM+OCM / Dashboard / API CLI / 多 rule-set tag 数组 / initial_path / JSON Schema / certificate provider 体系 / cloudflared inbound 等）
-- **sing-box 官方 gRPC API（`type: api`）完整迁移** - 弃用 `experimental.clash_api`（HTTP/JSON），改用 1.14+ 官方 gRPC-Web over HTTP/1.1 协议；后端封装 `src-tauri/src/app/singbox_api/` 模块（含 11 个已实现方法：GetVersion / GetGroups / GetClashModeStatus / SetClashMode / GetStartedAt / SelectOutbound / URLTest / CloseConnection / CloseAllConnections / SetGroupExpand + 4 个 server-streaming：SubscribeGroups/Status/Log/Connections）。其中 `SubscribeGroups` 通过 `groups-data` Tauri 事件推送给前端，代理页测速完成 / 节点切换 / 折叠展开时延迟实时回写；详见 `docs/sing-box-api-migration.md`
-- **新增 gRPC 方法（1.14 新增）** - 后端 `proxy_service.rs` + `lib.rs` 注册：`get_rules`（路由规则表，恢复 RulesView 规则管理 UI）、`get_services`（Tailscale / USB/IP service 状态）、`network_quality_test`（网络质量测试：TCP RTT + 上下行带宽 + 延迟）
-- **Tailscale 模式（实验性，1.14 新增 endpoint）** - `AppConfig.enable_tailscale_endpoint` / `tailscale_run_ssh_server` / `tailscale_taildrop_directory`；开启后注入 `endpoints: [{type:tailscale, ssh_server, taildrop_directory}]`；设置页新增"1.14 实验性"折叠组 4 个开关
-- **Web Dashboard 集成（1.14 官方 sing-box-dashboard）** - `AppConfig.enable_web_dashboard`；开启后 API service 启用 `dashboard.enabled = true` 并自动派生 secret；设置页 1 个开关
-- **RulesView 规则管理 UI 恢复** - `src/views/RulesView.vue` 重写：调 `get_rules` 后端 + `n-data-table` 展示 type / payload / outbound 三列；彩色 type 标签 + 分页
-- **fetch-kernel.mjs 内核下载支持 Release Track** - 新增 `--track stable | oldstable | beta | testing` 参数（默认 stable）；oldstable 自动选上一 major.minor 的最新 stable
+- 升级 sing-box 内核到 1.14.0
+- 迁移到 sing-box 官方 gRPC API（`type: api`）
+- 新增 gRPC 方法：`get_rules` / `get_services` / `network_quality_test`
+- 新增 Tailscale endpoint 实验性支持
+- 新增 Web Dashboard 集成
+- 恢复 RulesView 规则管理 UI
+- `fetch-kernel.mjs` 内核下载支持 Release Track（stable / oldstable / beta / testing）
 
 ### 🔧 优化改进
 
-- **4 个 deprecated 字段迁移（为 1.16 移除做准备）** - 配置生成层完全清理 1.13 旧字段：
-  - `experimental.clash_api` → 顶层 `services: [{type:api}]`（已由 `docs/sing-box-api-migration.md` 完成）
-  - `cache_file.store_rdrc` → `cache_file.store_dns`（1.14 替代）
-  - `dns.independent_cache: true` → 删除（1.14 默认按 transport 隔离缓存）
-  - `rule_set[].download_detour` → 顶层 `route.default_http_client` + `http_clients`（1.16 移除 `download_detour`）
-- **订阅解析器补 1.14 协议与字段** - `parser.rs`：
-  - 新增 snell URI 解析（`snell://PSK@host:port?version=&obfs=&obfs-host=#tag`）
-  - 识别 wireguard / tailscale 协议（不再静默丢失）
-  - hysteria2 新增 1.14 字段：`bbr_profile` / `disable_chrome_parrot` / `hop_interval_max` / `realm`
-- **gRPC-Web 流式解析优化** - `client.rs::parse_response_headers` 改为边读边 parse frame，避免 SubscribeLog / 大响应（如 GetDeprecatedWarnings 长列表）一次性读到 buffer 导致 OOM
-- **配置生成层注入 12 个 1.14 字段** - `config_generator.rs`：
-  - `dns.optimistic`（乐观 DNS 缓存）
-  - `dns.timeout`（per-server 超时）
-  - `route.default_http_client = "default"`
-  - `http_clients: [{tag:"default"}]` 顶层 HTTP 客户端
-  - `services: [{type:api, dashboard.enabled, secret}]` Web Dashboard toggle
-  - `endpoints: [{type:tailscale, ssh_server, taildrop_directory}]` 可选注入
-- **内核下载支持 4 轨** - fetch-kernel.mjs 与 versioning.rs 透传 `kernel_update_track`（stable / oldstable / beta / testing）
-- **AppConfig 持久化 15 个 1.14 字段** - `state_model.rs` + `database.rs`（SQLite 列 + `try_get` 兜底兼容老库）+ `AppConfig.ts`（ts-rs 类型同步）+ `AppStore` 15 个 ref + `PersistenceState` 扩展 + `persistence.ts` 持久化
-- **proxy_service.rs 大幅精简（1240 → 407 行）** - 随 gRPC 迁移删掉所有 Clash API HTTP 调用代码：`build_controller_url` / `fetch_controller_json` / `put_controller` / `patch_controller_json` / `delete_controller` 五个函数移除；Tauri 命令注册收敛为 gRPC 桥接（`get_kernel_version` / `get_groups` / `select_outbound` / `url_test` / `get_clash_mode_status` / `set_clash_mode` 等）+ 内核写入 + 自定义规则 CRUD
-- **事件中继 4 WebSocket → 4 server-streaming** - `core/kernel_service/event.rs` 完全重写：之前 4 个独立 WebSocket 中继（traffic / memory / log / connection）替换为 4 个 gRPC server-streaming（`SubscribeStatus` / `SubscribeLog` / `SubscribeConnections` / `SubscribeGroups`），连接更少、重连更原子化；停止内核时通过全局 `Notify` 让所有 task 优雅退出
-- **代理模式切换改写 route.rules 最高优先级 clash_mode 规则** - `subscription_service/mode.rs` 重写：sing-box 1.14+ 已移除 `experimental.clash_api.default_mode`，改为在 `route.rules` 首位置插入一条 `clash_mode: global/rule` 规则（已存在则替换），并把 `modify_default_mode` 拆分为 `write_clash_mode_rule` / `ensure_route_rules` / `upsert_clash_mode_rule` 三个职责单一的 helper
-- **删除 metacubexd 兼容层 + 旧 RulesStore / rule-service** - gRPC 迁移清理工作：
-  - 移除 `core/kernel_service/embedded.rs::ensure_external_ui`（启动时预下载 metacubexd UI）
-  - 移除 `services/rule-service.ts` 与 `stores/kernel/RulesStore.ts`（旧版自定义规则 CRUD 入口，issue #62 的早期实现）
-  - `RulesView.vue` 完全重写：tab 三栏（rules / providers / custom）改为单一列表，调 `get_rules` 后端 + `n-data-table` 展示 type / payload / outbound 三列
-  - `ProxyView.vue` 删除 "providers" tab（官方 API 未暴露 proxy providers）；规则 / 代理提供者 UI 待官方 API 扩展后重建
-- **设置页新增"高级（1.14 实验性）"折叠组** - `SettingsAdvancedTab.vue` + `useAdvancedSettingsForm.ts`：5 个分组共 11 个控件（DNS 优化、mDNS、Hysteria2 抗指纹、obfs 类型、TLS spoof、Clash Mode、Web Dashboard、Tailscale endpoint/SSH server/Taildrop 目录）
-- **AppConfig.ts 自动生成类型补充** - `src/types/generated/AppConfig.ts` 手动补 15 个 1.14 字段（ts-rs 在 test 模式下不触发 export，需手动同步）
-
-### 🧪 测试验证
-
-- `cargo check --lib`：✅ 零错误（9 warnings 全是历史遗留 unused import/function）
-- `cargo clippy --lib`：✅ 通过
-- `cargo test --lib`：✅ **152 passed, 0 failed**
-- `pnpm type-check`：✅ **EXIT 0**（含新 RulesView + SettingsAdvancedTab + AppStore 1.14 字段）
-- `grpc_smoke` 实机联调 1.14.0：✅ **"🎉 全部 gRPC API 调用通过"** — 启动 sing-box 1.14.0 + 7 个方法 + 2 个流接口成功（GetVersion=1.14.0 / GetGroups / GetClashModeStatus / SetClashMode global→rule 回滚 / GetStartedAt / SubscribeLog 拿到真实日志 "service/api[0]: tcp server started at 127.0.0.1:29999"）
+- 清理 4 个 deprecated 字段（`clash_api` / `store_rdrc` / `independent_cache` / `download_detour`）
+- 订阅解析器补 1.14 协议与字段（snell / wireguard / tailscale / hysteria2 新字段）
+- gRPC-Web 流式解析优化
+- 配置生成层注入 12 个 1.14 字段
+- AppConfig 持久化 15 个 1.14 字段
+- `proxy_service.rs` 大幅精简（1240 → 407 行）
+- 事件中继 4 WebSocket → 4 server-streaming
+- 代理模式改写 `route.rules` 最高优先级 `clash_mode` 规则
+- 删除 metacubexd 兼容层 + 旧 `RulesStore` / `rule-service`
+- 设置页新增"高级（1.14 实验性）"折叠组
 
 ## [v2.3.1] - 2026-06-17
 
