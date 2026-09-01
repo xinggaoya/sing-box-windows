@@ -361,6 +361,33 @@ fn emit_groups(app: &AppHandle, groups: &Groups) {
     // 直接 emit 后端解出来的 Groups 结构(snake_case 字段名),前端负责按需转换。
     // SubscribeGroups 在以下情况都会推新 frame:URLTest 测速完成 / SelectOutbound 切换 /
     // SetGroupExpand 折叠展开,前端实时收到。
+    //
+    // 诊断:打印每帧的 group 数 + items 总数 + 分类计数(成功 / 失败 / 未测),排查
+    // "测速后没刷新"或"全部失败"时能直接看出 relay 链路是否在推送,以及测速
+    // 结果的分布。失败 = urlTestTime > 0 但 urlTestDelay == 0(sing-box 1.14 URLTest
+    // 失败时调 DeleteURLTestHistory,history 不存在时 proto 默认 0)。
+    let total_items: usize = groups.group.iter().map(|g| g.items.len()).sum();
+    let with_delay: usize = groups
+        .group
+        .iter()
+        .flat_map(|g| g.items.iter())
+        .filter(|it| it.url_test_delay > 0)
+        .count();
+    let with_failure: usize = groups
+        .group
+        .iter()
+        .flat_map(|g| g.items.iter())
+        .filter(|it| it.url_test_time > 0 && it.url_test_delay == 0)
+        .count();
+    let untested: usize = total_items.saturating_sub(with_delay + with_failure);
+    info!(
+        "groups-data emit: groups={} items={} (ok={} failed={} untested={})",
+        groups.group.len(),
+        total_items,
+        with_delay,
+        with_failure,
+        untested
+    );
     if let Err(e) = app.emit("groups-data", groups) {
         warn!("emit groups-data failed: {}", e);
     }

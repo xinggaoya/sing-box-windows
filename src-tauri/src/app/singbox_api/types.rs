@@ -8,6 +8,7 @@ pub struct Groups {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Group {
     pub tag: String,
     #[serde(rename = "type")]
@@ -19,6 +20,7 @@ pub struct Group {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GroupItem {
     pub tag: String,
     #[serde(rename = "type")]

@@ -130,16 +130,6 @@
               >
                 {{ formatLatency(node) }}
               </n-tag>
-              <n-button
-                size="tiny"
-                quaternary
-                :loading="proxyStore.nodeTestingMap[node]"
-                @click.stop="testNode(node)"
-              >
-                <template #icon>
-                  <n-icon size="13"><SpeedometerOutline /></n-icon>
-                </template>
-              </n-button>
             </div>
           </div>
         </div>
@@ -365,23 +355,14 @@ const changeProxy = async (groupName: string, proxyName: string) => {
   }
 }
 
-const testNode = async (proxyName: string) => {
-  if (!activeGroup.value) {
-    message.warning(t('proxy.testNoActiveGroup') ?? '请先选择组')
-    return
-  }
-  try {
-    await proxyStore.testNodeDelay(activeGroup.value.tag, proxyName)
-  } catch {
-    message.error(t('proxy.testFailed'))
-  }
-}
-
 const testActiveGroup = async () => {
   if (!activeGroup.value) return
   try {
+    // 不再弹"测速完成"message:URLTest gRPC RPC 是 fire-and-forget,调完不等测速完成,
+    // 真正的"测速完成"由 SubscribeGroups 推送新 frame 体现(成功的节点 urlTestDelay>0
+    // 立即显示延迟;失败的 8s 后由 store 延迟标红)。用户看到延迟数字/失败标签变化
+    // 就是完成信号,不需要 message 提示。
     await proxyStore.testGroupDelay(activeGroup.value.name)
-    message.success(t('proxy.groupTestComplete'))
   } catch {
     message.error(t('proxy.testErrorMessage'))
   }
@@ -390,7 +371,6 @@ const testActiveGroup = async () => {
 const batchTest = async () => {
   try {
     await proxyStore.testAllGroups()
-    message.success(t('proxy.batchTestComplete'))
   } catch {
     message.error(t('proxy.testErrorMessage'))
   }
@@ -448,17 +428,27 @@ const getNodeFlagUrl = (nodeName?: string | null) => {
 }
 
 const formatLatency = (proxyName: string) => {
-  const latency = proxyStore.getLatency(proxyName)
-  return latency > 0 ? `${latency}ms` : t('proxy.clickToTest')
+  const status = proxyStore.getLatencyStatus(proxyName)
+  if (status === 'ok') {
+    return `${proxyStore.getLatency(proxyName)}ms`
+  }
+  if (status === 'failed') {
+    return t('proxy.testFailed')  // "测速失败" / "Test failed" / "Ошибка теста"
+  }
+  return t('proxy.clickToTest')  // "点击测试" / "Click to test"
 }
 
 const latencyTagType = (proxyName: string) => {
-  const latency = proxyStore.getLatency(proxyName)
+  const status = proxyStore.getLatencyStatus(proxyName)
   if (activeGroup.value?.now === proxyName) return 'success' as const
-  if (latency <= 0) return 'default' as const
-  if (latency < 200) return 'success' as const
-  if (latency < 500) return 'warning' as const
-  return 'error' as const
+  if (status === 'ok') {
+    const latency = proxyStore.getLatency(proxyName)
+    if (latency < 200) return 'success' as const
+    if (latency < 500) return 'warning' as const
+    return 'error' as const
+  }
+  if (status === 'failed') return 'error' as const  // 红色:测过但失败
+  return 'default' as const  // 灰色:未测
 }
 
 // 进入代理页时,setupGroupsDataListener 内部会自检 activeConfigPath 是否变更,

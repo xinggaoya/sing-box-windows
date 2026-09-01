@@ -35,8 +35,28 @@ export const useProxyStore = defineStore('proxy', () => {
   const batchTesting = ref(false)
   /** 原始 gRPC Groups 数据 */
   const rawGroups = ref<GroupsData>({ group: [] })
-  const nodeTestingMap = ref<Record<string, boolean>>({})
+  // 节点级测速状态:已删除。sing-box 1.14 gRPC 没有"测单节点" RPC(只有 URLTest 测整组),
+  // 官方 sing-box-dashboard 也没有"测单节点"按钮。延迟刷新完全靠 SubscribeGroups 推送。
   const groupTestingMap = ref<Record<string, boolean>>({})
+  /**
+   * "已测过但失败的节点"集合。set 里的节点会被 getLatencyStatus 判定为 'failed'。
+   *
+   * 为什么需要这个:sing-box 1.14 URLTestGroup 测速失败时调 `DeleteURLTestHistory`,
+   * history 不存在时 proto 序列化默认 `urlTestTime=0` 和 `urlTestDelay=0`——
+   * **失败节点跟"还没测"长得一样**,无法仅靠 urlTestTime 区分。
+   *
+   * 因此前端必须主动追踪"哪些节点刚被测过且失败":
+   * - URLTest 触发时:不立即 fill,启动 15s timer
+   * - 15s 后(sing-box URLTestGroup 通常 < 10s 完成):检查所有该组节点,
+   *   urlTestDelay 仍为 0 的 → 加入 testedNodes
+   *   urlTestDelay > 0 的 → 已经在 SubscribeGroups 推过来时显示"Xms",不需要标 failed
+   * - 为什么不立刻 fill:立刻 fill + SubscribeGroups 中间推 frame(测速未完成时)
+   *   会让"最终会成功"的节点先被标 failed(因为 urlTestDelay 暂时还是 0),导致
+   *   "先失败后成功"的闪烁。
+   * - SubscribeGroups callback 仍保留清理逻辑(切订阅/重启时,testedNodes 里
+   *   已经不存在的 tag 会被移除,避免错位)
+   */
+  const testedNodes = ref<Set<string>>(new Set())
 
   const favorites = useLocalStorage<string[]>('proxy-favorites', [])
   const excludedRecommendations = useLocalStorage<string[]>('proxy-recommendation-excluded', [])
@@ -93,6 +113,28 @@ export const useProxyStore = defineStore('proxy', () => {
       if (item && item.urlTestDelay > 0) return item.urlTestDelay
     }
     return 0
+  }
+
+  /**
+   * 节点延迟状态(配合 `formatLatency` 区分显示):
+   * - `'ok'`:测速成功(urlTestDelay > 0)
+   * - `'failed'`:URLTest 已发出但该节点 urlTestDelay 仍为 0
+   *   sing-box 1.14 URLTestGroup 测速失败时调 DeleteURLTestHistory,导致
+   *   urlTestTime 和 urlTestDelay 都回到 0,跟"未测"无法区分。
+   *   所以前端用 `testedNodes` set 追踪"URLTest 已发但结果未到"——这些节点
+   *   在 SubscribeGroups 新 frame 到达时,如果 urlTestDelay > 0 会从 set 移除
+   *   (测速成功),剩下的就是 failed。
+   * - `'untested'`:还没测过(URLTest 没触发过该节点)
+   */
+  const getLatencyStatus = (proxyName: string): 'untested' | 'failed' | 'ok' => {
+    for (const g of proxyGroups.value) {
+      const item = g.items.find((it) => it.tag === proxyName)
+      if (!item) continue
+      if (item.urlTestDelay > 0) return 'ok'
+      if (testedNodes.value.has(proxyName)) return 'failed'
+      return 'untested'
+    }
+    return 'untested'
   }
 
   const isProxyGroup = (name: string) => proxyGroups.value.some((g) => g.name === name)
@@ -153,73 +195,102 @@ export const useProxyStore = defineStore('proxy', () => {
     }
   }
 
-  /** 整组测速（gRPC URLTest） */
+  /**
+   * 整组测速（gRPC URLTest）。
+   *
+   * 对齐官方 sing-box-dashboard (src/api/daemon.ts) 行为:
+   *   async urlTest(outboundTag: string): Promise<void> {
+   *     await this.client.uRLTest({ outboundTag });
+   *   }
+   * — 官方不调 fetchProxies,完全等 SubscribeGroups 流推送新 frame,前端 store 在
+   * update callback 里直接覆盖 groups。
+   *
+   * 我们之前"测速后等 3s + fetchProxies"是兜底补丁(误以为 SubscribeGroups 不推送),
+   * 但 fetchProxies 走的是 subscribe_groups().next() 取首帧,如果测速还没完成,
+   * 首帧是 URLTest 前的快照,urlTestDelay 全是 0,反而覆盖掉 SubscribeGroups 推过来的
+   * 新数据。移除兜底,让延迟刷新完全靠 relay 推送。
+   *
+   * 测速成功 / 失败的判定时序:
+   * - URLTest 触发后 ~5-15s 内,sing-box URLTestGroup 陆续完成各节点测速
+   * - 测速完成的节点通过 SubscribeGroups 推过来的新 frame,urlTestDelay > 0
+   *   → getLatencyStatus 走 'ok' 分支,UI 显示 "Xms"
+   * - 测速失败节点 urlTestDelay === 0 且 urlTestTime 也会被 DeleteURLTestHistory 清成 0
+   *   → 单看 proto 字段无法跟"未测"区分
+   * - 因此 15s 后用 setTimeout 把"组内 urlTestDelay 仍为 0 的节点"加入 testedNodes
+   *   → getLatencyStatus 走 'failed' 分支,UI 显示 "测速失败"
+   *
+   * 为什么不立刻 fill testedNodes:立刻 fill 会让 SubscribeGroups 中间推 frame
+   * (测速未完成时 urlTestDelay 暂时还是 0) 把"最终会成功"的节点误标 failed,
+   * 出现"先失败后成功"的闪烁。
+   */
   const testGroupDelay = async (groupName: string) => {
     groupTestingMap.value = { ...groupTestingMap.value, [groupName]: true }
     try {
       const result = await proxyService.urlTest(groupName)
-      if (!result.ok) return false
-      // sing-box 1.14 URLTest 完成后**不会**自动推 SubscribeGroups frame
-      // (Node 实测 8 秒内 0 个新 frame),所以测速完成后前端必须主动拉一次最新 groups
-      // 才能拿到更新后的 url_test_delay。
-      // 经验等待:小规模组 3-5 秒足够,大规模组可能更久,这里固定 3 秒。
-      await new Promise((r) => setTimeout(r, 3000))
-      await fetchProxies()
-      return true
-    } finally {
+      // 8s 后:loading 结束 + 标 failed。
+      // - 测速成功的节点:期间 SubscribeGroups 推新 frame,urlTestDelay > 0,
+      //   getLatencyStatus 自然走 'ok' 路径,UI 显示 "Xms"。
+      // - 测速失败的节点:urlTestDelay 仍 0,加入 testedNodes,UI 显示红色"测速失败"。
+      // - 未测的节点:urlTestDelay=0 + testedNodes 没它,UI 仍是灰色"点击测试"。
+      // 选 8s 是因为 sing-box 1.14 URLTestGroup 默认 timeout 5s,大多数订阅 8s 内
+      // 完成测速;15s 太长让用户以为"测速早就完成"。
+      setTimeout(() => {
+        const group = proxyGroups.value.find((g) => g.name === groupName)
+        if (group) {
+          const next = new Set(testedNodes.value)
+          for (const it of group.items) {
+            if (it.urlTestDelay === 0) next.add(it.tag)
+          }
+          testedNodes.value = next
+        }
+        groupTestingMap.value = { ...groupTestingMap.value, [groupName]: false }
+      }, 8000)
+      return result.ok
+    } catch {
+      // 异常(URLTest RPC 失败):立即结束 loading,不要再 setTimeout
       groupTestingMap.value = { ...groupTestingMap.value, [groupName]: false }
+      return false
     }
   }
 
   /**
-   * 单节点测速。
-   * ⚠️ 节点 tag 在 sing-box 1.14 里通常属于多个 selector 组(如 "自动选择" / "Telegram" 等),
-   * 不能用 `find` 反查(总是命中第一个组 "自动选择")。
-   * 必须由 view 层传当前激活的 group 进来。
+   * 批量测速所有组（gRPC URLTest）。同 testGroupDelay 的延迟 8s 标 failed 逻辑。
    */
-  const testNodeDelay = async (groupTag: string, proxyName: string) => {
-    if (!groupTag) {
-      throw new Error('testNodeDelay 缺少 groupTag(节点可能在多个组里)')
-    }
-    nodeTestingMap.value = { ...nodeTestingMap.value, [proxyName]: true }
-    try {
-      const result = await proxyService.urlTest(groupTag)
-      // 等测速完成(同 testGroupDelay 同样的 3 秒),主动拉 groups 拿最新延迟
-      if (result.ok) {
-        await new Promise((r) => setTimeout(r, 3000))
-        await fetchProxies()
-      }
-      return { ok: result.ok, delay: 0, proxy: proxyName } as {
-        ok: boolean
-        delay: number
-        proxy: string
-      }
-    } finally {
-      nodeTestingMap.value = { ...nodeTestingMap.value, [proxyName]: false }
-    }
-  }
-
   const testAllGroups = async () => {
     const groupNames = proxyGroups.value.map((g) => g.name)
     batchTesting.value = true
-    // 标记所有组在测速中(因为我们这里直接调 urlTest,绕过 testGroupDelay 的 loading 标记)
+    // 标记所有组在测速中
     groupTestingMap.value = groupNames.reduce(
       (acc, g) => ({ ...acc, [g]: true }),
       { ...groupTestingMap.value },
     )
     try {
-      // 直接调 urlTest,不走 testGroupDelay —— 否则 N 个组每个等 3 秒 = 30s+
+      // 并发触发所有组 URLTest,延迟刷新靠 SubscribeGroups relay 推送
       const results = await Promise.all(groupNames.map((g) => proxyService.urlTest(g)))
-      // 等待所有组测速完成
-      await new Promise((r) => setTimeout(r, 5000))
-      await fetchProxies()
+      // 8s 后:loading 结束 + 标 failed
+      setTimeout(() => {
+        const next = new Set(testedNodes.value)
+        for (const g of proxyGroups.value) {
+          for (const it of g.items) {
+            if (it.urlTestDelay === 0) next.add(it.tag)
+          }
+        }
+        testedNodes.value = next
+        batchTesting.value = false
+        groupTestingMap.value = groupNames.reduce(
+          (acc, g) => ({ ...acc, [g]: false }),
+          { ...groupTestingMap.value },
+        )
+      }, 8000)
       return results.map((r) => ({ ok: r.ok }))
-    } finally {
+    } catch {
+      // 异常:立即结束 loading
       batchTesting.value = false
       groupTestingMap.value = groupNames.reduce(
         (acc, g) => ({ ...acc, [g]: false }),
         { ...groupTestingMap.value },
       )
+      throw new Error('urlTest failed')
     }
   }
 
@@ -257,8 +328,8 @@ export const useProxyStore = defineStore('proxy', () => {
     return recommended
   }
 
-  // 订阅后端 SubscribeGroups 推送,URLTest 测速完成后会自动回写延迟。
-  // 之前完全靠前端 getGroups() 一次性快照,测速后不重取 → 延迟不刷新。
+  // 订阅后端 SubscribeGroups relay 推送,URLTest 测速完成后会实时回写延迟。
+  // 这是官方 sing-box-dashboard 的做法——测速后不做任何主动 fetch,完全靠流式推送。
   // 同时监听 kernel-ready 事件:订阅切换 / 代理模式切换 / 端口变更等会触发内核重启,
   // 重启后需要重新拉取代理组,否则代理页会一直显示旧配置对应的代理列表(需手动点刷新)。
   const groupsDataUnlisten = ref<(() => void) | null>(null)
@@ -267,8 +338,8 @@ export const useProxyStore = defineStore('proxy', () => {
     const { eventService } = await import('@/services/event-service')
     const { APP_EVENTS } = await import('@/constants/events')
 
-    // 兜底自检:如果进入代理页时,后端活跃配置路径已经和上次拉取时的不一致,
-    // 说明中途切换过订阅/配置,立即重新拉取。
+    // 自检:如果进入代理页时,后端活跃配置路径已经和上次拉取时的不一致,
+    // 说明中途切换过订阅/配置,立即重新拉取(否则 relay 推的还是旧 configPath 的 groups)。
     // 解决"切订阅后立即进入代理页,kernel-ready 事件已错过"的时序竞态。
     const currentActivePath = useAppStore().activeConfigPath
     if (lastFetchedConfigPath.value !== currentActivePath) {
@@ -282,9 +353,52 @@ export const useProxyStore = defineStore('proxy', () => {
         APP_EVENTS.groupsData,
         (payload: unknown) => {
           // 后端 emit 的是 gRPC Groups 结构(可能含 group / outboundList 等字段)
-          // 直接覆盖 rawGroups 即可
+          // 直接覆盖 rawGroups 即可,URLTest 完成后的 urlTestDelay 也会在这里更新
           const data = payload as GroupsData
+          // 诊断:在 dev tools console 打一条,确认事件是否真的到前端 + payload 形状。
+          // 字段名应该都是 camelCase:group/tag/type/selectable/selected/isExpand/items,
+          // GroupItem:tag/type/urlTestTime/urlTestDelay。
+          const firstGroup = (data as { group?: unknown[] }).group?.[0] as
+            | { tag?: string; items?: { tag?: string; urlTestDelay?: number }[] }
+            | undefined
+          const firstItem = firstGroup?.items?.[0]
+          const firstDelay = firstItem?.urlTestDelay
+          // eslint-disable-next-line no-console
+          console.debug(
+            `[groups-data] groups=${(data as { group?: unknown[] }).group?.length ?? 0}` +
+              ` firstGroup=${firstGroup?.tag} firstItem=${firstItem?.tag}` +
+              ` firstDelay=${firstDelay} (raw payload keys: ${Object.keys(data ?? {}).join(',')})`,
+          )
           if (data && Array.isArray((data as { group?: unknown[] }).group)) {
+            // 清理 testedNodes:对 set 中每个 tag,看新 frame 的对应 item:
+            // - 新 frame 没该 tag(切订阅/重启内核了)→ 移除
+            // - 新 frame 有该 tag 且 urlTestDelay > 0(测速成功)→ 移除
+            // - 新 frame 有该 tag 且 urlTestDelay === 0(测速失败)→ 保留
+            //   保留的节点会被 getLatencyStatus 判定为 'failed'。
+            if (testedNodes.value.size > 0) {
+              const newItemsByTag = new Set<string>()
+              for (const g of (data as { group: { items: { tag: string; urlTestDelay: number }[] }[] }).group) {
+                for (const it of g.items) newItemsByTag.add(it.tag)
+              }
+              const next = new Set<string>()
+              for (const tag of testedNodes.value) {
+                if (!newItemsByTag.has(tag)) continue  // 新 frame 里没了(切订阅/重启)
+                // 新 frame 里有该 tag
+                let newDelay = 0
+                for (const g of (data as { group: { items: { tag: string; urlTestDelay: number }[] }[] }).group) {
+                  const it = g.items.find((i) => i.tag === tag)
+                  if (it) {
+                    newDelay = it.urlTestDelay
+                    break
+                  }
+                }
+                if (newDelay > 0) continue  // 测速成功,移除
+                next.add(tag)  // 仍为 0,保留为 'failed'
+              }
+              if (next.size !== testedNodes.value.size) {
+                testedNodes.value = next
+              }
+            }
             rawGroups.value = data
             // SubscribeGroups 推送的快照也是对应当前 activeConfigPath,顺手记录避免重复 fetch
             lastFetchedConfigPath.value = useAppStore().activeConfigPath
@@ -318,7 +432,6 @@ export const useProxyStore = defineStore('proxy', () => {
     loading,
     batchTesting,
     rawGroups,
-    nodeTestingMap,
     groupTestingMap,
     favorites,
     excludedRecommendations,
@@ -333,6 +446,7 @@ export const useProxyStore = defineStore('proxy', () => {
     groupCount,
     nodeCount,
     getLatency,
+    getLatencyStatus,
     isProxyGroup,
     isFavorite,
     toggleFavorite,
@@ -341,7 +455,6 @@ export const useProxyStore = defineStore('proxy', () => {
     toggleGroupExpanded,
     fetchProxies,
     changeProxy,
-    testNodeDelay,
     testGroupDelay,
     testAllGroups,
     setupGroupsDataListener,
