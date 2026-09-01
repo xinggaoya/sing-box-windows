@@ -42,7 +42,8 @@ export async function main(rawArgs = process.argv.slice(2)) {
         force,
         getVersion: async () => {
           if (!resolvedVersion) {
-            resolvedVersion = await getLatestVersion()
+            // --track 必须透传给版本解析,否则 oldstable/beta/testing 永远解析成 stable
+            resolvedVersion = await getLatestVersion({ track: args.track })
           }
           return resolvedVersion
         }
@@ -205,7 +206,12 @@ export async function getLatestVersion(options = {}) {
   // - oldstable：上一稳定版（兼容性回退）
   // - beta：稳定预发版
   // - testing：testing 分支
-  const track = (options.track ?? 'stable').toLowerCase();
+  const track = String(options.track ?? 'stable').toLowerCase();
+  if (!['stable', 'oldstable', 'beta', 'testing'].includes(track)) {
+    throw new Error(
+      `Unknown --track '${track}'. Supported: stable | oldstable | beta | testing`
+    );
+  }
   const includePrerelease = track === 'beta' || track === 'testing';
 
   // oldstable/beta/testing：拉取 releases 列表后本地筛选
@@ -306,17 +312,40 @@ async function getLatestFromReleases(includePrerelease, track) {
   );
 }
 
-/// 从已排序（newest-first）的 releases 数组里按 track 选一个版本。
+/// 从按版本号降序排序后的 releases 数组里按 track 选一个版本。
+/// - stable：第一个 stable release
 /// - oldstable：找版本号第二大的 stable（major.minor 不同的最大 stable）
 /// - beta：第一个 prerelease
 /// - testing：第一个 prerelease（beta/testing 共用 same channel）
-/// - stable：第一个 stable release
+///
+/// 排序必须用版本号本身而不是 published_at：老版本的补丁（如 1.13.x 的后发补丁）
+/// 发布时间可能晚于新 major 的首个版本,按时间排序会把 oldstable 识别错。
+function parseVersionParts(tag) {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([\w.]+))?$/.exec(String(tag ?? '').trim());
+  if (!m) {
+    return null;
+  }
+  return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]), pre: m[4] ?? null };
+}
+
+/// 版本号降序比较（semver 语义:prerelease 低于同版本号的正式版）
+function compareVersionTagsDesc(a, b) {
+  const va = parseVersionParts(a?.tag_name);
+  const vb = parseVersionParts(b?.tag_name);
+  if (!va && !vb) return 0;
+  if (!va) return 1;
+  if (!vb) return -1;
+  for (const key of ['major', 'minor', 'patch']) {
+    if (va[key] !== vb[key]) return vb[key] - va[key];
+  }
+  if (va.pre && vb.pre) return vb.pre.localeCompare(va.pre);
+  if (va.pre) return 1;
+  if (vb.pre) return -1;
+  return 0;
+}
+
 function selectVersionFromReleases(releases, track, includePrerelease) {
-  const sorted = [...releases].sort((a, b) => {
-    const at = a?.published_at ?? a?.created_at ?? '';
-    const bt = b?.published_at ?? b?.created_at ?? '';
-    return bt.localeCompare(at); // descending
-  });
+  const sorted = [...releases].sort(compareVersionTagsDesc);
 
   if (track === 'stable') {
     const found = sorted.find((r) => !r.prerelease);
