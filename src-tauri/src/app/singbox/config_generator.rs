@@ -95,6 +95,27 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         json!({ "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN, "server": DNS_PROXY }),
     ];
 
+    // mDNS 规则必须排在所有其他 DNS 规则之前：*.local / link-local 反查只应答于
+    // 本地多播,落到 CN/代理解析都会失败。域名列表与 sing-box v1.14.0
+    // dns/transport/mdns 的 mdnsLocalZones 一一对应（不用 geosite-private,
+    // 那里面还混着 *.lan 等非 mDNS 名称,发去多播组不会有应答）。
+    if app_config.singbox_dns_use_mdns {
+        dns_rules.insert(
+            0,
+            json!({
+                "domain_suffix": [
+                    "local",
+                    "254.169.in-addr.arpa",
+                    "8.e.f.ip6.arpa",
+                    "9.e.f.ip6.arpa",
+                    "a.e.f.ip6.arpa",
+                    "b.e.f.ip6.arpa"
+                ],
+                "server": DNS_MDNS
+            }),
+        );
+    }
+
     if app_config.singbox_block_ads {
         dns_rules.insert(2, json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
     }
@@ -361,7 +382,8 @@ fn build_dns_servers(
         servers.push(build_fakeip_dns_server(app_config));
     }
 
-    // 1.14 mDNS server（*.local / link-local 名称解析）；通过 geosite-local rule_set 引用
+    // 1.14 mDNS server（*.local / link-local 反向解析）；由 build_dns_rules 里的
+    // mDNS 域名后缀规则引用
     if app_config.singbox_dns_use_mdns {
         servers.push(build_mdns_dns_server());
     }
