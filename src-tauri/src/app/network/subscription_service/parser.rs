@@ -731,6 +731,15 @@ fn decode_tag(raw: Option<&str>) -> String {
         .unwrap_or_default()
 }
 
+/// 对 URI userinfo 做 percent-decode。`url` crate 的 username()/password() 返回的是
+/// 原始编码值,trojan/snell 等密码里常见 `%40`、空格、非 ASCII 字符,不解码会导致
+/// 认证串错。解码失败时原样返回（保持旧行为）。
+fn decode_userinfo(raw: &str) -> String {
+    urlencoding::decode(raw)
+        .map(|s| s.to_string())
+        .unwrap_or_else(|_| raw.to_string())
+}
+
 fn default_tag_for_url(url: &Url) -> String {
     let host = url.host_str().unwrap_or("unknown");
     let port = url.port().unwrap_or(0);
@@ -821,7 +830,7 @@ fn build_basic_tls_config(
 
 fn parse_vless_uri(uri: &str) -> Option<Value> {
     let url = Url::parse(uri).ok()?;
-    let uuid = url.username().trim();
+    let uuid = decode_userinfo(url.username().trim());
     if uuid.is_empty() {
         return None;
     }
@@ -934,7 +943,7 @@ fn parse_vless_uri(uri: &str) -> Option<Value> {
 
 fn parse_trojan_uri(uri: &str) -> Option<Value> {
     let url = Url::parse(uri).ok()?;
-    let password = url.username().trim();
+    let password = decode_userinfo(url.username().trim());
     if password.is_empty() {
         return None;
     }
@@ -1004,7 +1013,7 @@ fn parse_trojan_uri(uri: &str) -> Option<Value> {
 
 fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
     let url = Url::parse(uri).ok()?;
-    let password = url.username().trim();
+    let password = decode_userinfo(url.username().trim());
     if password.is_empty() {
         return None;
     }
@@ -1095,23 +1104,18 @@ fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
         node["disable_chrome_parrot"] = json!(disable_chrome_parrot);
     }
 
-    // hop_interval_max / hop_interval（跳跃间隔随机化）
-    if let Some(hop_interval) = query
-        .get("hop_interval_max")
-        .or_else(|| query.get("hop_interval"))
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-    {
-        node["hop_interval_max"] = json!(hop_interval);
-    }
-
-    // realm（Hysteria2 NAT traversal 配套字段，详见 1.14 changelog）
-    if let Some(realm) = query
-        .get("realm")
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-    {
-        node["realm"] = json!(realm);
+    // hop_interval / hop_interval_max（端口跳跃间隔;1.14 新增 max 随机化上界）。
+    // 两个参数语义不同,必须分别写入对应字段;裸数字参数（如 "60"）按秒补单位,
+    // sing-box 侧是 badoption.Duration,合法值形如 "30s"/"10m"。
+    for (param, field) in [("hop_interval", "hop_interval"), ("hop_interval_max", "hop_interval_max")] {
+        if let Some(value) = query
+            .get(param)
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            let duration = normalize_duration_seconds(value);
+            node[field] = json!(duration);
+        }
     }
 
     // fastopen 参数（0/1）
@@ -1123,25 +1127,40 @@ fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
         node["tcp_fast_open"] = json!(fast_open);
     }
 
-    // mport 多端口参数（逗号分隔），映射到 server_ports
+    // mport 多端口参数（如 "20000-30000" 或逗号分隔多段）,映射到 server_ports。
+    // sing-box 的 server_ports 段格式是 "start:end"（冒号）,URI 的 mport 用连字符,
+    // 需要转换;原样写入连字符格式会导致内核严格反序列化失败、整个配置被拒。
     if let Some(mport) = query.get("mport").map(|s| s.trim()).filter(|s| !s.is_empty()) {
         let ports: Vec<Value> = mport
             .split(',')
             .map(|p| p.trim())
             .filter(|p| !p.is_empty())
-            .map(|p| Value::String(p.to_string()))
+            .map(|p| Value::String(p.replace('-', ":")))
             .collect();
         if !ports.is_empty() {
             node["server_ports"] = json!(ports);
         }
     }
 
+    // 注:hysteria2 URI 的 realm= 参数不映射 —— sing-box 1.14 的 realm 是
+    // Hysteria2Realm 结构体（必需 server_url/realm_id/stun_servers）,URI 里没有
+    // 这些结构化数据,把裸字符串写进 realm 字段会让内核拒绝整个配置。
+
     Some(node)
+}
+
+/// 把裸数字的时长参数补上秒单位（"60" → "60s"）;已带单位的值原样返回。
+fn normalize_duration_seconds(value: &str) -> String {
+    if value.chars().all(|c| c.is_ascii_digit()) && !value.is_empty() {
+        format!("{}s", value)
+    } else {
+        value.to_string()
+    }
 }
 
 fn parse_tuic_uri(uri: &str) -> Option<Value> {
     let url = Url::parse(uri).ok()?;
-    let uuid = url.username().trim();
+    let uuid = decode_userinfo(url.username().trim());
     if uuid.is_empty() {
         return None;
     }
@@ -1158,7 +1177,10 @@ fn parse_tuic_uri(uri: &str) -> Option<Value> {
         }
     };
 
-    let password = url.password().map(str::trim).filter(|value| !value.is_empty());
+    let password = url
+        .password()
+        .map(|p| decode_userinfo(p.trim()))
+        .filter(|value| !value.is_empty());
     let sni = query
         .get("sni")
         .or_else(|| query.get("servername"))
@@ -1237,7 +1259,7 @@ fn parse_tuic_uri(uri: &str) -> Option<Value> {
 
 fn parse_anytls_uri(uri: &str) -> Option<Value> {
     let url = Url::parse(uri).ok()?;
-    let password = url.username().trim();
+    let password = decode_userinfo(url.username().trim());
     if password.is_empty() {
         return None;
     }
@@ -1303,7 +1325,7 @@ fn parse_anytls_uri(uri: &str) -> Option<Value> {
 ///   snell://PSK@host:port?version=2&obfs=http#tag
 fn parse_snell_uri(uri: &str) -> Option<Value> {
     let url = Url::parse(uri).ok()?;
-    let psk = url.username().trim();
+    let psk = decode_userinfo(url.username().trim());
     if psk.is_empty() {
         return None;
     }
@@ -1542,9 +1564,21 @@ fn base64_decode_relaxed(input: &str) -> Option<Vec<u8>> {
 }
 
 fn parse_host_port(hostport: &str) -> Option<(String, u64)> {
-    let mut it = hostport.splitn(2, ':');
-    let server = it.next()?.trim().to_string();
-    let port = it.next()?.trim().parse::<u64>().ok()?;
+    // 兼容 IPv6 字面量 `[2001:db8::1]:8388`：取右起最后一个 ':' 之后为端口,
+    // 之前的部分去掉方括号。旧的 splitn(2, ':') 会把 IPv6 地址拦腰截断,
+    // 导致 ss:// 的 IPv6 节点被静默丢弃。
+    let hostport = hostport.trim();
+    let (server_raw, port_raw) = if hostport.starts_with('[') {
+        let end = hostport.find(']')?;
+        let server = &hostport[1..end];
+        let rest = &hostport[end + 1..];
+        let port = rest.strip_prefix(':')?;
+        (server, port)
+    } else {
+        hostport.rsplit_once(':')?
+    };
+    let server = server_raw.trim().to_string();
+    let port = port_raw.trim().parse::<u64>().ok()?;
     if server.is_empty() {
         return None;
     }
