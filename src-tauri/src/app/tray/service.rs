@@ -517,6 +517,8 @@ pub fn hide_main_window(app: &AppHandle, emit_events: bool) -> Result<(), String
         let _ = app.emit(events::ACTION_HIDE_WINDOW, ());
     }
 
+    refresh_runtime_state_in_background(app);
+
     Ok(())
 }
 
@@ -567,7 +569,18 @@ fn destroy_main_window_for_tray(app: &AppHandle) -> Result<(), String> {
         return Err(format!("销毁主窗口失败: {}", err));
     }
 
+    refresh_runtime_state_in_background(app);
+
     Ok(())
+}
+
+fn refresh_runtime_state_in_background(app: &AppHandle) {
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(err) = refresh_runtime_state_from_backend(&app_handle, true).await {
+            warn!("窗口关闭后刷新托盘运行态失败: {}", err);
+        }
+    });
 }
 
 pub fn request_app_exit(app: &AppHandle) -> Result<(), String> {
