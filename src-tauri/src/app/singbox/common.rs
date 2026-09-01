@@ -23,6 +23,8 @@ pub const DNS_PROXY: &str = "dns_proxy";
 pub const DNS_CN: &str = "dns_cn";
 pub const DNS_RESOLVER: &str = "dns_resolver";
 pub const DNS_FAKEIP: &str = "dns_fakeip";
+// 1.14 新增：mDNS server（*.local / link-local 名称解析）
+pub const DNS_MDNS: &str = "dns_mdns";
 
 pub const FAKE_DNS_FILTER_PROXY_ONLY: &str = "proxy_only";
 pub const FAKE_DNS_FILTER_GLOBAL_NON_CN: &str = "global_non_cn";

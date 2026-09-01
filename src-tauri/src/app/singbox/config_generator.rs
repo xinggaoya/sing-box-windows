@@ -1,7 +1,7 @@
 use super::common::{
     build_dns_server_config, dns_strategy, kernel_log_output_path, node_domain_resolver_strategy,
     normalize_default_outbound, normalize_download_detour, normalize_fake_dns_filter_mode, DNS_CN,
-    DNS_FAKEIP, DNS_PROXY, DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, PRIVATE_IP_CIDRS,
+    DNS_FAKEIP, DNS_MDNS, DNS_PROXY, DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, PRIVATE_IP_CIDRS,
     RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE,
     RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE, RS_GEOSITE_TELEGRAM,
     RS_GEOSITE_YOUTUBE,
@@ -361,7 +361,29 @@ fn build_dns_servers(
         servers.push(build_fakeip_dns_server(app_config));
     }
 
+    // 1.14 mDNS server（*.local / link-local 名称解析）；通过 geosite-local rule_set 引用
+    if app_config.singbox_dns_use_mdns {
+        servers.push(build_mdns_dns_server());
+    }
+
     servers
+}
+
+/// 构造 1.14 新增的 mDNS DNS server。mdns server 不需要 server/server_port 等参数,
+/// 自动监听 mDNS 多播组（224.0.0.251:5353 / [ff02::fb]:5353）解析 *.local 名称。
+fn build_mdns_dns_server() -> DnsServerConfig {
+    DnsServerConfig {
+        tag: DNS_MDNS.to_string(),
+        server_type: Some("mdns".to_string()),
+        server: None,
+        server_port: None,
+        path: None,
+        interface: None,
+        inet4_range: None,
+        inet6_range: None,
+        domain_resolver: None,
+        detour: None,
+    }
 }
 
 fn build_dns_server_with_fallback(
@@ -409,27 +431,42 @@ fn normalize_fakeip_range(raw: &str, fallback: &str) -> String {
 }
 
 fn apply_fake_dns_rules(dns_rules: &mut Vec<Value>, app_config: &AppConfig) {
-    // 先清理所有历史 fakeip 规则，再按当前开关重建，避免重复叠加。
-    dns_rules.retain(|rule| rule.get("server").and_then(|v| v.as_str()) != Some(DNS_FAKEIP));
+    // 先清理所有历史 fakeip 规则（含旧 query_type + server 风格 + 新的 evaluate + tag 风格），
+    // 再按当前开关重建，避免重复叠加。
+    // - 旧风格：`{ "server": "dns_fakeip", ... }`
+    // - 新风格：`{ "action": "evaluate", "server": "dns_fakeip", "tag": "fakeip-result" }`
+    dns_rules.retain(|rule| {
+        let server = rule.get("server").and_then(|v| v.as_str());
+        let tag = rule.get("tag").and_then(|v| v.as_str());
+        // 保留条件：不是直接用 fakeip server，也未带 fakeip-result tag
+        server != Some(DNS_FAKEIP) && tag != Some(FAKEIP_RESULT_TAG)
+    });
 
     if !app_config.singbox_fake_dns_enabled {
         return;
     }
 
+    // 1.14 推荐写法：用 `evaluate` action 触发 fakeip server 给响应打 tag，
+    // 后续 `match_response` 规则可基于 tag 拦截/转发。
+    // 这里用 query_type 限定 A/AAAA 走 fakeip（其他类型如 HTTPS 不需要 fake ip）。
     match normalize_fake_dns_filter_mode(app_config) {
         FAKE_DNS_FILTER_GLOBAL_NON_CN => {
-            // 全局非 CN：保留前面的 CN 规则，其他 A/AAAA 查询统一落到 fakeip。
+            // 全局非 CN：保留前面的 CN 规则，其他 A/AAAA 查询统一触发 fakeip evaluate。
             dns_rules.push(json!({
                 "query_type": ["A", "AAAA"],
-                "server": DNS_FAKEIP
+                "action": "evaluate",
+                "server": DNS_FAKEIP,
+                "tag": FAKEIP_RESULT_TAG
             }));
         }
         _ => {
-            // 仅代理流量：非 CN 域名走 fakeip，国内域名仍按原逻辑直连解析。
+            // 仅代理流量：仅对非 CN 域名触发 fakeip evaluate，国内域名仍按原逻辑直连解析。
             let rule = json!({
                 "query_type": ["A", "AAAA"],
                 "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN,
-                "server": DNS_FAKEIP
+                "action": "evaluate",
+                "server": DNS_FAKEIP,
+                "tag": FAKEIP_RESULT_TAG
             });
 
             let insert_idx = dns_rules
@@ -443,6 +480,11 @@ fn apply_fake_dns_rules(dns_rules: &mut Vec<Value>, app_config: &AppConfig) {
         }
     }
 }
+
+/// fakeip evaluate 规则打 tag 的常量，与 fakeip 响应匹配使用。
+/// 后续如要加 `match_response` 规则拦截特定 fakeip 响应（如 `ip_cidr: 198.18.0.0/15` + `action: reject`），
+/// 直接引用这个 tag 即可。
+const FAKEIP_RESULT_TAG: &str = "fakeip-result";
 
 fn remote_rule_set_value(
     tag: &str,
