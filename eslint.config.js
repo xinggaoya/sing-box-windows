@@ -37,6 +37,7 @@ export default withVueTs(
       '**/*.pid.lock',
       '**/tmp/**',
       '**/temp/**',
+      '**/.tmp_sbd/**',
       '**/.env*',
     ],
   },

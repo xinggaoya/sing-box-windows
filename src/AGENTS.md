@@ -25,6 +25,7 @@ src/
 | 后端事件监听       | `services/event-service.ts`  | traffic/log/connection 入口    |
 | 内核业务前端编排   | `services/kernel-service.ts` | 命令调用最集中                 |
 | 路由行为（含托盘） | `router/index.ts`            | `/blank` 逻辑关键              |
+| 节点选择 / 测速   | `services/proxy-service.ts` + `stores/kernel/ProxyStore.ts` | gRPC API（sing-box 1.14+） |
 
 ## CONVENTIONS (FRONTEND ONLY)
 
@@ -54,3 +55,5 @@ pnpm type-check
 
 - `main.ts` 仅做壳层初始化；真实业务启动在 `boot/useAppBootstrap.ts`。
 - 大文件热点集中在 `views/` 与 `services/kernel-service.ts`，改动前先查现有模式。
+- **API 协议已切换**：内核交互从 Clash API（HTTP RESTful）迁移到 sing-box 1.14+ 官方 gRPC API（`type: "api"`）。前端 services 调用新 Tauri 命令（`get_groups`、`select_outbound`、`url_test`、`close_connection`、`get_clash_mode_status` 等）。
+- **规则页与代理提供者页**已隐藏：官方 gRPC API 未暴露规则管理接口，对应 UI 暂时显示占位说明。详见 `docs/sing-box-api-migration.md`。

@@ -16,7 +16,8 @@ export * from './kernel/ProxyStore'
 export * from './kernel/ConnectionStore'
 export * from './kernel/TrafficStore'
 export * from './kernel/LogStore'
-export * from './kernel/RulesStore'
+// RulesStore 已删除：sing-box 官方 gRPC API 暂未暴露规则管理（toggle rule disabled 等），
+// 规则页 UI 已隐藏，等待官方 API 扩展后重建。
 
 // 导出订阅相关Store
 export * from './subscription/SubStore'

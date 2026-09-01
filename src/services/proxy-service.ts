@@ -1,42 +1,44 @@
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
-import type { ProxyProvidersResponse, RuleProvidersResponse, RulesResponse } from '@/types/controller'
 import { NotificationService } from './notification-service'
 import { invokeWithAppContext } from './invoke-client'
 import i18n from '@/locales'
 
-export interface ProxyLatencyHistoryEntry {
-  time: string
-  delay: number
-}
+// === gRPC API 返回类型（对应后端 singbox_api::types） ===
 
-export interface ProxyData {
+/** 节点项（对应 proto GroupItem） */
+export interface GroupItem {
+  tag: string
   type: string
-  name: string
-  now: string
-  all: string[]
-  history: ProxyLatencyHistoryEntry[]
-  udp: boolean
+  urlTestTime: number
+  urlTestDelay: number
 }
 
-// 延迟测试（测速）结果
-export interface ProxyDelayTestResult {
-  proxy: string
-  delay: number
+/** 节点组（对应 proto Group） */
+export interface ProxyGroup {
+  tag: string
+  type: string
+  selectable: boolean
+  selected: string
+  isExpand: boolean
+  items: GroupItem[]
+}
+
+/** 完整节点组集合（对应 proto Groups） */
+export interface GroupsData {
+  group: ProxyGroup[]
+}
+
+/** Clash 模式状态（对应 proto ClashModeStatus） */
+export interface ClashModeStatus {
+  modeList: string[]
+  currentMode: string
+}
+
+/** 节点测速结果（前端封装，对应 /SelectOutbound + /URLTest 调用结果） */
+export interface UrlTestResult {
   ok: boolean
-  error?: string | null
-  successSamples: number
-}
-
-export interface DelayTestOptions {
-  timeoutMs?: number
-  url?: string
-  concurrency?: number
-  samples?: number
-}
-
-export interface ProxiesData {
-  proxies: Record<string, ProxyData>
+  message?: string
 }
 
 export interface TunOptionsPayload {
@@ -63,7 +65,7 @@ export class ProxyService {
     return useKernelStore()
   }
 
-  private constructor() { }
+  private constructor() {}
 
   public static getInstance(): ProxyService {
     if (!ProxyService.instance) {
@@ -75,16 +77,12 @@ export class ProxyService {
   /**
    * 切换代理模式 - 简化版
    * 后端会从数据库读取配置，前端只需指定模式
-   * @param mode 代理模式
-   * @param messageCallback 消息回调
-   * @returns 是否需要关闭应用（重启管理员）
    */
   public async switchMode(
     mode: 'system' | 'tun' | 'manual',
     messageCallback?: (type: 'success' | 'info' | 'error', content: string) => void,
   ): Promise<boolean> {
     try {
-      // 根据模式同步独立开关，具体配置由后端从数据库读取
       if (mode === 'system') {
         await this.appStore.toggleSystemProxy(true)
         await this.appStore.toggleTun(false)
@@ -113,7 +111,6 @@ export class ProxyService {
         messageCallback(mode === 'manual' ? 'info' : 'success', content)
       }
 
-      // 如果内核正在运行，需要重启
       if (this.appStore.isRunning) {
         try {
           if (messageCallback) messageCallback('info', this.t('home.status.restarting'))
@@ -130,7 +127,7 @@ export class ProxyService {
         }
       }
 
-      return false // 不需要关闭应用
+      return false
     } catch (error) {
       if (messageCallback) {
         messageCallback('error', `${this.t('notification.proxySwitchFailed')}: ${error}`)
@@ -140,7 +137,7 @@ export class ProxyService {
     }
   }
 
-  // API Methods
+  // === Inbound 写入（不依赖 gRPC） ===
 
   async setSystemProxy(systemProxyBypass?: string) {
     const args =
@@ -148,20 +145,20 @@ export class ProxyService {
         ? { systemProxyBypass, system_proxy_bypass: systemProxyBypass }
         : undefined
     return invokeWithAppContext<void>('set_system_proxy', args, {
-      withProxyPort: 'port'
+      withProxyPort: 'port',
     })
   }
 
   async setTunProxy(tunOptions?: TunOptionsPayload) {
     const args = tunOptions ? { tunOptions, tun_options: tunOptions } : undefined
     return invokeWithAppContext<void>('set_tun_proxy', args, {
-      withProxyPort: 'port'
+      withProxyPort: 'port',
     })
   }
 
   async setManualProxy() {
     return invokeWithAppContext<void>('set_manual_proxy', undefined, {
-      withProxyPort: 'port'
+      withProxyPort: 'port',
     })
   }
 
@@ -169,121 +166,60 @@ export class ProxyService {
     return invokeWithAppContext<void>('toggle_ip_version', { preferIpv6 })
   }
 
-  async toggleProxyMode(mode: string) {
-    return invokeWithAppContext<string>('toggle_proxy_mode', { mode })
+  // === gRPC API 交互（sing-box 1.14+ 官方 type: api） ===
+
+  /** 获取内核版本号（"1.14.0" 等） */
+  async getKernelVersion(): Promise<string> {
+    return invokeWithAppContext<string>('get_kernel_version')
   }
 
-  async getCurrentProxyMode() {
-    return invokeWithAppContext<string>('get_current_proxy_mode')
+  /** 获取所有节点组（一次快照） */
+  async getGroups(): Promise<GroupsData> {
+    return invokeWithAppContext<GroupsData>('get_groups')
   }
 
-  async getProxies() {
-    return invokeWithAppContext<ProxiesData>('get_proxies', undefined, {
-      withApiPort: 'port'
-    })
+  /** 切换代理节点（gRPC SelectOutbound） */
+  async selectOutbound(group: string, proxy: string): Promise<void> {
+    return invokeWithAppContext<void>('select_outbound', { group, proxy })
   }
 
-  async getProxyProviders() {
-    return invokeWithAppContext<ProxyProvidersResponse>('get_proxy_providers', undefined, {
-      withApiPort: 'port',
-    })
-  }
-
-  async changeProxy(group: string, proxy: string, server?: string, port?: number) {
-    const args = { group, proxy, server, port }
-    return invokeWithAppContext<void>(
-      'change_proxy',
-      port ? args : { ...args, port: undefined },
-      { withApiPort: port ? undefined : 'port' }
-    )
-  }
-
-  async testNodeDelay(proxy: string, server?: string, port?: number) {
-    const args = { proxy, server, port }
-    return invokeWithAppContext<ProxyDelayTestResult>(
-      'test_node_delay',
-      port ? args : { ...args, port: undefined },
-      { withApiPort: port ? undefined : 'port' }
-    )
-  }
-
-  async testGroupDelay(group: string, server?: string, port?: number, options?: DelayTestOptions) {
-    const args = { group, server, port, options }
-    return invokeWithAppContext<ProxyDelayTestResult[]>(
-      'test_group_delay',
-      port ? args : { ...args, port: undefined },
-      { withApiPort: port ? undefined : 'port' }
-    )
-  }
-
-  async testNodesDelay(proxies: string[], options?: DelayTestOptions, port?: number) {
-    const args = { proxies, options, port }
-    return invokeWithAppContext<ProxyDelayTestResult[]>(
-      'test_nodes_delay',
-      port ? args : { ...args, port: undefined },
-      { withApiPort: port ? undefined : 'port' }
-    )
-  }
-
-  /**
-   * 测试所有代理组的延迟
-   * 获取所有代理组并为每个组测试延迟
-   */
-  async testAllNodesDelay(server?: string, port?: number) {
+  /** 整组测速（gRPC URLTest） */
+  async urlTest(group: string): Promise<UrlTestResult> {
     try {
-      const proxiesData = await this.getProxies()
-      const testPromises: Promise<ProxyDelayTestResult[]>[] = []
-
-      // 遍历所有代理组，测试每个组的延迟
-      for (const groupName of Object.keys(proxiesData.proxies)) {
-        // 跳过非选择器类型的代理组（如 DIRECT 和 REJECT）
-        const group = proxiesData.proxies[groupName]
-        if (group.type === 'Selector' || group.type === 'URLTest') {
-          testPromises.push(this.testGroupDelay(groupName, server, port))
-        }
-      }
-
-      // 并行执行所有延迟测试
-      await Promise.all(testPromises)
-    } catch (error) {
-      console.error('测试所有节点延迟失败:', error)
-      throw error
+      await invokeWithAppContext<void>('url_test', { group })
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, message: String(e) }
     }
   }
 
-  async getRules(port?: number) {
-    const args = typeof port === 'number' ? { port } : undefined
-    return invokeWithAppContext<RulesResponse>('get_rules', args, {
-      withApiPort: typeof port === 'number' ? undefined : 'port'
+  /** 关闭所有连接 */
+  async closeAllConnections(): Promise<void> {
+    return invokeWithAppContext<void>('close_all_connections')
+  }
+
+  /** 获取 Clash 模式状态 */
+  async getClashModeStatus(): Promise<ClashModeStatus> {
+    return invokeWithAppContext<ClashModeStatus>('get_clash_mode_status')
+  }
+
+  /** 运行时切换 Clash 模式（gRPC SetClashMode） */
+  async setClashMode(mode: string): Promise<void> {
+    return invokeWithAppContext<void>('set_clash_mode', { mode })
+  }
+
+  /** 持久化组展开状态（gRPC SetGroupExpand） */
+  async setGroupExpand(group: string, isExpand: boolean): Promise<void> {
+    return invokeWithAppContext<void>('set_group_expand', {
+      group,
+      isExpand,
+      is_expand: isExpand,
     })
   }
 
-  async getRuleProviders(port?: number) {
-    const args = typeof port === 'number' ? { port } : undefined
-    return invokeWithAppContext<RuleProvidersResponse>('get_rule_providers', args, {
-      withApiPort: typeof port === 'number' ? undefined : 'port',
-    })
-  }
-
-  async updateProxyProvider(provider: string, port?: number) {
-    const args = typeof port === 'number' ? { provider, port } : { provider }
-    return invokeWithAppContext<void>('update_proxy_provider', args, {
-      withApiPort: typeof port === 'number' ? undefined : 'port',
-    })
-  }
-
-  async updateRuleProvider(provider: string, port?: number) {
-    const args = typeof port === 'number' ? { provider, port } : { provider }
-    return invokeWithAppContext<void>('update_rule_provider', args, {
-      withApiPort: typeof port === 'number' ? undefined : 'port',
-    })
-  }
-
-  async toggleRuleDisabled(index: number, disabled: boolean, port?: number) {
-    const args = typeof port === 'number' ? { index, disabled, port } : { index, disabled }
-    return invokeWithAppContext<void>('toggle_rule_disabled', args, {
-      withApiPort: typeof port === 'number' ? undefined : 'port',
-    })
+  /** 获取内核启动时间戳（秒） */
+  async getStartedAt(): Promise<number> {
+    return invokeWithAppContext<number>('get_started_at')
   }
 }
 

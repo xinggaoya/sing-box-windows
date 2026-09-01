@@ -40,6 +40,22 @@ export interface PersistenceState {
   singboxEnableAppGroups: Ref<boolean>
   tunSelfHealEnabled: Ref<boolean>
   tunSelfHealCooldownSecs: Ref<number>
+  // === sing-box 1.14 升级新增字段 ===
+  kernelUpdateTrack: Ref<string>
+  singboxDnsOptimisticCache: Ref<boolean>
+  singboxDnsTimeout: Ref<string>
+  singboxDnsUseMdns: Ref<boolean>
+  singboxEnableTlsSpoof: Ref<boolean>
+  tunDnsMode: Ref<string>
+  tunIncludeMacs: Ref<string[]>
+  tunExcludeMacs: Ref<string[]>
+  hysteria2DisableChromeParrot: Ref<boolean>
+  hysteria2ObfsType: Ref<string>
+  clashMode: Ref<string>
+  enableWebDashboard: Ref<boolean>
+  enableTailscaleEndpoint: Ref<boolean>
+  tailscaleRunSshServer: Ref<boolean>
+  tailscaleTaildropDirectory: Ref<string>
 }
 
 export function createAppPersistence(state: PersistenceState) {
@@ -222,6 +238,25 @@ export function createAppPersistence(state: PersistenceState) {
       singbox_enable_app_groups: state.singboxEnableAppGroups.value,
       tun_self_heal_enabled: state.tunSelfHealEnabled.value,
       tun_self_heal_cooldown_secs: state.tunSelfHealCooldownSecs.value,
+      // === sing-box 1.14 升级新增字段 ===
+      kernel_update_track: state.kernelUpdateTrack?.value ?? 'stable',
+      singbox_dns_optimistic_cache:
+        state.singboxDnsOptimisticCache?.value ?? true,
+      singbox_dns_timeout: state.singboxDnsTimeout?.value ?? '5s',
+      singbox_dns_use_mdns: state.singboxDnsUseMdns?.value ?? true,
+      singbox_enable_tls_spoof: state.singboxEnableTlsSpoof?.value ?? false,
+      tun_dns_mode: state.tunDnsMode?.value ?? 'hijack',
+      tun_include_macs: [...(state.tunIncludeMacs?.value ?? [])],
+      tun_exclude_macs: [...(state.tunExcludeMacs?.value ?? [])],
+      hysteria2_disable_chrome_parrot:
+        state.hysteria2DisableChromeParrot?.value ?? false,
+      hysteria2_obfs_type: state.hysteria2ObfsType?.value ?? 'salamander',
+      clash_mode: state.clashMode?.value ?? 'rule',
+      enable_web_dashboard: state.enableWebDashboard?.value ?? false,
+      enable_tailscale_endpoint: state.enableTailscaleEndpoint?.value ?? false,
+      tailscale_run_ssh_server: state.tailscaleRunSshServer?.value ?? false,
+      tailscale_taildrop_directory:
+        state.tailscaleTaildropDirectory?.value ?? 'Taildrop',
     }
     // 前端自动保存仅负责持久化，不直接触发后端运行态重配。
     // 运行态变更统一由显式业务动作触发（如切换代理模式、重启内核、切换订阅）。

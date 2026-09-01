@@ -274,32 +274,16 @@ async fn update_singbox_config_ports(
         sanitize_geoip_private_rule_sets(config_obj);
         ensure_kernel_log_output(config_obj);
 
-        // 修改experimental.clash_api配置（如果存在）
-        if let Some(experimental) = config_obj.get_mut("experimental") {
-            if let Some(exp_obj) = experimental.as_object_mut() {
-                // 添加或修改clash_api配置
-                let clash_api = exp_obj.entry("clash_api").or_insert(json!({}));
-
-                if let Some(clash_api_obj) = clash_api.as_object_mut() {
-                    // 设置external_controller为本地端口
-                    clash_api_obj.insert(
-                        "external_controller".to_string(),
-                        json!(format!("127.0.0.1:{}", api_port)),
-                    );
+        // 更新 sing-box 1.14+ 官方 gRPC API 服务（type=api）的监听端口。
+        // 兼容两种结构：顶层 services 数组或实验性 experimental.api 兜底。
+        if let Some(services) = config_obj.get_mut("services").and_then(|v| v.as_array_mut()) {
+            for service in services.iter_mut() {
+                if service.get("type").and_then(|t| t.as_str()) == Some("api") {
+                    service
+                        .as_object_mut()
+                        .map(|obj| obj.insert("listen_port".to_string(), json!(api_port)));
                 }
             }
-        } else {
-            // 如果不存在experimental字段，添加它
-            config_obj.insert(
-                "experimental".to_string(),
-                json!({
-                    "clash_api": {
-                        "external_controller": format!("127.0.0.1:{}", api_port),
-                        "external_ui": "metacubexd",
-                        "default_mode": "rule"
-                    }
-                }),
-            );
         }
 
         // 修改入站端口（如果有inbounds）

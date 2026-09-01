@@ -318,6 +318,9 @@ fn is_supported_outbound_type(node_type: &str) -> bool {
             | "hysteria2"
             | "tuic"
             | "anytls"
+            | "snell"      // sing-box 1.14 新增
+            | "wireguard"  // 1.13 已有但此前未识别
+            | "tailscale"  // 1.14 endpoint（独立协议）
     )
 }
 
@@ -715,6 +718,10 @@ fn convert_uri_node_to_singbox(uri: &str) -> Option<Value> {
     if uri.starts_with("anytls://") {
         return parse_anytls_uri(uri);
     }
+    if uri.starts_with("snell://") {
+        // sing-box 1.14 新增：snell 协议
+        return parse_snell_uri(uri);
+    }
     None
 }
 
@@ -1068,6 +1075,45 @@ fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
         node["down_mbps"] = json!(down);
     }
 
+    // === sing-box 1.14 新增 hysteria2 字段 ===
+
+    // bbr_profile（BBR 拥塞控制）
+    if let Some(bbr_profile) = query
+        .get("bbr_profile")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        node["bbr_profile"] = json!(bbr_profile);
+    }
+
+    // disable_chrome_parrot（Chrome QUIC 指纹伪装关闭，用于 Ed25519 服务器）
+    if let Some(disable_chrome_parrot) = query
+        .get("disable_chrome_parrot")
+        .map(|s| s.as_str())
+        .and_then(parse_boolish)
+    {
+        node["disable_chrome_parrot"] = json!(disable_chrome_parrot);
+    }
+
+    // hop_interval_max / hop_interval（跳跃间隔随机化）
+    if let Some(hop_interval) = query
+        .get("hop_interval_max")
+        .or_else(|| query.get("hop_interval"))
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        node["hop_interval_max"] = json!(hop_interval);
+    }
+
+    // realm（Hysteria2 NAT traversal 配套字段，详见 1.14 changelog）
+    if let Some(realm) = query
+        .get("realm")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        node["realm"] = json!(realm);
+    }
+
     // fastopen 参数（0/1）
     if let Some(fast_open) = query
         .get("fastopen")
@@ -1248,6 +1294,63 @@ fn parse_anytls_uri(uri: &str) -> Option<Value> {
         .and_then(|s| s.trim().parse::<u64>().ok())
     {
         node["min_idle_session"] = json!(min_idle_session);
+    }
+
+    Some(node)
+}
+
+/// 解析 sing-box 1.14 新增的 snell 协议 URI：
+///   snell://PSK@host:port?version=2&obfs=http#tag
+fn parse_snell_uri(uri: &str) -> Option<Value> {
+    let url = Url::parse(uri).ok()?;
+    let psk = url.username().trim();
+    if psk.is_empty() {
+        return None;
+    }
+    let server = url.host_str()?.to_string();
+    let server_port = url.port().unwrap_or(8388) as u64;
+    let query = parse_query_map(&url);
+
+    let tag = {
+        let decoded = decode_tag(url.fragment());
+        if decoded.is_empty() {
+            default_tag_for_url(&url)
+        } else {
+            decoded
+        }
+    };
+
+    let mut node = json!({
+        "tag": tag,
+        "type": "snell",
+        "server": server,
+        "server_port": server_port,
+        "psk": psk,
+    });
+
+    // version（1/2/3/4/5，常见为 2）
+    if let Some(version) = query
+        .get("version")
+        .and_then(|s| s.trim().parse::<u64>().ok())
+    {
+        node["version"] = json!(version);
+    }
+
+    // obfs: 可选 salamander 混淆（snell v3+ 才支持）
+    if let Some(obfs_type) = query
+        .get("obfs")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        let mut obfs = json!({ "type": obfs_type });
+        if let Some(obfs_host) = query
+            .get("obfs-host")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            obfs["host"] = json!(obfs_host);
+        }
+        node["obfs"] = obfs;
     }
 
     Some(node)

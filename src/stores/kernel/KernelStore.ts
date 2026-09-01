@@ -42,9 +42,16 @@ export const useKernelStore = defineStore('kernel', () => {
   let statusUnlisten: (() => void) | null = null
   let errorUnlisten: (() => void) | null = null
   let healthUnlisten: (() => void) | null = null
+  let statusPollTimer: ReturnType<typeof setInterval> | null = null
   let lastEventTime = 0
 
   const applyStatus = (next: KernelStatus) => {
+    // 防御:如果后端返回的 error 标识 "Rust binary 未更新"(旧 binary 残缺实现),
+    // 不要用这个残缺响应覆盖当前 status,避免前端闪退到 stopped。
+    if (next.error && next.error.includes('Rust binary 未更新')) {
+      console.warn('[kernel-store] 跳过旧 binary 响应(保留当前 status):', next)
+      return
+    }
     if (typeof next.state_version === 'number') {
       // 避免旧状态覆盖新状态（事件乱序或请求返回较慢时尤其重要）。
       if (next.state_version < stateVersion.value) {
@@ -132,12 +139,23 @@ export const useKernelStore = defineStore('kernel', () => {
       })
     }
 
-    // 2. 先走“快照”初始化，再通过事件增量更新
+    // 2. 先走"快照"初始化，再通过事件增量更新
     const snapshot = await kernelService.getKernelSnapshot()
     applyStatus(snapshot)
 
-    // 3. 移除主动轮询，完全依赖后端事件推送
-    // 用户反馈：直接选用推送即可，无需主动定时查询
+    // 3. 定时轮询 status:之前完全依赖后端 kernel-status-changed 事件推送,
+    //    但该事件只在 kernel_start/stop/restart 状态点 emit,内核运行期间不 emit,
+    //    导致 status 不会实时反映最新状态(用户反馈"内核状态不刷新")。
+    //    改为 3 秒 polling 一次,事件 + polling 双管齐下。
+    if (statusPollTimer == null) {
+      statusPollTimer = setInterval(() => {
+        // 窗口不可见时跳过,减少无意义请求
+        if (typeof document !== 'undefined' && document.hidden) return
+        refreshStatus().catch(() => {
+          // 静默失败:polling 失败不应该刷错误,下次还会再试
+        })
+      }, 3000)
+    }
 
     // 4. Eager load available versions for better UX (dropdown ready on open)
     if (availableVersions.value.length === 0) {
@@ -300,6 +318,25 @@ export const useKernelStore = defineStore('kernel', () => {
     return `${seconds}秒`
   })
 
+  const cleanupStore = () => {
+    if (statusPollTimer != null) {
+      clearInterval(statusPollTimer)
+      statusPollTimer = null
+    }
+    if (statusUnlisten) {
+      statusUnlisten()
+      statusUnlisten = null
+    }
+    if (errorUnlisten) {
+      errorUnlisten()
+      errorUnlisten = null
+    }
+    if (healthUnlisten) {
+      healthUnlisten()
+      healthUnlisten = null
+    }
+  }
+
   return {
     status,
     startupDiagnosis,
@@ -315,6 +352,7 @@ export const useKernelStore = defineStore('kernel', () => {
     uptime,
     healthStatus,
     initializeStore,
+    cleanupStore,
     handleKernelFailureEvent,
     refreshStatus,
     restartKernel,

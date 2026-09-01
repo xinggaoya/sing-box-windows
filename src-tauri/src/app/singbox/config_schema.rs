@@ -15,6 +15,24 @@ pub(crate) struct SingBoxConfig {
     pub inbounds: Vec<Value>,
     pub outbounds: Vec<Value>,
     pub route: RouteConfig,
+    /// 1.14 顶层 HTTP 客户端定义；为 None 时不写入（兼容老内核）
+    /// 1.16 后 `rule_set.download_detour` 将被移除，统一通过 `http_clients` + `route.default_http_client` 表达
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub http_clients: Option<Vec<HttpClientConfig>>,
+    /// 1.14 顶层 services（替代 `experimental.clash_api`）；由 config_generator.rs 注入
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub services: Option<Vec<Value>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct HttpClientConfig {
+    pub tag: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_port: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -29,32 +47,27 @@ pub(crate) struct LogConfig {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ExperimentalConfig {
     pub cache_file: CacheFileConfig,
-    pub clash_api: ClashApiConfig,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct CacheFileConfig {
     pub enabled: bool,
+    /// 1.14 替代 1.13 deprecated `store_rdrc`；为 None 时不写入，避免污染配置
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub store_rdrc: Option<bool>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct ClashApiConfig {
-    pub external_controller: String,
-    pub external_ui: String,
-    pub external_ui_download_url: String,
-    pub external_ui_download_detour: String,
-    pub default_mode: String,
+    pub store_dns: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct DnsConfig {
     pub servers: Vec<DnsServerConfig>,
     pub rules: Vec<Value>,
-    pub independent_cache: bool,
+    /// 1.14 默认按 transport 隔离 DNS 缓存，`independent_cache` 已被移除
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optimistic: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reverse_mapping: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<String>,
     #[serde(rename = "final")]
     pub final_server: String,
 }
@@ -92,6 +105,9 @@ pub(crate) struct RouteConfig {
     pub auto_detect_interface: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_domain_resolver: Option<Value>,
+    /// 1.14 新增：默认 HTTP 客户端 tag，对应顶层 `http_clients[]`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_http_client: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -101,6 +117,9 @@ pub(crate) struct RemoteRuleSetConfig {
     pub kind: String,
     pub format: String,
     pub url: String,
-    pub download_detour: String,
+    /// 1.16 移除；1.14 仍然接受，但顶层 `http_clients` + `route.default_http_client` 才是新写法。
+    /// 改为 Option，仅在用户明确指定下载出站时写入。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub download_detour: Option<String>,
     pub update_interval: String,
 }

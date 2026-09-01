@@ -1,4 +1,4 @@
-﻿use crate::app::constants::common::messages;
+use crate::app::constants::common::messages;
 use crate::app::core::kernel_service::event::{
     cleanup_event_relay_tasks, start_websocket_relay, SHOULD_STOP_EVENTS,
 };
@@ -17,7 +17,6 @@ use crate::app::core::proxy_service::{
 };
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
-use crate::utils::http_client;
 use futures::FutureExt;
 use serde_json::json;
 use std::sync::Arc;
@@ -85,14 +84,16 @@ async fn verify_kernel_startup_stability(api_port: u16, proxy_port: u16) -> Resu
     // stability window: detect false-positive "started then crashed" scenarios.
     // first run may need to download metacubexd UI / rule sets,
     // use exponential backoff for cold starts; success returns quickly.
+    //
+    // sing-box 1.14 把 experimental.clash_api 替换为 route.services: [{type: "api"}],
+    // 该服务是 gRPC over HTTP/2,不再暴露 HTTP REST 端点(/version 等)。
+    // 因此这里只做 TCP 端口探测 —— api_port 监听中即视为 gRPC services 已就绪,
+    // proxy_port 监听中即视为 mixed inbound 已对外 accept。
     const MAX_CHECKS: u8 = 10;
     const INITIAL_RETRY_INTERVAL_MS: u64 = 300;
     const MAX_RETRY_INTERVAL_MS: u64 = 2000;
-    const API_TIMEOUT_MS: u64 = 1000;
-    const PROXY_PORT_PROBE_MS: u64 = 300;
+    const PORT_PROBE_MS: u64 = 300;
 
-    let client = http_client::get_client();
-    let api_url = format!("http://127.0.0.1:{}/version", api_port);
     let mut last_error = String::new();
 
     for attempt in 1..=MAX_CHECKS {
@@ -100,53 +101,42 @@ async fn verify_kernel_startup_stability(api_port: u16, proxy_port: u16) -> Resu
             return Err("kernel process exited immediately after startup".to_string());
         }
 
-        match client
-            .get(&api_url)
-            .timeout(Duration::from_millis(API_TIMEOUT_MS))
-            .send()
-            .await
+        // 1) gRPC API 端口:route.services 块监听即认为就绪
+        let api_ready = match tokio::time::timeout(
+            Duration::from_millis(PORT_PROBE_MS),
+            tokio::net::TcpStream::connect(("127.0.0.1", api_port)),
+        )
+        .await
         {
-            Ok(response) if response.status().is_success() => {
-                // API 就绪 ≠ mixed inbound 已对外 accept。额外校验代理端口可连，
-                // 避免"API 通但代理没通"导致系统代理指向尚未监听的端口。
-                match tokio::time::timeout(
-                    Duration::from_millis(PROXY_PORT_PROBE_MS),
-                    tokio::net::TcpStream::connect(("127.0.0.1", proxy_port)),
-                )
-                .await
-                {
-                    Ok(Ok(_)) => {
-                        info!(
-                            "kernel stability check passed (attempt {}/{}, proxy_port={})",
-                            attempt, MAX_CHECKS, proxy_port
-                        );
-                        return Ok(());
-                    }
-                    Ok(Err(e)) => {
-                        last_error = format!(
-                            "stability check attempt {} failed: proxy port {} not ready: {}",
-                            attempt, proxy_port, e
-                        );
-                    }
-                    Err(_) => {
-                        last_error = format!(
-                            "stability check attempt {} failed: proxy port {} probe timed out",
-                            attempt, proxy_port
-                        );
-                    }
-                }
-            }
-            Ok(response) => {
-                last_error = format!(
-                    "stability check attempt {} failed: API status {}",
-                    attempt,
-                    response.status()
+            Ok(Ok(_)) => Ok(()),
+            Ok(Err(e)) => Err(format!("api port {} not ready: {}", api_port, e)),
+            Err(_) => Err(format!("api port {} probe timed out", api_port)),
+        };
+
+        // 2) mixed inbound 端口:对外 accept 即认为就绪
+        let proxy_ready = match tokio::time::timeout(
+            Duration::from_millis(PORT_PROBE_MS),
+            tokio::net::TcpStream::connect(("127.0.0.1", proxy_port)),
+        )
+        .await
+        {
+            Ok(Ok(_)) => Ok(()),
+            Ok(Err(e)) => Err(format!("proxy port {} not ready: {}", proxy_port, e)),
+            Err(_) => Err(format!("proxy port {} probe timed out", proxy_port)),
+        };
+
+        match (api_ready, proxy_ready) {
+            (Ok(()), Ok(())) => {
+                info!(
+                    "kernel stability check passed (attempt {}/{}, api_port={}, proxy_port={})",
+                    attempt, MAX_CHECKS, api_port, proxy_port
                 );
+                return Ok(());
             }
-            Err(e) => {
+            (api, proxy) => {
                 last_error = format!(
-                    "stability check attempt {} failed: API connection error {}",
-                    attempt, e
+                    "stability check attempt {} failed: api={:?}, proxy={:?}",
+                    attempt, api, proxy
                 );
             }
         }
@@ -828,7 +818,6 @@ pub async fn kernel_restart_fast(
 pub async fn stop_kernel(app_handle: Option<&AppHandle>) -> Result<String, String> {
     KERNEL_STATE.set_state(KernelState::Stopping);
     disable_kernel_guard().await;
-    SHOULD_STOP_EVENTS.store(true, std::sync::atomic::Ordering::Relaxed);
     cleanup_event_relay_tasks().await;
 
     if let Err(e) = PROCESS_MANAGER.stop(app_handle).await {

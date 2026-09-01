@@ -171,14 +171,23 @@ class KernelService {
 
   /**
    * 获取内核状态
+   * Rust 端只从 db 读端口配置(权威源);改端口走独立接口 `update_singbox_ports` 同步 db,
+   * 之后 `kernel_restart_*` 重启内核时自然用新端口。
    */
   async getKernelStatus(): Promise<KernelStatus> {
     try {
-      return await invokeWithAppContext<KernelStatus>('kernel_get_status_enhanced', undefined, {
-        withApiPort: 'api_port',
-      })
+      const raw = await invokeWithAppContext<unknown>(
+        'kernel_get_status_enhanced_v2',
+        undefined,
+        {},
+      )
+      if (typeof raw === 'string') {
+        console.warn('[kernel-status] 后端返回 string(说明 Rust binary 是旧的),raw =', raw)
+        throw new Error(`Rust binary 未更新,只返回 string: ${raw}`)
+      }
+      return raw as KernelStatus
     } catch (error) {
-      console.error('获取内核状态失败:', error)
+      console.error('[kernel-status] 获取失败:', error)
       return {
         process_running: false,
         api_ready: false,
@@ -191,7 +200,7 @@ class KernelService {
 
   async getKernelSnapshot(): Promise<KernelStatus> {
     try {
-      return await invokeWithAppContext<KernelStatus>('kernel_get_snapshot', undefined, {
+      return await invokeWithAppContext<KernelStatus>('kernel_get_snapshot_v2', undefined, {
         withApiPort: 'api_port',
       })
     } catch (error) {

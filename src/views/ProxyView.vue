@@ -1,12 +1,6 @@
 <template>
   <div class="page-shell proxy-page">
     <ToolbarBar>
-      <template #tabs>
-        <n-tabs v-model:value="proxyStore.viewTab" type="segment" size="small">
-          <n-tab-pane name="groups" :tab="labels.groupsTab" />
-          <n-tab-pane name="providers" :tab="labels.providersTab" />
-        </n-tabs>
-      </template>
       <template #filters>
         <n-button size="small" secondary @click="refresh">
           <template #icon>
@@ -29,7 +23,7 @@
       </template>
     </ToolbarBar>
 
-    <div v-if="proxyStore.viewTab === 'groups'" class="split-view">
+    <div class="split-view">
       <div class="group-sidebar">
         <div class="sidebar-title">{{ labels.groupsTab }}</div>
         <div class="sidebar-list">
@@ -165,45 +159,11 @@
         />
       </div>
     </div>
-
-    <div v-else class="providers-view">
-      <div v-if="filteredProviders.length" class="providers-list">
-        <div v-for="provider in filteredProviders" :key="provider.name" class="provider-card">
-          <div class="provider-header">
-            <div>
-              <div class="provider-name">{{ provider.name }}</div>
-              <div class="provider-meta">
-                {{ provider.vehicleType || '-' }} · {{ provider.behavior || '-' }}
-                · {{ labels.nodeCount }} {{ provider.proxies?.length || 0 }}
-              </div>
-            </div>
-            <n-button
-              size="small"
-              secondary
-              :loading="proxyStore.providerUpdatingMap[provider.name]"
-              @click="refreshProvider(provider.name)"
-            >
-              {{ t('common.refresh') }}
-            </n-button>
-          </div>
-          <div class="provider-node-grid">
-            <div v-for="proxy in getProviderNodes(provider)" :key="proxy.name" class="provider-node-item">
-              <span class="provider-node-name">
-                <img v-if="getNodeFlagUrl(proxy.name)" class="node-flag" :src="getNodeFlagUrl(proxy.name)" alt="" />
-                <span>{{ getDisplayNodeName(proxy.name) }}</span>
-              </span>
-              <n-tag size="small" round :bordered="false">{{ formatLatency(proxy.name) }}</n-tag>
-            </div>
-          </div>
-        </div>
-      </div>
-      <EmptyState v-else :title="labels.noProviders" :icon="GlobeOutline" class="node-empty" />
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   GlobeOutline,
@@ -215,7 +175,6 @@ import {
 } from '@vicons/ionicons5'
 import { useProxyStore, type ProxyGroup } from '@/stores/kernel/ProxyStore'
 import { useI18n } from 'vue-i18n'
-import type { ProxyProvider } from '@/types/controller'
 import ToolbarBar from '@/components/common/ToolbarBar.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 
@@ -376,20 +335,17 @@ const activeGroupNodes = computed(() => {
   return list
 })
 
-const filteredProviders = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
-  return proxyStore.proxyProviders.filter((provider) => {
-    return (
-      !query ||
-      provider.name.toLowerCase().includes(query) ||
-      provider.proxies?.some((proxy) => proxy.name.toLowerCase().includes(query))
-    )
-  })
-})
-
 const selectGroup = (name: string) => {
   proxyStore.selectedGroup = name
 }
+
+// 启动 SubscribeGroups 推送监听(测速完成 / 切换节点 / 折叠展开都会实时回写延迟)
+onMounted(() => {
+  proxyStore.setupGroupsDataListener()
+})
+onBeforeUnmount(() => {
+  proxyStore.cleanupGroupsDataListener()
+})
 
 const refresh = async () => {
   try {
@@ -410,8 +366,12 @@ const changeProxy = async (groupName: string, proxyName: string) => {
 }
 
 const testNode = async (proxyName: string) => {
+  if (!activeGroup.value) {
+    message.warning(t('proxy.testNoActiveGroup') ?? '请先选择组')
+    return
+  }
   try {
-    await proxyStore.testNodeDelay(proxyName)
+    await proxyStore.testNodeDelay(activeGroup.value.tag, proxyName)
   } catch {
     message.error(t('proxy.testFailed'))
   }
@@ -446,18 +406,6 @@ const switchRecommended = async (group: ProxyGroup) => {
     message.error(t('proxy.switchErrorMessage'))
   }
 }
-
-const refreshProvider = async (providerName: string) => {
-  try {
-    await proxyStore.updateProvider(providerName)
-    message.success(providerName)
-  } catch (error) {
-    message.error(String(error))
-  }
-}
-
-const getProviderNodes = (provider: ProxyProvider) =>
-  (provider.proxies || []).slice().sort((left, right) => left.name.localeCompare(right.name))
 
 const getNodeCountryCode = (nodeName: string) => {
   const normalizedName = stripLeadingFlagEmoji(nodeName)
@@ -513,9 +461,8 @@ const latencyTagType = (proxyName: string) => {
   return 'error' as const
 }
 
-if (!proxyStore.proxyGroups.length) {
-  refresh()
-}
+// 进入代理页时,setupGroupsDataListener 内部会自检 activeConfigPath 是否变更,
+// 不一致会自动 fetchProxies,无需在这里手动调用 refresh。
 </script>
 
 <style scoped>

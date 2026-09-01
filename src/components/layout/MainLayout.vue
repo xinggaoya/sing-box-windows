@@ -74,7 +74,6 @@ import {
   DocumentTextOutline,
   SettingsOutline,
   FolderOutline,
-  AnalyticsOutline,
 } from '@vicons/ionicons5'
 import { useMessage } from 'naive-ui'
 import mitt from 'mitt'
@@ -162,7 +161,8 @@ const menuItems = computed<NavItem[]>(() => [
   { label: t('nav.proxy'), key: 'proxy', icon: SwapHorizontalOutline },
   { label: t('nav.connections'), key: 'connections', icon: LinkOutline },
   { label: t('nav.logs'), key: 'logs', icon: DocumentTextOutline },
-  { label: t('nav.rules'), key: 'rules', icon: AnalyticsOutline },
+  // 规则页隐藏：sing-box 官方 gRPC API 未暴露规则管理接口（see docs/sing-box-api-migration.md）
+  // 等待上游 API 扩展或自建后端命令后恢复：{ label: t('nav.rules'), key: 'rules', icon: AnalyticsOutline },
   { label: t('nav.settings'), key: 'settings', icon: SettingsOutline },
 ])
 

@@ -334,8 +334,9 @@ const getKernelFailureText = (fallback: string) =>
 
 const syncCurrentNodeProxyMode = async () => {
   try {
-    const mode = await proxyService.getCurrentProxyMode()
-    if (mode === 'global' || mode === 'rule') {
+    const status = await proxyService.getClashModeStatus()
+    const mode = status.currentMode
+    if (mode === 'global' || mode === 'rule' || mode === 'direct') {
       currentNodeProxyMode.value = mode
     }
   } catch {

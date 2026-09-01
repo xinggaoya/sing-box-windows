@@ -37,4 +37,35 @@ export interface AppConfig {
   singbox_enable_app_groups: boolean
   tun_self_heal_enabled: boolean
   tun_self_heal_cooldown_secs: number
+  // === sing-box 1.14 升级新增字段（ts-rs 自动生成） ===
+  /** 内核下载/升级通道：stable / oldstable / beta / testing */
+  kernel_update_track: string
+  /** 1.14 DNS 乐观缓存 */
+  singbox_dns_optimistic_cache: boolean
+  /** 1.14 per-server DNS 超时（如 "5s"） */
+  singbox_dns_timeout: string
+  /** 1.14 启用 mDNS server（*.local / link-local） */
+  singbox_dns_use_mdns: boolean
+  /** 1.14 TLS spoof（SNI 诱骗；仅 Windows x64/x86 + Admin） */
+  singbox_enable_tls_spoof: boolean
+  /** 1.14 TUN dns_mode：hijack / tun / off */
+  tun_dns_mode: string
+  /** 1.14 TUN include_mac_address */
+  tun_include_macs: string[]
+  /** 1.14 TUN exclude_mac_address */
+  tun_exclude_macs: string[]
+  /** 1.14 Hysteria2 disable_chrome_parrot */
+  hysteria2_disable_chrome_parrot: boolean
+  /** 1.14 Hysteria2 obfs 类型：salamander / gecko */
+  hysteria2_obfs_type: string
+  /** 1.14 Clash Mode 持久化：rule / global / direct */
+  clash_mode: string
+  /** 1.14 启用 Web Dashboard（sing-box-dashboard） */
+  enable_web_dashboard: boolean
+  /** 1.14 启用 Tailscale endpoint */
+  enable_tailscale_endpoint: boolean
+  /** Tailscale 节点 SSH server */
+  tailscale_run_ssh_server: boolean
+  /** Tailscale Taildrop 收件箱目录 */
+  tailscale_taildrop_directory: string
 }

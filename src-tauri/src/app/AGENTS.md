@@ -8,12 +8,13 @@
 
 ```
 src-tauri/src/app/
-├── core/       # 内核启停、代理模式、事件中继
-├── network/    # 订阅下载、解析、模式切换、自动更新
-├── system/     # 更新、权限、系统状态、后台任务
-├── storage/    # SQLite 服务与状态模型
-├── singbox/    # 配置生成与注入
-└── constants/  # 领域常量
+├── core/          # 内核启停、代理模式、事件中继
+├── network/       # 订阅下载、解析、模式切换、自动更新
+├── system/        # 更新、权限、系统状态、后台任务
+├── storage/       # SQLite 服务与状态模型
+├── singbox/       # 配置生成与注入
+├── singbox_api/   # sing-box 1.14+ 官方 gRPC API 客户端
+└── constants/     # 领域常量
 ```
 
 ## WHERE TO LOOK
@@ -25,6 +26,8 @@ src-tauri/src/app/
 | 更新流程          | `system/update_service.rs`               | 平台产物与下载流程         |
 | 存储读写          | `storage/enhanced_storage_service.rs`    | 与前端配置同步关键         |
 | sing-box 配置生成 | `singbox/config_generator.rs`            | 规则与 outbounds 组装      |
+| gRPC API 交互     | `singbox_api/` + `core/proxy_service.rs` | 替代 experimental.clash_api |
+| 事件中继          | `core/kernel_service/event.rs`           | 3 个 gRPC server-streaming |
 
 ## CONVENTIONS
 
@@ -53,3 +56,5 @@ cd src-tauri && cargo clippy
 
 - `network/subscription_service/` 与 `core/kernel_service/` 是高频联动区，改动其一需回归另一区域。
 - `system/background_tasks` 在启动自动运行，新增任务需评估启动时序与资源占用。
+- `singbox_api/` 客户端实现 gRPC-Web over WebSocket 协议（参照 sing-box-dashboard `src/api/websocket.ts` 的帧格式）；无 prost 依赖，所有 protobuf 解码手写在 `singbox_api/proto.rs`。
+- metacubexd 预下载（`core/kernel_service/embedded.rs::ensure_external_ui`）已删除；启动时不再下载 metacubexd UI。

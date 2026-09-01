@@ -25,6 +25,8 @@ fn proxy_listen_address(app_config: &AppConfig) -> &'static str {
 /// 说明：
 /// - 这是“设置页面操作会影响配置”的核心入口之一。
 /// - 该函数会覆盖/重建 `inbounds`，确保 mixed/tun 与端口设置始终与 AppConfig 一致。
+/// - 1.14 起 `experimental.clash_api` 已被 `services: [api]` 完全替代（由 config_generator.rs 注入），
+///   此处不再写 `clash_api` 字段；同时清空历史配置残留，避免启动时 deprecation 噪音。
 pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) {
     if let Some(config_obj) = config.as_object_mut() {
         ensure_kernel_log_output(config_obj);
@@ -34,31 +36,29 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
         // 采用“按 tag 定位并局部更新”的方式：如果用户导入的是原始订阅配置（结构不同），则不会强行改动。
         apply_profile_settings_if_present(config_obj, app_config);
 
-        // clash_api 主要用于前端 UI 通过 Clash API 读取代理组/切换节点。
+        // 1.14 替代 `experimental.clash_api`：完全清理历史残留，
+        // 实际 gRPC API 由 `services: [api]` 提供（config_generator.rs:271-287 注入）。
+        if let Some(experimental) = config_obj
+            .get_mut("experimental")
+            .and_then(|v| v.as_object_mut())
+        {
+            experimental.remove("clash_api");
+        }
+
+        // cache_file：1.14 替代 `store_rdrc` → `store_dns`（1.16 移除 store_rdrc）。
         let experimental = config_obj
             .entry("experimental".to_string())
             .or_insert(json!({}));
         if let Some(exp_obj) = experimental.as_object_mut() {
-            let clash_api = exp_obj.entry("clash_api".to_string()).or_insert(json!({}));
-            if let Some(clash_api_obj) = clash_api.as_object_mut() {
-                clash_api_obj.insert(
-                    "external_controller".to_string(),
-                    json!(format!("127.0.0.1:{}", app_config.api_port)),
-                );
-                // 允许用户指定 UI/规则集下载走哪个出站（国内网络通常需要走代理）
-                clash_api_obj.insert(
-                    "external_ui_download_detour".to_string(),
-                    json!(normalize_download_detour(app_config)),
-                );
-            }
-
             let cache_file = exp_obj.entry("cache_file".to_string()).or_insert(json!({}));
             if let Some(cache_obj) = cache_file.as_object_mut() {
                 cache_obj.insert("enabled".to_string(), json!(true));
+                // 兼容老字段（用户可能从 1.13 升级上来）→ 1.14 同时接受，1.16 后忽略
+                cache_obj.remove("store_rdrc");
                 if app_config.singbox_fake_dns_enabled {
-                    cache_obj.insert("store_rdrc".to_string(), json!(true));
+                    cache_obj.insert("store_dns".to_string(), json!(true));
                 } else {
-                    cache_obj.remove("store_rdrc");
+                    cache_obj.remove("store_dns");
                 }
             }
         }
@@ -67,10 +67,27 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
         let dns = config_obj.entry("dns".to_string()).or_insert(json!({}));
         if let Some(dns_obj) = dns.as_object_mut() {
             dns_obj.remove("strategy");
+            // 1.14 移除 `independent_cache`（强制按 transport 隔离缓存）
+            dns_obj.remove("independent_cache");
             if app_config.singbox_fake_dns_enabled {
                 dns_obj.insert("reverse_mapping".to_string(), json!(true));
             } else {
                 dns_obj.remove("reverse_mapping");
+            }
+            // 1.14 新增：乐观 DNS 缓存
+            if app_config.singbox_dns_optimistic_cache {
+                dns_obj.insert("optimistic".to_string(), json!(true));
+            } else {
+                dns_obj.remove("optimistic");
+            }
+            // 1.14 新增：per-server DNS 超时
+            if !app_config.singbox_dns_timeout.is_empty() {
+                dns_obj.insert(
+                    "timeout".to_string(),
+                    Value::String(app_config.singbox_dns_timeout.clone()),
+                );
+            } else {
+                dns_obj.remove("timeout");
             }
         }
     }
@@ -78,6 +95,7 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
 
 pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
     if let Some(config_obj) = config.as_object_mut() {
+        // 1.14 替代 clash_api：清空 external_controller 残留（端口同步在 services: [api] 处理）
         if let Some(experimental) = config_obj
             .get_mut("experimental")
             .and_then(|v| v.as_object_mut())
@@ -127,7 +145,6 @@ pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
 
 fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_config: &AppConfig) {
     let default_outbound = normalize_default_outbound(app_config);
-    let download_detour = normalize_download_detour(app_config);
     let mut fake_dns_route_cleanup_pairs = vec![
         (
             normalize_fakeip_range(&app_config.singbox_fake_dns_ipv4_range, "198.18.0.0/15"),
@@ -266,11 +283,13 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
         route_obj.remove("default_domain_strategy");
 
         if let Some(rule_sets) = route_obj.get_mut("rule_set").and_then(|v| v.as_array_mut()) {
-            // 仅对 remote 规则集更新 download_detour，避免影响本地文件规则集
+            // 1.14 替代 `download_detour`：移除所有 remote rule-set 的 download_detour，
+            // 统一通过顶层 `route.default_http_client` + `http_clients` 表达。
+            // 1.16 后 `download_detour` 字段将被内核直接拒绝。
             for rs in rule_sets.iter_mut() {
                 if let Some(obj) = rs.as_object_mut() {
                     if obj.get("type").and_then(|v| v.as_str()) == Some("remote") {
-                        obj.insert("download_detour".to_string(), json!(download_detour));
+                        obj.remove("download_detour");
                     }
                 }
             }
@@ -293,6 +312,11 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     )
                 });
             }
+        }
+
+        // 1.14 新增：默认 HTTP 客户端（替代 download_detour）—— 必须在 rule_set 借用结束后
+        if !route_obj.contains_key("default_http_client") {
+            route_obj.insert("default_http_client".to_string(), json!("default"));
         }
 
         if let Some(rules) = route_obj.get_mut("rules").and_then(|v| v.as_array_mut()) {

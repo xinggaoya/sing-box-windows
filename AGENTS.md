@@ -15,8 +15,10 @@
 ./
 ├── src/                 # 前端应用（路由/页面/store/service）
 ├── src-tauri/           # Rust 后端 + Tauri 打包
+│   └── src/app/singbox_api/  # sing-box 1.14+ 官方 gRPC API 客户端
 ├── scripts/             # 内核下载与 tauri wrapper
 ├── docs/                # 开发文档（包含详细命令与约束）
+│   └── sing-box-api-migration.md  # gRPC API 替换 Clash API 的迁移记录
 └── .github/workflows/   # Release CI（多平台矩阵）
 ```
 
@@ -27,6 +29,7 @@
 | 前端启动链路       | `src/main.ts`, `src/boot/useAppBootstrap.ts`      | 初始化顺序与事件桥都在这里      |
 | 前端调用后端       | `src/services/invoke-client.ts`                   | 命令调用统一入口（上下文注入）  |
 | 路由与托盘空白页   | `src/router/index.ts`, `src/views/BlankView.vue`  | `/blank` 是非标准但关键路径     |
+| gRPC API 客户端   | `src-tauri/src/app/singbox_api/`                 | 替代 experimental.clash_api     |
 | 后端入口与命令注册 | `src-tauri/src/lib.rs`                            | `setup + invoke_handler` 为核心 |
 | 内核生命周期       | `src-tauri/src/app/core/kernel_service/`          | 高复杂度热点目录                |
 | 订阅解析与模式切换 | `src-tauri/src/app/network/subscription_service/` | parser/mode/helpers 分层明显    |

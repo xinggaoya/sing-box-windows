@@ -2,6 +2,9 @@
 pub mod constants;
 pub mod storage; // 重新启用存储模块
 
+// sing-box 1.14+ 官方 gRPC API 客户端（替代 experimental.clash_api）
+pub mod singbox_api;
+
 // sing-box 配置生成与设置同步
 pub mod singbox;
 

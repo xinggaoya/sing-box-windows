@@ -131,6 +131,26 @@ impl DatabaseService {
             "ALTER TABLE app_config ADD COLUMN singbox_enable_app_groups BOOLEAN DEFAULT TRUE",
             "ALTER TABLE app_config ADD COLUMN tun_self_heal_enabled BOOLEAN DEFAULT TRUE",
             "ALTER TABLE app_config ADD COLUMN tun_self_heal_cooldown_secs INTEGER DEFAULT 90",
+            // === sing-box 1.14 升级新增字段迁移 ===
+            "ALTER TABLE app_config ADD COLUMN kernel_update_track TEXT DEFAULT 'stable'",
+            "ALTER TABLE app_config ADD COLUMN singbox_dns_optimistic_cache BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN singbox_dns_timeout TEXT DEFAULT '5s'",
+            "ALTER TABLE app_config ADD COLUMN singbox_dns_use_mdns BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE app_config ADD COLUMN singbox_enable_tls_spoof BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE app_config ADD COLUMN tun_dns_mode TEXT DEFAULT 'hijack'",
+            "ALTER TABLE app_config ADD COLUMN tun_include_macs TEXT DEFAULT '[]'",
+            "ALTER TABLE app_config ADD COLUMN tun_exclude_macs TEXT DEFAULT '[]'",
+            "ALTER TABLE app_config ADD COLUMN hysteria2_disable_chrome_parrot BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE app_config ADD COLUMN hysteria2_obfs_type TEXT DEFAULT 'salamander'",
+            "ALTER TABLE app_config ADD COLUMN clash_mode TEXT DEFAULT 'rule'",
+            "ALTER TABLE app_config ADD COLUMN enable_web_dashboard BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE app_config ADD COLUMN enable_tailscale_endpoint BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE app_config ADD COLUMN tailscale_run_ssh_server BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE app_config ADD COLUMN tailscale_taildrop_directory TEXT DEFAULT 'Taildrop'",
+            // 兜底：1.13 早期 schema 可能缺这些列
+            "ALTER TABLE app_config ADD COLUMN proxy_mode TEXT DEFAULT 'manual'",
+            "ALTER TABLE app_config ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE app_config ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP",
         ];
 
         for statement in alter_statements {
@@ -343,6 +363,53 @@ impl DatabaseService {
                 tun_self_heal_cooldown_secs: row
                     .try_get("tun_self_heal_cooldown_secs")
                     .unwrap_or(default_config.tun_self_heal_cooldown_secs),
+                // === sing-box 1.14 升级新增字段（SQLite 老库无列，使用 try_get + default 兜底） ===
+                kernel_update_track: row
+                    .try_get("kernel_update_track")
+                    .unwrap_or_else(|_| default_config.kernel_update_track.clone()),
+                singbox_dns_optimistic_cache: row
+                    .try_get("singbox_dns_optimistic_cache")
+                    .unwrap_or(default_config.singbox_dns_optimistic_cache),
+                singbox_dns_timeout: row
+                    .try_get("singbox_dns_timeout")
+                    .unwrap_or_else(|_| default_config.singbox_dns_timeout.clone()),
+                singbox_dns_use_mdns: row
+                    .try_get("singbox_dns_use_mdns")
+                    .unwrap_or(default_config.singbox_dns_use_mdns),
+                singbox_enable_tls_spoof: row
+                    .try_get("singbox_enable_tls_spoof")
+                    .unwrap_or(default_config.singbox_enable_tls_spoof),
+                tun_dns_mode: row
+                    .try_get("tun_dns_mode")
+                    .unwrap_or_else(|_| default_config.tun_dns_mode.clone()),
+                tun_include_macs: parse_string_array_column(
+                    row.try_get("tun_include_macs").unwrap_or(None),
+                ),
+                tun_exclude_macs: parse_string_array_column(
+                    row.try_get("tun_exclude_macs").unwrap_or(None),
+                ),
+                hysteria2_disable_chrome_parrot: row
+                    .try_get("hysteria2_disable_chrome_parrot")
+                    .unwrap_or(default_config.hysteria2_disable_chrome_parrot),
+                hysteria2_obfs_type: row
+                    .try_get("hysteria2_obfs_type")
+                    .unwrap_or_else(|_| default_config.hysteria2_obfs_type.clone()),
+                clash_mode: row
+                    .try_get("clash_mode")
+                    .unwrap_or_else(|_| default_config.clash_mode.clone()),
+                // === sing-box 1.14 升级新增字段（Web Dashboard + Tailscale） ===
+                enable_web_dashboard: row
+                    .try_get("enable_web_dashboard")
+                    .unwrap_or(default_config.enable_web_dashboard),
+                enable_tailscale_endpoint: row
+                    .try_get("enable_tailscale_endpoint")
+                    .unwrap_or(default_config.enable_tailscale_endpoint),
+                tailscale_run_ssh_server: row
+                    .try_get("tailscale_run_ssh_server")
+                    .unwrap_or(default_config.tailscale_run_ssh_server),
+                tailscale_taildrop_directory: row
+                    .try_get("tailscale_taildrop_directory")
+                    .unwrap_or_else(|_| default_config.tailscale_taildrop_directory.clone()),
             }))
         } else {
             Ok(None)
@@ -350,11 +417,15 @@ impl DatabaseService {
     }
 
     pub async fn save_app_config(&self, config: &AppConfig) -> Result<(), StorageError> {
+        // 注意：列顺序必须与 db 实际 schema 一致（同事在 1.13 → 1.14 升级时
+        // 把 tun_route_exclude_address 移到 tun_self_heal_cooldown_secs 之后，
+        // 同时在中间插入了 created_at / updated_at 时间戳列）。本 INSERT 严格按
+        // PRAGMA table_info(app_config) 的实际顺序排列。
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO app_config
-            (id, auto_start_kernel, auto_start_app, auto_hide_to_tray_on_autostart, tray_close_behavior, prefer_ipv6, allow_lan_access, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, tun_route_exclude_address, active_config_path, installed_kernel_version, singbox_dns_proxy, singbox_dns_cn, singbox_dns_resolver, singbox_urltest_url, singbox_default_proxy_outbound, singbox_block_ads, singbox_download_detour, singbox_dns_hijack, singbox_fake_dns_enabled, singbox_fake_dns_ipv4_range, singbox_fake_dns_ipv6_range, singbox_fake_dns_filter_mode, singbox_enable_app_groups, tun_self_heal_enabled, tun_self_heal_cooldown_secs, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, auto_start_kernel, auto_start_app, auto_hide_to_tray_on_autostart, tray_close_behavior, prefer_ipv6, allow_lan_access, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, active_config_path, installed_kernel_version, singbox_dns_proxy, singbox_dns_cn, singbox_dns_resolver, singbox_urltest_url, singbox_default_proxy_outbound, singbox_block_ads, singbox_download_detour, singbox_dns_hijack, singbox_fake_dns_enabled, singbox_fake_dns_ipv4_range, singbox_fake_dns_ipv6_range, singbox_fake_dns_filter_mode, singbox_enable_app_groups, tun_self_heal_enabled, tun_self_heal_cooldown_secs, created_at, updated_at, tun_route_exclude_address, kernel_update_track, singbox_dns_optimistic_cache, singbox_dns_timeout, singbox_dns_use_mdns, singbox_enable_tls_spoof, tun_dns_mode, tun_include_macs, tun_exclude_macs, hysteria2_disable_chrome_parrot, hysteria2_obfs_type, clash_mode, enable_web_dashboard, enable_tailscale_endpoint, tailscale_run_ssh_server, tailscale_taildrop_directory)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_start_kernel)
@@ -377,7 +448,6 @@ impl DatabaseService {
         .bind(&config.tun_ipv6)
         .bind(&config.tun_stack)
         .bind(config.tun_enable_ipv6)
-        .bind(serialize_optional_json(&config.tun_route_exclude_address)?)
         .bind(&config.active_config_path)
         .bind(&config.installed_kernel_version)
         .bind(&config.singbox_dns_proxy)
@@ -395,7 +465,27 @@ impl DatabaseService {
         .bind(config.singbox_enable_app_groups)
         .bind(config.tun_self_heal_enabled)
         .bind(config.tun_self_heal_cooldown_secs)
+        // === created_at / updated_at 时间戳 ===
         .bind(Utc::now())
+        .bind(Utc::now())
+        // === tun_route_exclude_address 位置在 updated_at 之后 ===
+        .bind(serialize_optional_json(&config.tun_route_exclude_address)?)
+        // === sing-box 1.14 升级新增字段（与 PRAGMA 顺序一致） ===
+        .bind(&config.kernel_update_track)
+        .bind(config.singbox_dns_optimistic_cache)
+        .bind(&config.singbox_dns_timeout)
+        .bind(config.singbox_dns_use_mdns)
+        .bind(config.singbox_enable_tls_spoof)
+        .bind(&config.tun_dns_mode)
+        .bind(serialize_string_vec(&config.tun_include_macs))
+        .bind(serialize_string_vec(&config.tun_exclude_macs))
+        .bind(config.hysteria2_disable_chrome_parrot)
+        .bind(&config.hysteria2_obfs_type)
+        .bind(&config.clash_mode)
+        .bind(config.enable_web_dashboard)
+        .bind(config.enable_tailscale_endpoint)
+        .bind(config.tailscale_run_ssh_server)
+        .bind(&config.tailscale_taildrop_directory)
         .execute(&self.pool)
         .await?;
 
@@ -647,4 +737,30 @@ fn parse_tun_route_exclude_address_column(raw: Option<String>) -> Option<Vec<Str
             None
         }
     }
+}
+
+/// 通用字符串数组列解析（用于 1.14 新增的 `tun_include_macs` / `tun_exclude_macs`）。
+/// 失败时回退为空 Vec 并 warn。
+fn parse_string_array_column(raw: Option<String>) -> Vec<String> {
+    let Some(raw) = raw else {
+        return Vec::new();
+    };
+    if raw.trim().is_empty() {
+        return Vec::new();
+    }
+    match serde_json::from_str::<Vec<String>>(&raw) {
+        Ok(values) => values,
+        Err(error) => {
+            tracing::warn!(
+                "检测到无效的字符串数组 JSON，已回退为空数组: {}",
+                error
+            );
+            Vec::new()
+        }
+    }
+}
+
+/// 把字符串数组序列化为 JSON 字符串写入 SQLite；空数组写 "[]"。
+fn serialize_string_vec(values: &[String]) -> String {
+    serde_json::to_string(values).unwrap_or_else(|_| "[]".to_string())
 }

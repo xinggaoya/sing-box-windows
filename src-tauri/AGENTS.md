@@ -9,6 +9,7 @@ Rust + Tauri 后端根目录，聚合命令注册、插件配置、平台打包�
 ```
 src-tauri/
 ├── src/            # 业务代码（app/entity/process/platform/utils）
+│   └── app/singbox_api/  # sing-box 1.14+ 官方 gRPC API 客户端（gRPC-Web over WebSocket）
 ├── Cargo.toml      # 依赖、profile、平台差异依赖
 ├── tauri.conf.json # 应用窗口/打包配置
 └── icons/          # 多平台图标资源
@@ -21,6 +22,7 @@ src-tauri/
 | 命令注册总入口 | `src/lib.rs`      | `invoke_handler` 暴露边界           |
 | 进程主入口     | `src/main.rs`     | 仅启动入口，逻辑薄                  |
 | 后端分层实现   | `src/app/`        | core/network/system/storage/singbox |
+| gRPC API 客户端 | `src/app/singbox_api/` | 替代 experimental.clash_api |
 | 平台差异依赖   | `Cargo.toml`      | cfg(windows/unix/macos)             |
 | 打包行为       | `tauri.conf.json` | 窗口与 bundle 相关                  |
 
@@ -48,3 +50,5 @@ cd src-tauri && cargo test
 
 - `tauri_plugin_websocket` 仅在 `lib.rs` 注册一次，无重复注册。
 - `Cargo.toml` 配置了激进的 release profile（LTO/codegen-units=1/strip=panic=abort），排障时注意 release 与 dev 行为差异（panic 直接 abort，不可恢复）。
+- **API 协议**：内核交互使用 sing-box 1.14+ 官方 `type: "api"`（gRPC-Web over WebSocket），由 `src/app/singbox_api/` 客户端实现；metacubexd 兼容层（`experimental.clash_api`）已彻底移除。
+- **规则与代理提供者管理**未实现：官方 gRPC API 未暴露对应接口，相关 UI 隐藏，等待上游 API 扩展。

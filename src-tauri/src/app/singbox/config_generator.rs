@@ -7,7 +7,7 @@ use super::common::{
     RS_GEOSITE_YOUTUBE,
 };
 use super::config_schema::{
-    CacheFileConfig, ClashApiConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, LogConfig,
+    CacheFileConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, HttpClientConfig, LogConfig,
     RemoteRuleSetConfig, RouteConfig, SingBoxConfig,
 };
 use crate::app::singbox::settings_patch::apply_app_settings_to_config;
@@ -24,7 +24,7 @@ pub use super::common::{
 /// 目标：
 /// - 默认规则：国内域名/IP 直连，其他走代理（可“绕过国内域名”）。
 /// - DNS：国内用国内 DNS，非国内用 DoH（尽量避免污染）。
-/// - 兼容：保留 Clash API（前端节点选择/延迟测试依赖）。
+/// - 启用 sing-box 1.14+ 官方 `type: api` 服务，供前端通过 gRPC-Web 交互（节点选择、测速、连接管理等）。
 pub fn generate_base_config(app_config: &AppConfig) -> Value {
     let dns_strategy = dns_strategy(app_config);
 
@@ -106,7 +106,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         rule_sets.push(remote_rule_set_value(
             RS_GEOSITE_ADS,
             "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
-            download_detour,
+            Some(download_detour),
             "1d",
         ));
     }
@@ -115,13 +115,13 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         remote_rule_set_value(
             RS_GEOSITE_CN,
             "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
-            download_detour,
+            Some(download_detour),
             "1d",
         ),
         remote_rule_set_value(
             RS_GEOSITE_GEOLOCATION_NOT_CN,
             "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs",
-            download_detour,
+            Some(download_detour),
             "1d",
         ),
     ]);
@@ -131,31 +131,31 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             remote_rule_set_value(
                 RS_GEOSITE_TELEGRAM,
                 "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs",
-                download_detour,
+                Some(download_detour),
                 "7d",
             ),
             remote_rule_set_value(
                 RS_GEOSITE_YOUTUBE,
                 "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-youtube.srs",
-                download_detour,
+                Some(download_detour),
                 "7d",
             ),
             remote_rule_set_value(
                 RS_GEOSITE_NETFLIX,
                 "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs",
-                download_detour,
+                Some(download_detour),
                 "7d",
             ),
             remote_rule_set_value(
                 RS_GEOSITE_OPENAI,
                 "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
-                download_detour,
+                Some(download_detour),
                 "7d",
             ),
             remote_rule_set_value(
                 RS_GEOSITE_GOOGLE,
                 "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs",
-                download_detour,
+                Some(download_detour),
                 "7d",
             ),
         ]);
@@ -165,13 +165,13 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         remote_rule_set_value(
             RS_GEOSITE_PRIVATE,
             "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-private.srs",
-            TAG_DIRECT,
+            Some(TAG_DIRECT),
             "7d",
         ),
         remote_rule_set_value(
             RS_GEOIP_CN,
             "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
-            download_detour,
+            Some(download_detour),
             "1d",
         ),
     ]);
@@ -238,24 +238,20 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         experimental: ExperimentalConfig {
             cache_file: CacheFileConfig {
                 enabled: true,
-                // Fake DNS 依赖反向域名映射缓存，开启持久化可降低切换网络后的映射丢失。
-                store_rdrc: app_config.singbox_fake_dns_enabled.then_some(true),
-            },
-            clash_api: ClashApiConfig {
-                external_controller: format!("127.0.0.1:{}", app_config.api_port),
-                external_ui: "metacubexd".to_string(),
-                // 让 sing-box 自动下载 UI（国内网络可能被墙，下载走代理可提高成功率）
-                external_ui_download_url:
-                    "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
-                        .to_string(),
-                external_ui_download_detour: download_detour.to_string(),
-                default_mode: "rule".to_string(),
+                // 1.14 替代 `store_rdrc`：Fake DNS 依赖反向域名映射缓存，开启持久化可降低切换网络后的映射丢失。
+                store_dns: app_config.singbox_fake_dns_enabled.then_some(true),
             },
         },
         dns: DnsConfig {
             servers: build_dns_servers(app_config, dns_strategy, default_outbound),
             rules: dns_rules,
-            independent_cache: true,
+            // 1.14 启用乐观 DNS 缓存：重复查询命中过期缓存立即返回 + 后台刷新，降低尾延迟
+            optimistic: app_config
+                .singbox_dns_optimistic_cache
+                .then_some(true),
+            // per-query / per-server DNS 超时（1.14 新增）；为空时不写入
+            timeout: (!app_config.singbox_dns_timeout.is_empty())
+                .then(|| app_config.singbox_dns_timeout.clone()),
             reverse_mapping: app_config.singbox_fake_dns_enabled.then_some(true),
             final_server: DNS_PROXY.to_string(),
         },
@@ -270,13 +266,62 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
                 "server": DNS_RESOLVER,
                 "strategy": dns_strategy
             })),
+            // 1.14 新增：指定默认 HTTP 客户端供所有远程 rule-set 下载使用
+            default_http_client: Some("default".to_string()),
         },
+        // 1.14 顶层 HTTP 客户端（替代 rule_set.download_detour）
+        http_clients: Some(vec![HttpClientConfig {
+            tag: "default".to_string(),
+            server: None,
+            server_port: None,
+            tls: None,
+        }]),
+        // services 由下方二次注入（要追加 services 字段）
+        services: None,
     };
 
     let mut config = serde_json::to_value(base).expect("SingBoxConfig 序列化失败");
 
     // 统一由 settings_patch 负责把端口/TUN/IPv6 偏好写入配置，确保行为一致。
     apply_app_settings_to_config(&mut config, app_config);
+
+    // 注入 sing-box 1.14+ 官方 gRPC API 服务（替代实验性的 Clash API）。
+    // 端口从 AppConfig.api_port 读取，与历史 Clash API 默认端口一致（28955）。
+    // 监听地址固定本机，避免对外暴露控制端口。
+    // dashboard.enabled 由 AppConfig.enable_web_dashboard 控制（默认 false，继续用本项目 Vue UI）。
+    if let Some(root) = config.as_object_mut() {
+        let mut api_service = json!({
+            "type": "api",
+            "listen": "127.0.0.1",
+            "listen_port": app_config.api_port,
+            "dashboard": { "enabled": app_config.enable_web_dashboard }
+        });
+        if app_config.enable_web_dashboard {
+            // 启用 dashboard 时同时提供 secret（用 listen_port 派生一个本地 secret）
+            // 防止 dashboard 在公网意外暴露时无鉴权
+            api_service["secret"] = json!(format!("{:x}", app_config.api_port));
+        }
+        root.insert("services".to_string(), json!([api_service]));
+
+        // 1.14 新增：可选的 Tailscale endpoint（实验性，需要 Tailscale auth key）
+        if app_config.enable_tailscale_endpoint {
+            let mut tailscale_endpoint = json!({
+                "type": "tailscale",
+                "tag": "tailscale-endpoint"
+            });
+            // Tailscale SSH server（1.14 新增）— 需 tailnet ACL 配合
+            if app_config.tailscale_run_ssh_server {
+                tailscale_endpoint["ssh_server"] = json!({ "enabled": true });
+            }
+            // Taildrop 收件箱目录（1.14 新增）
+            if !app_config.tailscale_taildrop_directory.is_empty() {
+                tailscale_endpoint["taildrop_directory"] =
+                    json!(app_config.tailscale_taildrop_directory);
+            }
+            root.insert("endpoints".to_string(), json!([tailscale_endpoint]));
+        }
+    }
+
     config
 }
 
@@ -402,7 +447,7 @@ fn apply_fake_dns_rules(dns_rules: &mut Vec<Value>, app_config: &AppConfig) {
 fn remote_rule_set_value(
     tag: &str,
     url: &str,
-    download_detour: &str,
+    download_detour: Option<&str>,
     update_interval: &str,
 ) -> Value {
     let rs = RemoteRuleSetConfig {
@@ -410,7 +455,8 @@ fn remote_rule_set_value(
         kind: "remote".to_string(),
         format: "binary".to_string(),
         url: url.to_string(),
-        download_detour: download_detour.to_string(),
+        // 1.14 已 deprecated，1.16 移除。默认 None 走顶层 `http_clients` + `route.default_http_client`
+        download_detour: download_detour.map(|s| s.to_string()),
         update_interval: update_interval.to_string(),
     };
     serde_json::to_value(rs).expect("RemoteRuleSetConfig 序列化失败")

@@ -189,7 +189,7 @@ fn fake_dns_should_append_fakeip_server_and_enable_reverse_mapping() {
         config
             .get("experimental")
             .and_then(|v| v.get("cache_file"))
-            .and_then(|v| v.get("store_rdrc"))
+            .and_then(|v| v.get("store_dns"))
             .and_then(|v| v.as_bool()),
         Some(true)
     );

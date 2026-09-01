@@ -1,4 +1,5 @@
 import type { KernelStatus, KernelDownloadPayload } from '@/services/kernel-service'
+import type { ProxyGroup as GroupsDataProxyGroup } from '@/services/proxy-service'
 import type {
   TrafficDataPayload,
   ConnectionsDataPayload,
@@ -20,6 +21,7 @@ export const APP_EVENTS = {
   memoryData: 'memory-data',
   logData: 'log-data',
   connectionsData: 'connections-data',
+  groupsData: 'groups-data',
   kernelHealth: 'kernel-health',
   kernelStatusChanged: 'kernel-status-changed',
   kernelReady: 'kernel-ready',
@@ -51,6 +53,8 @@ export type AppEventPayloads = {
   [APP_EVENTS.memoryData]: MemoryStatsPayload
   [APP_EVENTS.logData]: LogEventPayload
   [APP_EVENTS.connectionsData]: ConnectionsDataPayload
+  // groups-data 推送:对应后端 gRPC SubscribeGroups 的 Groups 结构
+  [APP_EVENTS.groupsData]: { group: GroupsDataProxyGroup[] }
   [APP_EVENTS.kernelHealth]: KernelHealthPayload
   [APP_EVENTS.kernelStatusChanged]: KernelStatus
   [APP_EVENTS.kernelReady]: void

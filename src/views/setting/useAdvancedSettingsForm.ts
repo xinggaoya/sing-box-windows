@@ -29,6 +29,18 @@ interface AppStoreLike {
   singboxDnsCn: string
   singboxDnsResolver: string
   singboxUrltestUrl: string
+  // === sing-box 1.14 新增字段（实验性） ===
+  singboxDnsOptimisticCache: boolean
+  singboxDnsTimeout: string
+  singboxDnsUseMdns: boolean
+  singboxEnableTlsSpoof: boolean
+  hysteria2DisableChromeParrot: boolean
+  hysteria2ObfsType: string
+  clashMode: string
+  enableWebDashboard: boolean
+  enableTailscaleEndpoint: boolean
+  tailscaleRunSshServer: boolean
+  tailscaleTaildropDirectory: string
   saveToBackend: (options?: { applyRuntime?: boolean }) => Promise<void>
 }
 
@@ -96,6 +108,41 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
     urltestUrl: '',
   })
 
+  // === sing-box 1.14 实验性 / 高级选项 ===
+  const savingSingboxExperimental = ref(false)
+  const singboxExperimentalForm = reactive({
+    dnsOptimisticCache: true,
+    dnsTimeout: '5s',
+    dnsUseMdns: true,
+    enableTlsSpoof: false,
+    hysteria2DisableChromeParrot: false,
+    hysteria2ObfsType: 'salamander' as 'salamander' | 'gecko',
+    clashMode: 'rule' as 'rule' | 'global' | 'direct',
+    enableWebDashboard: false,
+    enableTailscaleEndpoint: false,
+    tailscaleRunSshServer: false,
+    tailscaleTaildropDirectory: 'Taildrop',
+  })
+
+  const hysteria2ObfsTypeOptions = computed(() => {
+    const zh = (options.t('common.locale') as string | undefined) === 'zh-CN' ||
+      (typeof navigator !== 'undefined' && navigator.language?.startsWith('zh'))
+    return [
+      { label: zh ? 'Salamander（默认）' : 'Salamander (default)', value: 'salamander' },
+      { label: zh ? 'Gecko（1.14 新增）' : 'Gecko (1.14 new)', value: 'gecko' },
+    ]
+  })
+
+  const clashModeOptions = computed(() => {
+    const zh = (options.t('common.locale') as string | undefined) === 'zh-CN' ||
+      (typeof navigator !== 'undefined' && navigator.language?.startsWith('zh'))
+    return [
+      { label: zh ? '规则（默认）' : 'Rule (default)', value: 'rule' },
+      { label: zh ? '全局代理' : 'Global', value: 'global' },
+      { label: zh ? '全局直连' : 'Direct', value: 'direct' },
+    ]
+  })
+
   const defaultOutboundOptions = computed(() => [
     { label: options.t('setting.singboxProfile.outboundManual'), value: 'manual' },
     { label: options.t('setting.singboxProfile.outboundAuto'), value: 'auto' },
@@ -145,6 +192,27 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
       singboxProfileForm.dnsCn = options.appStore.singboxDnsCn
       singboxProfileForm.dnsResolver = options.appStore.singboxDnsResolver
       singboxProfileForm.urltestUrl = options.appStore.singboxUrltestUrl
+
+      // 1.14 实验性字段
+      singboxExperimentalForm.dnsOptimisticCache =
+        options.appStore.singboxDnsOptimisticCache
+      singboxExperimentalForm.dnsTimeout = options.appStore.singboxDnsTimeout
+      singboxExperimentalForm.dnsUseMdns = options.appStore.singboxDnsUseMdns
+      singboxExperimentalForm.enableTlsSpoof = options.appStore.singboxEnableTlsSpoof
+      singboxExperimentalForm.hysteria2DisableChromeParrot =
+        options.appStore.hysteria2DisableChromeParrot
+      singboxExperimentalForm.hysteria2ObfsType =
+        options.appStore.hysteria2ObfsType as 'salamander' | 'gecko'
+      singboxExperimentalForm.clashMode = options.appStore.clashMode as
+        | 'rule'
+        | 'global'
+        | 'direct'
+      singboxExperimentalForm.enableWebDashboard = options.appStore.enableWebDashboard
+      singboxExperimentalForm.enableTailscaleEndpoint =
+        options.appStore.enableTailscaleEndpoint
+      singboxExperimentalForm.tailscaleRunSshServer = options.appStore.tailscaleRunSshServer
+      singboxExperimentalForm.tailscaleTaildropDirectory =
+        options.appStore.tailscaleTaildropDirectory
     },
     { immediate: true },
   )
@@ -240,15 +308,48 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
     }
   }
 
+  // === sing-box 1.14 实验性 / 高级选项保存 ===
+  const saveSingboxExperimentalSettings = async () => {
+    savingSingboxExperimental.value = true
+    try {
+      options.appStore.singboxDnsOptimisticCache = singboxExperimentalForm.dnsOptimisticCache
+      options.appStore.singboxDnsTimeout = singboxExperimentalForm.dnsTimeout.trim() || '5s'
+      options.appStore.singboxDnsUseMdns = singboxExperimentalForm.dnsUseMdns
+      options.appStore.singboxEnableTlsSpoof = singboxExperimentalForm.enableTlsSpoof
+      options.appStore.hysteria2DisableChromeParrot =
+        singboxExperimentalForm.hysteria2DisableChromeParrot
+      options.appStore.hysteria2ObfsType = singboxExperimentalForm.hysteria2ObfsType
+      options.appStore.clashMode = singboxExperimentalForm.clashMode
+      options.appStore.enableWebDashboard = singboxExperimentalForm.enableWebDashboard
+      options.appStore.enableTailscaleEndpoint = singboxExperimentalForm.enableTailscaleEndpoint
+      options.appStore.tailscaleRunSshServer = singboxExperimentalForm.tailscaleRunSshServer
+      options.appStore.tailscaleTaildropDirectory =
+        singboxExperimentalForm.tailscaleTaildropDirectory.trim() || 'Taildrop'
+
+      await options.appStore.saveToBackend({ applyRuntime: true })
+      options.message.success(options.t('common.saveSuccess'))
+    } catch (error) {
+      console.error('保存 sing-box 1.14 实验性选项失败:', error)
+      options.message.error(options.t('common.saveFailed'))
+    } finally {
+      savingSingboxExperimental.value = false
+    }
+  }
+
   return {
     savingAdvanced,
     proxyAdvancedForm,
     savingSingboxProfile,
     singboxProfileForm,
+    savingSingboxExperimental,
+    singboxExperimentalForm,
     defaultOutboundOptions,
     downloadDetourOptions,
     fakeDnsFilterOptions,
+    hysteria2ObfsTypeOptions,
+    clashModeOptions,
     saveProxyAdvancedSettings,
     saveSingboxProfileSettings,
+    saveSingboxExperimentalSettings,
   }
 }

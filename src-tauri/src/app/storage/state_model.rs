@@ -57,6 +57,43 @@ pub struct AppConfig {
     pub tun_self_heal_enabled: bool,
     /// TUN 自愈冷却时间（秒）
     pub tun_self_heal_cooldown_secs: u16,
+
+    // === sing-box 1.14 升级新增字段 ===
+
+    /// 1.14 内核下载/升级通道：stable / oldstable / beta / testing
+    /// 默认 stable；oldstable 适合老配置兼容性回退
+    pub kernel_update_track: String,
+    /// 1.14 DNS 乐观缓存（optimistic）：重复查询命中过期缓存立即返回 + 后台刷新
+    pub singbox_dns_optimistic_cache: bool,
+    /// 1.14 per-server / per-query DNS 超时（如 "5s"）；空字符串表示用内核默认
+    pub singbox_dns_timeout: String,
+    /// 1.14 mDNS server（*.local / link-local）；默认开
+    pub singbox_dns_use_mdns: bool,
+    /// 1.14 启用 `tls.spoof`（SNI 诱骗，抗 SNI 过滤）
+    /// **仅 Windows x64/x86 + Admin**，ARM64 / Linux / macOS 需自动隐藏
+    pub singbox_enable_tls_spoof: bool,
+    /// 1.14 TUN `dns_mode`：hijack（默认）/ tun / off
+    /// hijack 会改平台 DNS，1.14 起为默认行为
+    pub tun_dns_mode: String,
+    /// 1.14 TUN `include_mac_address`：仅代理指定网卡的流量
+    pub tun_include_macs: Vec<String>,
+    /// 1.14 TUN `exclude_mac_address`：排除指定网卡
+    pub tun_exclude_macs: Vec<String>,
+    /// 1.14 Hysteria2 `disable_chrome_parrot`：服务器用 Ed25519 证书时必须开
+    pub hysteria2_disable_chrome_parrot: bool,
+    /// 1.14 Hysteria2 obfs 类型：salamander（默认）/ gecko
+    pub hysteria2_obfs_type: String,
+    /// 1.14 Clash Mode 快捷切换持久化：rule / global / direct
+    pub clash_mode: String,
+    /// 1.14 启用 `type: api` 的 `dashboard.enabled`（暴露 sing-box-dashboard 到 listen_port）
+    /// 默认 false（继续用本项目 Vue UI）
+    pub enable_web_dashboard: bool,
+    /// 1.14 启用 Tailscale endpoint（实验性，需要 Tailscale auth key）
+    pub enable_tailscale_endpoint: bool,
+    /// Tailscale 节点 SSH server（tailnet:22）
+    pub tailscale_run_ssh_server: bool,
+    /// Tailscale Taildrop 收件箱目录（默认 "Taildrop"）
+    pub tailscale_taildrop_directory: String,
 }
 
 impl Default for AppConfig {
@@ -105,6 +142,24 @@ impl Default for AppConfig {
             singbox_enable_app_groups: true,
             tun_self_heal_enabled: true,
             tun_self_heal_cooldown_secs: 90,
+
+            // sing-box 1.14 升级默认值
+            kernel_update_track: "stable".to_string(),
+            singbox_dns_optimistic_cache: true,
+            singbox_dns_timeout: "5s".to_string(),
+            singbox_dns_use_mdns: true,
+            // TLS spoof 涉及抓包权限，默认关；UI 在 Windows x64/x86 + Admin 上才显示
+            singbox_enable_tls_spoof: false,
+            tun_dns_mode: "hijack".to_string(),
+            tun_include_macs: Vec::new(),
+            tun_exclude_macs: Vec::new(),
+            hysteria2_disable_chrome_parrot: false,
+            hysteria2_obfs_type: "salamander".to_string(),
+            clash_mode: "rule".to_string(),
+            enable_web_dashboard: false,
+            enable_tailscale_endpoint: false,
+            tailscale_run_ssh_server: false,
+            tailscale_taildrop_directory: "Taildrop".to_string(),
         }
     }
 }

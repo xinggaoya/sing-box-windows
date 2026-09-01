@@ -279,9 +279,10 @@
               :step="500"
             />
           </n-form-item>
-          <n-form-item :label="extraLabels.latencyUrl">
-            <n-input v-model:value="proxyStore.latencyTestUrl" :placeholder="props.appStore.singboxUrltestUrl" />
-          </n-form-item>
+          <!--
+            节点测速 URL：原 Clash API 时代用 proxyStore.latencyTestUrl 单独配置，
+            官方 gRPC API 后由内核直接使用 singboxUrltestUrl 配置；该项已隐藏。
+          -->
         </div>
 
         <div class="form-section-title">{{ extraLabels.logRetentionPrefs }}</div>
@@ -296,6 +297,113 @@
           </n-form-item>
         </div>
         <div class="setting-hint">{{ extraLabels.logRetentionHint }}</div>
+      </div>
+    </transition>
+
+    <!-- sing-box 1.14 实验性 / 高级选项 -->
+    <h3 class="setting-section-title">{{ extraLabels.experimentalTitle }}</h3>
+    <div class="collapsible-header" @click="toggleSection('experimental')">
+      <span class="collapsible-label">{{ extraLabels.experimentalLabel }}</span>
+      <n-icon :size="16" class="collapse-arrow" :class="{ expanded: expandedSections.experimental }">
+        <ChevronDownOutline />
+      </n-icon>
+    </div>
+    <transition name="collapse">
+      <div v-if="expandedSections.experimental" class="collapsible-body">
+        <div class="setting-alert info">
+          <n-icon :size="16"><InformationCircleOutline /></n-icon>
+          <span>{{ extraLabels.experimentalHint }}</span>
+        </div>
+
+        <n-form label-placement="top" class="advanced-form">
+          <!-- DNS 1.14 增强 -->
+          <div class="form-section-title">{{ extraLabels.dns114Title }}</div>
+          <div class="setting-toggles-grid">
+            <div class="setting-toggle-item">
+              <span class="setting-toggle-label">{{ extraLabels.dnsOptimisticCache }}</span>
+              <n-switch v-model:value="singboxExperimentalForm.dnsOptimisticCache" />
+            </div>
+            <div class="setting-toggle-item">
+              <span class="setting-toggle-label">{{ extraLabels.dnsUseMdns }}</span>
+              <n-switch v-model:value="singboxExperimentalForm.dnsUseMdns" />
+            </div>
+          </div>
+          <n-form-item :label="extraLabels.dnsTimeout">
+            <n-input
+              v-model:value="singboxExperimentalForm.dnsTimeout"
+              :placeholder="'5s'"
+            />
+          </n-form-item>
+
+          <!-- Hysteria2 抗指纹 -->
+          <div class="form-section-title">{{ extraLabels.hysteria2Title }}</div>
+          <div class="setting-form-grid">
+            <n-form-item :label="extraLabels.hysteria2ObfsType">
+              <n-select
+                v-model:value="singboxExperimentalForm.hysteria2ObfsType"
+                :options="hysteria2ObfsTypeOptions"
+              />
+            </n-form-item>
+            <n-form-item :label="extraLabels.hysteria2DisableChromeParrot">
+              <n-switch v-model:value="singboxExperimentalForm.hysteria2DisableChromeParrot" />
+            </n-form-item>
+          </div>
+
+          <!-- TLS 抗指纹（仅 Windows x64/x86 + Admin） -->
+          <div class="form-section-title">{{ extraLabels.tlsTitle }}</div>
+          <div class="setting-toggles-grid">
+            <div class="setting-toggle-item">
+              <span class="setting-toggle-label">{{ extraLabels.enableTlsSpoof }}</span>
+              <n-switch v-model:value="singboxExperimentalForm.enableTlsSpoof" />
+            </div>
+          </div>
+
+          <!-- Clash Mode 持久化 -->
+          <div class="form-section-title">{{ extraLabels.clashModeTitle }}</div>
+          <n-form-item :label="extraLabels.clashMode">
+            <n-select
+              v-model:value="singboxExperimentalForm.clashMode"
+              :options="clashModeOptions"
+            />
+          </n-form-item>
+
+          <!-- Web Dashboard -->
+          <div class="form-section-title">{{ extraLabels.dashboardTitle }}</div>
+          <div class="setting-toggles-grid">
+            <div class="setting-toggle-item">
+              <span class="setting-toggle-label">{{ extraLabels.enableWebDashboard }}</span>
+              <n-switch v-model:value="singboxExperimentalForm.enableWebDashboard" />
+            </div>
+          </div>
+
+          <!-- Tailscale -->
+          <div class="form-section-title">{{ extraLabels.tailscaleTitle }}</div>
+          <div class="setting-toggles-grid">
+            <div class="setting-toggle-item">
+              <span class="setting-toggle-label">{{ extraLabels.enableTailscaleEndpoint }}</span>
+              <n-switch v-model:value="singboxExperimentalForm.enableTailscaleEndpoint" />
+            </div>
+            <div class="setting-toggle-item">
+              <span class="setting-toggle-label">{{ extraLabels.tailscaleRunSshServer }}</span>
+              <n-switch v-model:value="singboxExperimentalForm.tailscaleRunSshServer" />
+            </div>
+          </div>
+          <n-form-item :label="extraLabels.tailscaleTaildropDirectory">
+            <n-input
+              v-model:value="singboxExperimentalForm.tailscaleTaildropDirectory"
+              :placeholder="'Taildrop'"
+            />
+          </n-form-item>
+
+          <n-button
+            type="primary"
+            block
+            :loading="savingSingboxExperimental"
+            @click="saveSingboxExperimentalSettings"
+          >
+            {{ extraLabels.save }}
+          </n-button>
+        </n-form>
       </div>
     </transition>
   </div>
@@ -337,6 +445,7 @@ const expandedSections = reactive({
   proxy: false,
   profile: false,
   dashboard: false,
+  experimental: false,
 })
 
 const toggleSection = (key: keyof typeof expandedSections) => {
@@ -348,11 +457,16 @@ const {
   proxyAdvancedForm,
   savingSingboxProfile,
   singboxProfileForm,
+  savingSingboxExperimental,
+  singboxExperimentalForm,
   defaultOutboundOptions,
   downloadDetourOptions,
   fakeDnsFilterOptions,
+  hysteria2ObfsTypeOptions,
+  clashModeOptions,
   saveProxyAdvancedSettings,
   saveSingboxProfileSettings,
+  saveSingboxExperimentalSettings,
 } = useAdvancedSettingsForm({
   appStore: props.appStore,
   message,
@@ -375,6 +489,29 @@ const extraLabels = computed(() => {
     logRetentionHint: zh
       ? '仅控制前端界面展示的日志条数；磁盘上的 sing-box.log 由内核启动时自动滚动（超过 10MB 保留最近 3 份）。'
       : 'Controls only the number of log rows shown in the UI. The on-disk sing-box.log is rotated automatically on kernel start (kept to last 3 files after 10MB).',
+    // === sing-box 1.14 实验性 / 高级选项 ===
+    experimentalTitle: zh ? '高级（1.14 实验性）' : 'Advanced (1.14 Experimental)',
+    experimentalLabel: zh ? '1.14 新增能力' : '1.14 New Capabilities',
+    experimentalHint: zh
+      ? '以下选项对应 sing-box 1.14 内核能力。修改后需要重启内核生效。'
+      : 'These options correspond to sing-box 1.14 capabilities. Kernel restart is required to take effect.',
+    dns114Title: zh ? 'DNS 1.14 增强' : 'DNS 1.14 Enhancements',
+    dnsOptimisticCache: zh ? '乐观 DNS 缓存（降低重复查询延迟）' : 'Optimistic DNS cache (reduces repeat query latency)',
+    dnsUseMdns: zh ? '启用 mDNS（*.local / link-local）' : 'Enable mDNS (*.local / link-local)',
+    dnsTimeout: zh ? 'DNS 超时（如 5s）' : 'DNS timeout (e.g. 5s)',
+    hysteria2Title: zh ? 'Hysteria2 抗指纹' : 'Hysteria2 Fingerprint Resistance',
+    hysteria2ObfsType: zh ? '混淆类型' : 'Obfuscation type',
+    hysteria2DisableChromeParrot: zh ? '关闭 Chrome QUIC 指纹（Ed25519 证书时需开）' : 'Disable Chrome QUIC fingerprint (required for Ed25519 servers)',
+    tlsTitle: zh ? 'TLS 抗指纹' : 'TLS Fingerprint Resistance',
+    enableTlsSpoof: zh ? '启用 TLS spoof（SNI 诱骗，仅 Windows x64/x86 + Admin）' : 'Enable TLS spoof (SNI deception, Windows x64/x86 + Admin only)',
+    clashModeTitle: zh ? 'Clash 模式' : 'Clash Mode',
+    clashMode: zh ? '默认模式' : 'Default mode',
+    enableWebDashboard: zh ? '启用 sing-box-dashboard Web 面板' : 'Enable sing-box-dashboard Web panel',
+    tailscaleTitle: zh ? 'Tailscale 模式（实验性）' : 'Tailscale Mode (Experimental)',
+    enableTailscaleEndpoint: zh ? '启用 Tailscale endpoint' : 'Enable Tailscale endpoint',
+    tailscaleRunSshServer: zh ? '同时启用 Tailscale SSH server（tailnet:22）' : 'Also enable Tailscale SSH server (tailnet:22)',
+    tailscaleTaildropDirectory: zh ? 'Taildrop 收件箱目录' : 'Taildrop inbox directory',
+    save: zh ? '保存 1.14 实验性选项' : 'Save 1.14 Experimental Options',
   }
 })
 

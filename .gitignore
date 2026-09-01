@@ -40,3 +40,12 @@ target
 
 # ZCode 工具临时产物
 .zcode/
+
+# 调研时克隆的外部仓库（sing-box-dashboard 等）
+.tmp_sbd/
+
+# gRPC 联调临时产物（含 sing-box.exe ~80 MB、probe 脚本、cache.db 等）
+.tmp_smoke/
+
+# 调试时误创建的截图（具体文件名）
+/--full-page

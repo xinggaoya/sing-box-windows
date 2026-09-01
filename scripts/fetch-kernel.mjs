@@ -97,13 +97,15 @@ export function resolveRequestedTargets(
 
 export function printHelp() {
   console.log(`Usage:
-  node scripts/fetch-kernel.mjs [--all] [--platform windows|linux|macos] [--arch amd64|arm64|386|armv5] [--version x.y.z] [--out path] [--skip-existing] [--force]
+  node scripts/fetch-kernel.mjs [--all] [--platform windows|linux|macos] [--arch amd64|arm64|386|armv5] [--version x.y.z] [--track stable|oldstable|beta|testing] [--out path] [--skip-existing] [--force]
 
 Examples:
   node scripts/fetch-kernel.mjs --platform windows --arch amd64
   node scripts/fetch-kernel.mjs --all
   node scripts/fetch-kernel.mjs --platform macos --arch arm64 --version 1.12.10
   node scripts/fetch-kernel.mjs --all --skip-existing
+  node scripts/fetch-kernel.mjs --all --track oldstable   # 上一稳定版（适合兼容性回退）
+  node scripts/fetch-kernel.mjs --all --track beta        # 预发版
 `)
 }
 
@@ -197,81 +199,195 @@ export async function fetchKernel(target, version, kernelBaseDir, options = {}) 
   console.log(`[${target.platform}/${target.arch}] Saved: ${targetExecutable}`)
 }
 
-export async function getLatestVersion() {
+export async function getLatestVersion(options = {}) {
+  // sing-box 1.14 起 Linux/Docker 有 4 个发布轨：
+  // - stable：当前稳定版（默认），走 `releases/latest`
+  // - oldstable：上一稳定版（兼容性回退）
+  // - beta：稳定预发版
+  // - testing：testing 分支
+  const track = (options.track ?? 'stable').toLowerCase();
+  const includePrerelease = track === 'beta' || track === 'testing';
+
+  // oldstable/beta/testing：拉取 releases 列表后本地筛选
+  // stable：直接走 `releases/latest`
+  if (track === 'stable') {
+    return await getLatestFromEndpoint('https://api.github.com/repos/SagerNet/sing-box/releases/latest');
+  }
+
+  return await getLatestFromReleases(includePrerelease, track);
+}
+
+async function getLatestFromEndpoint(url) {
   const apiSources = [
+    { url, withAuth: true },
     {
-      url: 'https://api.github.com/repos/SagerNet/sing-box/releases/latest',
-      withAuth: true
-    },
-    {
-      url: 'https://v6.gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
+      url: `https://v6.gh-proxy.com/${url}`,
       withAuth: false
     },
     {
-      url: 'https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
+      url: `https://gh-proxy.com/${url}`,
       withAuth: false
     },
     {
-      url: 'https://ghfast.top/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
+      url: `https://ghfast.top/${url}`,
       withAuth: false
     }
-  ]
+  ];
 
   for (const source of apiSources) {
     try {
       const res = await fetch(source.url, {
         headers: buildGithubHeaders(source.withAuth),
         redirect: 'follow'
-      })
+      });
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
+        throw new Error(`HTTP ${res.status}`);
       }
-      const data = await res.json()
-      const version = normalizeVersionTag(data?.tag_name)
+      const data = await res.json();
+      const version = normalizeVersionTag(data?.tag_name);
       if (version) {
-        return version
+        console.log(`[track] resolved version ${version} from ${source.url}`);
+        return version;
       }
     } catch (error) {
-      console.warn(`Latest version fetch failed: ${error?.message ?? error}`)
+      console.warn(`Latest version fetch failed: ${error?.message ?? error}`);
     }
   }
 
+  // Fallback to release page scraping
+  return await scrapeLatestFromReleasePage();
+}
+
+async function getLatestFromReleases(includePrerelease, track) {
+  const apiSources = [
+    {
+      url: 'https://api.github.com/repos/SagerNet/sing-box/releases?per_page=100',
+      withAuth: true
+    },
+    {
+      url: 'https://v6.gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases?per_page=100',
+      withAuth: false
+    },
+    {
+      url: 'https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases?per_page=100',
+      withAuth: false
+    },
+    {
+      url: 'https://ghfast.top/https://api.github.com/repos/SagerNet/sing-box/releases?per_page=100',
+      withAuth: false
+    }
+  ];
+
+  for (const source of apiSources) {
+    try {
+      const res = await fetch(source.url, {
+        headers: buildGithubHeaders(source.withAuth),
+        redirect: 'follow'
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const releases = await res.json();
+      if (!Array.isArray(releases) || releases.length === 0) {
+        throw new Error('empty releases list');
+      }
+      const version = selectVersionFromReleases(releases, track, includePrerelease);
+      if (version) {
+        console.log(`[track=${track}] resolved version ${version} from ${source.url}`);
+        return version;
+      }
+    } catch (error) {
+      console.warn(`Releases list fetch failed: ${error?.message ?? error}`);
+    }
+  }
+
+  throw new Error(
+    `Unable to fetch releases list for track=${track}. If running in CI, set SING_BOX_GITHUB_TOKEN for higher API rate limits.`
+  );
+}
+
+/// 从已排序（newest-first）的 releases 数组里按 track 选一个版本。
+/// - oldstable：找版本号第二大的 stable（major.minor 不同的最大 stable）
+/// - beta：第一个 prerelease
+/// - testing：第一个 prerelease（beta/testing 共用 same channel）
+/// - stable：第一个 stable release
+function selectVersionFromReleases(releases, track, includePrerelease) {
+  const sorted = [...releases].sort((a, b) => {
+    const at = a?.published_at ?? a?.created_at ?? '';
+    const bt = b?.published_at ?? b?.created_at ?? '';
+    return bt.localeCompare(at); // descending
+  });
+
+  if (track === 'stable') {
+    const found = sorted.find((r) => !r.prerelease);
+    return found ? normalizeVersionTag(found.tag_name) : null;
+  }
+
+  if (track === 'oldstable') {
+    // 1) 找最新的 major.minor 组（>= 1.14.x）
+    // 2) 再找它前一个 major.minor 的最新 stable
+    const stableReleases = sorted.filter((r) => !r.prerelease);
+    if (stableReleases.length < 2) {
+      // 兜底：只有一个 stable 时直接用
+      return stableReleases[0] ? normalizeVersionTag(stableReleases[0].tag_name) : null;
+    }
+    const newest = normalizeVersionTag(stableReleases[0].tag_name);
+    const newestMajorMinor = newest?.split('.').slice(0, 2).join('.');
+    const olderMajorMinorReleases = stableReleases
+      .map((r) => ({ release: r, version: normalizeVersionTag(r.tag_name) }))
+      .filter(({ version }) => {
+        const mm = version?.split('.').slice(0, 2).join('.');
+        return mm && mm !== newestMajorMinor;
+      });
+    if (olderMajorMinorReleases.length === 0) {
+      return newest;
+    }
+    return olderMajorMinorReleases[0].version;
+  }
+
+  if (track === 'beta' || track === 'testing') {
+    if (!includePrerelease) {
+      return null;
+    }
+    const found = sorted.find((r) => r.prerelease);
+    return found ? normalizeVersionTag(found.tag_name) : null;
+  }
+
+  return null;
+}
+
+async function scrapeLatestFromReleasePage() {
   const releasePageSources = [
     'https://github.com/SagerNet/sing-box/releases/latest',
     'https://v6.gh-proxy.com/https://github.com/SagerNet/sing-box/releases/latest',
     'https://gh-proxy.com/https://github.com/SagerNet/sing-box/releases/latest',
     'https://ghfast.top/https://github.com/SagerNet/sing-box/releases/latest'
-  ]
+  ];
 
   for (const url of releasePageSources) {
     try {
       const res = await fetch(url, {
         headers: buildGithubHeaders(false),
         redirect: 'follow'
-      })
+      });
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
+        throw new Error(`HTTP ${res.status}`);
       }
-
-      const fromFinalUrl = parseVersionFromReleaseUrl(res.url)
+      const fromFinalUrl = parseVersionFromReleaseUrl(res.url);
       if (fromFinalUrl) {
-        return fromFinalUrl
+        return fromFinalUrl;
       }
-
-      // 部分镜像会返回 HTML，不一定保留重定向 URL，兜底解析页面内容。
-      const html = await res.text()
-      const fromHtml = parseVersionFromReleaseHtml(html)
+      const html = await res.text();
+      const fromHtml = parseVersionFromReleaseHtml(html);
       if (fromHtml) {
-        return fromHtml
+        return fromHtml;
       }
     } catch (error) {
-      console.warn(`Latest release page fetch failed: ${error?.message ?? error}`)
+      console.warn(`Latest release page fetch failed: ${error?.message ?? error}`);
     }
   }
 
-  throw new Error(
-    'Unable to fetch latest version. If running in CI, set SING_BOX_GITHUB_TOKEN for higher API rate limits.'
-  )
+  throw new Error('Unable to fetch latest version (fallback also failed).');
 }
 
 export function normalizeVersionTag(tag) {

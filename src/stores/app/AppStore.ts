@@ -103,6 +103,23 @@ export const useAppStore = defineStore(
     const tunSelfHealEnabled = ref(true)
     const tunSelfHealCooldownSecs = ref(90)
 
+    // === sing-box 1.14 升级新增字段 ===
+    const kernelUpdateTrack = ref<string>('stable')
+    const singboxDnsOptimisticCache = ref(true)
+    const singboxDnsTimeout = ref<string>('5s')
+    const singboxDnsUseMdns = ref(true)
+    const singboxEnableTlsSpoof = ref(false)
+    const tunDnsMode = ref<string>('hijack')
+    const tunIncludeMacs = ref<string[]>([])
+    const tunExcludeMacs = ref<string[]>([])
+    const hysteria2DisableChromeParrot = ref(false)
+    const hysteria2ObfsType = ref<string>('salamander')
+    const clashMode = ref<string>('rule')
+    const enableWebDashboard = ref(false)
+    const enableTailscaleEndpoint = ref(false)
+    const tailscaleRunSshServer = ref(false)
+    const tailscaleTaildropDirectory = ref<string>('Taildrop')
+
     const {
       isDataRestored,
       startInitialization,
@@ -151,6 +168,22 @@ export const useAppStore = defineStore(
       singboxEnableAppGroups,
       tunSelfHealEnabled,
       tunSelfHealCooldownSecs,
+      // === sing-box 1.14 新增字段 ===
+      kernelUpdateTrack,
+      singboxDnsOptimisticCache,
+      singboxDnsTimeout,
+      singboxDnsUseMdns,
+      singboxEnableTlsSpoof,
+      tunDnsMode,
+      tunIncludeMacs,
+      tunExcludeMacs,
+      hysteria2DisableChromeParrot,
+      hysteria2ObfsType,
+      clashMode,
+      enableWebDashboard,
+      enableTailscaleEndpoint,
+      tailscaleRunSshServer,
+      tailscaleTaildropDirectory,
     })
 
     // 同步开机自启设置与系统状态
@@ -446,6 +479,22 @@ export const useAppStore = defineStore(
       singboxEnableAppGroups,
       tunSelfHealEnabled,
       tunSelfHealCooldownSecs,
+      // === sing-box 1.14 新增字段 ===
+      kernelUpdateTrack,
+      singboxDnsOptimisticCache,
+      singboxDnsTimeout,
+      singboxDnsUseMdns,
+      singboxEnableTlsSpoof,
+      tunDnsMode,
+      tunIncludeMacs,
+      tunExcludeMacs,
+      hysteria2DisableChromeParrot,
+      hysteria2ObfsType,
+      clashMode,
+      enableWebDashboard,
+      enableTailscaleEndpoint,
+      tailscaleRunSshServer,
+      tailscaleTaildropDirectory,
       setRunningState,
       setConnectingState,
       toggleAutoStart,
