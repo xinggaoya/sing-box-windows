@@ -169,7 +169,6 @@ export default {
     testFailed: '遅延テスト失敗',
     nodeTestFailed: 'ノード遅延テスト失敗',
     nodeTestComplete: 'ノード遅延テスト完了',
-    groupTestComplete: 'グループ遅延テスト完了',
     batchTestComplete: 'バッチ遅延テスト完了',
     loadSuccess: 'プロキシリスト読み込み成功',
     loadFailed: 'プロキシリスト取得失敗',

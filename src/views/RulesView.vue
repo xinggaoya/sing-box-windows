@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue'
-import { ReloadOutline, AnalyticsOutline } from '@vicons/ionicons5'
+import { ReloadOutline } from '@vicons/ionicons5'
 import { NTag } from 'naive-ui'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useI18n } from 'vue-i18n'

@@ -147,7 +147,6 @@ export default {
     testFailed: 'Latency test failed',
     nodeTestFailed: 'Node latency test failed',
     nodeTestComplete: 'Node latency test complete',
-    groupTestComplete: 'Group latency test complete',
     batchTestComplete: 'Batch latency test complete',
     loadSuccess: 'Proxy list loaded successfully',
     loadFailed: 'Failed to get proxy list',

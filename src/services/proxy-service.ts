@@ -1,8 +1,4 @@
-import { useAppStore } from '@/stores/app/AppStore'
-import { useKernelStore } from '@/stores/kernel/KernelStore'
-import { NotificationService } from './notification-service'
 import { invokeWithAppContext } from './invoke-client'
-import i18n from '@/locales'
 
 // === gRPC API 返回类型（对应后端 singbox_api::types） ===
 
@@ -54,16 +50,6 @@ export interface TunOptionsPayload {
 
 export class ProxyService {
   private static instance: ProxyService
-  private notificationService = NotificationService.getInstance()
-  private t = i18n.global.t
-
-  private get appStore() {
-    return useAppStore()
-  }
-
-  private get kernelStore() {
-    return useKernelStore()
-  }
 
   private constructor() {}
 
@@ -72,69 +58,6 @@ export class ProxyService {
       ProxyService.instance = new ProxyService()
     }
     return ProxyService.instance
-  }
-
-  /**
-   * 切换代理模式 - 简化版
-   * 后端会从数据库读取配置，前端只需指定模式
-   */
-  public async switchMode(
-    mode: 'system' | 'tun' | 'manual',
-    messageCallback?: (type: 'success' | 'info' | 'error', content: string) => void,
-  ): Promise<boolean> {
-    try {
-      if (mode === 'system') {
-        await this.appStore.toggleSystemProxy(true)
-        await this.appStore.toggleTun(false)
-      } else if (mode === 'manual') {
-        await this.appStore.toggleSystemProxy(false)
-        await this.appStore.toggleTun(false)
-      } else {
-        await this.appStore.toggleSystemProxy(false)
-        await this.appStore.toggleTun(true)
-      }
-
-      const applied = await this.kernelStore.applyProxySettings()
-      if (!applied) {
-        const errorText = this.t('notification.applyProxyFailed')
-        if (messageCallback) messageCallback('error', errorText)
-        return false
-      }
-
-      if (messageCallback) {
-        const content =
-          mode === 'system'
-            ? this.t('notification.systemProxyEnabled')
-            : mode === 'tun'
-              ? this.t('notification.tunEnabled')
-              : this.t('notification.manualProxyEnabled')
-        messageCallback(mode === 'manual' ? 'info' : 'success', content)
-      }
-
-      if (this.appStore.isRunning) {
-        try {
-          if (messageCallback) messageCallback('info', this.t('home.status.restarting'))
-          else this.notificationService.info(this.t('home.status.restarting'))
-
-          await this.kernelStore.restartKernel()
-
-          if (messageCallback) messageCallback('success', this.t('notification.kernelRestarted'))
-          else this.notificationService.success(this.t('notification.kernelRestarted'))
-        } catch (error) {
-          const errorMsg = `${this.t('proxy.modeChangeFailed')}: ${error}`
-          if (messageCallback) messageCallback('error', errorMsg)
-          else this.notificationService.error(errorMsg)
-        }
-      }
-
-      return false
-    } catch (error) {
-      if (messageCallback) {
-        messageCallback('error', `${this.t('notification.proxySwitchFailed')}: ${error}`)
-      }
-      console.error('proxySwitchFailed:', error)
-      return false
-    }
   }
 
   // === Inbound 写入（不依赖 gRPC） ===

@@ -199,14 +199,11 @@ class KernelService {
   }
 
   async getKernelSnapshot(): Promise<KernelStatus> {
-    try {
-      return await invokeWithAppContext<KernelStatus>('kernel_get_snapshot_v2', undefined, {
-        withApiPort: 'api_port',
-      })
-    } catch (error) {
-      console.error('获取内核快照失败，回退到状态查询:', error)
-      return this.getKernelStatus()
-    }
+    // 注意:不要改回 kernel_get_snapshot_v2 —— 那个命令返回的是 gRPC Status 结构
+    // (memory/uplink/...),与本方法声明的 KernelStatus(process_running/kernel_state/...)
+    // 完全不同,塞进 applyStatus 会把 appStore.isRunning 短暂污染成 undefined。
+    // 快照初始化和 3s 轮询共用同一个 enhanced status 端点即可。
+    return this.getKernelStatus()
   }
 
   async isKernelRunning(): Promise<boolean> {

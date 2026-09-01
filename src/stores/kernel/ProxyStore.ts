@@ -227,6 +227,12 @@ export const useProxyStore = defineStore('proxy', () => {
     groupTestingMap.value = { ...groupTestingMap.value, [groupName]: true }
     try {
       const result = await proxyService.urlTest(groupName)
+      if (!result.ok) {
+        // URLTest RPC 本身失败(如内核未运行):节点根本没被测,立即结束 loading
+        // 并且不安排 8s 标记,否则整组节点会被错误标成"测速失败"。
+        groupTestingMap.value = { ...groupTestingMap.value, [groupName]: false }
+        return false
+      }
       // 8s 后:loading 结束 + 标 failed。
       // - 测速成功的节点:期间 SubscribeGroups 推新 frame,urlTestDelay > 0,
       //   getLatencyStatus 自然走 'ok' 路径,UI 显示 "Xms"。
@@ -245,7 +251,7 @@ export const useProxyStore = defineStore('proxy', () => {
         }
         groupTestingMap.value = { ...groupTestingMap.value, [groupName]: false }
       }, 8000)
-      return result.ok
+      return true
     } catch {
       // 异常(URLTest RPC 失败):立即结束 loading,不要再 setTimeout
       groupTestingMap.value = { ...groupTestingMap.value, [groupName]: false }
@@ -267,17 +273,32 @@ export const useProxyStore = defineStore('proxy', () => {
     try {
       // 并发触发所有组 URLTest,延迟刷新靠 SubscribeGroups relay 推送
       const results = await Promise.all(groupNames.map((g) => proxyService.urlTest(g)))
-      // 8s 后:loading 结束 + 标 failed
+      // RPC 失败的组(如内核未运行):节点根本没被测,立即结束 loading 并跳过 8s 标记
+      const okGroups = groupNames.filter((_, i) => results[i]?.ok)
+      const failedGroups = groupNames.filter((_, i) => !results[i]?.ok)
+      if (failedGroups.length > 0) {
+        groupTestingMap.value = failedGroups.reduce(
+          (acc, g) => ({ ...acc, [g]: false }),
+          { ...groupTestingMap.value },
+        )
+      }
+      if (okGroups.length === 0) {
+        batchTesting.value = false
+        return results.map((r) => ({ ok: r.ok }))
+      }
+      // 8s 后:loading 结束 + 标 failed(只针对 RPC 成功的组)
+      const okGroupSet = new Set(okGroups)
       setTimeout(() => {
         const next = new Set(testedNodes.value)
         for (const g of proxyGroups.value) {
+          if (!okGroupSet.has(g.name)) continue
           for (const it of g.items) {
             if (it.urlTestDelay === 0) next.add(it.tag)
           }
         }
         testedNodes.value = next
         batchTesting.value = false
-        groupTestingMap.value = groupNames.reduce(
+        groupTestingMap.value = okGroups.reduce(
           (acc, g) => ({ ...acc, [g]: false }),
           { ...groupTestingMap.value },
         )
@@ -334,91 +355,81 @@ export const useProxyStore = defineStore('proxy', () => {
   // 重启后需要重新拉取代理组,否则代理页会一直显示旧配置对应的代理列表(需手动点刷新)。
   const groupsDataUnlisten = ref<(() => void) | null>(null)
   const kernelReadyUnlisten = ref<(() => void) | null>(null)
+  // 防并发重入:guard 检查要等两个 await import 之后才做,快速进出代理页时
+  // 两次调用都会通过 null 检查 → 双注册 + 一个 unlisten 句柄被覆盖泄漏。
+  let groupsListenerSetupInFlight = false
   const setupGroupsDataListener = async () => {
-    const { eventService } = await import('@/services/event-service')
-    const { APP_EVENTS } = await import('@/constants/events')
+    if (groupsDataUnlisten.value || groupsListenerSetupInFlight) return
+    groupsListenerSetupInFlight = true
+    try {
+      const { eventService } = await import('@/services/event-service')
+      const { APP_EVENTS } = await import('@/constants/events')
 
-    // 自检:如果进入代理页时,后端活跃配置路径已经和上次拉取时的不一致,
-    // 说明中途切换过订阅/配置,立即重新拉取(否则 relay 推的还是旧 configPath 的 groups)。
-    // 解决"切订阅后立即进入代理页,kernel-ready 事件已错过"的时序竞态。
-    const currentActivePath = useAppStore().activeConfigPath
-    if (lastFetchedConfigPath.value !== currentActivePath) {
-      fetchProxies().catch(() => {
-        // 静默失败:内核可能正在重启,API 还没就绪,后续 kernel-ready / groups-data 会兜底
-      })
-    }
+      // await 之后复查:期间可能已被并发调用注册过
+      if (groupsDataUnlisten.value) return
 
-    if (!groupsDataUnlisten.value) {
-      groupsDataUnlisten.value = await eventService.on(
-        APP_EVENTS.groupsData,
-        (payload: unknown) => {
-          // 后端 emit 的是 gRPC Groups 结构(可能含 group / outboundList 等字段)
-          // 直接覆盖 rawGroups 即可,URLTest 完成后的 urlTestDelay 也会在这里更新
-          const data = payload as GroupsData
-          // 诊断:在 dev tools console 打一条,确认事件是否真的到前端 + payload 形状。
-          // 字段名应该都是 camelCase:group/tag/type/selectable/selected/isExpand/items,
-          // GroupItem:tag/type/urlTestTime/urlTestDelay。
-          const firstGroup = (data as { group?: unknown[] }).group?.[0] as
-            | { tag?: string; items?: { tag?: string; urlTestDelay?: number }[] }
-            | undefined
-          const firstItem = firstGroup?.items?.[0]
-          const firstDelay = firstItem?.urlTestDelay
-          // eslint-disable-next-line no-console
-          console.debug(
-            `[groups-data] groups=${(data as { group?: unknown[] }).group?.length ?? 0}` +
-              ` firstGroup=${firstGroup?.tag} firstItem=${firstItem?.tag}` +
-              ` firstDelay=${firstDelay} (raw payload keys: ${Object.keys(data ?? {}).join(',')})`,
-          )
-          if (data && Array.isArray((data as { group?: unknown[] }).group)) {
-            // 清理 testedNodes:对 set 中每个 tag,看新 frame 的对应 item:
-            // - 新 frame 没该 tag(切订阅/重启内核了)→ 移除
-            // - 新 frame 有该 tag 且 urlTestDelay > 0(测速成功)→ 移除
-            // - 新 frame 有该 tag 且 urlTestDelay === 0(测速失败)→ 保留
-            //   保留的节点会被 getLatencyStatus 判定为 'failed'。
-            if (testedNodes.value.size > 0) {
-              const newItemsByTag = new Set<string>()
-              for (const g of (data as { group: { items: { tag: string; urlTestDelay: number }[] }[] }).group) {
-                for (const it of g.items) newItemsByTag.add(it.tag)
-              }
-              const next = new Set<string>()
-              for (const tag of testedNodes.value) {
-                if (!newItemsByTag.has(tag)) continue  // 新 frame 里没了(切订阅/重启)
-                // 新 frame 里有该 tag
-                let newDelay = 0
-                for (const g of (data as { group: { items: { tag: string; urlTestDelay: number }[] }[] }).group) {
-                  const it = g.items.find((i) => i.tag === tag)
-                  if (it) {
-                    newDelay = it.urlTestDelay
-                    break
-                  }
-                }
-                if (newDelay > 0) continue  // 测速成功,移除
-                next.add(tag)  // 仍为 0,保留为 'failed'
-              }
-              if (next.size !== testedNodes.value.size) {
-                testedNodes.value = next
-              }
-            }
-            rawGroups.value = data
-            // SubscribeGroups 推送的快照也是对应当前 activeConfigPath,顺手记录避免重复 fetch
-            lastFetchedConfigPath.value = useAppStore().activeConfigPath
-          } else if (data && Array.isArray((data as { outbounds?: unknown[] }).outbounds)) {
-            // 兼容:某些 sing-box 版本发 OutboundList 而不是 Groups
-            rawGroups.value = { group: [] }
-          }
-        },
-      )
-    }
-
-    if (!kernelReadyUnlisten.value) {
-      // 内核就绪后重新拉取一次代理组,确保代理页与内核当前配置一致。
-      // 注意:首次进入应用时 HomeView 的 onMounted 也会调用 fetchProxies,
-      // 这里再次调用是幂等的,只会产生一次额外的 gRPC 请求,可接受。
-      kernelReadyUnlisten.value = await eventService.on(APP_EVENTS.kernelReady, () => {
+      // 自检:如果进入代理页时,后端活跃配置路径已经和上次拉取时的不一致,
+      // 说明中途切换过订阅/配置,立即重新拉取(否则 relay 推的还是旧 configPath 的 groups)。
+      // 解决"切订阅后立即进入代理页,kernel-ready 事件已错过"的时序竞态。
+      const currentActivePath = useAppStore().activeConfigPath
+      if (lastFetchedConfigPath.value !== currentActivePath) {
         fetchProxies().catch(() => {
-          // 静默失败:可能是内核刚启动,API 还没完全就绪,下次 groups-data 推送会兜底
+          // 静默失败:内核可能正在重启,API 还没就绪,后续 kernel-ready / groups-data 会兜底
         })
-      })
+      }
+
+      if (!groupsDataUnlisten.value) {
+        groupsDataUnlisten.value = await eventService.on(
+          APP_EVENTS.groupsData,
+          (payload: unknown) => {
+            // 后端 emit 的是 gRPC Groups 结构(可能含 group / outboundList 等字段)
+            // 直接覆盖 rawGroups 即可,URLTest 完成后的 urlTestDelay 也会在这里更新
+            const data = payload as GroupsData
+            if (data && Array.isArray((data as { group?: unknown[] }).group)) {
+              // 清理 testedNodes:对 set 中每个 tag,看新 frame 的对应 item:
+              // - 新 frame 没该 tag(切订阅/重启内核了)→ 移除
+              // - 新 frame 有该 tag 且 urlTestDelay > 0(测速成功)→ 移除
+              // - 新 frame 有该 tag 且 urlTestDelay === 0(测速失败)→ 保留
+              //   保留的节点会被 getLatencyStatus 判定为 'failed'。
+              if (testedNodes.value.size > 0) {
+                const newDelayByTag = new Map<string, number>()
+                for (const g of (data as { group: { items: { tag: string; urlTestDelay: number }[] }[] }).group) {
+                  for (const it of g.items) newDelayByTag.set(it.tag, it.urlTestDelay)
+                }
+                const next = new Set<string>()
+                for (const tag of testedNodes.value) {
+                  const newDelay = newDelayByTag.get(tag)
+                  if (newDelay === undefined) continue // 新 frame 里没了(切订阅/重启)
+                  if (newDelay > 0) continue // 测速成功,移除
+                  next.add(tag) // 仍为 0,保留为 'failed'
+                }
+                if (next.size !== testedNodes.value.size) {
+                  testedNodes.value = next
+                }
+              }
+              rawGroups.value = data
+              // SubscribeGroups 推送的快照也是对应当前 activeConfigPath,顺手记录避免重复 fetch
+              lastFetchedConfigPath.value = useAppStore().activeConfigPath
+            } else if (data && Array.isArray((data as { outbounds?: unknown[] }).outbounds)) {
+              // 兼容:某些 sing-box 版本发 OutboundList 而不是 Groups
+              rawGroups.value = { group: [] }
+            }
+          },
+        )
+      }
+
+      if (!kernelReadyUnlisten.value) {
+        // 内核就绪后重新拉取一次代理组,确保代理页与内核当前配置一致。
+        // 注意:首次进入应用时 HomeView 的 onMounted 也会调用 fetchProxies,
+        // 这里再次调用是幂等的,只会产生一次额外的 gRPC 请求,可接受。
+        kernelReadyUnlisten.value = await eventService.on(APP_EVENTS.kernelReady, () => {
+          fetchProxies().catch(() => {
+            // 静默失败:可能是内核刚启动,API 还没完全就绪,下次 groups-data 推送会兜底
+          })
+        })
+      }
+    } finally {
+      groupsListenerSetupInFlight = false
     }
   }
   const cleanupGroupsDataListener = () => {

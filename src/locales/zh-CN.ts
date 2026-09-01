@@ -145,7 +145,6 @@ export default {
     testFailed: '延迟测试失败',
     nodeTestFailed: '节点延迟测试失败',
     nodeTestComplete: '节点延迟测试完成',
-    groupTestComplete: '组延迟测试完成',
     batchTestComplete: '批量延迟测试完成',
     loadSuccess: '代理列表加载成功',
     loadFailed: '获取代理列表失败',

@@ -181,6 +181,39 @@ export function createAppPersistence(state: PersistenceState) {
         appConfig.tun_self_heal_enabled ?? state.tunSelfHealEnabled.value
       state.tunSelfHealCooldownSecs.value =
         appConfig.tun_self_heal_cooldown_secs ?? state.tunSelfHealCooldownSecs.value
+
+      // sing-box 1.14 升级新增字段（与 saveToBackend 的写入列表一一对应；
+      // 漏读任意字段都会导致重启后 UI 回退默认值，且下一次自动保存会把
+      // 默认值覆盖回数据库）
+      state.kernelUpdateTrack.value =
+        appConfig.kernel_update_track || state.kernelUpdateTrack.value
+      state.singboxDnsOptimisticCache.value =
+        appConfig.singbox_dns_optimistic_cache ?? state.singboxDnsOptimisticCache.value
+      state.singboxDnsTimeout.value = appConfig.singbox_dns_timeout || state.singboxDnsTimeout.value
+      state.singboxDnsUseMdns.value =
+        appConfig.singbox_dns_use_mdns ?? state.singboxDnsUseMdns.value
+      state.singboxEnableTlsSpoof.value =
+        appConfig.singbox_enable_tls_spoof ?? state.singboxEnableTlsSpoof.value
+      state.tunDnsMode.value = appConfig.tun_dns_mode || state.tunDnsMode.value
+      state.tunIncludeMacs.value = Array.isArray(appConfig.tun_include_macs)
+        ? [...appConfig.tun_include_macs]
+        : state.tunIncludeMacs.value
+      state.tunExcludeMacs.value = Array.isArray(appConfig.tun_exclude_macs)
+        ? [...appConfig.tun_exclude_macs]
+        : state.tunExcludeMacs.value
+      state.hysteria2DisableChromeParrot.value =
+        appConfig.hysteria2_disable_chrome_parrot ?? state.hysteria2DisableChromeParrot.value
+      state.hysteria2ObfsType.value =
+        appConfig.hysteria2_obfs_type || state.hysteria2ObfsType.value
+      state.clashMode.value = appConfig.clash_mode || state.clashMode.value
+      state.enableWebDashboard.value =
+        appConfig.enable_web_dashboard ?? state.enableWebDashboard.value
+      state.enableTailscaleEndpoint.value =
+        appConfig.enable_tailscale_endpoint ?? state.enableTailscaleEndpoint.value
+      state.tailscaleRunSshServer.value =
+        appConfig.tailscale_run_ssh_server ?? state.tailscaleRunSshServer.value
+      state.tailscaleTaildropDirectory.value =
+        appConfig.tailscale_taildrop_directory || state.tailscaleTaildropDirectory.value
     } catch {
       // 加载失败时静默处理
     } finally {
@@ -316,6 +349,22 @@ export function createAppPersistence(state: PersistenceState) {
       state.singboxEnableAppGroups,
       state.tunSelfHealEnabled,
       state.tunSelfHealCooldownSecs,
+      // === sing-box 1.14 升级新增字段（与 loadFromBackend 的读取列表一一对应） ===
+      state.kernelUpdateTrack,
+      state.singboxDnsOptimisticCache,
+      state.singboxDnsTimeout,
+      state.singboxDnsUseMdns,
+      state.singboxEnableTlsSpoof,
+      state.tunDnsMode,
+      state.tunIncludeMacs,
+      state.tunExcludeMacs,
+      state.hysteria2DisableChromeParrot,
+      state.hysteria2ObfsType,
+      state.clashMode,
+      state.enableWebDashboard,
+      state.enableTailscaleEndpoint,
+      state.tailscaleRunSshServer,
+      state.tailscaleTaildropDirectory,
     ],
     scheduleSave,
     { deep: true },

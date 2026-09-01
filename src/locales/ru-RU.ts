@@ -173,7 +173,6 @@ export default {
     testFailed: 'Ошибка теста задержки',
     nodeTestFailed: 'Ошибка теста задержки узла',
     nodeTestComplete: 'Тест задержки узла завершен',
-    groupTestComplete: 'Групповой тест задержки завершен',
     batchTestComplete: 'Пакетный тест задержки завершен',
     loadSuccess: 'Список прокси загружен успешно',
     loadFailed: 'Ошибка получения списка прокси',
