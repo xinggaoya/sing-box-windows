@@ -1,6 +1,6 @@
 use crate::app::constants::common::messages;
 use crate::app::core::kernel_service::event::{
-    cleanup_event_relay_tasks, start_websocket_relay, SHOULD_STOP_EVENTS,
+    cleanup_event_relay_tasks, start_websocket_relay,
 };
 use crate::app::core::kernel_service::guard::{disable_kernel_guard, enable_kernel_guard};
 use crate::app::core::kernel_service::orchestrator::execute_kernel_operation;
@@ -482,6 +482,12 @@ pub(super) async fn start_kernel_impl(
             // 稳定性校验通过（含 proxy_port 连通校验），此时端口已就绪，
             // 安全地开启 OS 系统代理，避免代理指向尚未监听的端口。
             apply_os_proxy(&resolved.proxy);
+
+            // 恢复持久化的代理模式（gRPC SetClashMode，带重试；失败仅告警）
+            crate::app::network::subscription_service::mode::apply_persisted_clash_mode(
+                &app_handle,
+            )
+            .await;
 
             info!("?? 启动事件中继服务，端口: {}", resolved.api_port);
             match start_websocket_relay(app_handle.clone(), Some(resolved.api_port)).await {

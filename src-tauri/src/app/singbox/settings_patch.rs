@@ -1,6 +1,6 @@
 use super::common::{
     build_dns_server_config, dns_strategy, ensure_kernel_log_output, normalize_default_outbound,
-    normalize_download_detour, normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_PROXY,
+    normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_PROXY,
     DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN,
     RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM,
     RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM,
@@ -37,13 +37,18 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
         apply_profile_settings_if_present(config_obj, app_config);
 
         // 1.14 替代 `experimental.clash_api`：完全清理历史残留，
-        // 实际 gRPC API 由 `services: [api]` 提供（config_generator.rs:271-287 注入）。
+        // 实际 gRPC API 由 `services: [api]` 提供（config_generator.rs 注入）。
         if let Some(experimental) = config_obj
             .get_mut("experimental")
             .and_then(|v| v.as_object_mut())
         {
             experimental.remove("clash_api");
         }
+
+        // 兜底补齐 1.14 gRPC api 服务：api 服务此前只在配置生成时注入,升级前的
+        // 旧 config.json（订阅刷新失败/离线时不会被再生成）被删掉 clash_api 后
+        // 就没有任何 API 通道,内核能启动但状态/代理组/模式切换全部不可用。
+        ensure_api_service(config_obj, app_config);
 
         // cache_file：1.14 替代 `store_rdrc` → `store_dns`（1.16 移除 store_rdrc）。
         let experimental = config_obj
@@ -606,6 +611,46 @@ fn ensure_sniff_route_rule(rules: &mut Vec<Value>) -> usize {
     } else {
         rules.insert(0, json!({ "action": "sniff" }));
         0
+    }
+}
+
+/// 确保 `services` 数组存在且包含 1.14 gRPC api 服务（形状与 config_generator 注入的
+/// 保持一致），已有 api 服务时同步端口 / dashboard 开关。
+fn ensure_api_service(
+    config_obj: &mut serde_json::Map<String, Value>,
+    app_config: &AppConfig,
+) {
+    let mut api_service = json!({
+        "type": "api",
+        "listen": "127.0.0.1",
+        "listen_port": app_config.api_port,
+        "dashboard": { "enabled": app_config.enable_web_dashboard }
+    });
+    if app_config.enable_web_dashboard {
+        // 启用 dashboard 时同时提供 secret（用 listen_port 派生,与生成器一致）,
+        // 防止 dashboard 意外暴露时无鉴权
+        api_service["secret"] = json!(format!("{:x}", app_config.api_port));
+    }
+
+    let services = config_obj
+        .entry("services".to_string())
+        .or_insert(json!([]));
+    let Some(arr) = services.as_array_mut() else {
+        return;
+    };
+    if let Some(existing) = arr
+        .iter_mut()
+        .find(|s| s.get("type").and_then(|t| t.as_str()) == Some("api"))
+    {
+        if let (Some(existing_obj), Some(new_obj)) =
+            (existing.as_object_mut(), api_service.as_object())
+        {
+            for (key, value) in new_obj {
+                existing_obj.insert(key.clone(), value.clone());
+            }
+        }
+    } else {
+        arr.push(api_service);
     }
 }
 

@@ -16,14 +16,13 @@
 
 use futures::StreamExt;
 use reqwest::Client;
-use serde::Serialize;
 use std::error::Error as _;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
+use tracing::warn;
 
-use super::proto::{decode_error_to_string, Decoder, DecodeError};
+use super::proto::{decode_error_to_string, Decoder};
 use super::types::{ClashModeStatus, ConnectionEvents, Groups, Log, Status};
 
 #[derive(Debug, thiserror::Error)]
@@ -136,8 +135,8 @@ impl ApiClientHandle {
             .pool_max_idle_per_host(0)
             .build()
             .expect("reqwest streaming client");
-        // 诊断:打印请求全貌(method+url+headers+body hex),用于对比 Tauri runtime
-        // 下 reqwest 实际发出的 wire 字节与隔离测试的差异,定位 0 字节 EOF 根因。
+        // 排障时临时打开:打印请求全貌(method+url+headers+body hex),用于对比
+        // Tauri runtime 下 reqwest 实际发出的 wire 字节与隔离测试的差异。
         let url = self.method_url(method);
         let body_hex: String = body
             .iter()
@@ -145,7 +144,7 @@ impl ApiClientHandle {
             .map(|b| format!("{:02x}", b))
             .collect::<Vec<_>>()
             .join(" ");
-        tracing::info!(
+        tracing::debug!(
             "REQ method={} url={} body={}B head=[{}]",
             method,
             url,
@@ -167,8 +166,22 @@ impl ApiClientHandle {
 
     /// 发起一次 unary RPC
     pub async fn unary(&self, method: &str, body: &[u8]) -> ApiResult<Vec<u8>> {
-        let resp = self
-            .build_request(method, body.to_vec())
+        self.unary_with_timeout(method, body, None).await
+    }
+
+    /// 带独立超时的 unary RPC。共享 client 有 15s 总超时（`ApiClientHandle::new`）,
+    /// 慢 RPC（如 NetworkQualityTest 要跑带宽压测）需要单独放宽。
+    pub async fn unary_with_timeout(
+        &self,
+        method: &str,
+        body: &[u8],
+        timeout: Option<Duration>,
+    ) -> ApiResult<Vec<u8>> {
+        let mut req = self.build_request(method, body.to_vec());
+        if let Some(t) = timeout {
+            req = req.timeout(t);
+        }
+        let resp = req
             .send()
             .await
             .map_err(|e| ApiError::Http(format!("send: {}", e)))?;
@@ -205,9 +218,12 @@ impl ApiClientHandle {
     }
 
     /// sing-box 1.14+：网络质量测试（unary，返回完整结果）
-    /// 等价于 CLI `sing-box api network-quality`，含 TCP RTT + 上下行带宽
+    /// 等价于 CLI `sing-box api network-quality`，含 TCP RTT + 上下行带宽。
+    /// 带宽压测在慢链路上可能远超共享 client 的 15s 总超时,放宽到 90s。
     pub async fn network_quality_test(&self) -> ApiResult<super::types::NetworkQualityResult> {
-        let resp = self.unary("NetworkQualityTest", &[]).await?;
+        let resp = self
+            .unary_with_timeout("NetworkQualityTest", &[], Some(Duration::from_secs(90)))
+            .await?;
         super::proto::decode_network_quality_result(&resp)
             .map_err(|e| ApiError::Decode(decode_error_to_string(&e)))
     }
@@ -567,10 +583,10 @@ impl HttpStream {
             ))
         })?;
         let status = resp.status();
-        // 诊断:打印响应 headers,看 sing-box 返回的 content-length / transfer-encoding
-        // / grpc-status / trailers 头,定位"0 字节 EOF"是 gRPC 立即结束还是 server 提前 close。
+        // 排障时临时打开:打印响应 headers,看 sing-box 返回的 content-length /
+        // transfer-encoding / grpc-status / trailers 头。
         let h = resp.headers();
-        tracing::info!(
+        tracing::debug!(
             "RESP status={} content-length={:?} transfer-encoding={:?} content-type={:?} grpc-status={:?} grpc-message={:?} trailer={:?}",
             status,
             h.get("content-length"),
@@ -610,13 +626,13 @@ impl HttpStream {
                 total_chunks += 1;
                 total_bytes += chunk.len();
                 if total_chunks == 1 {
-                    // 首个 chunk 打印 hex,用于诊断 body 立即 EOF 的真实字节
+                    // 排障时临时打开:首个 chunk hex,用于诊断 body 立即 EOF 的真实字节
                     let head: Vec<String> = chunk
                         .iter()
                         .take(40)
                         .map(|b| format!("{:02x}", b))
                         .collect();
-                    tracing::info!(
+                    tracing::debug!(
                         "HttpStream first chunk: {}B head=[{}]",
                         chunk.len(),
                         head.join(" ")

@@ -1,6 +1,6 @@
 pub mod auto_update;
 pub mod helpers;
-mod mode;
+pub mod mode;
 mod parser;
 
 use crate::app::constants::{messages, paths};

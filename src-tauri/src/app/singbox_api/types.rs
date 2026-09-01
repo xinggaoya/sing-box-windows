@@ -178,6 +178,7 @@ pub struct Connection {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClashModeStatus {
     pub mode_list: Vec<String>,
     pub current_mode: String,

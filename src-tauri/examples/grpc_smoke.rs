@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 3) SelectOutbound
-    if let Some(g) = groups.group.first() {
+    if let Some(g) = groups.group.iter().find(|g| !g.items.is_empty()) {
         let target = if g.items.len() > 1 { &g.items[1].tag } else { &g.items[0].tag };
         handle.select_outbound(&g.tag, target).await?;
         println!("✅ SelectOutbound: group={} → outbound={}", g.tag, target);

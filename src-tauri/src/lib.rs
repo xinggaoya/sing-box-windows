@@ -233,7 +233,6 @@ pub fn run() {
             // Core - gRPC API 交互（sing-box 1.14+ 官方 type: api）
             crate::app::core::proxy_service::get_kernel_version,
             crate::app::core::proxy_service::kernel_get_status_enhanced_v2,
-            crate::app::core::proxy_service::kernel_get_snapshot_v2,
             crate::app::core::proxy_service::get_groups,
             crate::app::core::proxy_service::select_outbound,
             crate::app::core::proxy_service::url_test,

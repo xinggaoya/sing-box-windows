@@ -120,14 +120,30 @@ impl<'a> Decoder<'a> {
         Ok(self.read_varint()? as i64)
     }
 
-    /// 跳过当前字段（按 wire type 处理）
+    /// 跳过当前字段（按 wire type 处理）。
+    /// protobuf 要求解码器必须能跳过任意 wire type 的未知字段,否则上游新增一个
+    /// fixed64/fixed32 字段就会让整条流解码失败（relay 只 warn 并丢帧,表现为静默停更）。
     pub fn skip_field(&mut self, wire_type: u8) -> Result<(), DecodeError> {
         match wire_type {
             0 => {
                 self.read_varint()?;
             }
+            1 => {
+                // fixed64
+                if self.pos + 8 > self.buf.len() {
+                    return Err(DecodeError::Underflow(self.pos));
+                }
+                self.pos += 8;
+            }
             2 => {
                 let _ = self.read_bytes()?;
+            }
+            5 => {
+                // fixed32
+                if self.pos + 4 > self.buf.len() {
+                    return Err(DecodeError::Underflow(self.pos));
+                }
+                self.pos += 4;
             }
             _ => return Err(DecodeError::UnknownWire(wire_type, 0)),
         }
@@ -486,22 +502,12 @@ pub fn decode_network_quality_result(buf: &[u8]) -> Result<super::types::Network
     Ok(r)
 }
 
-// ============ Message 编码函数（仅用于请求侧） ============
-
-/// 把 string 编码为 length-delimited bytes（用于 outbound request body）
-pub fn encode_string(s: &str) -> Vec<u8> {
-    let mut out = Vec::with_capacity(s.len() + 8);
-    encode_varint(out.len() as u64, &mut out);
-    out.extend_from_slice(s.as_bytes());
-    out
-}
-
-/// 把 i64 编码为 varint
-pub fn encode_varint_i64(v: i64) -> Vec<u8> {
-    let mut out = Vec::new();
-    encode_varint(v as u64, &mut out);
-    out
-}
+// ============ 请求侧编码辅助 ============
+//
+// 注意:请求 body 的编码在 client.rs 内自带一份正确实现（encode_field_tag(field, wire)
+// 双参数版 + encode_string）。本模块曾有一套单参数 encode_field_tag(硬编码 wire-type-2)
+// 和长度前缀写错(恒为 0)的 encode_string,是历史上 grpc-status 13 "invalid wire-format
+// data" 的根因,已删除以免误用;这里只保留 varint 编码供测试与潜在调用方使用。
 
 pub fn encode_varint(mut value: u64, out: &mut Vec<u8>) {
     loop {
@@ -517,27 +523,10 @@ pub fn encode_varint(mut value: u64, out: &mut Vec<u8>) {
     }
 }
 
-/// 构造一个 wire-type-2 字段（field number = N）的 tag varint
-pub fn encode_field_tag(field_number: u32) -> Vec<u8> {
-    let tag = (field_number << 3) | 2;
-    let mut out = Vec::new();
-    encode_varint(tag as u64, &mut out);
-    out
+/// 把 `DecodeError` 转换为可跨线程的 `String`
+pub fn decode_error_to_string(e: &DecodeError) -> String {
+    format!("{}", e)
 }
-
-/// 空请求 body（用于 google.protobuf.Empty 类型的方法）
-pub fn empty_request_body() -> Vec<u8> {
-    Vec::new()
-}
-
-// 帮助函数：把 i32 写到 Vec
-pub fn encode_i32(v: i32) -> Vec<u8> {
-    let mut out = Vec::new();
-    encode_varint(v as u64, &mut out);
-    out
-}
-
-// 让 from_str 在解码错误时方便
 
 #[cfg(test)]
 mod tests {
@@ -558,9 +547,34 @@ mod tests {
         let groups = decode_groups(&[]).unwrap();
         assert!(groups.group.is_empty());
     }
-}
 
-/// 把 `DecodeError` 转换为可跨线程的 `String`
-pub fn decode_error_to_string(e: &DecodeError) -> String {
-    format!("{}", e)
+    #[test]
+    fn skip_unknown_fixed_width_fields() {
+        // field 15 wire-type 1 (fixed64) + 8 字节体,后跟 field 1 wire-type 0 varint 42
+        let mut buf = vec![(15 << 3) | 1, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+        buf.push(1 << 3); // field 1, wire type 0
+        buf.push(42);
+        let mut dec = Decoder::new(&buf);
+        let tag = dec.read_varint().unwrap();
+        assert_eq!((tag >> 3, tag & 0x07), (15, 1));
+        dec.skip_field(1).unwrap();
+        let tag2 = dec.read_varint().unwrap();
+        assert_eq!((tag2 >> 3, tag2 & 0x07), (1, 0));
+        assert_eq!(dec.read_varint().unwrap(), 42);
+    }
+
+    #[test]
+    fn skip_unknown_fixed32_fields() {
+        // field 15 wire-type 5 (fixed32) + 4 字节体,后跟 field 1 wire-type 0 varint 7
+        let mut buf = vec![(15 << 3) | 5, 0xde, 0xad, 0xbe, 0xef];
+        buf.push(1 << 3);
+        buf.push(7);
+        let mut dec = Decoder::new(&buf);
+        let tag = dec.read_varint().unwrap();
+        assert_eq!((tag >> 3, tag & 0x07), (15, 5));
+        dec.skip_field(5).unwrap();
+        let tag2 = dec.read_varint().unwrap();
+        assert_eq!((tag2 >> 3, tag2 & 0x07), (1, 0));
+        assert_eq!(dec.read_varint().unwrap(), 7);
+    }
 }

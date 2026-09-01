@@ -9,7 +9,7 @@ use crate::app::constants::{config, messages, network_config, paths};
 use crate::app::core::tun_profile::{TunProfile, TunProxyOptions};
 use crate::app::singbox::config_generator::inject_custom_rules;
 use crate::app::singbox::common::normalize_default_outbound;
-use crate::app::singbox_api::{ApiClientConfig, ApiClientHandle, Groups, Status};
+use crate::app::singbox_api::{ApiClientConfig, ApiClientHandle, Groups};
 use crate::app::storage::custom_rule::{CustomRule, CustomRuleAction, CustomRuleMatchType, STORAGE_KEY};
 use crate::app::storage::enhanced_storage_service::{db_get_app_config, get_enhanced_storage};
 use crate::app::system::config_service;
@@ -17,11 +17,11 @@ use crate::entity::config_model;
 use crate::utils::config_util::ConfigUtil;
 use crate::utils::proxy_util::{disable_system_proxy, enable_system_proxy, DEFAULT_BYPASS_LIST};
 use chrono::Utc;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::fs;
 use std::sync::Arc;
 use tauri::AppHandle;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 // =====================================================================
 // Inbound 写入 + OS 代理控制（保留，与 gRPC 无关）
@@ -233,44 +233,57 @@ pub async fn update_dns_strategy(app_handle: &AppHandle, prefer_ipv6: bool) -> R
         "ipv4_only"
     };
 
-    let dns_object = if let Some(obj) = config
-        .as_object_mut()
-        .and_then(|obj| obj.get_mut("dns"))
-        .and_then(|dns| dns.as_object_mut())
+    // sing-box 1.12+ 已废弃顶层 `dns.strategy` 与 per-server `strategy`
+    // （settings_patch 会把旧字段删掉）。IP 版本偏好现在只存在两处：
+    //   1. dns.servers[].domain_resolver 对象内的 strategy
+    //   2. route.default_domain_resolver 对象内的 strategy
+    // 这里同步更新已存在的这两类对象；不凭空创建 default_domain_resolver
+    // （缺 server 字段可能过不了内核校验——本应用生成的配置都带完整对象）。
+    let mut updated = 0;
+    if let Some(servers) = config
+        .get_mut("dns")
+        .and_then(|dns| dns.get_mut("servers"))
+        .and_then(|s| s.as_array_mut())
     {
-        obj
-    } else {
-        let dns_value = json!({
-            "servers": [],
-            "strategy": strategy_value
-        });
-        config
-            .as_object_mut()
-            .ok_or_else(|| "配置文件结构异常，无法写入DNS配置".to_string())?
-            .insert("dns".to_string(), dns_value);
-        config
-            .as_object_mut()
-            .and_then(|obj| obj.get_mut("dns"))
-            .and_then(|dns| dns.as_object_mut())
-            .ok_or_else(|| "创建DNS配置失败".to_string())?
-    };
-
-    dns_object.insert(
-        "strategy".to_string(),
-        Value::String(strategy_value.to_string()),
-    );
-
-    if let Some(servers) = dns_object.get_mut("servers").and_then(|s| s.as_array_mut()) {
         for server in servers.iter_mut() {
-            if let Some(server_obj) = server.as_object_mut() {
-                if server_obj.get("address").is_some() {
-                    server_obj.insert(
+            let Some(server_obj) = server.as_object_mut() else {
+                continue;
+            };
+            // 清理历史版本写入的废弃 per-server strategy
+            server_obj.remove("strategy");
+            if let Some(dr) = server_obj.get_mut("domain_resolver") {
+                if let Some(dr_obj) = dr.as_object_mut() {
+                    dr_obj.insert(
                         "strategy".to_string(),
                         Value::String(strategy_value.to_string()),
                     );
+                    updated += 1;
                 }
             }
         }
+    }
+    if let Some(dns_obj) = config
+        .get_mut("dns")
+        .and_then(|dns| dns.as_object_mut())
+    {
+        dns_obj.remove("strategy");
+    }
+    if let Some(ddr) = config
+        .get_mut("route")
+        .and_then(|route| route.get_mut("default_domain_resolver"))
+        .and_then(|ddr| ddr.as_object_mut())
+    {
+        ddr.insert(
+            "strategy".to_string(),
+            Value::String(strategy_value.to_string()),
+        );
+        updated += 1;
+    }
+    if updated == 0 {
+        warn!(
+            "配置中不存在 domain_resolver 对象，IP 版本偏好仅在下次配置再生时生效（persisted prefer_ipv6={})",
+            prefer_ipv6
+        );
     }
 
     let serialized =
@@ -302,20 +315,6 @@ pub fn get_api_token() -> String {
 // =====================================================================
 // gRPC API 交互（sing-box 1.14+ 官方 type: api）
 // =====================================================================
-
-/// 创建默认 gRPC API 客户端句柄（指向本机 + AppConfig.api_port）
-fn make_handle(app_handle: &AppHandle) -> Result<ApiClientHandle, String> {
-    let config = get_grpc_config(app_handle)?;
-    Ok(ApiClientHandle::new(config))
-}
-
-fn get_grpc_config(app_handle: &AppHandle) -> Result<ApiClientConfig, String> {
-    let app_config = tauri::async_runtime::block_on(async {
-        db_get_app_config(app_handle.clone()).await
-    })
-    .map_err(|e| format!("获取应用配置失败: {}", e))?;
-    Ok(ApiClientConfig::localhost(app_config.api_port))
-}
 
 /// 异步获取 gRPC 客户端句柄
 async fn make_handle_async(app_handle: AppHandle) -> Result<(ApiClientHandle, ApiClientConfig), String> {
@@ -594,22 +593,6 @@ pub async fn kernel_get_status_enhanced_v2(
     }))
 }
 
-/// 单次 Status 快照（不订阅）
-#[tauri::command]
-pub async fn kernel_get_snapshot_v2(app_handle: AppHandle) -> Result<Status, String> {
-    let (handle, _) = make_handle_async(app_handle).await?;
-    let mut sub = handle
-        .subscribe_status(1_000_000_000)
-        .await
-        .map_err(|e| format!("订阅 Status 失败: {}", e))?;
-    let snapshot = sub
-        .next()
-        .await
-        .map_err(|e| format!("读取 Status 失败: {}", e))?;
-    sub.close().await;
-    snapshot.ok_or_else(|| "Status 快照为空".to_string())
-}
-
 // =====================================================================
 // 自定义规则 CRUD（issue #62）—— 写文件路径，不依赖 gRPC
 // =====================================================================
@@ -803,23 +786,72 @@ fn inject_custom_rules_into_file(
     rules: &[CustomRule],
     default_outbound: &str,
 ) -> Result<(), String> {
-    let content = fs::read_to_string(config_path)
+    let live_content = fs::read_to_string(config_path)
         .map_err(|e| format!("读取配置失败: {}", e))?;
+    let injected_path = config_path.with_extension("injected");
     let base_path = config_path.with_extension("base");
-    if !base_path.exists() {
-        fs::write(&base_path, &content)
-            .map_err(|e| format!("写入 .base 备份失败: {}", e))?;
-    }
-    let base_content = fs::read_to_string(&base_path)
-        .map_err(|e| format!("读取 .base 备份失败: {}", e))?;
-    let mut config: Value = serde_json::from_str(&base_content)
-        .map_err(|e| format!("解析 .base 备份失败: {}", e))?;
+
+    // 计算干净基线（不含已注入的自定义规则）：
+    // 1) 有 .injected 注入台账 → 基线 = 当前 live 内容剔除台账记录的注入规则。
+    //    旧方案用一次性 .base 快照,订阅更新 / 端口修改 / 设置 patch 对 live 配置的
+    //    修改会在下一次规则编辑时被旧快照静默回退;按台账"先剔除再注入"则永远以
+    //    live 配置的最新内容为基线,其他写入方的修改得以保留。
+    // 2) 无台账但有历史 .base → 沿用 .base（迁移路径,写完台账后删除）。
+    // 3) 都没有 → live 本身就是干净基线（首次注入）。
+    let baseline_content = if injected_path.exists() {
+        let injected_values: Vec<Value> = fs::read_to_string(&injected_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+        strip_injected_rules(&live_content, &injected_values)?
+    } else if base_path.exists() {
+        fs::read_to_string(&base_path).map_err(|e| format!("读取 .base 备份失败: {}", e))?
+    } else {
+        live_content.clone()
+    };
+
+    let mut config: Value = serde_json::from_str(&baseline_content)
+        .map_err(|e| format!("解析配置基线失败: {}", e))?;
     inject_custom_rules(&mut config, rules, default_outbound);
     let serialized = serde_json::to_string_pretty(&config)
         .map_err(|e| format!("序列化配置失败: {}", e))?;
-    fs::write(config_path, serialized)
-        .map_err(|e| format!("写入配置文件失败: {}", e))?;
+
+    // 先写台账再写配置：若中途崩溃,台账"超前"（记录了未实际写入的规则）是良性的——
+    // 下次剔除时这些规则不在 live 里,剔除是空操作;反过来则可能漏剔导致重复注入。
+    let injected_now: Vec<Value> = rules
+        .iter()
+        .filter_map(|r| r.to_route_rule(default_outbound))
+        .collect();
+    fs::write(
+        &injected_path,
+        serde_json::to_string(&injected_now).map_err(|e| format!("序列化注入台账失败: {}", e))?,
+    )
+    .map_err(|e| format!("写入注入台账失败: {}", e))?;
+    fs::write(config_path, serialized).map_err(|e| format!("写入配置文件失败: {}", e))?;
+
+    // 台账已接管幂等性,历史 .base 快照不再需要
+    if base_path.exists() {
+        let _ = fs::remove_file(&base_path);
+    }
     Ok(())
+}
+
+/// 从配置内容中剔除与 `injected` 完全相同的路由规则（serde_json::Value 的对象比较
+/// 与键序无关）,得到干净基线。
+fn strip_injected_rules(content: &str, injected: &[Value]) -> Result<String, String> {
+    if injected.is_empty() {
+        return Ok(content.to_string());
+    }
+    let mut config: Value =
+        serde_json::from_str(content).map_err(|e| format!("解析配置失败: {}", e))?;
+    if let Some(rules_arr) = config
+        .get_mut("route")
+        .and_then(|r| r.get_mut("rules"))
+        .and_then(|r| r.as_array_mut())
+    {
+        rules_arr.retain(|rule| !injected.iter().any(|inj| inj == rule));
+    }
+    serde_json::to_string_pretty(&config).map_err(|e| format!("序列化配置失败: {}", e))
 }
 
 async fn is_active_config_use_original(

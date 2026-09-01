@@ -1,21 +1,21 @@
 //! sing-box 1.14+ 官方 gRPC API 事件中继
 //!
-//! 通过 3 个 gRPC server-streaming 订阅替代之前 4 个独立 WebSocket：
+//! 通过 4 个 gRPC server-streaming 订阅替代之前 4 个独立 WebSocket：
 //! - `SubscribeStatus`     → 流量（traffic-data）+ 内存（合并到 status）+ goroutines
 //! - `SubscribeLog`        → 日志（log-data，含 level）
 //! - `SubscribeConnections`→ 连接事件（connections-data）
+//! - `SubscribeGroups`     → 代理组快照（groups-data）
 //!
 //! 启动时由 `start_websocket_relay` 创建后台 task，停止内核时由 `cleanup_event_relay_tasks` 终止。
 
 use futures::FutureExt;
-use serde::Serialize;
-use serde_json::Value;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::app::singbox_api::{ApiClientConfig, ApiClientHandle, ConnectionEvents, Groups, Log, Status};
 
@@ -27,11 +27,19 @@ pub(super) static SHOULD_STOP_EVENTS: tokio::sync::OnceCell<Notify> =
 pub(super) static RELAY_TASKS: std::sync::OnceLock<Mutex<Vec<JoinHandle<()>>>> =
     std::sync::OnceLock::new();
 
+/// 清理纪元：`cleanup_event_relay_tasks` 每执行一次 +1。
+/// `start_websocket_relay` 在 spawn 与注册句柄之间存在窗口，若并发的 cleanup
+/// 恰好落在该窗口内，新 task 既收不到 notify 也不在句柄表里，会泄漏成重复事件流。
+/// start 通过在注册完成后复查纪元来堵住这个窗口（见 start_websocket_relay）。
+static RELAY_EPOCH: AtomicU64 = AtomicU64::new(0);
+
 fn tasks_vec() -> &'static Mutex<Vec<JoinHandle<()>>> {
     RELAY_TASKS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
 pub(super) async fn cleanup_event_relay_tasks() {
+    // 先递增纪元再清理，保证 start 侧"注册后复查纪元"能观察到本次清理。
+    RELAY_EPOCH.fetch_add(1, Ordering::Relaxed);
     if let Some(notify) = SHOULD_STOP_EVENTS.get() {
         notify.notify_waiters();
     }
@@ -44,12 +52,13 @@ pub(super) async fn cleanup_event_relay_tasks() {
     }
 }
 
-/// 启动 3 个 gRPC 订阅并把消息作为 Tauri 事件转发给前端
+/// 启动 4 个 gRPC 订阅并把消息作为 Tauri 事件转发给前端
 pub(super) async fn start_websocket_relay(
     app_handle: AppHandle,
     port: Option<u16>,
 ) -> Result<(), String> {
     cleanup_event_relay_tasks().await;
+    let epoch_after_cleanup = RELAY_EPOCH.load(Ordering::Relaxed);
 
     let port = match port {
         Some(p) => p,
@@ -68,20 +77,23 @@ pub(super) async fn start_websocket_relay(
     let status_handle = handle.clone();
     let status_app = app_handle.clone();
     let status_task = tokio::spawn(async move {
-        run_status_relay(status_app, status_handle, &notify).await;
+        run_status_relay(status_app, status_handle, notify).await;
     });
+    let status_abort = status_task.abort_handle();
 
     let log_handle = handle.clone();
     let log_app = app_handle.clone();
     let log_task = tokio::spawn(async move {
-        run_log_relay(log_app, log_handle, &notify).await;
+        run_log_relay(log_app, log_handle, notify).await;
     });
+    let log_abort = log_task.abort_handle();
 
     let conn_handle = handle.clone();
     let conn_app = app_handle.clone();
     let conn_task = tokio::spawn(async move {
-        run_connections_relay(conn_app, conn_handle, &notify).await;
+        run_connections_relay(conn_app, conn_handle, notify).await;
     });
+    let conn_abort = conn_task.abort_handle();
 
     // 4) SubscribeGroups 持续订阅:URLTest 测速完成后 / SelectOutbound 切换节点 /
     // SetGroupExpand 折叠展开时,sing-box 都会推一帧新的 Groups(含 url_test_delay),
@@ -89,14 +101,29 @@ pub(super) async fn start_websocket_relay(
     let groups_handle = handle.clone();
     let groups_app = app_handle.clone();
     let groups_task = tokio::spawn(async move {
-        run_groups_relay(groups_app, groups_handle, &notify).await;
+        run_groups_relay(groups_app, groups_handle, notify).await;
     });
+    let groups_abort = groups_task.abort_handle();
 
     if let Ok(mut tasks) = tasks_vec().lock() {
         tasks.push(status_task);
         tasks.push(log_task);
         tasks.push(conn_task);
         tasks.push(groups_task);
+    }
+
+    // 并发 cleanup 可能在"spawn 完 → 句柄注册完"的窗口内执行：那批 task 当时
+    // 尚未注册，cleanup 的 drain 拿不到句柄，notify_waiters 也唤醒不了还在
+    // connect 阶段的 task。注册完成后复查纪元，若期间发生过 cleanup，
+    // 由这里 abort 自己刚 spawn 的 4 个 task（只动本地句柄，不碰句柄表，
+    // 避免误杀并发启动的另一代任务），避免同一内核出现两代中继重复 emit 事件。
+    if RELAY_EPOCH.load(Ordering::Relaxed) != epoch_after_cleanup {
+        warn!("事件中继启动期间发生并发清理，中止本次启动的 4 个中继 task");
+        status_abort.abort();
+        log_abort.abort();
+        conn_abort.abort();
+        groups_abort.abort();
+        return Ok(());
     }
 
     info!("gRPC 事件中继已启动（4 个 server-streaming）");
@@ -362,32 +389,34 @@ fn emit_groups(app: &AppHandle, groups: &Groups) {
     // SubscribeGroups 在以下情况都会推新 frame:URLTest 测速完成 / SelectOutbound 切换 /
     // SetGroupExpand 折叠展开,前端实时收到。
     //
-    // 诊断:打印每帧的 group 数 + items 总数 + 分类计数(成功 / 失败 / 未测),排查
-    // "测速后没刷新"或"全部失败"时能直接看出 relay 链路是否在推送,以及测速
+    // debug 级诊断:每帧的 group 数 + items 总数 + 分类计数(成功 / 失败 / 未测),
+    // 排查"测速后没刷新"或"全部失败"时能直接看出 relay 链路是否在推送,以及测速
     // 结果的分布。失败 = urlTestTime > 0 但 urlTestDelay == 0(sing-box 1.14 URLTest
     // 失败时调 DeleteURLTestHistory,history 不存在时 proto 默认 0)。
-    let total_items: usize = groups.group.iter().map(|g| g.items.len()).sum();
-    let with_delay: usize = groups
-        .group
-        .iter()
-        .flat_map(|g| g.items.iter())
-        .filter(|it| it.url_test_delay > 0)
-        .count();
-    let with_failure: usize = groups
-        .group
-        .iter()
-        .flat_map(|g| g.items.iter())
-        .filter(|it| it.url_test_time > 0 && it.url_test_delay == 0)
-        .count();
-    let untested: usize = total_items.saturating_sub(with_delay + with_failure);
-    info!(
-        "groups-data emit: groups={} items={} (ok={} failed={} untested={})",
-        groups.group.len(),
-        total_items,
-        with_delay,
-        with_failure,
-        untested
-    );
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        let total_items: usize = groups.group.iter().map(|g| g.items.len()).sum();
+        let with_delay: usize = groups
+            .group
+            .iter()
+            .flat_map(|g| g.items.iter())
+            .filter(|it| it.url_test_delay > 0)
+            .count();
+        let with_failure: usize = groups
+            .group
+            .iter()
+            .flat_map(|g| g.items.iter())
+            .filter(|it| it.url_test_time > 0 && it.url_test_delay == 0)
+            .count();
+        let untested = total_items.saturating_sub(with_delay + with_failure);
+        debug!(
+            "groups-data emit: groups={} items={} (ok={} failed={} untested={})",
+            groups.group.len(),
+            total_items,
+            with_delay,
+            with_failure,
+            untested
+        );
+    }
     if let Err(e) = app.emit("groups-data", groups) {
         warn!("emit groups-data failed: {}", e);
     }
@@ -402,13 +431,20 @@ fn emit_connections(app: &AppHandle, events: &ConnectionEvents) {
     // 这里把 ConnectionEvent 列表展开成"当前活跃连接"列表,字段重命名为前端期望的格式,
     // 然后以 `{connections: [...], uploadTotal, downloadTotal, memory}` emit。
     // CLOSED 事件通过 `id` 隐式删除(前端在 activeConnections 中找不到就移到 closedConnections)。
+    //
+    // serde 字段名必须与 src/types/events.ts 的 ConnectionsDataPayload /
+    // ConnectionItem / ConnectionMetadata 一致(camelCase,IP 字段为 sourceIP /
+    // destinationIP 大写 IP)。
     use serde::Serialize;
     #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
     struct Metadata {
         network: String,
         #[serde(rename = "type")]
         ty: String,
+        #[serde(rename = "sourceIP")]
         source_ip: String,
+        #[serde(rename = "destinationIP")]
         destination_ip: String,
         source_port: String,
         destination_port: String,
@@ -417,6 +453,7 @@ fn emit_connections(app: &AppHandle, events: &ConnectionEvents) {
         process: String,
     }
     #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
     struct ConnItem {
         id: String,
         chains: Vec<String>,
@@ -428,6 +465,7 @@ fn emit_connections(app: &AppHandle, events: &ConnectionEvents) {
         metadata: Metadata,
     }
     #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
     struct Payload {
         connections: Vec<ConnItem>,
         upload_total: i64,
@@ -495,9 +533,4 @@ fn emit_connections(app: &AppHandle, events: &ConnectionEvents) {
     if let Err(e) = app.emit("connections-data", &payload) {
         warn!("emit connections-data failed: {}", e);
     }
-}
-
-#[allow(dead_code)]
-fn _serde_anchor(_v: &Value) -> impl Serialize + '_ {
-    _v
 }
