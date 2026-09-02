@@ -566,6 +566,8 @@ export default {
       selectVersion: 'Select Version',
       selectVersionDesc: 'Choose a specific kernel version to download',
       latest: 'Latest',
+      versionLocked:
+        'The app targets the latest kernel; the version follows app releases. Manual switching is disabled and download always uses the latest version.',
     },
     proxyAdvanced: {
       title: 'Advanced Proxy Settings',

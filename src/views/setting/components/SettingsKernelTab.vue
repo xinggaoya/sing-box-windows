@@ -18,16 +18,24 @@
         </div>
         <div class="setting-desc">{{ props.t('setting.kernel.embeddedHint') }}</div>
       </div>
-      <n-select
-        :value="props.selectedKernelVersion"
-        :options="props.kernelVersionOptions"
-        :loading="props.kernelStore.isLoading"
-        :disabled="props.downloading"
-        size="small"
-        style="width: 160px"
-        placeholder="Latest"
-        @update:value="props.onSelectedKernelVersionChange"
-      />
+      <!-- 应用基于 sing-box 1.14+ gRPC API 开发，旧内核不兼容，版本选择锁定为最新版 -->
+      <n-tooltip trigger="hover">
+        <template #trigger>
+          <span class="version-select-wrap">
+            <n-select
+              :value="props.selectedKernelVersion"
+              :options="props.kernelVersionOptions"
+              :loading="props.kernelStore.isLoading"
+              disabled
+              size="small"
+              style="width: 160px"
+              placeholder="Latest"
+              @update:value="props.onSelectedKernelVersionChange"
+            />
+          </span>
+        </template>
+        {{ props.t('setting.kernel.versionLocked') }}
+      </n-tooltip>
     </div>
 
     <div
@@ -187,6 +195,12 @@ const versionBadgeClass = computed(() =>
 .kernel-status-info {
   flex: 1;
   min-width: 0;
+}
+
+/* 禁用态的 select 不会触发 hover 事件，tooltip 需要包一层可 hover 的容器 */
+.version-select-wrap {
+  display: inline-flex;
+  cursor: not-allowed;
 }
 
 .download-progress-card {

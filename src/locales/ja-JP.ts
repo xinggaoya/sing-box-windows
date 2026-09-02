@@ -614,6 +614,8 @@ export default {
       selectVersion: 'バージョンを選択',
       selectVersionDesc: 'ダウンロードする特定のカーネルバージョンを選択',
       latest: '最新版',
+      versionLocked:
+        'アプリは最新カーネル向けに開発されているため、バージョンはアプリのリリースに追従します。手動切り替えは無効で、ダウンロードは常に最新版を使用します。',
     },
     proxyAdvanced: {
       title: '高度なプロキシ設定',

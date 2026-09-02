@@ -560,6 +560,7 @@ export default {
       selectVersion: '选择版本',
       selectVersionDesc: '选择要下载的特定内核版本',
       latest: '最新版本',
+      versionLocked: '应用基于最新内核开发，版本跟随应用发布，暂不支持手动切换（下载固定使用最新版）',
     },
     proxyAdvanced: {
       title: '代理高级设置',

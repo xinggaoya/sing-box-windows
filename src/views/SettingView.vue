@@ -683,12 +683,7 @@ onMounted(async () => {
   if (kernelStore.fetchLatestKernelVersion) {
     await kernelStore.fetchLatestKernelVersion()
   }
-  if (
-    kernelStore.fetchKernelReleases &&
-    (!kernelStore.availableVersions || kernelStore.availableVersions.length === 0)
-  ) {
-    await kernelStore.fetchKernelReleases()
-  }
+  // 版本选择已锁定为最新版（旧内核与 1.14+ gRPC API 不兼容），不再拉取 release 列表填充下拉框
   await updateStore.initializeStore?.()
   await setupUpdateProgressListener()
 })
