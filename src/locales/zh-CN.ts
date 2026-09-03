@@ -107,6 +107,7 @@ export default {
     },
     quick: {
       testAll: '一键测速',
+      testAllDesc: '测试所有代理组延迟',
       nodeMode: '节点模式',
       proxyAddr: '代理地址',
     },

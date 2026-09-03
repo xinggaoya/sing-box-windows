@@ -108,6 +108,7 @@ export default {
     },
     quick: {
       testAll: 'Test All',
+      testAllDesc: 'Test latency of all proxy groups',
       nodeMode: 'Node Mode',
       proxyAddr: 'Proxy Address',
     },

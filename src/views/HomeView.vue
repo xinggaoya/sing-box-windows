@@ -1,39 +1,60 @@
 <template>
   <div class="page-shell home-page">
-    <!-- Hero 状态卡（精简：状态 + 重启，不再重复速度与统计） -->
+    <!-- Hero 主控卡：运行状态 + 实时速率 + 操作 -->
     <section class="hero-card" :class="statusClass">
       <div class="hero-glow"></div>
       <div class="hero-inner">
-        <div class="hero-top">
-          <div class="hero-left">
-            <div class="hero-status-dot"></div>
-            <div class="hero-info">
-              <h2 class="hero-title">{{ statusTitle }}</h2>
-              <p class="hero-subtitle">{{ statusDescription }}</p>
+        <div class="hero-status">
+          <div class="hero-status-dot"></div>
+          <div class="hero-info">
+            <h2 class="hero-title">{{ statusTitle }}</h2>
+            <p class="hero-subtitle">{{ statusDescription }}</p>
+          </div>
+        </div>
+
+        <div class="hero-speeds">
+          <div class="speed-metric">
+            <span class="speed-icon up">
+              <n-icon :size="15"><ArrowUpOutline /></n-icon>
+            </span>
+            <div class="speed-data">
+              <span class="speed-value">{{ formatSpeed(trafficStore.traffic.up) }}</span>
+              <span class="speed-label">{{ t('home.traffic.up') }}</span>
             </div>
           </div>
-          <div class="hero-actions">
-            <n-button
-              :type="kernelRunning ? 'error' : 'primary'"
-              :loading="kernelLoading"
-              @click="restartKernel"
-            >
-              <template #icon>
-                <n-icon><PowerOutline /></n-icon>
-              </template>
-              {{ t('home.restart') }}
-            </n-button>
-            <n-tooltip v-if="isWindowsPlatform && !isAdmin" trigger="hover">
-              <template #trigger>
-                <n-button secondary type="warning" @click="restartAsAdmin">
-                  <template #icon>
-                    <n-icon><ShieldCheckmarkOutline /></n-icon>
-                  </template>
-                </n-button>
-              </template>
-              {{ t('home.restartAsAdmin') }}
-            </n-tooltip>
+          <div class="speed-divider"></div>
+          <div class="speed-metric">
+            <span class="speed-icon down">
+              <n-icon :size="15"><ArrowDownOutline /></n-icon>
+            </span>
+            <div class="speed-data">
+              <span class="speed-value">{{ formatSpeed(trafficStore.traffic.down) }}</span>
+              <span class="speed-label">{{ t('home.traffic.down') }}</span>
+            </div>
           </div>
+        </div>
+
+        <div class="hero-actions">
+          <n-button
+            :type="kernelRunning ? 'error' : 'primary'"
+            :loading="kernelLoading"
+            @click="restartKernel"
+          >
+            <template #icon>
+              <n-icon><PowerOutline /></n-icon>
+            </template>
+            {{ t('home.restart') }}
+          </n-button>
+          <n-tooltip v-if="isWindowsPlatform && !isAdmin" trigger="hover">
+            <template #trigger>
+              <n-button secondary type="warning" @click="restartAsAdmin">
+                <template #icon>
+                  <n-icon><ShieldCheckmarkOutline /></n-icon>
+                </template>
+              </n-button>
+            </template>
+            {{ t('home.restartAsAdmin') }}
+          </n-tooltip>
         </div>
       </div>
     </section>
@@ -62,58 +83,80 @@
       </div>
     </n-alert>
 
-    <!-- 快捷操作区（常用功能一键直达） -->
-    <div class="quick-actions">
-      <button class="quick-btn" :disabled="quickTesting" @click="quickTestAll">
-        <div class="quick-icon purple">
-          <n-icon :size="20"><SpeedometerOutline /></n-icon>
-        </div>
-        <span class="quick-label">{{ t('home.quick.testAll') }}</span>
+    <!-- 控制台：一键测速 / 系统代理 / TUN / 节点模式 -->
+    <div class="control-grid">
+      <button type="button" class="control-card" :disabled="quickTesting" @click="quickTestAll">
+        <span class="control-icon purple">
+          <n-icon :size="20" :class="{ spinning: quickTesting }"><SpeedometerOutline /></n-icon>
+        </span>
+        <span class="control-body">
+          <span class="control-name">{{ t('home.quick.testAll') }}</span>
+          <span class="control-meta">{{
+            quickTesting ? t('proxy.testing') : t('home.quick.testAllDesc')
+          }}</span>
+        </span>
       </button>
-      <button
-        class="quick-btn"
-        :class="{ on: systemProxyEnabled }"
-        :disabled="modeSwitchPending"
-        @click="toggleSystemProxy(!systemProxyEnabled)"
-      >
-        <div class="quick-icon" :class="systemProxyEnabled ? 'green' : 'gray'">
+
+      <div class="control-card" :class="{ active: systemProxyEnabled }">
+        <span class="control-icon" :class="systemProxyEnabled ? 'green' : 'gray'">
           <n-icon :size="20"><GlobeOutline /></n-icon>
-        </div>
-        <span class="quick-label">{{ t('home.proxyMode.system') }}</span>
-        <span class="quick-state" :class="systemProxyEnabled ? 'on' : 'off'">
-          {{ systemProxyEnabled ? t('common.enabled') : t('common.disabled') }}
         </span>
-      </button>
-      <button
-        class="quick-btn"
-        :class="{ on: tunProxyEnabled }"
-        :disabled="modeSwitchPending"
-        @click="toggleTunProxy(!tunProxyEnabled)"
-      >
-        <div class="quick-icon" :class="tunProxyEnabled ? 'green' : 'gray'">
+        <span class="control-body">
+          <span class="control-name">{{ t('home.proxyMode.system') }}</span>
+          <code class="control-meta mono">{{ proxyAddress }}</code>
+        </span>
+        <n-switch
+          :value="systemProxyEnabled"
+          size="small"
+          :disabled="modeSwitchPending"
+          @update:value="(v: boolean) => toggleSystemProxy(v)"
+        />
+      </div>
+
+      <div class="control-card" :class="{ active: tunProxyEnabled }">
+        <span class="control-icon" :class="tunProxyEnabled ? 'green' : 'gray'">
           <n-icon :size="20"><FlashOutline /></n-icon>
-        </div>
-        <span class="quick-label">{{ t('home.proxyMode.tun') }}</span>
-        <span class="quick-state" :class="tunProxyEnabled ? 'on' : 'off'">
-          {{ tunProxyEnabled ? t('common.enabled') : t('common.disabled') }}
         </span>
-      </button>
-      <button class="quick-btn" @click="cycleNodeProxyMode">
-        <div class="quick-icon blue">
+        <span class="control-body">
+          <span class="control-name">{{ t('home.proxyMode.tun') }}</span>
+          <span class="control-meta" :title="t('home.proxyMode.tunTip')">
+            {{ t('home.proxyMode.tunTip') }}
+          </span>
+        </span>
+        <n-switch
+          :value="tunProxyEnabled"
+          size="small"
+          :disabled="modeSwitchPending"
+          @update:value="(v: boolean) => toggleTunProxy(v)"
+        />
+      </div>
+
+      <div class="control-card mode-card">
+        <span class="control-icon blue">
           <n-icon :size="20"><RadioOutline /></n-icon>
+        </span>
+        <div class="mode-content">
+          <span class="control-name">{{ t('home.proxyHeader.nodeMode') }}</span>
+          <div class="mode-chips">
+            <button
+              v-for="mode in nodeProxyModes"
+              :key="mode.value"
+              type="button"
+              class="mode-chip"
+              :class="{ active: currentNodeProxyMode === mode.value }"
+              @click="handleNodeProxyModeChange(mode.value)"
+            >
+              <n-icon :size="14"><component :is="mode.icon" /></n-icon>
+              <span>{{ t(mode.nameKey) }}</span>
+            </button>
+          </div>
         </div>
-        <span class="quick-label">{{ t('home.quick.nodeMode') }}</span>
-        <span class="quick-state">{{
-          currentNodeProxyMode === 'global'
-            ? t('home.nodeMode.global')
-            : t('home.nodeMode.rule')
-        }}</span>
-      </button>
+      </div>
     </div>
 
-    <!-- 主网格：流量图 + 运行信息 -->
+    <!-- 主网格：流量监控 + 运行信息 -->
     <div class="main-grid">
-      <SectionCard flush class="chart-panel">
+      <SectionCard flush class="chart-panel" :title="t('home.traffic.title')">
         <div class="chart-inner">
           <TrafficChart
             :upload-speed="trafficStore.traffic.up"
@@ -122,87 +165,32 @@
         </div>
       </SectionCard>
 
-      <!-- 运行信息卡（精简不重复：代理地址 / 连接数 / 总流量 / 内存） -->
       <SectionCard class="info-panel">
-        <div class="info-grid">
-          <div class="info-item">
+        <div class="info-rows">
+          <div class="info-row">
             <span class="info-label">{{ t('home.quick.proxyAddr') }}</span>
-            <code class="info-value">{{ proxyAddress }}</code>
+            <span class="info-value-wrap">
+              <code class="info-value">{{ proxyAddress }}</code>
+              <n-button size="tiny" quaternary @click="showPortModal = true">
+                {{ t('common.edit') }}
+              </n-button>
+            </span>
           </div>
-          <div class="info-item">
+          <div class="info-row">
             <span class="info-label">{{ t('nav.connections') }}</span>
             <code class="info-value">{{ connectionStore.connections.length }}</code>
           </div>
-          <div class="info-item">
-            <span class="info-label">{{ t('home.traffic.total') }}</span>
-            <code class="info-value">{{
-              formatBytes(trafficStore.traffic.totalUp + trafficStore.traffic.totalDown)
-            }}</code>
+          <div class="info-row">
+            <span class="info-label">{{ t('home.traffic.uploadTotal') }}</span>
+            <code class="info-value">{{ formatBytes(trafficStore.traffic.totalUp) }}</code>
           </div>
-          <div class="info-item">
+          <div class="info-row">
+            <span class="info-label">{{ t('home.traffic.downloadTotal') }}</span>
+            <code class="info-value">{{ formatBytes(trafficStore.traffic.totalDown) }}</code>
+          </div>
+          <div class="info-row">
             <span class="info-label">{{ t('home.memory') }}</span>
             <code class="info-value">{{ formatBytes(connectionStore.memory.inuse) }}</code>
-          </div>
-        </div>
-      </SectionCard>
-    </div>
-
-    <!-- 代理模式详细开关区 -->
-    <div class="bottom-grid">
-      <SectionCard>
-        <template #actions>
-          <n-button size="tiny" quaternary @click="showPortModal = true">
-            {{ t('common.edit') }}
-          </n-button>
-        </template>
-        <div class="toggle-list">
-          <div class="toggle-item" :class="{ active: systemProxyEnabled }">
-            <div class="toggle-icon">
-              <n-icon :size="18"><GlobeOutline /></n-icon>
-            </div>
-            <div class="toggle-info">
-              <span class="toggle-name">{{ t('home.proxyMode.system') }}</span>
-              <code class="toggle-port">{{ proxyAddress }}</code>
-            </div>
-            <n-switch
-              :value="systemProxyEnabled"
-              size="small"
-              :disabled="modeSwitchPending"
-              @update:value="(v: boolean) => toggleSystemProxy(v)"
-            />
-          </div>
-          <div class="toggle-item" :class="{ active: tunProxyEnabled }">
-            <div class="toggle-icon">
-              <n-icon :size="18"><FlashOutline /></n-icon>
-            </div>
-            <div class="toggle-info">
-              <span class="toggle-name">{{ t('home.proxyMode.tun') }}</span>
-              <span class="toggle-desc">{{ t('home.proxyMode.tunTip') }}</span>
-            </div>
-            <n-switch
-              :value="tunProxyEnabled"
-              size="small"
-              :disabled="modeSwitchPending"
-              @update:value="(v: boolean) => toggleTunProxy(v)"
-            />
-          </div>
-        </div>
-      </SectionCard>
-
-      <SectionCard>
-        <div class="mode-chips-wrap">
-          <div class="mode-chips-title">{{ t('home.proxyHeader.nodeMode') }}</div>
-          <div class="mode-chips">
-            <div
-              v-for="mode in nodeProxyModes"
-              :key="mode.value"
-              class="mode-chip"
-              :class="{ active: currentNodeProxyMode === mode.value }"
-              @click="handleNodeProxyModeChange(mode.value)"
-            >
-              <n-icon :size="15"><component :is="mode.icon" /></n-icon>
-              <span>{{ t(mode.nameKey) }}</span>
-            </div>
           </div>
         </div>
       </SectionCard>
@@ -223,6 +211,8 @@ import {
   FlashOutline,
   RadioOutline,
   SpeedometerOutline,
+  ArrowUpOutline,
+  ArrowDownOutline,
 } from '@vicons/ionicons5'
 import { useAppStore } from '@/stores'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
@@ -238,7 +228,7 @@ import TrafficChart from '@/components/layout/TrafficChart.vue'
 import SectionCard from '@/components/common/SectionCard.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
 import { useSudoStore } from '@/stores'
-import { formatBytes } from '@/utils'
+import { formatBytes, formatSpeed } from '@/utils'
 
 defineOptions({
   name: 'HomeView',
@@ -290,7 +280,7 @@ const statusTitle = computed(() => {
   }
 })
 
-// 状态描述（替代重复的统计条，提供更有价值的状态说明）
+// 状态描述（提供比状态名更有价值的说明）
 const statusDescription = computed(() => {
   switch (statusState.value) {
     case 'running':
@@ -318,13 +308,11 @@ const nodeProxyModes = [
   {
     value: 'global',
     nameKey: 'home.nodeMode.global',
-    tipKey: 'home.nodeMode.globalTip',
     icon: GlobeOutline,
   },
   {
     value: 'rule',
     nameKey: 'home.nodeMode.rule',
-    tipKey: 'home.nodeMode.ruleTip',
     icon: RadioOutline,
   },
 ]
@@ -343,7 +331,7 @@ const syncCurrentNodeProxyMode = async () => {
   }
 }
 
-// 快捷操作：一键全部测速
+// 一键测速
 const quickTestAll = async () => {
   if (quickTesting.value) return
   try {
@@ -356,12 +344,6 @@ const quickTestAll = async () => {
   } finally {
     quickTesting.value = false
   }
-}
-
-// 快捷操作：循环切换节点模式 global <-> rule
-const cycleNodeProxyMode = async () => {
-  const next = currentNodeProxyMode.value === 'global' ? 'rule' : 'global'
-  await handleNodeProxyModeChange(next)
 }
 
 const toggleSystemProxy = async (value: boolean) => {
@@ -636,7 +618,7 @@ onMounted(async () => {
   margin: 0 auto;
 }
 
-/* ============ Hero 卡 ============ */
+/* ============ Hero 主控卡 ============ */
 .hero-card {
   position: relative;
   border-radius: var(--radius-xl);
@@ -678,17 +660,14 @@ onMounted(async () => {
 
 .hero-inner {
   position: relative;
-}
-
-.hero-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-5);
   flex-wrap: wrap;
 }
 
-.hero-left {
+.hero-status {
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -768,10 +747,70 @@ onMounted(async () => {
   color: var(--text-tertiary);
 }
 
+/* 实时速率 */
+.hero-speeds {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.speed-metric {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.speed-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.speed-icon.up {
+  background: var(--green-500-soft);
+  color: var(--success-color);
+}
+
+.speed-icon.down {
+  background: var(--primary-soft);
+  color: var(--primary-color);
+}
+
+.speed-data {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.speed-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.speed-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.speed-divider {
+  width: 1px;
+  height: 30px;
+  background: var(--panel-border);
+}
+
 .hero-actions {
   display: flex;
   gap: var(--space-2);
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* ============ 诊断告警 ============ */
@@ -801,42 +840,59 @@ onMounted(async () => {
   padding-left: 18px;
 }
 
-/* ============ 快捷操作区 ============ */
-.quick-actions {
+/* ============ 控制台卡片 ============ */
+.control-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: var(--space-3);
 }
 
-.quick-btn {
+.control-card {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-lg);
   background: var(--panel-bg);
-  cursor: pointer;
+  box-shadow: var(--shadow-xs);
   transition:
     transform var(--transition-fast),
     border-color var(--transition-fast),
     box-shadow var(--transition-fast);
   text-align: left;
+  min-width: 0;
 }
 
-.quick-btn:hover:not(:disabled) {
+button.control-card {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.control-card:hover:not(:disabled) {
   transform: translateY(-2px);
   border-color: var(--border-hover);
   box-shadow: var(--shadow-md);
 }
 
-.quick-btn:disabled {
+.control-card:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.quick-icon {
+.control-card:focus-visible,
+.mode-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.control-card.active {
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 14px var(--primary-soft-strong);
+}
+
+.control-icon {
   width: 40px;
   height: 40px;
   border-radius: var(--radius-md);
@@ -844,198 +900,86 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   color: #fff;
-}
-
-.quick-icon.purple {
-  background: linear-gradient(135deg, var(--indigo-400), var(--indigo-600));
-}
-
-.quick-icon.green {
-  background: linear-gradient(135deg, var(--green-400), var(--green-600));
-}
-
-.quick-icon.blue {
-  background: linear-gradient(135deg, var(--blue-400), var(--blue-600));
-}
-
-.quick-icon.gray {
-  background: var(--bg-surface-2);
-  color: var(--text-tertiary);
-}
-
-.quick-label {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.quick-state {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  font-weight: 500;
-}
-
-.quick-state.on {
-  color: var(--success-color);
-}
-
-.quick-state.off {
-  color: var(--text-tertiary);
-}
-
-/* ============ 主网格：流量图 + 运行信息 ============ */
-.main-grid {
-  display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: var(--space-4);
-  min-height: 0;
-}
-
-.chart-panel {
-  min-height: 0;
-}
-
-.chart-inner {
-  height: 220px;
-  padding: var(--space-3);
-}
-
-/* 运行信息卡 */
-.info-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-  flex: 1;
-  align-content: center;
-}
-
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface-2);
-}
-
-.info-label {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.info-value {
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* ============ 底部网格：代理开关 + 节点模式 ============ */
-.bottom-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
-}
-
-.toggle-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.toggle-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface-2);
-  transition: background var(--transition-fast);
-}
-
-.toggle-item.active {
-  background: var(--primary-soft);
-}
-
-.toggle-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
-.toggle-item.active .toggle-icon {
-  background: var(--primary-color);
-  color: var(--primary-contrast);
-  box-shadow: 0 2px 8px var(--primary-soft-strong);
+.control-icon.purple {
+  background: linear-gradient(135deg, var(--indigo-400), var(--indigo-600));
 }
 
-.toggle-info {
-  flex: 1;
-  min-width: 0;
+.control-icon.green {
+  background: linear-gradient(135deg, var(--green-400), var(--green-600));
+}
+
+.control-icon.blue {
+  background: linear-gradient(135deg, var(--blue-400), var(--blue-600));
+}
+
+.control-icon.gray {
+  background: var(--bg-surface-2);
+  color: var(--text-tertiary);
+}
+
+.control-icon .spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.control-body {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
-.toggle-name {
+.control-name {
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.toggle-desc,
-.toggle-port {
+.control-meta {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.toggle-port {
+.control-meta.mono {
   font-family: var(--font-mono);
 }
 
-/* 节点模式 */
-.mode-chips-wrap {
+/* 节点模式卡 */
+.mode-content {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-}
-
-.mode-chips-title {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
 }
 
 .mode-chips {
   display: flex;
   gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .mode-chip {
-  flex: 1;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: var(--space-3);
-  border-radius: var(--radius-sm);
+  gap: 5px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: var(--radius-pill);
   background: var(--bg-surface-2);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
@@ -1052,10 +996,73 @@ onMounted(async () => {
   box-shadow: 0 2px 8px var(--primary-soft-strong);
 }
 
-@media (max-width: 960px) {
-  .main-grid,
-  .bottom-grid {
+/* ============ 主网格：流量监控 + 运行信息 ============ */
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.chart-inner {
+  height: 240px;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+/* 运行信息卡 */
+.info-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-rows {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.info-row + .info-row {
+  border-top: 1px dashed var(--border-color);
+}
+
+.info-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.info-value-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.info-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 1080px) {
+  .main-grid {
     grid-template-columns: 1fr;
+  }
+
+  .hero-actions {
+    margin-left: 0;
   }
 }
 </style>

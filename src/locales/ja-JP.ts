@@ -125,6 +125,7 @@ export default {
     },
     quick: {
       testAll: '全測速',
+      testAllDesc: 'すべてのプロキシグループの遅延をテスト',
       nodeMode: 'ノードモード',
       proxyAddr: 'プロキシアドレス',
     },

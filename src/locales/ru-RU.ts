@@ -129,6 +129,7 @@ export default {
     },
     quick: {
       testAll: 'Тест всех',
+      testAllDesc: 'Проверить задержку всех прокси-групп',
       nodeMode: 'Режим узла',
       proxyAddr: 'Адрес прокси',
     },
