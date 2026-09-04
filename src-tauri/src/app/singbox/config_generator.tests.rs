@@ -296,3 +296,48 @@ fn generated_tun_inbound_should_use_explicit_route_exclude_address_override() {
         Some(&serde_json::json!(["203.0.113.0/24"]))
     );
 }
+
+#[test]
+fn prefer_ipv6_should_not_leak_into_dns_bootstrap_strategy() {
+    let app_config = AppConfig {
+        prefer_ipv6: true,
+        ..AppConfig::default()
+    };
+
+    let config = generate_base_config(&app_config);
+    let servers = config
+        .get("dns")
+        .and_then(|v| v.get("servers"))
+        .and_then(|v| v.as_array())
+        .expect("dns.servers 应存在");
+
+    // dns_cn 默认是域名（h3://dns.alidns.com/dns-query），其 domain_resolver 承担
+    // bootstrap 解析。开启 IPv6 优先时也应保持 IPv4 优先：本机无 IPv6 路由时若
+    // bootstrap 跟随 prefer_ipv6，内核会优先拨 tcp6 并整体失败
+    // （dial tcp6: cannot assign requested address，TUN 模式最先暴露）。
+    let cn_server = servers
+        .iter()
+        .find(|server| server.get("tag").and_then(|v| v.as_str()) == Some(DNS_CN))
+        .expect("dns_cn server 应存在");
+    assert_eq!(
+        cn_server
+            .get("domain_resolver")
+            .and_then(|v| v.get("strategy"))
+            .and_then(|v| v.as_str()),
+        Some("prefer_ipv4"),
+        "DNS bootstrap 解析不应跟随全局 prefer_ipv6: {:?}",
+        cn_server
+    );
+
+    // 全局 IPv6 偏好仍应体现在 route.default_domain_resolver（代理/出口侧域名解析）。
+    let route_default_resolver = config
+        .get("route")
+        .and_then(|v| v.get("default_domain_resolver"))
+        .expect("route.default_domain_resolver 应存在");
+    assert_eq!(
+        route_default_resolver
+            .get("strategy")
+            .and_then(|v| v.as_str()),
+        Some("prefer_ipv6")
+    );
+}

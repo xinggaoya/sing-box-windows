@@ -4,6 +4,7 @@
 
 ### 🐛 问题修复
 
+- 修复开启"IPv6 优先"后 TUN 模式 DNS 报错（`dial tcp6: cannot assign requested address`）：DNS 服务器自身域名的 bootstrap 解析不再跟随全局 IPv6 偏好，保持 IPv4 优先
 - 修复关闭主窗口后托盘代理开关状态陈旧（#67）
 - 修复订阅切换后代理节点列表不更新
 - 修复 gRPC `URLTest` 测速完成后延迟不刷新

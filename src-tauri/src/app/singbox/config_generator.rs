@@ -1,10 +1,10 @@
 use super::common::{
-    build_dns_server_config, dns_strategy, kernel_log_output_path, node_domain_resolver_strategy,
-    normalize_default_outbound, normalize_download_detour, normalize_fake_dns_filter_mode, DNS_CN,
-    DNS_FAKEIP, DNS_MDNS, DNS_PROXY, DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, PRIVATE_IP_CIDRS,
-    RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE,
-    RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE, RS_GEOSITE_TELEGRAM,
-    RS_GEOSITE_YOUTUBE,
+    build_dns_server_config, dns_bootstrap_strategy, dns_strategy, kernel_log_output_path,
+    node_domain_resolver_strategy, normalize_default_outbound, normalize_download_detour,
+    normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_MDNS, DNS_PROXY, DNS_RESOLVER,
+    FAKE_DNS_FILTER_GLOBAL_NON_CN, PRIVATE_IP_CIDRS, RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN,
+    RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI,
+    RS_GEOSITE_PRIVATE, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
 };
 use super::config_schema::{
     CacheFileConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, HttpClientConfig, LogConfig,
@@ -264,7 +264,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             },
         },
         dns: DnsConfig {
-            servers: build_dns_servers(app_config, dns_strategy, default_outbound),
+            servers: build_dns_servers(app_config, default_outbound),
             rules: dns_rules,
             // 1.14 启用乐观 DNS 缓存：重复查询命中过期缓存立即返回 + 后台刷新，降低尾延迟
             optimistic: app_config
@@ -346,16 +346,15 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     config
 }
 
-fn build_dns_servers(
-    app_config: &AppConfig,
-    dns_strategy: &str,
-    default_outbound: &str,
-) -> Vec<DnsServerConfig> {
+fn build_dns_servers(app_config: &AppConfig, default_outbound: &str) -> Vec<DnsServerConfig> {
+    // DNS server 自身域名的解析用独立的 bootstrap 策略，不跟随全局 prefer_ipv6，
+    // 避免无 IPv6 路由时 dns.alidns.com 的 AAAA 优先导致 DNS 拨号整体失败。
+    let bootstrap_strategy = dns_bootstrap_strategy(app_config);
     let mut servers = vec![
         build_dns_server_with_fallback(
             DNS_PROXY,
             &app_config.singbox_dns_proxy,
-            Some(dns_strategy),
+            Some(bootstrap_strategy),
             Some(default_outbound),
             Some(DNS_RESOLVER),
             "https://1.1.1.1/dns-query",
@@ -363,7 +362,7 @@ fn build_dns_servers(
         build_dns_server_with_fallback(
             DNS_CN,
             &app_config.singbox_dns_cn,
-            Some(dns_strategy),
+            Some(bootstrap_strategy),
             Some(TAG_DIRECT),
             Some(DNS_RESOLVER),
             "h3://dns.alidns.com/dns-query",
@@ -371,7 +370,7 @@ fn build_dns_servers(
         build_dns_server_with_fallback(
             DNS_RESOLVER,
             &app_config.singbox_dns_resolver,
-            Some(dns_strategy),
+            Some(bootstrap_strategy),
             Some(TAG_DIRECT),
             None,
             "114.114.114.114",

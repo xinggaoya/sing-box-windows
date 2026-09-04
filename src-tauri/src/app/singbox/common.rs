@@ -103,6 +103,22 @@ pub fn dns_strategy(app_config: &AppConfig) -> &'static str {
     }
 }
 
+/// DNS 服务器自身域名的 bootstrap 解析策略（如 dns.alidns.com → 连接用 IP）。
+///
+/// 故意不跟随 [`dns_strategy`] 的 `prefer_ipv6`：该偏好的意图是“代理/出口侧
+/// 优先 IPv6”，而 DNS bootstrap 是本机直连拨号，IPv4 几乎总是可用。若 bootstrap
+/// 也 prefer_ipv6，在“域名有 AAAA 记录但本机无 IPv6 路由”的网络下，内核会优先
+/// 拨 tcp6 并直接失败（cannot assign requested address），整条 DNS 链路被打挂；
+/// TUN 模式因劫持全部系统 DNS 而最先暴露。开启 IPv6 时仅放宽为 prefer_ipv4
+/// （A/AAAA 都查、IPv4 优先、可回退 AAAA），默认路径维持 ipv4_only 不变。
+pub fn dns_bootstrap_strategy(app_config: &AppConfig) -> &'static str {
+    if app_config.prefer_ipv6 {
+        "prefer_ipv4"
+    } else {
+        "ipv4_only"
+    }
+}
+
 pub fn node_domain_resolver_strategy(app_config: &AppConfig) -> &'static str {
     if app_config.prefer_ipv6 {
         "prefer_ipv6"

@@ -61,9 +61,12 @@ fn sync_settings_to_config_file(
         ConfigPatchMode::PortsOnly => apply_port_settings_only(&mut config, app_config),
     }
 
-    // 写回文件
+    // 内容无变化时跳过写盘，避免重复同步设置时反复改写配置文件（mtime 变化）
     let updated =
         serde_json::to_string_pretty(&config).map_err(|e| format!("序列化配置失败: {}", e))?;
+    if updated == content {
+        return Ok(());
+    }
     std::fs::write(config_path, updated).map_err(|e| format!("写入配置文件失败: {}", e))?;
 
     Ok(())
@@ -589,7 +592,7 @@ pub async fn db_save_active_subscription_index(
 mod tests {
     use super::{
         normalize_app_config_for_persistence, resolve_patch_mode_for_subscription,
-        resolve_patch_mode_with_hint, ConfigPatchMode,
+        resolve_patch_mode_with_hint, sync_settings_to_config_file, ConfigPatchMode,
     };
     use crate::app::storage::state_model::Subscription;
 
@@ -669,5 +672,86 @@ mod tests {
             "error should mention invalid CIDR, got: {}",
             error
         );
+    }
+
+    #[test]
+    fn sync_settings_to_config_file_should_migrate_stale_dns_bootstrap_strategy() {
+        // 模拟旧版本落盘的激活配置：prefer_ipv6 泄漏进 DNS bootstrap 解析策略
+        let stale_config = r#"{
+  "dns": {
+    "final": "dns_proxy",
+    "servers": [
+      {
+        "tag": "dns_cn",
+        "type": "h3",
+        "server": "dns.alidns.com",
+        "server_port": 443,
+        "domain_resolver": {
+          "server": "dns_resolver",
+          "strategy": "prefer_ipv6"
+        }
+      }
+    ],
+    "rules": []
+  },
+  "inbounds": [],
+  "outbounds": [],
+  "route": {
+    "rules": [],
+    "final": "自动选择",
+    "default_domain_resolver": {
+      "server": "dns_resolver",
+      "strategy": "prefer_ipv6"
+    }
+  }
+}"#;
+
+        let dir = std::env::temp_dir().join(format!(
+            "sbw-sync-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).expect("应能创建临时目录");
+        let config_path = dir.join("config.json");
+        std::fs::write(&config_path, stale_config).expect("应能写入临时配置");
+
+        let app_config = crate::app::storage::state_model::AppConfig {
+            prefer_ipv6: true,
+            ..crate::app::storage::state_model::AppConfig::default()
+        };
+
+        let result = sync_settings_to_config_file(&config_path, &app_config, ConfigPatchMode::Full);
+        assert!(result.is_ok(), "Full patch 应成功: {:?}", result);
+
+        let synced = std::fs::read_to_string(&config_path).expect("应能读回配置");
+        let value: serde_json::Value = serde_json::from_str(&synced).expect("patch 后应为合法 JSON");
+
+        // DNS bootstrap 策略应被迁移为 IPv4 优先，而全局偏好仍保留在 route 层
+        let cn_resolver = value
+            .pointer("/dns/servers/0/domain_resolver")
+            .expect("dns_cn 应被重建并带 domain_resolver");
+        assert_eq!(
+            cn_resolver.get("strategy").and_then(|v| v.as_str()),
+            Some("prefer_ipv4"),
+            "存量配置的 DNS bootstrap 策略应迁移为 prefer_ipv4: {}",
+            synced
+        );
+        assert_eq!(
+            value
+                .pointer("/route/default_domain_resolver/strategy")
+                .and_then(|v| v.as_str()),
+            Some("prefer_ipv6")
+        );
+
+        // 幂等：再次同步内容无变化时不应改写文件
+        let before = std::fs::read_to_string(&config_path).expect("应能读取当前配置");
+        let second = sync_settings_to_config_file(&config_path, &app_config, ConfigPatchMode::Full);
+        assert!(second.is_ok(), "重复 patch 应成功: {:?}", second);
+        let after = std::fs::read_to_string(&config_path).expect("应能读取当前配置");
+        assert_eq!(before, after, "重复同步不应改变配置内容");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

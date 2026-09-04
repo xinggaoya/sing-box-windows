@@ -1,6 +1,6 @@
 use super::common::{
-    build_dns_server_config, dns_strategy, ensure_kernel_log_output, normalize_default_outbound,
-    normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_PROXY,
+    build_dns_server_config, dns_bootstrap_strategy, dns_strategy, ensure_kernel_log_output,
+    normalize_default_outbound, normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_PROXY,
     DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN,
     RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM,
     RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM,
@@ -197,7 +197,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                             if let Ok(cfg) = build_dns_server_config(
                                 DNS_PROXY,
                                 &app_config.singbox_dns_proxy,
-                                Some(dns_strategy(app_config)),
+                                Some(dns_bootstrap_strategy(app_config)),
                                 Some(default_outbound),
                                 Some(DNS_RESOLVER),
                             ) {
@@ -212,7 +212,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                             if let Ok(cfg) = build_dns_server_config(
                                 DNS_CN,
                                 &app_config.singbox_dns_cn,
-                                Some(dns_strategy(app_config)),
+                                Some(dns_bootstrap_strategy(app_config)),
                                 Some(TAG_DIRECT),
                                 Some(DNS_RESOLVER),
                             ) {
@@ -227,7 +227,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                             if let Ok(cfg) = build_dns_server_config(
                                 DNS_RESOLVER,
                                 &app_config.singbox_dns_resolver,
-                                Some(dns_strategy(app_config)),
+                                Some(dns_bootstrap_strategy(app_config)),
                                 Some(TAG_DIRECT),
                                 None,
                             ) {

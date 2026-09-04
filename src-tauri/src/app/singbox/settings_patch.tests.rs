@@ -336,3 +336,57 @@ fn apply_app_settings_should_fallback_to_canonical_tun_route_exclude_address_def
         Some(&json!(default_tun_route_exclude_addresses()))
     );
 }
+
+#[test]
+fn apply_app_settings_should_keep_dns_bootstrap_ipv4_first_when_prefer_ipv6() {
+    let mut config = json!({
+        "dns": {
+            "servers": [
+                {
+                    "tag": DNS_CN,
+                    "type": "h3",
+                    "server": "dns.alidns.com",
+                    "server_port": 443
+                }
+            ],
+            "rules": []
+        },
+        "experimental": {},
+        "inbounds": [],
+        "route": {
+            "rule_set": [],
+            "rules": [
+                {
+                    "action": "sniff"
+                }
+            ],
+            "final": "direct",
+            "auto_detect_interface": true
+        }
+    });
+    let app_config = AppConfig {
+        prefer_ipv6: true,
+        ..AppConfig::default()
+    };
+
+    apply_app_settings_to_config(&mut config, &app_config);
+
+    let servers = config
+        .get("dns")
+        .and_then(|v| v.get("servers"))
+        .and_then(|v| v.as_array())
+        .expect("dns.servers 应存在");
+    let cn_server = servers
+        .iter()
+        .find(|server| server.get("tag").and_then(|v| v.as_str()) == Some(DNS_CN))
+        .expect("dns_cn 应被按 tag 重建");
+    assert_eq!(
+        cn_server
+            .get("domain_resolver")
+            .and_then(|v| v.get("strategy"))
+            .and_then(|v| v.as_str()),
+        Some("prefer_ipv4"),
+        "apply 后 DNS bootstrap 策略不应跟随全局 prefer_ipv6: {:?}",
+        cn_server
+    );
+}
