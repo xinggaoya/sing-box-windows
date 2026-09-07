@@ -9,10 +9,10 @@ Pinia 状态中心，按领域拆分为 app/kernel/subscription/tray；通过组
 | Task                 | Location        | Notes                         |
 | -------------------- | --------------- | ----------------------------- |
 | Store 注入与导出入口 | `index.ts`      | 全局注册与聚合入口            |
-| 应用级配置状态       | `app/`          | 主题、语言、窗口、持久化      |
-| 内核运行与连接状态   | `kernel/`       | Kernel/Traffic/Connection/Log |
-| 订阅状态             | `subscription/` | 活跃配置、节点/配置索引       |
-| 托盘交互状态         | `tray/`         | 托盘联动与窗口行为            |
+| 应用级配置状态       | `app/`          | App/Locale/Sudo/Theme/Update/Window + `composables/`（persistence、messaging） |
+| 内核运行与连接状态   | `kernel/`       | Kernel/KernelRuntime/Connection/Log/Proxy/Traffic |
+| 订阅状态             | `subscription/` | `SubStore.ts` + `types.ts`：活跃配置、节点/配置索引 |
+| 托盘交互状态         | `tray/`         | `TrayStore.ts`：托盘联动与窗口行为 |
 
 ## CONVENTIONS
 
