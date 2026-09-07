@@ -70,10 +70,10 @@ pub struct AppConfig {
     /// 1.14 mDNS server（*.local / link-local）；默认开
     pub singbox_dns_use_mdns: bool,
     /// 1.14 启用 `tls.spoof`（SNI 诱骗，抗 SNI 过滤）
-    /// **仅 Windows x64/x86 + Admin**，ARM64 / Linux / macOS 需自动隐藏
+    /// Linux / macOS / Windows 可用（需提权）；Windows ARM64 不支持，UI 需自动隐藏
     pub singbox_enable_tls_spoof: bool,
-    /// 1.14 TUN `dns_mode`：hijack（默认）/ tun / off
-    /// hijack 会改平台 DNS，1.14 起为默认行为
+    /// 1.14 TUN `dns_mode`：hijack（默认）/ native / disabled
+    /// hijack 会改平台 DNS 并劫持 53 端口，1.14 起为默认行为
     pub tun_dns_mode: String,
     /// 1.14 TUN `include_mac_address`：仅代理指定网卡的流量
     pub tun_include_macs: Vec<String>,

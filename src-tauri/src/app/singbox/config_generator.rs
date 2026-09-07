@@ -122,80 +122,25 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
 
     apply_fake_dns_rules(&mut dns_rules, app_config);
 
-    let mut rule_sets: Vec<Value> = Vec::new();
-    if app_config.singbox_block_ads {
-        rule_sets.push(remote_rule_set_value(
-            RS_GEOSITE_ADS,
-            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
-            Some(download_detour),
-            "1d",
-        ));
-    }
-
-    rule_sets.extend([
-        remote_rule_set_value(
-            RS_GEOSITE_CN,
-            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
-            Some(download_detour),
-            "1d",
-        ),
-        remote_rule_set_value(
-            RS_GEOSITE_GEOLOCATION_NOT_CN,
-            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs",
-            Some(download_detour),
-            "1d",
-        ),
-    ]);
-
-    if app_config.singbox_enable_app_groups {
-        rule_sets.extend([
-            remote_rule_set_value(
-                RS_GEOSITE_TELEGRAM,
-                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs",
-                Some(download_detour),
-                "7d",
-            ),
-            remote_rule_set_value(
-                RS_GEOSITE_YOUTUBE,
-                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-youtube.srs",
-                Some(download_detour),
-                "7d",
-            ),
-            remote_rule_set_value(
-                RS_GEOSITE_NETFLIX,
-                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs",
-                Some(download_detour),
-                "7d",
-            ),
-            remote_rule_set_value(
-                RS_GEOSITE_OPENAI,
-                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
-                Some(download_detour),
-                "7d",
-            ),
-            remote_rule_set_value(
-                RS_GEOSITE_GOOGLE,
-                "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs",
-                Some(download_detour),
-                "7d",
-            ),
-        ]);
-    }
-
-    rule_sets.extend([
-        remote_rule_set_value(
-            RS_GEOSITE_PRIVATE,
-            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-private.srs",
-            Some(TAG_DIRECT),
-            "7d",
-        ),
-        remote_rule_set_value(
-            RS_GEOIP_CN,
-            "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
-            Some(download_detour),
-            "1d",
-        ),
-    ]);
+    // 远程 rule-set 与本地缓存副本（1.14 initial_path）共用同一份清单，
+    // 见 `remote_rule_set_sources`。缓存目录未初始化时不写 initial_path。
+    //
+    // 下载出站（1.14 原生写法）：所有 rule-set 经 `http_clients["default"]` 下载，
+    // detour 跟随用户的下载出站偏好；仅当偏好为 manual 时，private 这类本机规则集
+    // 单独走 `http_clients["direct-download"]`（直连），保持 1.13 时代 `download_detour` 的语义。
+    let download_via_manual = download_detour == TAG_MANUAL;
+    let rule_set_cache_dir = crate::app::system::rule_set_cache_service::cache_dir().cloned();
+    let rule_sets = remote_rule_set_sources(app_config)
+        .iter()
+        .map(|source| {
+            let initial_path = rule_set_cache_dir
+                .as_ref()
+                .map(|dir| dir.join(format!("{}.srs", source.tag)).to_string_lossy().to_string());
+            let http_client = (download_via_manual && source.direct_detour)
+                .then(|| "direct-download".to_string());
+            remote_rule_set_value(source, initial_path, http_client)
+        })
+        .collect::<Vec<Value>>();
 
     let mut route_rules: Vec<Value> = vec![json!({ "action": "sniff" })];
 
@@ -290,13 +235,28 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             // 1.14 新增：指定默认 HTTP 客户端供所有远程 rule-set 下载使用
             default_http_client: Some("default".to_string()),
         },
-        // 1.14 顶层 HTTP 客户端（替代 rule_set.download_detour）
-        http_clients: Some(vec![HttpClientConfig {
-            tag: "default".to_string(),
-            server: None,
-            server_port: None,
-            tls: None,
-        }]),
+        // 1.14 顶层 HTTP 客户端（替代 rule_set.download_detour）：
+        // "default" 供所有 rule-set 下载使用，detour 跟随下载出站偏好；
+        // 偏好为 manual 时额外提供 "direct-download"，供 private 等本机规则集固定直连。
+        http_clients: Some({
+            let mut clients = vec![HttpClientConfig {
+                tag: "default".to_string(),
+                detour: Some(download_detour.to_string()),
+                server: None,
+                server_port: None,
+                tls: None,
+            }];
+            if download_via_manual {
+                clients.push(HttpClientConfig {
+                    tag: "direct-download".to_string(),
+                    detour: Some(TAG_DIRECT.to_string()),
+                    server: None,
+                    server_port: None,
+                    tls: None,
+                });
+            }
+            clients
+        }),
         // services 由下方二次注入（要追加 services 字段）
         services: None,
     };
@@ -508,21 +468,109 @@ fn apply_fake_dns_rules(dns_rules: &mut Vec<Value>, app_config: &AppConfig) {
 const FAKEIP_RESULT_TAG: &str = "fakeip-result";
 
 fn remote_rule_set_value(
-    tag: &str,
-    url: &str,
-    download_detour: Option<&str>,
-    update_interval: &str,
+    source: &RemoteRuleSetSource,
+    initial_path: Option<String>,
+    http_client: Option<String>,
 ) -> Value {
     let rs = RemoteRuleSetConfig {
-        tag: tag.to_string(),
+        tag: source.tag.to_string(),
         kind: "remote".to_string(),
         format: "binary".to_string(),
-        url: url.to_string(),
-        // 1.14 已 deprecated，1.16 移除。默认 None 走顶层 `http_clients` + `route.default_http_client`
-        download_detour: download_detour.map(|s| s.to_string()),
-        update_interval: update_interval.to_string(),
+        url: source.url.to_string(),
+        // 1.14 新增：本地初始副本路径（rule_set_cache_service 预热），缓存未初始化时不写入
+        initial_path,
+        // 1.14 原生写法：经顶层 `http_clients` 下载（1.13 的 deprecated `download_detour` 不再写入）
+        http_client,
+        update_interval: source.update_interval.to_string(),
     };
     serde_json::to_value(rs).expect("RemoteRuleSetConfig 序列化失败")
+}
+
+/// 远程 rule-set 来源清单条目：配置生成与 rule-set 缓存预热共用同一份定义，
+/// 避免 tag / URL / 更新间隔在两处维护导致漂移。
+pub struct RemoteRuleSetSource {
+    pub tag: &'static str,
+    pub url: &'static str,
+    pub update_interval: &'static str,
+    /// true 时固定走 direct 下载（如本机专用规则集），false 跟随用户的下载出站设置
+    pub direct_detour: bool,
+}
+
+/// 当前配置将生成的全部远程 rule-set（顺序与 route.rule_set 一致）。
+/// `rule_set_cache_service::warm_rule_set_cache` 也用这份清单预热本地副本。
+pub fn remote_rule_set_sources(app_config: &AppConfig) -> Vec<RemoteRuleSetSource> {
+    let mut sources = Vec::new();
+    if app_config.singbox_block_ads {
+        sources.push(RemoteRuleSetSource {
+            tag: RS_GEOSITE_ADS,
+            url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+            update_interval: "1d",
+            direct_detour: false,
+        });
+    }
+    sources.extend([
+        RemoteRuleSetSource {
+            tag: RS_GEOSITE_CN,
+            url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+            update_interval: "1d",
+            direct_detour: false,
+        },
+        RemoteRuleSetSource {
+            tag: RS_GEOSITE_GEOLOCATION_NOT_CN,
+            url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs",
+            update_interval: "1d",
+            direct_detour: false,
+        },
+    ]);
+    if app_config.singbox_enable_app_groups {
+        sources.extend([
+            RemoteRuleSetSource {
+                tag: RS_GEOSITE_TELEGRAM,
+                url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs",
+                update_interval: "7d",
+                direct_detour: false,
+            },
+            RemoteRuleSetSource {
+                tag: RS_GEOSITE_YOUTUBE,
+                url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-youtube.srs",
+                update_interval: "7d",
+                direct_detour: false,
+            },
+            RemoteRuleSetSource {
+                tag: RS_GEOSITE_NETFLIX,
+                url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs",
+                update_interval: "7d",
+                direct_detour: false,
+            },
+            RemoteRuleSetSource {
+                tag: RS_GEOSITE_OPENAI,
+                url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
+                update_interval: "7d",
+                direct_detour: false,
+            },
+            RemoteRuleSetSource {
+                tag: RS_GEOSITE_GOOGLE,
+                url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs",
+                update_interval: "7d",
+                direct_detour: false,
+            },
+        ]);
+    }
+    sources.extend([
+        RemoteRuleSetSource {
+            tag: RS_GEOSITE_PRIVATE,
+            url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-private.srs",
+            update_interval: "7d",
+            direct_detour: true,
+        },
+        RemoteRuleSetSource {
+            tag: RS_GEOIP_CN,
+            url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+            update_interval: "1d",
+            direct_detour: false,
+        },
+    ]);
+    sources
 }
 
 /// 基于骨架配置注入节点，并更新“自动选择/手动切换”等组的候选列表。

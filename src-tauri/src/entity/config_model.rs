@@ -27,6 +27,9 @@ pub struct Inbound {
     pub route_exclude_address: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub set_system_proxy: Option<bool>,
+    /// 1.14 新增：TUN 对系统 DNS 的接管方式（hijack / native / disabled），仅 tun inbound 使用
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dns_mode: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, Serialize)]

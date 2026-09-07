@@ -217,6 +217,26 @@ impl ApiClientHandle {
             .map_err(|e| ApiError::Decode(decode_error_to_string(&e)))
     }
 
+    /// sing-box 1.14+：获取所有出站快照
+    /// 官方 API 没有 unary `GetOutbounds`，只有 server-streaming `SubscribeOutbounds`，
+    /// 与 `get_groups_snapshot` 同样取首个 data frame 作为快照。
+    /// 用于恢复代理提供者/全量出站列表 UI。
+    pub async fn get_outbounds(&self) -> ApiResult<super::types::OutboundList> {
+        let mut stream =
+            HttpStream::new(self.build_streaming_request("SubscribeOutbounds", Vec::new())).await?;
+        let frame = stream.next().await?.ok_or(ApiError::Closed)?;
+        super::proto::decode_outbound_list(&frame)
+            .map_err(|e| ApiError::Decode(decode_error_to_string(&e)))
+    }
+
+    /// sing-box 1.14+：获取已弃用字段告警（GetDeprecatedWarnings）
+    /// 内核启动后调用，提示用户配置中仍在使用、将在 1.16 被移除的字段。
+    pub async fn get_deprecated_warnings(&self) -> ApiResult<super::types::DeprecatedWarnings> {
+        let resp = self.unary("GetDeprecatedWarnings", &[]).await?;
+        super::proto::decode_deprecated_warnings(&resp)
+            .map_err(|e| ApiError::Decode(decode_error_to_string(&e)))
+    }
+
     /// sing-box 1.14+：网络质量测试（unary，返回完整结果）
     /// 等价于 CLI `sing-box api network-quality`，含 TCP RTT + 上下行带宽。
     /// 带宽压测在慢链路上可能远超共享 client 的 15s 总超时,放宽到 90s。

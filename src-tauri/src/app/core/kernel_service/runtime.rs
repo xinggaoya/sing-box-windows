@@ -230,6 +230,7 @@ pub async fn resolve_proxy_runtime_state(
         enable_ipv6: app_config.tun_enable_ipv6,
         route_exclude_address: app_config.tun_route_exclude_address.clone(),
         interface_name: None,
+        dns_mode: app_config.tun_dns_mode.clone(),
     });
 
     let proxy_state = ProxyRuntimeState {

@@ -1,4 +1,4 @@
-use crate::app::singbox::common::PRIVATE_IP_CIDRS;
+use crate::app::singbox::common::{normalize_dns_mode, PRIVATE_IP_CIDRS};
 use crate::entity::config_model;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
@@ -72,6 +72,8 @@ pub struct TunProxyOptions {
     pub enable_ipv6: bool,
     pub route_exclude_address: Option<Vec<String>>,
     pub interface_name: Option<String>,
+    /// 1.14 新增：对系统 DNS 的接管方式（hijack / native / disabled）
+    pub dns_mode: String,
 }
 
 impl Default for TunProxyOptions {
@@ -86,6 +88,7 @@ impl Default for TunProxyOptions {
             enable_ipv6: true,
             route_exclude_address: None,
             interface_name: None,
+            dns_mode: "hijack".to_string(),
         }
     }
 }
@@ -101,6 +104,7 @@ pub struct TunProfile {
     pub mtu: u16,
     pub interface_name: String,
     pub route_exclude_address: Vec<String>,
+    pub dns_mode: String,
 }
 
 impl TunProfile {
@@ -136,6 +140,7 @@ impl TunProfile {
                 .map(|cidrs| cidrs.to_vec())
                 .or_else(|| options.route_exclude_address.clone())
                 .unwrap_or_else(default_tun_route_exclude_addresses),
+            dns_mode: normalize_dns_mode(&options.dns_mode).to_string(),
         }
     }
 
@@ -163,6 +168,7 @@ impl TunProfile {
                 route_address: None,
                 route_exclude_address: None,
                 set_system_proxy: None,
+                dns_mode: None,
             },
             config_model::Inbound {
                 r#type: "tun".to_string(),
@@ -178,6 +184,7 @@ impl TunProfile {
                 route_address: None,
                 route_exclude_address: Some(self.route_exclude_address.clone()),
                 set_system_proxy: None,
+                dns_mode: Some(self.dns_mode.clone()),
             },
         ]
     }

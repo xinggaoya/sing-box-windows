@@ -82,6 +82,7 @@ fn build_inbounds_for_state(state: &ProxyRuntimeState) -> Vec<config_model::Inbo
         route_address: None,
         route_exclude_address: None,
         set_system_proxy: None,
+        dns_mode: None,
     }]
 }
 
@@ -463,6 +464,32 @@ pub async fn get_services(
         .get_services()
         .await
         .map_err(|e| format!("获取服务列表失败: {}", e))
+}
+
+/// 获取所有出站快照（SubscribeOutbounds 首帧）
+/// 数据源用于恢复代理提供者 / 全量出站列表 UI 与按延迟排序
+#[tauri::command]
+pub async fn get_outbounds(
+    app_handle: AppHandle,
+) -> Result<crate::app::singbox_api::OutboundList, String> {
+    let (handle, _) = make_handle_async(app_handle).await?;
+    handle
+        .get_outbounds()
+        .await
+        .map_err(|e| format!("获取出站列表失败: {}", e))
+}
+
+/// 获取已弃用字段告警（GetDeprecatedWarnings）
+/// 内核启动后调用，提示配置中将在 1.16 被移除的字段（主要是用户手改的自定义配置）
+#[tauri::command]
+pub async fn get_deprecated_warnings(
+    app_handle: AppHandle,
+) -> Result<crate::app::singbox_api::DeprecatedWarnings, String> {
+    let (handle, _) = make_handle_async(app_handle).await?;
+    handle
+        .get_deprecated_warnings()
+        .await
+        .map_err(|e| format!("获取弃用告警失败: {}", e))
 }
 
 /// 网络质量测试（unary：TCP RTT + 上下行带宽 + 延迟）

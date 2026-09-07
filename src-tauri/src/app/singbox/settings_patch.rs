@@ -1,10 +1,10 @@
 use super::common::{
     build_dns_server_config, dns_bootstrap_strategy, dns_strategy, ensure_kernel_log_output,
-    normalize_default_outbound, normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_PROXY,
-    DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, RS_GEOSITE_ADS, RS_GEOSITE_GEOLOCATION_NOT_CN,
-    RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_TELEGRAM,
-    RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM,
-    TAG_YOUTUBE,
+    normalize_default_outbound, normalize_dns_mode, normalize_fake_dns_filter_mode, DNS_CN,
+    DNS_FAKEIP, DNS_PROXY, DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, RS_GEOSITE_ADS,
+    RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI,
+    RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX,
+    TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
 };
 use crate::app::core::tun_profile::{
     default_tun_route_exclude_addresses, normalize_persisted_tun_route_exclude_address,
@@ -559,6 +559,8 @@ fn apply_inbounds_settings(config_obj: &mut Map<String, Value>, app_config: &App
             "strict_route": app_config.tun_strict_route,
             "stack": app_config.tun_stack,
             "mtu": app_config.tun_mtu,
+            // 1.14 新增：对系统 DNS 的接管方式（hijack 默认改写系统 DNS，disabled 保持不接管）
+            "dns_mode": normalize_dns_mode(&app_config.tun_dns_mode),
             "route_exclude_address": tun_route_exclude_address
         }));
     }

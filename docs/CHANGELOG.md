@@ -4,6 +4,7 @@
 
 ### 🐛 问题修复
 
+- 修复 `tun_dns_mode` 设置未注入内核 TUN 配置的问题：该字段此前仅持久化，配置生成与运行时切换两条路径现均写入 `tun.dns_mode`（1.14 起默认 hijack 接管系统 DNS，设置页可切换 native / disabled）
 - 修复开启"IPv6 优先"后 TUN 模式 DNS 报错（`dial tcp6: cannot assign requested address`）：DNS 服务器自身域名的 bootstrap 解析不再跟随全局 IPv6 偏好，保持 IPv4 优先
 - 修复关闭主窗口后托盘代理开关状态陈旧（#67）
 - 修复订阅切换后代理节点列表不更新
@@ -16,7 +17,11 @@
 
 - 升级 sing-box 内核到 1.14.0
 - 迁移到 sing-box 官方 gRPC API（`type: api`）
-- 新增 gRPC 方法：`get_rules` / `get_services` / `network_quality_test`
+- 新增 gRPC 方法：`get_rules` / `get_services` / `get_outbounds` / `get_deprecated_warnings` / `network_quality_test`
+- 设置页新增"TUN DNS 接管模式"选择（hijack / native / disabled），1.14 升级后可一键关闭系统 DNS 接管
+- 首次升级弹出 TUN DNS 接管告知；内核启动后自动检测配置弃用字段并弹窗提示（1.16 移除计划预热）
+- 设置页新增 1.16 弃用字段移除计划提示卡
+- rule-set 本地缓存预热（1.14 `initial_path`）：后台下载 `<数据目录>/rule-sets/<tag>.srs` 副本，离线冷启动不再被首次下载阻塞
 - 新增 Tailscale endpoint 实验性支持
 - 新增 Web Dashboard 集成
 - 恢复 RulesView 规则管理 UI
@@ -25,6 +30,10 @@
 ### 🔧 优化改进
 
 - 清理 4 个 deprecated 字段（`clash_api` / `store_rdrc` / `independent_cache` / `download_detour`）
+- 远程 rule-set 下载完全迁移到 1.14 原生写法：顶层 `http_clients`（detour 跟随下载出站偏好）+ `route.default_http_client`，生成配置不再写 `download_detour`，不会再触发内核弃用告警
+- `SubscribeConnections` 改为事件驱动（interval 0），仅在连接变化时推送，大幅减少空闲流量；连接页时长显示改用本地心跳
+- Windows ARM64 平台自动隐藏 TLS spoof 开关（内核 WinDivert 驱动不支持）
+- 远程 rule-set 清单收敛为单一来源（`remote_rule_set_sources`），配置生成与缓存预热共用
 - 订阅解析器补 1.14 协议与字段（snell / wireguard / tailscale / hysteria2 新字段）
 - gRPC-Web 流式解析优化
 - 配置生成层注入 12 个 1.14 字段

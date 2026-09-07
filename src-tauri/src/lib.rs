@@ -153,6 +153,10 @@ pub fn run() {
                     tracing::warn!("启动时清理内核进程失败: {}", e);
                 }
 
+                // 1.14 rule-set 本地缓存：初始化目录 + 后台预热（离线冷启动兜底，不阻塞启动）
+                crate::app::system::rule_set_cache_service::init_cache_dir(&app_handle);
+                crate::app::system::rule_set_cache_service::spawn_warm_task(app_handle.clone());
+
                 // 应用升级后：尝试刷新当前活动订阅一次，尽量在首次拉起内核前完成配置迁移。
                 crate::app::system::startup_refresh_service::start_upgrade_subscription_refresh(
                     &app_handle,
@@ -245,6 +249,8 @@ pub fn run() {
             // sing-box 1.14+ 新增 gRPC 桥接
             crate::app::core::proxy_service::get_rules,
             crate::app::core::proxy_service::get_services,
+            crate::app::core::proxy_service::get_outbounds,
+            crate::app::core::proxy_service::get_deprecated_warnings,
             crate::app::core::proxy_service::network_quality_test,
             // Network - Subscription service commands
             crate::app::network::subscription_service::download_subscription,

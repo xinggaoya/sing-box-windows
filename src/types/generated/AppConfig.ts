@@ -46,9 +46,9 @@ export interface AppConfig {
   singbox_dns_timeout: string
   /** 1.14 启用 mDNS server（*.local / link-local） */
   singbox_dns_use_mdns: boolean
-  /** 1.14 TLS spoof（SNI 诱骗；仅 Windows x64/x86 + Admin） */
+  /** 1.14 TLS spoof（SNI 诱骗；需提权，Windows ARM64 不支持） */
   singbox_enable_tls_spoof: boolean
-  /** 1.14 TUN dns_mode：hijack / tun / off */
+  /** 1.14 TUN dns_mode：hijack（默认）/ native / disabled */
   tun_dns_mode: string
   /** 1.14 TUN include_mac_address */
   tun_include_macs: string[]

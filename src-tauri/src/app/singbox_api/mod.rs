@@ -25,7 +25,7 @@ pub mod types;
 
 pub use client::{ApiClientConfig, ApiClientHandle, GroupsSubscription, HttpStream};
 pub use types::{
-    ClashModeStatus, Connection, ConnectionEvents, Group, Groups, GroupItem, Log, LogEntry,
-    LogLevel, NetworkQualityResult, OutboundList, Rule, RuleList, Service, ServiceList,
-    ServiceStatus, Status,
+    ClashModeStatus, Connection, ConnectionEvents, DeprecatedWarning, DeprecatedWarnings, Group,
+    Groups, GroupItem, Log, LogEntry, LogLevel, NetworkQualityResult, OutboundList, Rule, RuleList,
+    Service, ServiceList, ServiceStatus, Status,
 };

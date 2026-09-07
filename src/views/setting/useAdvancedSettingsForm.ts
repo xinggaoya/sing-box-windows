@@ -16,6 +16,7 @@ interface AppStoreLike {
   tunStrictRoute: boolean
   tunSelfHealEnabled: boolean
   tunSelfHealCooldownSecs: number
+  tunDnsMode: string
   singboxDefaultProxyOutbound: string
   singboxDownloadDetour: string
   singboxBlockAds: boolean
@@ -89,6 +90,8 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
     tunStrictRoute: true,
     tunSelfHealEnabled: true,
     tunSelfHealCooldownSecs: 90,
+    // 1.14 新增：TUN 对系统 DNS 的接管方式（默认 hijack，会修改系统 DNS 设置）
+    tunDnsMode: 'hijack' as 'hijack' | 'native' | 'disabled',
   })
 
   const savingSingboxProfile = ref(false)
@@ -158,6 +161,13 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
     { label: options.t('setting.singboxProfile.fakeDnsFilterGlobalNonCn'), value: 'global_non_cn' },
   ])
 
+  // 1.14 TUN dns_mode：接管系统 DNS 的方式（对应 sing-box tun.dns_mode）
+  const tunDnsModeOptions = computed(() => [
+    { label: options.t('setting.proxyAdvanced.tunDnsModeHijack'), value: 'hijack' },
+    { label: options.t('setting.proxyAdvanced.tunDnsModeNative'), value: 'native' },
+    { label: options.t('setting.proxyAdvanced.tunDnsModeDisabled'), value: 'disabled' },
+  ])
+
   watch(
     () => options.appStore.isDataRestored,
     (restored) => {
@@ -173,6 +183,7 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
       proxyAdvancedForm.tunStrictRoute = options.appStore.tunStrictRoute
       proxyAdvancedForm.tunSelfHealEnabled = options.appStore.tunSelfHealEnabled
       proxyAdvancedForm.tunSelfHealCooldownSecs = options.appStore.tunSelfHealCooldownSecs
+      proxyAdvancedForm.tunDnsMode = options.appStore.tunDnsMode as 'hijack' | 'native' | 'disabled'
 
       singboxProfileForm.defaultProxyOutbound = options.appStore
         .singboxDefaultProxyOutbound as 'manual' | 'auto'
@@ -253,6 +264,7 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
       )
       options.appStore.tunSelfHealEnabled = proxyAdvancedForm.tunSelfHealEnabled
       options.appStore.tunSelfHealCooldownSecs = proxyAdvancedForm.tunSelfHealCooldownSecs
+      options.appStore.tunDnsMode = proxyAdvancedForm.tunDnsMode
 
       await options.appStore.saveToBackend({ applyRuntime: true })
       options.message.success(options.t('common.saveSuccess'))
@@ -346,6 +358,7 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
     defaultOutboundOptions,
     downloadDetourOptions,
     fakeDnsFilterOptions,
+    tunDnsModeOptions,
     hysteria2ObfsTypeOptions,
     clashModeOptions,
     saveProxyAdvancedSettings,

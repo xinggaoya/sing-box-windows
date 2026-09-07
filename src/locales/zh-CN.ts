@@ -573,6 +573,12 @@ export default {
       tunAddressInfo: '地址段已固定为 172.19.0.1/30 与 fdfe:dcba:9876::1/126。',
       tunMtu: 'MTU',
       tunStack: '协议栈模式',
+      tunDnsMode: 'TUN DNS 接管模式',
+      tunDnsModeHijack: 'Hijack：写入系统 DNS 并劫持 53 端口（默认）',
+      tunDnsModeNative: 'Native：仅写入系统接口 DNS',
+      tunDnsModeDisabled: 'Disabled：不修改系统 DNS',
+      tunDnsModeHint:
+        'sing-box 1.14 起 TUN 模式默认接管系统 DNS（修改网卡 DNS 并劫持明文 53 端口查询）。若升级后出现解析异常，可切换为 Disabled 恢复原有行为；修改需重启内核生效。',
       tunRouteExcludeAddress: '排除路由地址',
       tunRouteExcludeAddressPlaceholder:
         '每行填写一个 CIDR，例如：\n192.168.0.0/16\nfd00::/8\n留空则使用默认行为',
@@ -647,6 +653,13 @@ export default {
     kernel: '内核',
     show: '显示窗口',
     quit: '退出应用',
+  },
+  upgradeNotices: {
+    dnsHijackTitle: 'TUN 模式现在默认接管系统 DNS',
+    dnsHijackBody:
+      '升级到 sing-box 1.14 后，TUN 模式默认写入系统接口 DNS 并劫持 53 端口明文查询（hijack 模式）。如果升级后出现网页打不开、域名解析异常等问题，可在 设置 → 高级设置 → 代理高级设置 中将"TUN DNS 接管模式"切换为 Disabled 恢复原有行为。',
+    deprecatedTitle: '检测到配置中的弃用字段',
+    deprecatedBody: '以下配置字段已被 sing-box 弃用，将在 1.16 版本移除，请尽快调整：',
   },
   notification: {
     proxyModeChanged: '代理模式已更改',

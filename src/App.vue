@@ -18,6 +18,9 @@
 
             <!-- 更新通知组件 -->
             <UpdateNotification />
+
+            <!-- 升级告知：1.14 TUN DNS 接管弹窗 + 弃用字段告警 -->
+            <AppUpgradeNotices />
           </n-message-provider>
         </n-notification-provider>
       </n-modal-provider>
@@ -46,6 +49,7 @@ import {
 
 import MessageConsumer from '@/components/MessageConsumer.vue'
 import UpdateNotification from '@/components/UpdateNotification.vue'
+import AppUpgradeNotices from '@/components/AppUpgradeNotices.vue'
 import SudoPasswordModal from '@/components/system/SudoPasswordModal.vue'
 import { useAppBootstrap } from '@/boot/useAppBootstrap'
 import { eventService } from '@/services/event-service'

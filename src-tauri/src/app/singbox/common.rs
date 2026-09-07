@@ -95,6 +95,15 @@ pub fn normalize_download_detour(app_config: &AppConfig) -> &'static str {
     }
 }
 
+/// 1.14 TUN `dns_mode` 合法值归一化（非法/历史残留值回退默认 hijack）
+pub fn normalize_dns_mode(value: &str) -> &'static str {
+    match value {
+        "native" => "native",
+        "disabled" => "disabled",
+        _ => "hijack",
+    }
+}
+
 pub fn dns_strategy(app_config: &AppConfig) -> &'static str {
     if app_config.prefer_ipv6 {
         "prefer_ipv6"

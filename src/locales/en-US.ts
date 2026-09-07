@@ -580,6 +580,12 @@ export default {
       tunAddressInfo: 'IPv4/IPv6 ranges are preset to 172.19.0.1/30 and fdfe:dcba:9876::1/126.',
       tunMtu: 'MTU',
       tunStack: 'Protocol stack',
+      tunDnsMode: 'TUN DNS takeover mode',
+      tunDnsModeHijack: 'Hijack: set system DNS and hijack port 53 (default)',
+      tunDnsModeNative: 'Native: set per-interface system DNS only',
+      tunDnsModeDisabled: 'Disabled: do not touch system DNS',
+      tunDnsModeHint:
+        'Since sing-box 1.14, TUN mode takes over system DNS by default (rewrites interface DNS and hijacks plain-text port 53 queries). If name resolution misbehaves after upgrading, switch to Disabled to restore the previous behavior. Kernel restart required.',
       tunRouteExcludeAddress: 'Route exclude addresses',
       tunRouteExcludeAddressPlaceholder:
         'One CIDR per line, e.g.\n192.168.0.0/16\nfd00::/8\nLeave blank to use the default behavior',
@@ -656,6 +662,14 @@ export default {
     kernel: 'Kernel',
     show: 'Show Window',
     quit: 'Quit Application',
+  },
+  upgradeNotices: {
+    dnsHijackTitle: 'TUN mode now takes over system DNS by default',
+    dnsHijackBody:
+      'After upgrading to sing-box 1.14, TUN mode sets per-interface system DNS and hijacks plain-text port 53 queries by default (hijack mode). If websites fail to open or name resolution misbehaves after upgrading, switch "TUN DNS takeover mode" to Disabled under Settings → Advanced → Proxy advanced to restore the previous behavior.',
+    deprecatedTitle: 'Deprecated fields detected in config',
+    deprecatedBody:
+      'The following config fields are deprecated by sing-box and will be removed in 1.16. Please update your config soon:',
   },
   notification: {
     proxyModeChanged: 'Proxy mode changed',

@@ -629,6 +629,12 @@ export default {
         'IPv4/IPv6 の CIDR は 172.19.0.1/30 と fdfe:dcba:9876::1/126 に固定されています。',
       tunMtu: 'MTU',
       tunStack: 'スタックモード',
+      tunDnsMode: 'TUN DNS テイクオーバーモード',
+      tunDnsModeHijack: 'Hijack：システム DNS を設定し 53 番ポートを乗っ取る（既定）',
+      tunDnsModeNative: 'Native：インターフェース DNS のみ設定',
+      tunDnsModeDisabled: 'Disabled：システム DNS を変更しない',
+      tunDnsModeHint:
+        'sing-box 1.14 から TUN モードは既定でシステム DNS を引き継ぎます（インターフェース DNS の書き換えと平文 53 番ポートの傍受）。アップグレード後に名前解決に問題が出た場合は Disabled に切り替えてください。カーネルの再起動が必要です。',
       tunRouteExcludeAddress: '除外ルートアドレス',
       tunRouteExcludeAddressPlaceholder:
         '1 行につき 1 つの CIDR を入力してください。例:\n192.168.0.0/16\nfd00::/8\n空欄のままなら既定の動作を使います',
@@ -714,6 +720,13 @@ export default {
   },
 
   // 通知メッセージ
+  upgradeNotices: {
+    dnsHijackTitle: 'TUN モードが既定でシステム DNS を引き継ぐようになりました',
+    dnsHijackBody:
+      'sing-box 1.14 へのアップグレード後、TUN モードは既定でインターフェース DNS を書き換え、平文の 53 番ポート問い合わせを傍受します（hijack モード）。アップグレード後にサイトが開けない・名前解決がおかしいなどの問題が出た場合は、設定 → 詳細設定 → プロキシ詳細設定 の「TUN DNS テイクオーバーモード」を Disabled に切り替えると従来の動作に戻せます。',
+    deprecatedTitle: '設定内に非推奨フィールドが検出されました',
+    deprecatedBody: '以下の設定フィールドは sing-box で非推奨となり、1.16 で削除されます。早めに調整してください：',
+  },
   notification: {
     proxyModeChanged: 'プロキシモードが変更されました',
     proxyModeChangeFailed: 'プロキシモードの変更に失敗しました',

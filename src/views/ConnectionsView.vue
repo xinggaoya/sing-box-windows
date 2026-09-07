@@ -209,7 +209,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import {
   ArrowDownOutline,
@@ -447,8 +447,23 @@ const getChainText = (connection: ConnectionItem) => connection.chains.join(' > 
 const getProcessText = (connection: ConnectionItem) =>
   connection.metadata.process || connection.metadata.processPath || '-'
 
+// 1s 本地心跳：连接推送为事件驱动（仅变化时到达），用于让时长文案持续走动
+const nowTick = ref(Date.now())
+let nowTickTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  nowTickTimer = setInterval(() => {
+    nowTick.value = Date.now()
+  }, 1000)
+})
+onBeforeUnmount(() => {
+  if (nowTickTimer) {
+    clearInterval(nowTickTimer)
+    nowTickTimer = null
+  }
+})
+
 const formatTimeAgo = (time: string) => {
-  const diff = Date.now() - new Date(time).getTime()
+  const diff = nowTick.value - new Date(time).getTime()
   if (diff < 60_000) return t('connections.secondsAgo', { count: Math.max(1, Math.floor(diff / 1000)) })
   if (diff < 3_600_000) return t('connections.minutesAgo', { count: Math.floor(diff / 60_000) })
   if (diff < 86_400_000) return t('connections.hoursAgo', { count: Math.floor(diff / 3_600_000) })

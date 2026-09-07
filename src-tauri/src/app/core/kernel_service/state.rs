@@ -444,6 +444,7 @@ impl KernelRuntimeConfig {
                 enable_ipv6: config.tun_enable_ipv6,
                 route_exclude_address: config.tun_route_exclude_address.clone(),
                 interface_name: None,
+                dns_mode: config.tun_dns_mode.clone(),
             }),
             system_proxy_enabled: Some(config.system_proxy_enabled),
             tun_enabled: Some(config.tun_enabled),

@@ -27,6 +27,9 @@ pub(crate) struct SingBoxConfig {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct HttpClientConfig {
     pub tag: String,
+    /// Dial Field：经由哪个出站下载（如 manual / direct）；None 表示直连
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detour: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,9 +120,13 @@ pub(crate) struct RemoteRuleSetConfig {
     pub kind: String,
     pub format: String,
     pub url: String,
-    /// 1.16 移除；1.14 仍然接受，但顶层 `http_clients` + `route.default_http_client` 才是新写法。
-    /// 改为 Option，仅在用户明确指定下载出站时写入。
+    /// 1.14 新增：本地初始副本路径。内核仅在缓存缺失时读取一次，冷启动不再被首次下载阻塞；
+    /// 缓存目录未初始化（如单测环境）时为 None，不写入该字段。
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub download_detour: Option<String>,
+    pub initial_path: Option<String>,
+    /// 1.14 新增：使用顶层 `http_clients` 中哪个客户端下载；None 走 `route.default_http_client`。
+    /// 1.13 的 deprecated `download_detour` 不再写入。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub http_client: Option<String>,
     pub update_interval: String,
 }

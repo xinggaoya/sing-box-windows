@@ -27,6 +27,7 @@ pub mod system {
     pub mod background_tasks;
     pub mod backup_service;
     pub mod config_service;
+    pub mod rule_set_cache_service;
     pub mod startup_restore_service;
     pub mod startup_refresh_service;
     pub mod sudo_service;

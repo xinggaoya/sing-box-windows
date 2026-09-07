@@ -72,6 +72,24 @@ pub struct NetworkQualityResult {
     pub upload_latency_ms: i32,
 }
 
+/// sing-box 1.14 新增：已弃用字段告警（GetDeprecatedWarnings）
+/// 用于启动后提示用户哪些配置字段将在后续版本（1.16）被移除。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeprecatedWarning {
+    pub message: String,
+    pub impending: bool,
+    pub migration_link: String,
+    pub description: String,
+    pub deprecated_version: String,
+    pub scheduled_version: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DeprecatedWarnings {
+    pub warnings: Vec<DeprecatedWarning>,
+}
+
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ServiceStatus {

@@ -502,6 +502,45 @@ pub fn decode_network_quality_result(buf: &[u8]) -> Result<super::types::Network
     Ok(r)
 }
 
+/// 1.14 GetDeprecatedWarnings 解码
+/// proto 字段号：
+///   DeprecatedWarnings.warnings (1) -> repeated DeprecatedWarning
+///   DeprecatedWarning.message (1) / impending (2, bool) / migrationLink (3) /
+///   description (4) / deprecatedVersion (5) / scheduledVersion (6)
+pub fn decode_deprecated_warnings(buf: &[u8]) -> Result<super::types::DeprecatedWarnings, DecodeError> {
+    use super::types::DeprecatedWarning;
+    let mut dec = Decoder::new(buf);
+    let mut list = super::types::DeprecatedWarnings::default();
+    while !dec.eof() {
+        let tag = dec.read_varint()?;
+        let field = (tag >> 3) as u32;
+        let wire = (tag & 0x07) as u8;
+        if (field, wire) == (1, 2) {
+            let body = dec.read_bytes()?;
+            let mut wdec = Decoder::new(body);
+            let mut warning = DeprecatedWarning::default();
+            while !wdec.eof() {
+                let wtag = wdec.read_varint()?;
+                let wfield = (wtag >> 3) as u32;
+                let wwire = (wtag & 0x07) as u8;
+                match (wfield, wwire) {
+                    (1, 2) => warning.message = wdec.read_string()?,
+                    (2, 0) => warning.impending = wdec.read_bool()?,
+                    (3, 2) => warning.migration_link = wdec.read_string()?,
+                    (4, 2) => warning.description = wdec.read_string()?,
+                    (5, 2) => warning.deprecated_version = wdec.read_string()?,
+                    (6, 2) => warning.scheduled_version = wdec.read_string()?,
+                    _ => wdec.skip_field(wwire)?,
+                }
+            }
+            list.warnings.push(warning);
+        } else {
+            dec.skip_field(wire)?;
+        }
+    }
+    Ok(list)
+}
+
 // ============ 请求侧编码辅助 ============
 //
 // 注意:请求 body 的编码在 client.rs 内自带一份正确实现（encode_field_tag(field, wire)

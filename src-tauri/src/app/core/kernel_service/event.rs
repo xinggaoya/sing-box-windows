@@ -236,7 +236,8 @@ async fn run_connections_relay(app: AppHandle, handle: ApiClientHandle, notify: 
         if notify.notified().now_or_never().is_some() {
             break;
         }
-        match handle.subscribe_connections(1_000_000_000).await {
+        // 1.14+: interval_nanos=0 表示事件驱动（仅连接变化时推送），避免 1s 轮询的全量快照流量
+        match handle.subscribe_connections(0).await {
             Ok(mut sub) => loop {
                 tokio::select! {
                     _ = notify.notified() => {
