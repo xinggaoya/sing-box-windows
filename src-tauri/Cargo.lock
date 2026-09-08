@@ -4232,7 +4232,7 @@ checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
 
 [[package]]
 name = "sing-box-windows"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
