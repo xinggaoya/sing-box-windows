@@ -17,7 +17,7 @@ src/
 ├── router/       # 路由与 /blank 托盘态
 ├── services/     # invoke + event 封装（12 个 service）
 ├── stores/       # Pinia 领域状态
-├── views/        # 页面视图（Home/Proxy/Rules/Connections/Log/Sub/Setting/Blank）
+├── views/        # 页面视图（Home/Proxy/Rules/Connections/Log/Sub/TemplateMarket/Setting/Blank）
 └── types/        # TS 类型（含 ts-rs 生成的 generated/）
 ```
 
@@ -32,6 +32,7 @@ src/
 | 路由行为（含托盘） | `router/index.ts`            | `/blank` 逻辑关键              |
 | 节点选择 / 测速   | `services/proxy-service.ts` + `stores/kernel/ProxyStore.ts` | gRPC API（sing-box 1.14+） |
 | 规则页（只读展示） | `views/RulesView.vue`        | 调 gRPC `get_rules`，仅展示    |
+| 模板市场           | `views/TemplateMarketView.vue` | 三 Tab：当前模板/市场/我的发布，调 `services/template-market-service.ts` |
 | 设计系统 / 主题    | `assets/tokens.css` + `stores/app/ThemeStore.ts` | Indigo 三层 token，主题覆盖 `--primary-*` |
 | 资源清理          | `composables/useCleanup.ts`  | 组件卸载统一清理监听/定时器    |
 

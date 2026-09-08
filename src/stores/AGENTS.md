@@ -12,6 +12,7 @@ Pinia 状态中心，按领域拆分为 app/kernel/subscription/tray；通过组
 | 应用级配置状态       | `app/`          | App/Locale/Sudo/Theme/Update/Window + `composables/`（persistence、messaging） |
 | 内核运行与连接状态   | `kernel/`       | Kernel/KernelRuntime/Connection/Log/Proxy/Traffic |
 | 订阅状态             | `subscription/` | `SubStore.ts` + `types.ts`：活跃配置、节点/配置索引 |
+| 模板市场             | `template/`     | `TemplateStore.ts`：本地模板、市场设置、激活模板（显式 action 持久化，非深度 watch） |
 | 托盘交互状态         | `tray/`         | `TrayStore.ts`：托盘联动与窗口行为 |
 
 ## CONVENTIONS

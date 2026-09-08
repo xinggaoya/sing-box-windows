@@ -54,7 +54,8 @@
 | 前端事件消费         | `src/services/event-service.ts` + `src/constants/events.ts` | 事件名常量约 27 个             |
 | 路由与托盘空白页     | `src/router/index.ts`, `src/views/BlankView.vue`  | `/blank` 是非标准但关键路径              |
 | gRPC API 客户端      | `src-tauri/src/app/singbox_api/`                  | 替代 experimental.clash_api              |
-| 后端入口与命令注册   | `src-tauri/src/lib.rs`                            | 84 个命令；setup 同步+异步初始化链       |
+| 后端入口与命令注册   | `src-tauri/src/lib.rs`                            | 116 个命令；setup 同步+异步初始化链      |
+| 模板市场与在线模板   | `src-tauri/src/app/template_marketplace/`         | 本地模板 KV 存储 + 市场客户端 + 15 命令  |
 | 内核生命周期         | `src-tauri/src/app/core/kernel_service/`          | 高复杂度热点目录                         |
 | 内核版本管理         | `src-tauri/src/app/core/kernel_service/versioning.rs` | 默认最新版；指定版本下载前前端强制确认兼容风险 |
 | 订阅解析与模式切换   | `src-tauri/src/app/network/subscription_service/` | parser/mode/helpers 分层明显             |
@@ -70,6 +71,7 @@
 | Symbol / Area                 | Type               | Location                                                | Role                                |
 | ----------------------------- | ------------------ | ------------------------------------------------------- | ----------------------------------- |
 | `useAppBootstrap`             | Frontend bootstrap | `src/boot/useAppBootstrap.ts`                           | 统一串联 store 初始化与后端事件桥接 |
+| `useTemplateStore`            | Template store     | `src/stores/template/TemplateStore.ts`                  | 本地模板/市场设置/激活模板状态      |
 | `run()`                       | Backend entry      | `src-tauri/src/lib.rs`                                  | 插件注册、异步初始化链、命令暴露    |
 | `kernel_start_enhanced` 等    | Tauri commands     | `src-tauri/src/app/core/kernel_service/*`               | 内核启停与健康检查                  |
 | `get_groups`/`get_rules` 等   | Tauri commands     | `src-tauri/src/app/core/proxy_service.rs`               | gRPC 代理查询/选择/测速/自定义规则  |

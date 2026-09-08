@@ -129,7 +129,7 @@ src-tauri/src/
 ├── utils/           # http/file/log/process 等工具
 ├── error.rs         # 统一错误
 ├── main.rs          # 程序入口（薄）
-└── lib.rs           # run()：插件注册、setup（同步+异步初始化链）、84 个命令注册
+└── lib.rs           # run()：插件注册、setup（同步+异步初始化链）、116 个命令注册
 ```
 
 ## Key Features
@@ -167,7 +167,7 @@ src-tauri/src/
 5. Create page views in `views/`
 6. Implement backend commands in `src-tauri/src/app/`
 7. Update routing configuration (if needed)
-8. Register new Tauri commands in `lib.rs`（当前 84 个命令）
+8. Register new Tauri commands in `lib.rs`（当前 116 个命令）
 9. **按 DOC SYNC GATE 更新对应层级文档与 CHANGELOG**
 
 ### Store Development Patterns

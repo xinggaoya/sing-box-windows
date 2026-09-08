@@ -103,6 +103,10 @@ Sing-Box Windows 是一个跨平台桌面客户端，前端使用 Vue 3 + TypeSc
   - 订阅解析
   - 自动更新
   - 配置切换与回滚
+- `template_marketplace/`
+  - 本地配置模板 CRUD（generic_config KV 通道）
+  - 模板市场远程客户端（匿名发布 + 编辑令牌，服务端独立私有仓库 sing-box-template-server）
+  - 当前激活模板读取（官方骨架 / 在线模板）
 - `storage/`
   - SQLite 初始化与迁移
   - 应用配置、主题、语言、窗口、更新设置持久化
@@ -121,6 +125,7 @@ Sing-Box Windows 是一个跨平台桌面客户端，前端使用 Vue 3 + TypeSc
 
 - `src/views/HomeView.vue`：内核状态、启动/停止、流量概览
 - `src/views/SubView.vue`：订阅管理、导入、更新、回滚
+- `src/views/TemplateMarketView.vue`：模板市场（当前模板 / 市场 / 我的发布），订阅生成所用模板在此切换
 - `src/views/ProxyView.vue`：节点与代理模式切换
 - `src/views/ConnectionsView.vue`：活跃连接查看与筛选
 - `src/views/RulesView.vue`：规则命中与路由规则查看

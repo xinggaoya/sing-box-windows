@@ -10,6 +10,7 @@
 src-tauri/src/app/
 ├── core/          # 内核启停、代理模式、gRPC 查询、事件中继
 ├── network/       # 订阅下载、解析、模式切换、自动更新
+├── template_marketplace/  # 在线模板：本地 KV 存储、市场客户端（独立私有服务端）、15 个命令
 ├── system/        # 更新（自研）、权限、系统状态、后台任务、启动恢复
 ├── storage/       # SQLite 服务与状态模型（含 custom_rule）
 ├── singbox/       # 配置生成与注入（含 1.14 DNS、自定义规则）
@@ -29,6 +30,7 @@ src-tauri/src/app/
 | sing-box 配置生成 | `singbox/config_generator.rs`            | 规则/outbounds/DNS 组装，1.14 mDNS/evaluate 注入 |
 | gRPC API 交互     | `singbox_api/` + `core/proxy_service.rs` | 替代 experimental.clash_api |
 | 自定义规则 CRUD   | `core/proxy_service.rs` + `storage/custom_rule.rs` | 5 个命令，存 `generic_config` 表 key=`custom_rules` |
+| 模板/市场         | `template_marketplace/commands.rs` + `local_store.rs` | 15 个命令，存 `generic_config` 表 key=`config_templates`/`template_market_settings` |
 | 事件中继          | `core/kernel_service/event.rs`           | 4 个 gRPC server-streaming（Status/Log/Connections/Groups），指数退避+清理纪元 |
 | 托盘              | `tray/`                                  | 启动偏好、关窗后状态刷新、动作分发 |
 
