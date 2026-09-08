@@ -22,6 +22,9 @@ export * from './kernel/LogStore'
 // 导出订阅相关Store
 export * from './subscription/SubStore'
 
+// 导出模板市场相关Store
+export * from './template/TemplateStore'
+
 // 导出系统托盘Store
 export * from './tray/TrayStore'
 

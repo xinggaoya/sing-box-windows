@@ -41,6 +41,7 @@ export interface AppBootstrapDeps {
       initializeStore: () => Promise<void>
       getActiveSubscription: () => { configPath?: string; useOriginalConfig?: boolean } | null
     }
+    templateStore: { initializeStore: () => Promise<void> }
     kernelStore: { initializeStore: () => Promise<void> }
     updateStore: {
       initializeStore: () => Promise<void>
@@ -65,6 +66,7 @@ export function useAppBootstrap(deps: AppBootstrapDeps) {
     localeStore,
     windowStore,
     subStore,
+    templateStore,
     kernelStore,
     updateStore,
     trafficStore,
@@ -201,7 +203,11 @@ export function useAppBootstrap(deps: AppBootstrapDeps) {
     await logStore.initializeStore()
     cleanupFns.push(() => logStore.cleanupListeners())
 
-    await Promise.allSettled([trafficStore.initializeStore(), connectionStore.initializeStore()])
+    await Promise.allSettled([
+      trafficStore.initializeStore(),
+      connectionStore.initializeStore(),
+      templateStore.initializeStore(),
+    ])
 
     await trayStore.initTray()
 

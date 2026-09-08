@@ -40,7 +40,10 @@
                   {{ t('sub.inUse') }}
                 </n-tag>
                 <n-tag
-                  v-if="!item.isManual && (item.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES) > 0"
+                  v-if="
+                    !item.isManual &&
+                    (item.autoUpdateIntervalMinutes ?? DEFAULT_AUTO_UPDATE_MINUTES) > 0
+                  "
                   size="small"
                   round
                   :bordered="false"
@@ -53,11 +56,7 @@
                 </n-tag>
               </div>
             </div>
-            <n-dropdown
-              trigger="hover"
-              placement="bottom-end"
-              :options="getDropdownOptions(index)"
-            >
+            <n-dropdown trigger="hover" placement="bottom-end" :options="getDropdownOptions(index)">
               <n-button text class="more-btn">
                 <n-icon size="20"><EllipsisVerticalOutline /></n-icon>
               </n-button>
@@ -83,7 +82,10 @@
               <n-icon size="14"><CalendarOutline /></n-icon>
               <span class="info-text">{{ formatExpireTime(item.subscriptionExpire) }}</span>
             </div>
-            <div v-if="item.autoUpdateFailCount && item.autoUpdateFailCount > 0" class="info-row warn">
+            <div
+              v-if="item.autoUpdateFailCount && item.autoUpdateFailCount > 0"
+              class="info-row warn"
+            >
               <n-icon size="14"><AlertCircleOutline /></n-icon>
               <span class="info-text">{{ formatAutoUpdateHealth(item) }}</span>
             </div>
@@ -110,7 +112,12 @@
       </div>
 
       <!-- Empty State -->
-      <EmptyState v-else :title="t('sub.noSubs')" :description="t('sub.noSubscriptionsYet')" :icon="LinkOutline">
+      <EmptyState
+        v-else
+        :title="t('sub.noSubs')"
+        :description="t('sub.noSubscriptionsYet')"
+        :icon="LinkOutline"
+      >
         <template #action>
           <n-button type="primary" @click="showAddModal = true">
             {{ t('sub.addFirstSubscription') }}
@@ -152,7 +159,7 @@
             <p class="form-hint">{{ t('sub.urlHint') }}</p>
           </n-tab-pane>
           <n-tab-pane name="manual" :tab="t('sub.manualConfig')">
-            <n-form-item :label="t('sub.content')" path="manualContent">        
+            <n-form-item :label="t('sub.content')" path="manualContent">
               <n-input
                 v-model:value="formValue.manualContent"
                 type="textarea"
@@ -164,7 +171,7 @@
             <p class="form-hint">{{ t('sub.manualHint') }}</p>
           </n-tab-pane>
           <n-tab-pane name="uri" :tab="t('sub.uriList')">
-            <n-form-item :label="t('sub.uriContent')" path="uriContent">        
+            <n-form-item :label="t('sub.uriContent')" path="uriContent">
               <n-input
                 v-model:value="formValue.uriContent"
                 type="textarea"
@@ -180,12 +187,25 @@
         <div v-if="activeTab !== 'uri'" class="form-switch">
           <div class="switch-label">
             <span>{{ t('sub.useOriginalConfig') }}</span>
-            <span class="switch-desc">{{ formValue.useOriginalConfig ? t('sub.useOriginal') : t('sub.useExtractedNodes') }}</span>
+            <span class="switch-desc">{{
+              formValue.useOriginalConfig ? t('sub.useOriginal') : t('sub.useExtractedNodes')
+            }}</span>
           </div>
-          <n-switch v-model:value="formValue.useOriginalConfig" @update:value="markUseOriginalTouched" />
+          <n-switch
+            v-model:value="formValue.useOriginalConfig"
+            @update:value="markUseOriginalTouched"
+          />
         </div>
         <p v-if="formValue.useOriginalConfig" class="form-hint warning">
           {{ t('sub.originalConfigWarning') }}
+        </p>
+        <p v-else class="form-hint">
+          {{ t('templateMarket.willUseTemplate') }}:
+          {{
+            templateStore.isActiveOfficial
+              ? t('templateMarket.officialName')
+              : templateStore.activeTemplate?.name || '-'
+          }}
         </p>
 
         <n-form-item :label="t('sub.autoUpdate')" path="autoUpdateIntervalMinutes">
@@ -243,6 +263,7 @@
 import { ref, computed, onMounted, onUnmounted, h, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useSubStore } from '@/stores/subscription/SubStore'
+import { useTemplateStore } from '@/stores/template/TemplateStore'
 import { useAppStore } from '@/stores'
 import { subscriptionService } from '@/services/subscription-service'
 import type { SubscriptionPersistResult } from '@/services/subscription-service'
@@ -284,7 +305,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 
 defineOptions({
-  name: 'SubView'
+  name: 'SubView',
 })
 
 type Subscription = FrontendSubscription
@@ -295,6 +316,7 @@ interface SubscriptionForm extends Subscription {
 
 const message = useMessage()
 const subStore = useSubStore()
+const templateStore = useTemplateStore()
 const appStore = useAppStore()
 const { t } = useI18n()
 
@@ -340,24 +362,24 @@ const rules: FormRules = {
       required: true,
       message: t('sub.urlRequired'),
       trigger: 'blur',
-      validator: (rule, value) => activeTab.value === 'url' ? !!value : true
-    }
+      validator: (rule, value) => (activeTab.value === 'url' ? !!value : true),
+    },
   ],
   manualContent: [
     {
       required: true,
       message: t('sub.contentRequired'),
       trigger: 'blur',
-      validator: (rule, value) => activeTab.value === 'manual' ? !!value : true
-    }
+      validator: (rule, value) => (activeTab.value === 'manual' ? !!value : true),
+    },
   ],
   uriContent: [
     {
       required: true,
       message: t('sub.uriContentRequired'),
       trigger: 'blur',
-      validator: (rule, value) => activeTab.value === 'uri' ? !!value : true
-    }
+      validator: (rule, value) => (activeTab.value === 'uri' ? !!value : true),
+    },
   ],
 }
 
@@ -376,32 +398,35 @@ const getDropdownOptions = (index: number): DropdownOption[] => [
     label: t('sub.copyLink'),
     key: 'copy',
     icon: () => h('span', { class: 'icon' }, [h(CopyOutline)]),
-    props: { onClick: () => copyUrl(subStore.list[index].url) }
+    props: { onClick: () => copyUrl(subStore.list[index].url) },
   },
   {
     label: t('sub.edit'),
     key: 'edit',
     icon: () => h('span', { class: 'icon' }, [h(CreateOutline)]),
-    props: { onClick: () => handleEdit(index, subStore.list[index]) }
+    props: { onClick: () => handleEdit(index, subStore.list[index]) },
   },
   {
     label: t('sub.editConfig'),
     key: 'edit-config',
     icon: () => h('span', { class: 'icon' }, [h(CodeOutline)]),
     show: subStore.activeIndex === index,
-    props: { onClick: editCurrentConfig }
+    props: { onClick: editCurrentConfig },
   },
   {
     label: t('sub.refreshNow'),
     key: 'refresh',
     icon: () => h('span', { class: 'icon' }, [h(RefreshOutline)]),
-    props: { onClick: () => refreshSubscription(index, subStore.activeIndex === index && appStore.isRunning) }
+    props: {
+      onClick: () =>
+        refreshSubscription(index, subStore.activeIndex === index && appStore.isRunning),
+    },
   },
   {
     label: t('sub.rollback'),
     key: 'rollback',
     icon: () => h('span', { class: 'icon' }, [h(ArrowUndoOutline)]),
-    props: { onClick: () => rollbackSubscription(index) }
+    props: { onClick: () => rollbackSubscription(index) },
   },
   { type: 'divider', key: 'd1' },
   {
@@ -409,8 +434,8 @@ const getDropdownOptions = (index: number): DropdownOption[] => [
     key: 'delete',
     icon: () => h('span', { class: 'icon delete' }, [h(TrashOutline)]),
     disabled: subStore.activeIndex === index,
-    props: { onClick: () => deleteSubscription(index) }
-  }
+    props: { onClick: () => deleteSubscription(index) },
+  },
 ]
 
 const resetForm = () => {
@@ -596,15 +621,15 @@ const refreshSubscription = async (index: number, applyRuntime = false, silent =
     subStore.list[index].isLoading = true
     const savedResult = item.isManual
       ? await subscriptionService.addManualSubscription(
-        item.manualContent || '',
-        item.useOriginalConfig,
-        persistOptions,
-      )
+          item.manualContent || '',
+          item.useOriginalConfig,
+          persistOptions,
+        )
       : await subscriptionService.downloadSubscription(
-        item.url,
-        item.useOriginalConfig,
-        persistOptions,
-      )
+          item.url,
+          item.useOriginalConfig,
+          persistOptions,
+        )
 
     const savedPath = savedResult.configPath
     if (savedPath) {
@@ -625,7 +650,6 @@ const refreshSubscription = async (index: number, applyRuntime = false, silent =
     if (!silent) {
       message.success(applyRuntime ? t('sub.refreshAndApplied') : t('sub.refreshSuccess'))
     }
-
   } catch (error) {
     message.error(t('sub.refreshFailed') + error)
   } finally {
@@ -729,7 +753,10 @@ const formatTime = (timestamp: number): string => formatLocalTime(timestamp)
 const formatAutoUpdateHealth = (item: Subscription) => formatAutoUpdateHealthText(item, t)
 
 const regenerateConfigFor = async (item: Subscription) => {
-  const persistOptions = { fileName: generateConfigFileName(item.name || 'sub'), applyRuntime: false }
+  const persistOptions = {
+    fileName: generateConfigFileName(item.name || 'sub'),
+    applyRuntime: false,
+  }
   if (item.isManual) {
     const content = item.manualContent?.trim() ?? ''
     if (!content) {
@@ -813,7 +840,6 @@ onMounted(() => {
 onUnmounted(() => {
   stopAutoUpdateLoop()
 })
-
 </script>
 
 <style scoped>
@@ -850,7 +876,9 @@ onUnmounted(() => {
 
 .sub-card.active {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 1px var(--primary-color), var(--shadow-md);
+  box-shadow:
+    0 0 0 1px var(--primary-color),
+    var(--shadow-md);
 }
 
 .sub-card-header {

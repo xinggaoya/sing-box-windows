@@ -42,6 +42,7 @@ import {
   useKernelStore,
   useUpdateStore,
   useSubStore,
+  useTemplateStore,
   useTrafficStore,
   useConnectionStore,
   useLogStore,
@@ -67,6 +68,7 @@ const appStore = useAppStore()
 const localeStore = useLocaleStore()
 const windowStore = useWindowStore()
 const subStore = useSubStore()
+const templateStore = useTemplateStore()
 const kernelStore = useKernelStore()
 const updateStore = useUpdateStore()
 const trafficStore = useTrafficStore()
@@ -128,12 +130,15 @@ const mapKernelFailureCodeToMessage = (code: string, fallback: string) => {
   return te(key) ? t(key) : fallback
 }
 
-const normalizeKernelFailurePayload = (payload: KernelFailurePayload | unknown): NormalizedKernelFailure => {
+const normalizeKernelFailurePayload = (
+  payload: KernelFailurePayload | unknown,
+): NormalizedKernelFailure => {
   const typed = payload && typeof payload === 'object' ? (payload as KernelFailurePayload) : {}
   const code = typed.code || 'KERNEL_RUNTIME_ERROR'
   const rawMessage = extractKernelErrorMessage(payload)
   const details = typed.details || rawMessage
-  const baseMessage = typed.message || rawMessage || t('notification.kernelErrors.KERNEL_RUNTIME_ERROR')
+  const baseMessage =
+    typed.message || rawMessage || t('notification.kernelErrors.KERNEL_RUNTIME_ERROR')
   const userMessage = mapKernelFailureCodeToMessage(code, baseMessage)
   const source = typed.source || 'kernel'
   const recoverable = typed.recoverable === true
@@ -144,8 +149,10 @@ const normalizeKernelFailurePayload = (payload: KernelFailurePayload | unknown):
 const normalizeKernelOperationFailedPayload = (
   payload: KernelOperationFailedPayload | unknown,
 ): NormalizedKernelFailure => {
-  const typed = payload && typeof payload === 'object' ? (payload as KernelOperationFailedPayload) : {}
-  const details = extractKernelErrorMessage(payload) || t('notification.kernelErrors.KERNEL_RUNTIME_ERROR')
+  const typed =
+    payload && typeof payload === 'object' ? (payload as KernelOperationFailedPayload) : {}
+  const details =
+    extractKernelErrorMessage(payload) || t('notification.kernelErrors.KERNEL_RUNTIME_ERROR')
   const operation = typed.operation || 'kernel.operation'
   const userMessage = t('notification.kernelErrors.KERNEL_OPERATION_FAILED', { operation })
   return {
@@ -198,6 +205,7 @@ onMounted(async () => {
         localeStore,
         windowStore,
         subStore,
+        templateStore,
         kernelStore,
         updateStore,
         trafficStore,
@@ -233,7 +241,7 @@ onMounted(async () => {
 
           // 提示原因：密码缺失/失效
           appStore.showWarningMessage?.(
-            code === 'invalid' ? t('home.sudoPassword.invalid') : t('home.sudoPassword.required')
+            code === 'invalid' ? t('home.sudoPassword.invalid') : t('home.sudoPassword.required'),
           )
 
           const ok = await sudoStore.requestPassword()
@@ -272,8 +280,7 @@ onMounted(async () => {
           payload && typeof payload === 'object' && 'message' in payload
             ? String((payload as { message?: unknown }).message ?? '')
             : ''
-        const fallback =
-          '应用升级后自动刷新当前订阅失败，请在订阅页手动点击“立即更新配置”。'
+        const fallback = '应用升级后自动刷新当前订阅失败，请在订阅页手动点击“立即更新配置”。'
         appStore.showWarningMessage?.(messageText || fallback)
       },
     )
@@ -297,7 +304,6 @@ function cleanup() {
 onBeforeUnmount(() => {
   cleanup()
 })
-
 </script>
 
 <style>

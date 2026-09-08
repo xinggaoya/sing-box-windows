@@ -30,6 +30,11 @@ const router = createRouter({
           component: () => import('@/views/SubView.vue'),
         },
         {
+          path: '/template-market',
+          name: 'TemplateMarket',
+          component: () => import('@/views/TemplateMarketView.vue'),
+        },
+        {
           path: '/proxy',
           name: 'Proxy',
           component: () => import('@/views/ProxyView.vue'),

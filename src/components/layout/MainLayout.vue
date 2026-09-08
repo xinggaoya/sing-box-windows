@@ -74,6 +74,7 @@ import {
   DocumentTextOutline,
   SettingsOutline,
   FolderOutline,
+  CloudDownloadOutline,
 } from '@vicons/ionicons5'
 import { useMessage } from 'naive-ui'
 import mitt from 'mitt'
@@ -151,6 +152,7 @@ const currentMenu = computed(() => {
     '/connections': 'connections',
     '/proxy': 'proxy',
     '/rules': 'rules',
+    '/template-market': 'templateMarket',
   }
   return pathToMenuMap[path] || path.slice(1)
 })
@@ -158,6 +160,7 @@ const currentMenu = computed(() => {
 const menuItems = computed<NavItem[]>(() => [
   { label: t('nav.home'), key: 'home', icon: HomeOutline },
   { label: t('nav.subscription'), key: 'subscription', icon: FolderOutline },
+  { label: t('nav.templateMarket'), key: 'templateMarket', icon: CloudDownloadOutline },
   { label: t('nav.proxy'), key: 'proxy', icon: SwapHorizontalOutline },
   { label: t('nav.connections'), key: 'connections', icon: LinkOutline },
   { label: t('nav.logs'), key: 'logs', icon: DocumentTextOutline },
@@ -178,6 +181,7 @@ const onSelect = (key: string) => {
       connections: '/connections',
       proxy: '/proxy',
       rules: '/rules',
+      templateMarket: '/template-market',
     }
     router.push(routeMap[key] || `/${key}`)
   }
