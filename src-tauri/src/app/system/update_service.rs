@@ -596,27 +596,26 @@ pub async fn get_detailed_platform_info() -> Result<PlatformDetailedInfo, String
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct PlatformDetailedInfo {
     pub os: String,           // 操作系统：windows, linux, macos
-    pub arch: String,         // 架构：x86_64, aarch64, etc.
+    pub arch: String,         // 架构：amd64, arm64, etc.
     pub display_name: String, // 显示名称：Windows x64, macOS ARM64 等
 }
 
 impl PlatformDetailedInfo {
     pub fn current() -> Self {
         let os = env::consts::OS.to_string();
-        let arch = env::consts::ARCH.to_string();
+        let arch = crate::platform::get_system_arch().to_string();
 
         // 生成友好的显示名称
         let display_name = match (os.as_str(), arch.as_str()) {
-            ("windows", "x86_64") => "Windows x64".to_string(),
-            ("windows", "x86") => "Windows x86".to_string(),
-            ("windows", "aarch64") => "Windows ARM64".to_string(),
-            ("linux", "x86_64") => "Linux x64".to_string(),
-            ("linux", "x86") => "Linux x86".to_string(),
-            ("linux", "aarch64") => "Linux ARM64".to_string(),
-            ("linux", "arm") => "Linux ARM".to_string(),
-            ("macos", "x86_64") => "macOS Intel".to_string(),
-            ("macos", "aarch64") => "macOS Apple Silicon".to_string(),
-            ("macos", "arm") => "macOS ARM".to_string(),
+            ("windows", "amd64") => "Windows x64".to_string(),
+            ("windows", "386") => "Windows x86".to_string(),
+            ("windows", "arm64") => "Windows ARM64".to_string(),
+            ("linux", "amd64") => "Linux x64".to_string(),
+            ("linux", "386") => "Linux x86".to_string(),
+            ("linux", "arm64") => "Linux ARM64".to_string(),
+            ("linux", "armv5") => "Linux ARM".to_string(),
+            ("macos", "amd64") => "macOS Intel".to_string(),
+            ("macos", "arm64") => "macOS Apple Silicon".to_string(),
             _ => format!("{} ({})", os, arch),
         };
 

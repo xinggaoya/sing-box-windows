@@ -103,6 +103,22 @@ pub fn platform_kill_process_by_pid(pid: u32) -> Result<(), String> {
 
 /// 获取系统架构（Windows）
 pub fn platform_get_system_arch() -> &'static str {
+    // x64 应用在 Windows ARM 上运行时，编译目标仍是 x86_64，需要读取宿主架构。
+    let native_arch = std::env::var("PROCESSOR_ARCHITEW6432")
+        .ok()
+        .or_else(|| std::env::var("PROCESSOR_ARCHITECTURE").ok());
+    if let Some(arch) = native_arch.as_deref() {
+        if arch.eq_ignore_ascii_case("arm64") || arch.eq_ignore_ascii_case("aarch64") {
+            return "arm64";
+        }
+        if arch.eq_ignore_ascii_case("amd64") || arch.eq_ignore_ascii_case("x86_64") {
+            return "amd64";
+        }
+        if arch.eq_ignore_ascii_case("x86") || arch.eq_ignore_ascii_case("i386") {
+            return "386";
+        }
+    }
+
     match std::env::consts::ARCH {
         "x86_64" => "amd64",
         "x86" => "386",

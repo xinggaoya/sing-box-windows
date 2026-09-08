@@ -304,12 +304,7 @@ pub(super) fn get_system_arch() -> &'static str {
     info!("Rust ARCH 常量: {}", std::env::consts::ARCH);
 
     if cfg!(target_os = "windows") {
-        match std::env::consts::ARCH {
-            "x86_64" => "amd64",
-            "x86" => "386",
-            "aarch64" => "arm64",
-            _ => "amd64",
-        }
+        crate::platform::get_system_arch()
     } else if cfg!(target_os = "linux") {
         let mut detected_arch = "amd64";
 
