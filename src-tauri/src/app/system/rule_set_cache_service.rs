@@ -26,7 +26,10 @@ pub fn init_cache_dir(app_handle: &AppHandle) -> Option<PathBuf> {
     }
     let dir = app_handle.path().app_data_dir().ok()?.join("rule-sets");
     if let Err(e) = std::fs::create_dir_all(&dir) {
-        warn!("创建 rule-set 缓存目录失败: {}（本次启动不写 initial_path）", e);
+        warn!(
+            "创建 rule-set 缓存目录失败: {}（本次启动不写 initial_path）",
+            e
+        );
         return None;
     }
     let _ = CACHE_DIR.set(dir.clone());
@@ -90,7 +93,11 @@ async fn warm_rule_set_cache(app_handle: &AppHandle) -> Result<(), String> {
                 }
                 Err(e) => warn!("下载 rule-set 失败 ({}): {}", source.tag, e),
             },
-            Ok(resp) => warn!("下载 rule-set 失败 ({}): HTTP {}", source.tag, resp.status()),
+            Ok(resp) => warn!(
+                "下载 rule-set 失败 ({}): HTTP {}",
+                source.tag,
+                resp.status()
+            ),
             Err(e) => warn!("下载 rule-set 失败 ({}): {}", source.tag, e),
         }
     }

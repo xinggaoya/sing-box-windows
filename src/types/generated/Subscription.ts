@@ -6,6 +6,8 @@ export interface Subscription {
   is_manual: boolean
   manual_content: string | null
   use_original_config: boolean
+  /** 该订阅配置是否由"在线模板"生成（设置同步仅对齐端口） */
+  config_from_template?: boolean
   config_path?: string
   backup_path?: string
   auto_update_interval_minutes?: number

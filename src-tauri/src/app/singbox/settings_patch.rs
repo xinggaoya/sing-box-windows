@@ -148,6 +148,47 @@ pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
     }
 }
 
+/// 在线模板生成的配置兜底：确保 gRPC api 服务、mixed 入站与内核日志输出存在，
+/// 让前端状态链路与系统代理在第三方模板下依然可用（均只在缺失时补齐，不覆盖模板自身结构）。
+pub fn ensure_template_runtime_compat(config: &mut Value, app_config: &AppConfig) {
+    if let Some(config_obj) = config.as_object_mut() {
+        ensure_kernel_log_output(config_obj);
+        ensure_mixed_inbound(config_obj, app_config);
+        ensure_api_service(config_obj, app_config);
+    }
+}
+
+/// 模板完全没有 mixed 入站时补一个（有则保留模板自己的入站，端口由 apply_port_settings_only 对齐）。
+fn ensure_mixed_inbound(config_obj: &mut Map<String, Value>, app_config: &AppConfig) {
+    let has_mixed = config_obj
+        .get("inbounds")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .any(|inbound| inbound.get("type").and_then(|v| v.as_str()) == Some("mixed"))
+        })
+        .unwrap_or(false);
+    if has_mixed {
+        return;
+    }
+
+    let inbounds = config_obj
+        .entry("inbounds".to_string())
+        .or_insert(json!([]));
+    if let Some(arr) = inbounds.as_array_mut() {
+        arr.insert(
+            0,
+            json!({
+                "type": "mixed",
+                "tag": "mixed-in",
+                "listen": proxy_listen_address(app_config),
+                "listen_port": app_config.proxy_port,
+                "set_system_proxy": app_config.system_proxy_enabled
+            }),
+        );
+    }
+}
+
 fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_config: &AppConfig) {
     let default_outbound = normalize_default_outbound(app_config);
     let mut fake_dns_route_cleanup_pairs = vec![
@@ -618,10 +659,7 @@ fn ensure_sniff_route_rule(rules: &mut Vec<Value>) -> usize {
 
 /// 确保 `services` 数组存在且包含 1.14 gRPC api 服务（形状与 config_generator 注入的
 /// 保持一致），已有 api 服务时同步端口 / dashboard 开关。
-fn ensure_api_service(
-    config_obj: &mut serde_json::Map<String, Value>,
-    app_config: &AppConfig,
-) {
+fn ensure_api_service(config_obj: &mut serde_json::Map<String, Value>, app_config: &AppConfig) {
     let mut api_service = json!({
         "type": "api",
         "listen": "127.0.0.1",

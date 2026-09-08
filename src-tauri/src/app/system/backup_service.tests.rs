@@ -10,6 +10,7 @@ fn build_subscription(path: &str) -> Subscription {
         is_manual: false,
         manual_content: None,
         use_original_config: false,
+        config_from_template: false,
         config_path: Some(path.to_string()),
         backup_path: None,
         auto_update_interval_minutes: Some(720),

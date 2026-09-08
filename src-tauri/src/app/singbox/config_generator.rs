@@ -10,7 +10,9 @@ use super::config_schema::{
     CacheFileConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, HttpClientConfig, LogConfig,
     RemoteRuleSetConfig, RouteConfig, SingBoxConfig,
 };
-use crate::app::singbox::settings_patch::apply_app_settings_to_config;
+use crate::app::singbox::settings_patch::{
+    apply_app_settings_to_config, apply_port_settings_only, ensure_template_runtime_compat,
+};
 use crate::app::storage::state_model::AppConfig;
 use serde_json::{json, Value};
 // 兼容旧引用：这些 tag 之前是 `config_generator` 的 `pub const`，保留同名导出以降低未来重构的破坏性。
@@ -133,9 +135,11 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     let rule_sets = remote_rule_set_sources(app_config)
         .iter()
         .map(|source| {
-            let initial_path = rule_set_cache_dir
-                .as_ref()
-                .map(|dir| dir.join(format!("{}.srs", source.tag)).to_string_lossy().to_string());
+            let initial_path = rule_set_cache_dir.as_ref().map(|dir| {
+                dir.join(format!("{}.srs", source.tag))
+                    .to_string_lossy()
+                    .to_string()
+            });
             let http_client = (download_via_manual && source.direct_detour)
                 .then(|| "direct-download".to_string());
             remote_rule_set_value(source, initial_path, http_client)
@@ -212,9 +216,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             servers: build_dns_servers(app_config, default_outbound),
             rules: dns_rules,
             // 1.14 启用乐观 DNS 缓存：重复查询命中过期缓存立即返回 + 后台刷新，降低尾延迟
-            optimistic: app_config
-                .singbox_dns_optimistic_cache
-                .then_some(true),
+            optimistic: app_config.singbox_dns_optimistic_cache.then_some(true),
             // per-query / per-server DNS 超时（1.14 新增）；为空时不写入
             timeout: (!app_config.singbox_dns_timeout.is_empty())
                 .then(|| app_config.singbox_dns_timeout.clone()),
@@ -583,10 +585,81 @@ pub fn generate_config_with_nodes(
     Ok(config)
 }
 
+/// 模板中占位节点的标记：模板作者把它作为字符串元素放进 `outbounds` 数组，
+/// 生成时会被替换为订阅节点（保持作者安排的位置与顺序）。
+pub const NODES_PLACEHOLDER: &str = "{{NODES}}";
+
+/// 在线模板生成：解析模板 JSON → 注入订阅节点（优先 `{{NODES}}` 占位符定位）→
+/// 补齐运行时必需块（api 服务 / mixed 入站 / 日志）→ 对齐端口。
+///
+/// 模板自带 DNS/分组/规则语义；`singbox_*` 高级选项不参与模板路径。
+pub fn generate_config_from_template(
+    template_content: &str,
+    app_config: &AppConfig,
+    nodes: &[Value],
+) -> Result<Value, String> {
+    let mut config = parse_template_config(template_content)?;
+
+    let placeholder_pos = take_nodes_placeholder(&mut config)?;
+    match placeholder_pos {
+        Some(pos) => {
+            inject_nodes_impl(&mut config, app_config, nodes, NodeInsertPosition::At(pos))?
+        }
+        None => inject_nodes_impl(&mut config, app_config, nodes, NodeInsertPosition::Append)?,
+    }
+
+    ensure_template_runtime_compat(&mut config, app_config);
+    apply_port_settings_only(&mut config, app_config);
+    Ok(config)
+}
+
+fn parse_template_config(template_content: &str) -> Result<Value, String> {
+    let trimmed = template_content.trim();
+    if trimmed.is_empty() {
+        return Err("模板内容为空".to_string());
+    }
+    let value: Value =
+        serde_json::from_str(trimmed).map_err(|e| format!("模板不是合法 JSON: {e}"))?;
+    if !value.is_object() {
+        return Err("模板内容必须是 JSON 对象".to_string());
+    }
+    Ok(value)
+}
+
+/// 移除 `outbounds` 中的 `{{NODES}}` 字符串占位符，返回其所在位置（未找到返回 None）。
+fn take_nodes_placeholder(config: &mut Value) -> Result<Option<usize>, String> {
+    let Some(outbounds) = config.get_mut("outbounds").and_then(|v| v.as_array_mut()) else {
+        return Ok(None);
+    };
+    let Some(pos) = outbounds
+        .iter()
+        .position(|ob| ob.as_str() == Some(NODES_PLACEHOLDER))
+    else {
+        return Ok(None);
+    };
+    outbounds.remove(pos);
+    Ok(Some(pos))
+}
+
 pub fn inject_nodes(
     config: &mut Value,
     app_config: &AppConfig,
     nodes: &[Value],
+) -> Result<(), String> {
+    inject_nodes_impl(config, app_config, nodes, NodeInsertPosition::Append)
+}
+
+/// 节点在 outbounds 中的插入位置。
+enum NodeInsertPosition {
+    Append,
+    At(usize),
+}
+
+fn inject_nodes_impl(
+    config: &mut Value,
+    app_config: &AppConfig,
+    nodes: &[Value],
+    position: NodeInsertPosition,
 ) -> Result<(), String> {
     let outbounds = ensure_outbounds_array(config)?;
 
@@ -687,9 +760,15 @@ pub fn inject_nodes(
     ensure_urltest_and_selector(outbounds, &group_node_tags)?;
     ensure_app_group_selectors(outbounds, &group_node_tags)?;
 
-    // 追加节点出站
-    for node in normalized_nodes {
-        outbounds.push(node);
+    // 追加/插入节点出站
+    match position {
+        NodeInsertPosition::Append => outbounds.extend(normalized_nodes),
+        NodeInsertPosition::At(pos) => {
+            let pos = pos.min(outbounds.len());
+            for (offset, node) in normalized_nodes.into_iter().enumerate() {
+                outbounds.insert(pos + offset, node);
+            }
+        }
     }
 
     Ok(())

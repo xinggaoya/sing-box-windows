@@ -68,8 +68,7 @@ impl StartupDiagnosisKind {
             StartupDiagnosisKind::SudoRequired
             | StartupDiagnosisKind::SudoInvalid
             | StartupDiagnosisKind::PermissionDenied => 70,
-            StartupDiagnosisKind::PortConflict
-            | StartupDiagnosisKind::ConflictCleanupFailed => 60,
+            StartupDiagnosisKind::PortConflict | StartupDiagnosisKind::ConflictCleanupFailed => 60,
             StartupDiagnosisKind::ProcessExitedEarly => 50,
             StartupDiagnosisKind::ApiHttpError | StartupDiagnosisKind::ApiTimeout => 40,
             StartupDiagnosisKind::GuardRestartFailed => 30,
@@ -342,9 +341,7 @@ impl KernelStateManager {
     pub fn record_startup_diagnosis(&self, diagnosis: StartupDiagnosis) {
         if let Ok(mut guard) = self.startup_diagnosis.write() {
             match guard.as_ref() {
-                None => {
-                    *guard = Some(diagnosis)
-                }
+                None => *guard = Some(diagnosis),
                 Some(existing) if existing.attempt_id != diagnosis.attempt_id => {
                     *guard = Some(diagnosis)
                 }
@@ -376,11 +373,7 @@ impl KernelStateManager {
     pub fn get_restart_stats(&self) -> RestartStats {
         RestartStats {
             restart_count: self.restart_count.load(Ordering::SeqCst),
-            last_restart_reason: self
-                .last_restart_reason
-                .read()
-                .ok()
-                .and_then(|g| g.clone()),
+            last_restart_reason: self.last_restart_reason.read().ok().and_then(|g| g.clone()),
             last_restart_at: self.last_restart_at.read().ok().and_then(|g| *g),
         }
     }

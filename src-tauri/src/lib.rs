@@ -202,6 +202,22 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Template marketplace commands (在线模板市场)
+            crate::app::template_marketplace::commands::get_config_templates,
+            crate::app::template_marketplace::commands::save_config_template,
+            crate::app::template_marketplace::commands::delete_config_template,
+            crate::app::template_marketplace::commands::get_template_market_settings,
+            crate::app::template_marketplace::commands::set_template_market_settings,
+            crate::app::template_marketplace::commands::set_active_template,
+            crate::app::template_marketplace::commands::export_official_template,
+            crate::app::template_marketplace::commands::market_check_service,
+            crate::app::template_marketplace::commands::market_list_templates,
+            crate::app::template_marketplace::commands::market_get_template_detail,
+            crate::app::template_marketplace::commands::market_publish_template,
+            crate::app::template_marketplace::commands::market_update_template,
+            crate::app::template_marketplace::commands::market_delete_template,
+            crate::app::template_marketplace::commands::market_download_template,
+            crate::app::template_marketplace::commands::market_refresh_my_templates,
             // Enhanced Storage service commands (数据库)
             crate::app::storage::enhanced_storage_service::db_get_app_config,
             crate::app::storage::enhanced_storage_service::db_save_app_config,

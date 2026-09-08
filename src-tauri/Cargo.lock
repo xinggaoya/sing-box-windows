@@ -4271,6 +4271,7 @@ dependencies = [
  "ts-rs",
  "url",
  "urlencoding",
+ "uuid",
  "walkdir",
  "which",
  "winreg 0.52.0",

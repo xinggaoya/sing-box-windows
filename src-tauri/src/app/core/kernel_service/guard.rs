@@ -4,7 +4,9 @@ use crate::app::core::kernel_service::runtime::{
 };
 use crate::app::core::kernel_service::state::KERNEL_STATE;
 use crate::app::core::kernel_service::status::is_kernel_running;
-use crate::app::core::kernel_service::utils::{emit_kernel_error_with_context, emit_kernel_stopped};
+use crate::app::core::kernel_service::utils::{
+    emit_kernel_error_with_context, emit_kernel_stopped,
+};
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::time::Duration;
@@ -190,9 +192,8 @@ fn spawn_guard_loop(app_handle: AppHandle) -> JoinHandle<()> {
 
             // 周期性检查内核日志大小并滚动，避免长期运行无限增长（不只在启动时滚动一次）。
             if last_log_rotation_at.elapsed() >= Duration::from_secs(LOG_ROTATION_INTERVAL_SECS) {
-                let log_path = std::path::PathBuf::from(
-                    crate::app::singbox::common::kernel_log_output_path(),
-                );
+                let log_path =
+                    std::path::PathBuf::from(crate::app::singbox::common::kernel_log_output_path());
                 log_rotation::rotate_if_needed(&log_path);
                 last_log_rotation_at = Instant::now();
             }
@@ -209,8 +210,10 @@ fn spawn_guard_loop(app_handle: AppHandle) -> JoinHandle<()> {
                     }
 
                     let mut should_attempt_self_heal = false;
-                    match crate::app::system::system_service::check_network_connectivity(Some(false))
-                        .await
+                    match crate::app::system::system_service::check_network_connectivity(Some(
+                        false,
+                    ))
+                    .await
                     {
                         Ok(true) => {
                             if connectivity_failures > 0 {
@@ -247,7 +250,8 @@ fn spawn_guard_loop(app_handle: AppHandle) -> JoinHandle<()> {
                         let succeeded = heal_restart(&app_handle, mode_label).await;
                         // 复位计数与冷却；无论成败都进入冷却窗口避免抖动。
                         connectivity_failures = 0;
-                        next_self_heal_at = Instant::now() + Duration::from_secs(policy.cooldown_secs);
+                        next_self_heal_at =
+                            Instant::now() + Duration::from_secs(policy.cooldown_secs);
                         if !succeeded {
                             // heal_restart 内部已标记 failed 并上报错误，此处不额外处理。
                             // 若是 sudo 失效等不可恢复错误，停止守护避免无意义重试。

@@ -14,6 +14,7 @@ use crate::app::storage::enhanced_storage_service::{
     db_save_app_config_internal, db_save_subscriptions,
 };
 use crate::app::storage::state_model::AppConfig;
+use crate::app::template_marketplace;
 use crate::utils::http_client;
 use base64::{engine::general_purpose, Engine as _};
 use helpers::{backup_existing_config, resolve_target_config_path, runtime_state_from_config};
@@ -99,13 +100,12 @@ struct SubscriptionFetchResult {
 const SUBSCRIPTION_USERINFO_COMPAT_UAS: [&str; 2] = ["clash.meta", "clash-verge/1.7.7"];
 
 fn normalized_active_config_path(path: &Option<String>) -> Option<&str> {
-    path.as_deref().map(str::trim).filter(|value| !value.is_empty())
+    path.as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
 }
 
-fn active_config_change_requires_restart(
-    previous: &Option<String>,
-    next: &Option<String>,
-) -> bool {
+fn active_config_change_requires_restart(previous: &Option<String>, next: &Option<String>) -> bool {
     normalized_active_config_path(previous) != normalized_active_config_path(next)
 }
 
@@ -293,6 +293,28 @@ async fn update_subscription_userinfo(
     Ok(())
 }
 
+/// 标记订阅配置的生成方式（在线模板 / 官方骨架）。
+/// 设置变更同步时据此选择 patch 模式：模板配置仅对齐端口，避免覆盖模板自身的 DNS/分组语义。
+async fn set_subscription_config_source(
+    app_handle: &AppHandle,
+    target_path: &Path,
+    config_from_template: bool,
+) -> Result<(), String> {
+    let mut subscriptions = db_get_subscriptions(app_handle.clone()).await?;
+    let target = target_path.to_string_lossy().to_string();
+    let mut updated = false;
+    for sub in subscriptions.iter_mut() {
+        if sub.config_path.as_deref() == Some(target.as_str()) {
+            sub.config_from_template = config_from_template;
+            updated = true;
+        }
+    }
+    if updated {
+        db_save_subscriptions(subscriptions, app_handle.clone()).await?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)] // Tauri 接口需与前端参数保持一致
 pub async fn download_subscription(
@@ -321,7 +343,7 @@ pub async fn download_subscription(
 
     let target_path = resolve_target_config_path(file_name, config_path)?;
     let trimmed_url = url.trim();
-    let (userinfo, validation_outcome) = download_and_process_subscription(
+    let (userinfo, validation_outcome, used_template) = download_and_process_subscription(
         trimmed_url,
         use_original_config,
         app_handle,
@@ -331,11 +353,14 @@ pub async fn download_subscription(
     .await
     .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
 
+    // 原始配置或在线模板生成的配置：设置同步只对齐端口，不用官方高级选项覆盖
+    let ports_only_hint = use_original_config || used_template;
+
     if apply_runtime {
         if let Err(e) = set_active_config_path(
             app_handle.clone(),
             Some(target_path.to_string_lossy().to_string()),
-            Some(use_original_config),
+            Some(ports_only_hint),
         )
         .await
         {
@@ -347,6 +372,10 @@ pub async fn download_subscription(
             warn!("应用代理配置失败: {}", e);
         }
         auto_manage_with_saved_config(app_handle, true, "subscription-download").await;
+    }
+
+    if let Err(e) = set_subscription_config_source(app_handle, &target_path, used_template).await {
+        warn!("标记订阅配置来源失败: {}", e);
     }
 
     if let Err(e) =
@@ -396,20 +425,24 @@ pub async fn add_manual_subscription(
 
     let target_path = resolve_target_config_path(file_name, config_path)?;
 
-    let validation_outcome = process_subscription_content(
+    let (validation_outcome, used_template) = process_subscription_content(
         content,
         use_original_config,
         app_handle,
         &app_config,
         &target_path,
     )
+    .await
     .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
+
+    // 原始配置或在线模板生成的配置：设置同步只对齐端口，不用官方高级选项覆盖
+    let ports_only_hint = use_original_config || used_template;
 
     if apply_runtime {
         if let Err(e) = set_active_config_path(
             app_handle.clone(),
             Some(target_path.to_string_lossy().to_string()),
-            Some(use_original_config),
+            Some(ports_only_hint),
         )
         .await
         {
@@ -421,6 +454,10 @@ pub async fn add_manual_subscription(
             warn!("应用代理配置失败: {}", e);
         }
         auto_manage_with_saved_config(app_handle, true, "subscription-manual").await;
+    }
+
+    if let Err(e) = set_subscription_config_source(app_handle, &target_path, used_template).await {
+        warn!("标记订阅配置来源失败: {}", e);
     }
 
     let (validated, validation_skip_reason) = summarize_validation(&validation_outcome);
@@ -533,10 +570,10 @@ pub async fn get_current_proxy_mode(app_handle: AppHandle) -> Result<String, Str
 async fn download_and_process_subscription(
     url: &str,
     use_original_config: bool,
-    _app_handle: &AppHandle,
+    app_handle: &AppHandle,
     app_config: &AppConfig,
     target_path: &Path,
-) -> Result<(Option<SubscriptionUserInfo>, ValidationOutcome), Box<dyn Error>> {
+) -> Result<(Option<SubscriptionUserInfo>, ValidationOutcome, bool), Box<dyn Error>> {
     let work_dir = crate::utils::app_util::get_work_dir_sync();
     let sing_box_dir = Path::new(&work_dir).join("sing-box");
 
@@ -560,7 +597,7 @@ async fn download_and_process_subscription(
     if use_original_config {
         info!("使用原始订阅内容，仅修改必要的端口和地址");
         let outcome = process_original_config(&response_text, app_config, target_path)?;
-        return Ok((userinfo, outcome));
+        return Ok((userinfo, outcome, false));
     }
 
     let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
@@ -619,9 +656,25 @@ async fn download_and_process_subscription(
         error!("{}: {}", messages::ERR_CREATE_DIR_FAILED, e);
     }
 
-    // 不再读取/替换模板文件：直接根据 AppConfig 生成一份通用配置骨架，然后注入订阅节点。
-    let config = config_generator::generate_config_with_nodes(app_config, &extracted_nodes)
-        .map_err(|e| format!("生成配置失败: {}", e))?;
+    // 生成配置：激活在线模板时用模板内容（{{NODES}} 占位符定位/节点注入），否则用官方骨架。
+    let active_template =
+        template_marketplace::local_store::load_active_template_content(app_handle).await?;
+    let used_template = active_template.is_some();
+    let config = match active_template.as_deref() {
+        Some(template_content) => config_generator::generate_config_from_template(
+            template_content,
+            app_config,
+            &extracted_nodes,
+        ),
+        None => config_generator::generate_config_with_nodes(app_config, &extracted_nodes),
+    }
+    .map_err(|e| {
+        if used_template {
+            format!("使用在线模板生成配置失败: {e}")
+        } else {
+            format!("生成配置失败: {e}")
+        }
+    })?;
 
     info!("正在保存配置到: {:?}", target_path);
 
@@ -647,19 +700,22 @@ async fn download_and_process_subscription(
         target_path, outcome
     );
     info!("订阅已更新并应用到模板，配置已保存");
-    Ok((userinfo, outcome))
+    Ok((userinfo, outcome, used_template))
 }
 
-fn process_subscription_content(
+async fn process_subscription_content(
     content: String,
     use_original_config: bool,
-    _app_handle: &AppHandle,
+    app_handle: &AppHandle,
     app_config: &AppConfig,
     target_path: &Path,
-) -> Result<ValidationOutcome, Box<dyn Error>> {
+) -> Result<(ValidationOutcome, bool), Box<dyn Error>> {
     if use_original_config {
         info!("使用原始配置内容，仅调整端口和地址");
-        return process_original_config(&content, app_config, target_path);
+        return Ok((
+            process_original_config(&content, app_config, target_path)?,
+            false,
+        ));
     }
 
     let mut extracted_nodes = extract_nodes_from_subscription(&content)?;
@@ -678,8 +734,24 @@ fn process_subscription_content(
     }
 
     // 手动输入的订阅内容（URI/节点列表等）同样走“生成骨架 + 注入节点”的路径。
-    let config = config_generator::generate_config_with_nodes(app_config, &extracted_nodes)
-        .map_err(|e| format!("生成配置失败: {}", e))?;
+    let active_template =
+        template_marketplace::local_store::load_active_template_content(app_handle).await?;
+    let used_template = active_template.is_some();
+    let config = match active_template.as_deref() {
+        Some(template_content) => config_generator::generate_config_from_template(
+            template_content,
+            app_config,
+            &extracted_nodes,
+        ),
+        None => config_generator::generate_config_with_nodes(app_config, &extracted_nodes),
+    }
+    .map_err(|e| {
+        if used_template {
+            format!("使用在线模板生成配置失败: {e}")
+        } else {
+            format!("生成配置失败: {e}")
+        }
+    })?;
 
     info!("正在保存手动配置到: {:?}", target_path);
 
@@ -697,7 +769,7 @@ fn process_subscription_content(
         "手动配置已写入 {:?}（校验结果: {:?}）",
         target_path, outcome
     );
-    Ok(outcome)
+    Ok((outcome, used_template))
 }
 
 fn process_original_config(

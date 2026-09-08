@@ -751,10 +751,7 @@ fn parse_string_array_column(raw: Option<String>) -> Vec<String> {
     match serde_json::from_str::<Vec<String>>(&raw) {
         Ok(values) => values,
         Err(error) => {
-            tracing::warn!(
-                "检测到无效的字符串数组 JSON，已回退为空数组: {}",
-                error
-            );
+            tracing::warn!("检测到无效的字符串数组 JSON，已回退为空数组: {}", error);
             Vec::new()
         }
     }

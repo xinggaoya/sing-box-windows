@@ -316,7 +316,10 @@ mod tests {
         };
         let profile = TunProfile::from_options(&options, None);
 
-        assert_eq!(profile.route_exclude_address, vec!["198.51.100.0/24".to_string()]);
+        assert_eq!(
+            profile.route_exclude_address,
+            vec!["198.51.100.0/24".to_string()]
+        );
     }
 
     #[test]

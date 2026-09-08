@@ -320,7 +320,7 @@ fn is_supported_outbound_type(node_type: &str) -> bool {
             | "anytls"
             | "snell"      // sing-box 1.14 新增
             | "wireguard"  // 1.13 已有但此前未识别
-            | "tailscale"  // 1.14 endpoint（独立协议）
+            | "tailscale" // 1.14 endpoint（独立协议）
     )
 }
 
@@ -328,10 +328,7 @@ fn is_supported_outbound_type(node_type: &str) -> bool {
 ///
 /// 统一处理 sni/skip-cert-verify/alpn 字段映射，避免在多个分支重复样板代码。
 fn build_tls_from_clash(clash_node: &Value, server: &str) -> Value {
-    let sni = clash_node
-        .get("sni")
-        .and_then(|s| s.as_str())
-        .unwrap_or("");
+    let sni = clash_node.get("sni").and_then(|s| s.as_str()).unwrap_or("");
     let (insecure, alpn) = read_clash_tls_flags(clash_node);
     let mut tls = build_basic_tls_config(server, sni, insecure, None);
     if let Some(alpn_value) = alpn {
@@ -379,7 +376,11 @@ fn read_clash_tls_flags(clash_node: &Value) -> (bool, Option<Value>) {
                 .iter()
                 .filter_map(|v| v.as_str().map(|s| Value::String(s.to_string())))
                 .collect();
-            if list.is_empty() { None } else { Some(Value::Array(list)) }
+            if list.is_empty() {
+                None
+            } else {
+                Some(Value::Array(list))
+            }
         } else if let Some(s) = alpn_value.as_str() {
             parse_csv_string_array(Some(s))
         } else {
@@ -396,9 +397,10 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
     let name = clash_node.get("name").and_then(|n| n.as_str())?;
     let server = clash_node.get("server").and_then(|s| s.as_str())?;
     // serde_yaml 可能把 "22892" 解析为字符串而非整数；同时兼容数值与字符串两种形式。
-    let port = clash_node
-        .get("port")
-        .and_then(|p| p.as_u64().or_else(|| p.as_str().and_then(|s| s.parse::<u64>().ok())))?;
+    let port = clash_node.get("port").and_then(|p| {
+        p.as_u64()
+            .or_else(|| p.as_str().and_then(|s| s.parse::<u64>().ok()))
+    })?;
 
     match node_type {
         "vmess" => {
@@ -414,7 +416,10 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
             });
 
             if let Some(true) = clash_node.get("tls").and_then(|t| t.as_bool()) {
-                let sni = clash_node.get("servername").and_then(|s| s.as_str()).unwrap_or("");
+                let sni = clash_node
+                    .get("servername")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("");
                 let (insecure, alpn_value) = read_clash_tls_flags(clash_node);
                 let alpn_csv = alpn_value.and_then(|v| {
                     v.as_array().map(|arr| {
@@ -467,7 +472,10 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
             });
 
             if let Some(true) = clash_node.get("tls").and_then(|t| t.as_bool()) {
-                let sni = clash_node.get("servername").and_then(|s| s.as_str()).unwrap_or("");
+                let sni = clash_node
+                    .get("servername")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("");
                 let (insecure, alpn_value) = read_clash_tls_flags(clash_node);
                 let alpn_csv = alpn_value.and_then(|v| {
                     v.as_array().map(|arr| {
@@ -489,8 +497,14 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
             let password = clash_node.get("password").and_then(|p| p.as_str())?;
             // 与 hysteria2 / tuic / anytls 统一走 build_basic_tls_config（不带 utls），
             // 完整透传 skip-cert-verify + alpn，避免漏 insecure。
-            let sni = clash_node.get("sni").and_then(|s| s.as_str()).unwrap_or(server);
-            let tls_enabled = clash_node.get("tls").and_then(|t| t.as_bool()).unwrap_or(true);
+            let sni = clash_node
+                .get("sni")
+                .and_then(|s| s.as_str())
+                .unwrap_or(server);
+            let tls_enabled = clash_node
+                .get("tls")
+                .and_then(|t| t.as_bool())
+                .unwrap_or(true);
             let (insecure, alpn_value) = read_clash_tls_flags(clash_node);
             let alpn_csv = alpn_value.and_then(|v| {
                 v.as_array().map(|arr| {
@@ -538,12 +552,14 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
             });
 
             if let Some(up) = clash_node.get("up").and_then(|v| {
-                v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+                v.as_u64()
+                    .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
             }) {
                 node["up_mbps"] = json!(up);
             }
             if let Some(down) = clash_node.get("down").and_then(|v| {
-                v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+                v.as_u64()
+                    .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
             }) {
                 node["down_mbps"] = json!(down);
             }
@@ -900,13 +916,7 @@ fn parse_vless_uri(uri: &str) -> Option<Value> {
             // tls: 必须显式读 allowInsecure / alpn，机场伪装节点 100% 需要 insecure: true。
             let insecure = read_insecure_from_query(&query);
             let alpn = read_alpn_from_query(&query);
-            node["tls"] = build_tls_config(
-                &server,
-                sni,
-                &fingerprint,
-                insecure,
-                alpn.as_deref(),
-            );
+            node["tls"] = build_tls_config(&server, sni, &fingerprint, insecure, alpn.as_deref());
         }
     }
 
@@ -1077,10 +1087,16 @@ fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
     }
 
     // upmbps/downmbps 是 hysteria2 URI 的客户端带宽声明（MBps）
-    if let Some(up) = query.get("upmbps").and_then(|s| s.trim().parse::<u64>().ok()) {
+    if let Some(up) = query
+        .get("upmbps")
+        .and_then(|s| s.trim().parse::<u64>().ok())
+    {
         node["up_mbps"] = json!(up);
     }
-    if let Some(down) = query.get("downmbps").and_then(|s| s.trim().parse::<u64>().ok()) {
+    if let Some(down) = query
+        .get("downmbps")
+        .and_then(|s| s.trim().parse::<u64>().ok())
+    {
         node["down_mbps"] = json!(down);
     }
 
@@ -1107,12 +1123,11 @@ fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
     // hop_interval / hop_interval_max（端口跳跃间隔;1.14 新增 max 随机化上界）。
     // 两个参数语义不同,必须分别写入对应字段;裸数字参数（如 "60"）按秒补单位,
     // sing-box 侧是 badoption.Duration,合法值形如 "30s"/"10m"。
-    for (param, field) in [("hop_interval", "hop_interval"), ("hop_interval_max", "hop_interval_max")] {
-        if let Some(value) = query
-            .get(param)
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-        {
+    for (param, field) in [
+        ("hop_interval", "hop_interval"),
+        ("hop_interval_max", "hop_interval_max"),
+    ] {
+        if let Some(value) = query.get(param).map(|s| s.trim()).filter(|s| !s.is_empty()) {
             let duration = normalize_duration_seconds(value);
             node[field] = json!(duration);
         }
@@ -1130,7 +1145,11 @@ fn parse_hysteria2_uri(uri: &str) -> Option<Value> {
     // mport 多端口参数（如 "20000-30000" 或逗号分隔多段）,映射到 server_ports。
     // sing-box 的 server_ports 段格式是 "start:end"（冒号）,URI 的 mport 用连字符,
     // 需要转换;原样写入连字符格式会导致内核严格反序列化失败、整个配置被拒。
-    if let Some(mport) = query.get("mport").map(|s| s.trim()).filter(|s| !s.is_empty()) {
+    if let Some(mport) = query
+        .get("mport")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
         let ports: Vec<Value> = mport
             .split(',')
             .map(|p| p.trim())
@@ -1443,7 +1462,11 @@ fn parse_vmess_uri(uri: &str) -> Option<Value> {
                 .iter()
                 .filter_map(|x| x.as_str().map(|s| s.to_string()))
                 .collect();
-            if csv.is_empty() { None } else { Some(csv.join(",")) }
+            if csv.is_empty() {
+                None
+            } else {
+                Some(csv.join(","))
+            }
         } else {
             v.get("alpn")
                 .and_then(|x| x.as_str())

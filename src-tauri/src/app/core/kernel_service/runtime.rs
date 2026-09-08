@@ -1,14 +1,12 @@
 use crate::app::constants::common::messages;
-use crate::app::core::kernel_service::event::{
-    cleanup_event_relay_tasks, start_websocket_relay,
-};
+use crate::app::core::kernel_service::event::{cleanup_event_relay_tasks, start_websocket_relay};
 use crate::app::core::kernel_service::guard::{disable_kernel_guard, enable_kernel_guard};
 use crate::app::core::kernel_service::orchestrator::execute_kernel_operation;
 use crate::app::core::kernel_service::state::{KernelState, KERNEL_STATE};
 use crate::app::core::kernel_service::status::is_kernel_running;
 use crate::app::core::kernel_service::utils::{
     emit_kernel_error_with_context, emit_kernel_started, emit_kernel_starting, emit_kernel_status,
-    emit_kernel_stopped, KernelStatusPayload, resolve_config_path,
+    emit_kernel_stopped, resolve_config_path, KernelStatusPayload,
 };
 use crate::app::core::kernel_service::PROCESS_MANAGER;
 use crate::app::core::proxy_service::{
@@ -57,11 +55,20 @@ impl ResolvedProxyState {
 
 fn classify_startup_stability_failure(detail: &str) -> (&'static str, &'static str) {
     if detail.contains("API status") {
-        ("KERNEL_API_HTTP_ERROR", "kernel API returned error status code")
+        (
+            "KERNEL_API_HTTP_ERROR",
+            "kernel API returned error status code",
+        )
     } else if detail.contains("exited immediately") {
-        ("KERNEL_PROCESS_EXITED_EARLY", "kernel process exited shortly after startup")
+        (
+            "KERNEL_PROCESS_EXITED_EARLY",
+            "kernel process exited shortly after startup",
+        )
     } else {
-        ("KERNEL_API_TIMEOUT", "kernel API not ready within stability window")
+        (
+            "KERNEL_API_TIMEOUT",
+            "kernel API not ready within stability window",
+        )
     }
 }
 
@@ -340,9 +347,8 @@ pub(super) async fn start_kernel_impl(
 
     // 启动内核前检查磁盘日志大小，超过阈值则滚动，避免 sing-box.log 无限增长。
     {
-        let log_path = std::path::PathBuf::from(
-            crate::app::singbox::common::kernel_log_output_path(),
-        );
+        let log_path =
+            std::path::PathBuf::from(crate::app::singbox::common::kernel_log_output_path());
         crate::app::core::kernel_service::log_rotation::rotate_if_needed(&log_path);
     }
 

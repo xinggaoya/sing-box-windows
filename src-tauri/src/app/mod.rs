@@ -22,14 +22,17 @@ pub mod network {
     pub mod subscription_service;
 }
 
+// 在线模板市场（本地模板 + 远程市场客户端）
+pub mod template_marketplace;
+
 // System services
 pub mod system {
     pub mod background_tasks;
     pub mod backup_service;
     pub mod config_service;
     pub mod rule_set_cache_service;
-    pub mod startup_restore_service;
     pub mod startup_refresh_service;
+    pub mod startup_restore_service;
     pub mod sudo_service;
     pub mod system_service;
     pub mod update_service;
@@ -46,8 +49,8 @@ pub use network::subscription_service;
 pub use system::background_tasks;
 pub use system::backup_service;
 pub use system::config_service;
-pub use system::startup_restore_service;
 pub use system::startup_refresh_service;
+pub use system::startup_restore_service;
 pub use system::system_service;
 pub use system::update_service;
 pub use tray as tray_service;

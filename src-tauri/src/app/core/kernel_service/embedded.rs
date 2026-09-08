@@ -246,4 +246,3 @@ fn is_embedded_newer(current: &str, embedded: &str) -> Option<bool> {
         _ => None,
     }
 }
-

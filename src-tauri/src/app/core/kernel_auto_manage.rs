@@ -114,8 +114,8 @@ async fn auto_manage_kernel_internal(
     app_handle: AppHandle,
     options: AutoManageOptions,
 ) -> Result<AutoManageResult, String> {
-    let _attempt_id = crate::app::core::kernel_service::state::KERNEL_STATE
-        .begin_attempt("kernel-auto-manage");
+    let _attempt_id =
+        crate::app::core::kernel_service::state::KERNEL_STATE.begin_attempt("kernel-auto-manage");
 
     if let Err(err) = ensure_embedded_kernel(&app_handle).await {
         warn!("安装内嵌内核失败，继续按现有逻辑处理: {}", err);

@@ -59,7 +59,6 @@ pub struct AppConfig {
     pub tun_self_heal_cooldown_secs: u16,
 
     // === sing-box 1.14 升级新增字段 ===
-
     /// 1.14 内核下载/升级通道：stable / oldstable / beta / testing
     /// 默认 stable；oldstable 适合老配置兼容性回退
     pub kernel_update_track: String,
@@ -268,6 +267,9 @@ pub struct Subscription {
     pub is_manual: bool,
     pub manual_content: Option<String>,
     pub use_original_config: bool,
+    /// 该订阅配置是否由“在线模板”生成（设置同步时仅 patch 端口，不用官方高级选项覆盖模板语义）
+    #[serde(default)]
+    pub config_from_template: bool,
     pub config_path: Option<String>,
     pub backup_path: Option<String>,
     pub auto_update_interval_minutes: Option<u64>,

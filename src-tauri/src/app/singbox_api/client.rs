@@ -366,17 +366,15 @@ impl ApiClientHandle {
     /// SubscribeGroups（server-streaming）
     /// 返回的每帧是 proto Groups(含每个 group 当前 selected / 每个 item 的 url_test_delay)
     pub async fn subscribe_groups(&self) -> ApiResult<GroupsSubscription> {
-        let stream = HttpStream::new(self.build_streaming_request("SubscribeGroups", Vec::new())).await?;
+        let stream =
+            HttpStream::new(self.build_streaming_request("SubscribeGroups", Vec::new())).await?;
         let (tx, rx) = mpsc::channel::<Groups>(16);
         let task = tokio::spawn(spawn_groups_loop(stream, tx));
         Ok(GroupsSubscription { rx, _task: task })
     }
 
     /// SubscribeStatus（server-streaming）
-    pub async fn subscribe_status(
-        &self,
-        interval_nanos: i64,
-    ) -> ApiResult<StatusSubscription> {
+    pub async fn subscribe_status(&self, interval_nanos: i64) -> ApiResult<StatusSubscription> {
         let mut body = Vec::new();
         body.extend_from_slice(&encode_field_tag(1, 0));
         body.extend_from_slice(&encode_varint_i64(interval_nanos));
@@ -390,10 +388,9 @@ impl ApiClientHandle {
     /// 返回 ServiceStatus{status: IDLE/STARTING/STARTED/STOPPING/FATAL, errorMessage}
     /// 用于探测内核运行状态(替代 1.13 的 experimental.clash_api HTTP /version)。
     pub async fn subscribe_service_status(&self) -> ApiResult<ServiceStatusSubscription> {
-        let stream = HttpStream::new(
-            self.build_streaming_request("SubscribeServiceStatus", Vec::new()),
-        )
-        .await?;
+        let stream =
+            HttpStream::new(self.build_streaming_request("SubscribeServiceStatus", Vec::new()))
+                .await?;
         let (tx, rx) = mpsc::channel::<super::types::ServiceStatusSnapshot>(8);
         let task = tokio::spawn(spawn_service_status_loop(stream, tx));
         Ok(ServiceStatusSubscription { rx, _task: task })
@@ -401,7 +398,8 @@ impl ApiClientHandle {
 
     /// SubscribeLog（server-streaming）
     pub async fn subscribe_log(&self) -> ApiResult<LogSubscription> {
-        let stream = HttpStream::new(self.build_streaming_request("SubscribeLog", Vec::new())).await?;
+        let stream =
+            HttpStream::new(self.build_streaming_request("SubscribeLog", Vec::new())).await?;
         let (tx, rx) = mpsc::channel::<Log>(64);
         let task = tokio::spawn(spawn_log_loop(stream, tx));
         Ok(LogSubscription { rx, _task: task })
@@ -415,7 +413,8 @@ impl ApiClientHandle {
         let mut body = Vec::new();
         body.extend_from_slice(&encode_field_tag(1, 0));
         body.extend_from_slice(&encode_varint_i64(interval_nanos));
-        let stream = HttpStream::new(self.build_streaming_request("SubscribeConnections", body)).await?;
+        let stream =
+            HttpStream::new(self.build_streaming_request("SubscribeConnections", body)).await?;
         let (tx, rx) = mpsc::channel::<ConnectionEvents>(128);
         let task = tokio::spawn(spawn_connections_loop(stream, tx));
         Ok(ConnectionsSubscription { rx, _task: task })
@@ -474,7 +473,10 @@ async fn parse_response_headers(resp: reqwest::Response) -> ApiResult<ParsedResp
         let mut pos = 0;
         while buffer.len() - pos >= 5 {
             let len = u32::from_be_bytes([
-                buffer[pos + 1], buffer[pos + 2], buffer[pos + 3], buffer[pos + 4],
+                buffer[pos + 1],
+                buffer[pos + 2],
+                buffer[pos + 3],
+                buffer[pos + 4],
             ]) as usize;
             if buffer.len() - pos < 5 + len {
                 // frame 不完整，等下一个 chunk
@@ -533,9 +535,7 @@ fn parse_grpc_web_body(buffer: &[u8]) -> ApiResult<ParsedResponse> {
     let mut pos = 0;
     while pos < buffer.len() {
         if buffer.len() - pos < 5 {
-            return Err(ApiError::Http(format!(
-                "truncated frame at pos {pos}"
-            )));
+            return Err(ApiError::Http(format!("truncated frame at pos {pos}")));
         }
         let flag = buffer[pos];
         let len = u32::from_be_bytes([
@@ -661,9 +661,8 @@ impl HttpStream {
                 buffer.extend_from_slice(&chunk);
                 // 从 buffer 中解析所有完整 data frame
                 while buffer.len() >= 5 {
-                    let len = u32::from_be_bytes([
-                        buffer[1], buffer[2], buffer[3], buffer[4],
-                    ]) as usize;
+                    let len =
+                        u32::from_be_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]) as usize;
                     if buffer.len() < 5 + len {
                         break;
                     }
@@ -687,9 +686,7 @@ impl HttpStream {
                                 }
                             }
                             if status != 0 {
-                                let _ = tx
-                                    .send(Err(ApiError::Grpc { status, message }))
-                                    .await;
+                                let _ = tx.send(Err(ApiError::Grpc { status, message })).await;
                             }
                         }
                     } else {
@@ -782,10 +779,7 @@ fn spawn_service_status_loop(
     })
 }
 
-fn spawn_log_loop(
-    mut stream: HttpStream,
-    tx: mpsc::Sender<Log>,
-) -> tokio::task::JoinHandle<()> {
+fn spawn_log_loop(mut stream: HttpStream, tx: mpsc::Sender<Log>) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         while let Ok(Some(buf)) = stream.next().await {
             match super::proto::decode_log(&buf) {

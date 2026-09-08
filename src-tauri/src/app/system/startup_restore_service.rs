@@ -43,7 +43,10 @@ pub fn resolve_startup_active_config_path(
 pub async fn prepare_startup_restore(app_handle: &AppHandle) -> Result<Option<String>, String> {
     let storage = get_enhanced_storage(app_handle).await?;
     let mut app_config = storage.get_app_config().await.map_err(|e| e.to_string())?;
-    let subscriptions = storage.get_subscriptions().await.map_err(|e| e.to_string())?;
+    let subscriptions = storage
+        .get_subscriptions()
+        .await
+        .map_err(|e| e.to_string())?;
     let active_subscription_index = storage
         .get_active_subscription_index()
         .await

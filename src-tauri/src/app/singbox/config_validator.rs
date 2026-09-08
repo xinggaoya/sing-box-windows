@@ -34,7 +34,10 @@ pub enum ValidationOutcome {
 
 impl ValidationOutcome {
     pub fn is_valid(&self) -> bool {
-        matches!(self, ValidationOutcome::Valid | ValidationOutcome::Skipped { .. })
+        matches!(
+            self,
+            ValidationOutcome::Valid | ValidationOutcome::Skipped { .. }
+        )
     }
 
     pub fn is_invalid(&self) -> bool {
@@ -93,11 +96,7 @@ pub fn validate_singbox_config(config_path: &Path) -> Result<ValidationOutcome, 
     // sing-box 错误优先在 stderr
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let raw = if !stderr.is_empty() {
-        stderr
-    } else {
-        stdout
-    };
+    let raw = if !stderr.is_empty() { stderr } else { stdout };
 
     let summary = humanize_singbox_error(&raw);
     Ok(ValidationOutcome::Invalid {
@@ -122,8 +121,7 @@ pub fn validate_singbox_config_inline(
     use std::io::Write;
 
     if let Some(parent) = target_path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("创建配置目录失败: {}", e))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败: {}", e))?;
     }
 
     // 备份现有配置（即使目标文件不存在也允许）
@@ -157,13 +155,8 @@ pub fn validate_singbox_config_inline(
         if target_path.exists() {
             std::fs::remove_file(target_path).ok();
         }
-        std::fs::rename(&tmp_path, target_path).map_err(|e2| {
-            format!(
-                "原子重命名失败 ({}): {}",
-                tmp_path.display(),
-                e2
-            )
-        })?;
+        std::fs::rename(&tmp_path, target_path)
+            .map_err(|e2| format!("原子重命名失败 ({}): {}", tmp_path.display(), e2))?;
         // 抑制第一次 rename 的非空 e 警告
         let _ = e;
     }
@@ -195,12 +188,14 @@ fn humanize_singbox_error(raw: &str) -> String {
     if lowered.contains("legacy dns servers is deprecated")
         || lowered.contains("enable_deprecated_legacy_dns_servers")
     {
-        return "当前配置仍使用已弃用的 legacy DNS servers。请关闭“按原始配置运行”后重新生成。".to_string();
+        return "当前配置仍使用已弃用的 legacy DNS servers。请关闭“按原始配置运行”后重新生成。"
+            .to_string();
     }
     if lowered.contains("legacy domain strategy options is deprecated")
         || lowered.contains("enable_deprecated_legacy_domain_strategy_options")
     {
-        return "当前配置仍使用已弃用的 legacy domain strategy 选项。请重新导入订阅后重试。".to_string();
+        return "当前配置仍使用已弃用的 legacy domain strategy 选项。请重新导入订阅后重试。"
+            .to_string();
     }
     if lowered.contains("dns.servers") && lowered.contains("unknown field \"strategy\"") {
         return "配置包含已弃用字段 dns.servers[].strategy。请重新导入订阅后重试。".to_string();
@@ -244,10 +239,7 @@ fn truncate_for_log(raw: &str, max_bytes: usize) -> String {
 ///
 /// 50ms 轮询粒度足以让"正常 100-500ms 的 check"不浪费 CPU；
 /// 同时 5s 上限防止大配置 / 卡死 IO 把订阅流程拖死。
-fn run_with_timeout(
-    mut cmd: Command,
-    timeout: Duration,
-) -> Result<std::process::Output, String> {
+fn run_with_timeout(mut cmd: Command, timeout: Duration) -> Result<std::process::Output, String> {
     use std::io::Read;
 
     let mut child = cmd

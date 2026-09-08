@@ -10,6 +10,7 @@ fn make_subscription(name: &str, config_path: Option<&str>) -> Subscription {
         is_manual: false,
         manual_content: None,
         use_original_config: false,
+        config_from_template: false,
         config_path: config_path.map(|value| value.to_string()),
         backup_path: None,
         auto_update_interval_minutes: None,

@@ -7,10 +7,12 @@
 
 use crate::app::constants::{config, messages, network_config, paths};
 use crate::app::core::tun_profile::{TunProfile, TunProxyOptions};
-use crate::app::singbox::config_generator::inject_custom_rules;
 use crate::app::singbox::common::normalize_default_outbound;
+use crate::app::singbox::config_generator::inject_custom_rules;
 use crate::app::singbox_api::{ApiClientConfig, ApiClientHandle, Groups};
-use crate::app::storage::custom_rule::{CustomRule, CustomRuleAction, CustomRuleMatchType, STORAGE_KEY};
+use crate::app::storage::custom_rule::{
+    CustomRule, CustomRuleAction, CustomRuleMatchType, STORAGE_KEY,
+};
 use crate::app::storage::enhanced_storage_service::{db_get_app_config, get_enhanced_storage};
 use crate::app::system::config_service;
 use crate::entity::config_model;
@@ -263,10 +265,7 @@ pub async fn update_dns_strategy(app_handle: &AppHandle, prefer_ipv6: bool) -> R
             }
         }
     }
-    if let Some(dns_obj) = config
-        .get_mut("dns")
-        .and_then(|dns| dns.as_object_mut())
-    {
+    if let Some(dns_obj) = config.get_mut("dns").and_then(|dns| dns.as_object_mut()) {
         dns_obj.remove("strategy");
     }
     if let Some(ddr) = config
@@ -318,7 +317,9 @@ pub fn get_api_token() -> String {
 // =====================================================================
 
 /// 异步获取 gRPC 客户端句柄
-async fn make_handle_async(app_handle: AppHandle) -> Result<(ApiClientHandle, ApiClientConfig), String> {
+async fn make_handle_async(
+    app_handle: AppHandle,
+) -> Result<(ApiClientHandle, ApiClientConfig), String> {
     let app_config = db_get_app_config(app_handle)
         .await
         .map_err(|e| format!("获取应用配置失败: {}", e))?;
@@ -444,9 +445,7 @@ pub async fn get_started_at(app_handle: AppHandle) -> Result<i64, String> {
 
 /// 获取所有路由规则（解锁 P2.7 RulesView 恢复）
 #[tauri::command]
-pub async fn get_rules(
-    app_handle: AppHandle,
-) -> Result<crate::app::singbox_api::RuleList, String> {
+pub async fn get_rules(app_handle: AppHandle) -> Result<crate::app::singbox_api::RuleList, String> {
     let (handle, _) = make_handle_async(app_handle).await?;
     handle
         .get_rules()
@@ -519,8 +518,8 @@ pub async fn kernel_get_status_enhanced_v2(
     app_handle: AppHandle,
 ) -> Result<serde_json::Value, String> {
     use crate::app::core::kernel_service::state::KERNEL_STATE;
-    use tokio::net::TcpStream;
     use std::time::Duration;
+    use tokio::net::TcpStream;
 
     // 0) binary 版本戳 —— 用户可凭此确认 Rust 后端是否真的更新
     tracing::info!("[STATUS_V2_BUILD] 2026-09-01-v4-binary-version-stamp");
@@ -562,7 +561,11 @@ pub async fn kernel_get_status_enhanced_v2(
     let process_running = api_port_open || proxy_port_open;
     tracing::info!(
         "[STATUS_V2_BUILD] api_port={} open={} | proxy_port={} open={} | process_running={}",
-        api_port, api_port_open, proxy_port, proxy_port_open, process_running
+        api_port,
+        api_port_open,
+        proxy_port,
+        proxy_port_open,
+        process_running
     );
 
     // 3) gRPC GetVersion 探测(决定 api_ready 和 kernel_state)
@@ -588,11 +591,23 @@ pub async fn kernel_get_status_enhanced_v2(
             }
             Ok(Err(e)) => {
                 tracing::warn!("[STATUS_V2_BUILD] gRPC GetVersion Err: {} (端口通但 gRPC 失败 — sing-box 启动早期?)", e);
-                (false, "starting".to_string(), Some(format!("gRPC 探测失败: {}", e)), None)
+                (
+                    false,
+                    "starting".to_string(),
+                    Some(format!("gRPC 探测失败: {}", e)),
+                    None,
+                )
             }
             Err(_) => {
-                tracing::warn!("[STATUS_V2_BUILD] gRPC GetVersion timeout (2s) — 端口通但 gRPC 不响应");
-                (false, "starting".to_string(), Some("gRPC 探测超时(2s)".to_string()), None)
+                tracing::warn!(
+                    "[STATUS_V2_BUILD] gRPC GetVersion timeout (2s) — 端口通但 gRPC 不响应"
+                );
+                (
+                    false,
+                    "starting".to_string(),
+                    Some("gRPC 探测超时(2s)".to_string()),
+                    None,
+                )
             }
         }
     } else {
@@ -813,8 +828,8 @@ fn inject_custom_rules_into_file(
     rules: &[CustomRule],
     default_outbound: &str,
 ) -> Result<(), String> {
-    let live_content = fs::read_to_string(config_path)
-        .map_err(|e| format!("读取配置失败: {}", e))?;
+    let live_content =
+        fs::read_to_string(config_path).map_err(|e| format!("读取配置失败: {}", e))?;
     let injected_path = config_path.with_extension("injected");
     let base_path = config_path.with_extension("base");
 
@@ -837,11 +852,11 @@ fn inject_custom_rules_into_file(
         live_content.clone()
     };
 
-    let mut config: Value = serde_json::from_str(&baseline_content)
-        .map_err(|e| format!("解析配置基线失败: {}", e))?;
+    let mut config: Value =
+        serde_json::from_str(&baseline_content).map_err(|e| format!("解析配置基线失败: {}", e))?;
     inject_custom_rules(&mut config, rules, default_outbound);
-    let serialized = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("序列化配置失败: {}", e))?;
+    let serialized =
+        serde_json::to_string_pretty(&config).map_err(|e| format!("序列化配置失败: {}", e))?;
 
     // 先写台账再写配置：若中途崩溃,台账"超前"（记录了未实际写入的规则）是良性的——
     // 下次剔除时这些规则不在 live 里,剔除是空操作;反过来则可能漏剔导致重复注入。

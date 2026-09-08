@@ -1,7 +1,6 @@
 use super::{
-    active_config_change_requires_restart,
-    extract_nodes_from_subscription, extract_subscription_userinfo,
-    merge_subscription_fetch_result, parse_subscription_userinfo,
+    active_config_change_requires_restart, extract_nodes_from_subscription,
+    extract_subscription_userinfo, merge_subscription_fetch_result, parse_subscription_userinfo,
     should_retry_subscription_userinfo, try_decode_base64_to_text, SubscriptionFetchResult,
     SubscriptionUserInfo,
 };

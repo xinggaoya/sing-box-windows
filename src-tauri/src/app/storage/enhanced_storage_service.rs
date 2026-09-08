@@ -22,6 +22,8 @@ enum ConfigPatchMode {
 fn resolve_patch_mode_for_subscription(subscription: Option<&Subscription>) -> ConfigPatchMode {
     match subscription {
         Some(sub) if sub.use_original_config => ConfigPatchMode::PortsOnly,
+        // 在线模板生成的配置：模板自带 DNS/分组/规则语义，设置同步仅对齐端口
+        Some(sub) if sub.config_from_template => ConfigPatchMode::PortsOnly,
         _ => ConfigPatchMode::Full,
     }
 }
@@ -310,10 +312,9 @@ impl EnhancedStorageService {
 }
 
 fn resolve_app_data_dir<R: tauri::Runtime>(app_handle: &AppHandle<R>) -> std::path::PathBuf {
-    app_handle
-        .path()
-        .app_data_dir()
-        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")))
+    app_handle.path().app_data_dir().unwrap_or_else(|_| {
+        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+    })
 }
 
 fn resolve_startup_preferences_path<R: tauri::Runtime>(
@@ -605,6 +606,7 @@ mod tests {
             is_manual: false,
             manual_content: None,
             use_original_config,
+            config_from_template: false,
             config_path: Some("/tmp/sub.json".to_string()),
             backup_path: None,
             auto_update_interval_minutes: Some(60),
@@ -726,7 +728,8 @@ mod tests {
         assert!(result.is_ok(), "Full patch 应成功: {:?}", result);
 
         let synced = std::fs::read_to_string(&config_path).expect("应能读回配置");
-        let value: serde_json::Value = serde_json::from_str(&synced).expect("patch 后应为合法 JSON");
+        let value: serde_json::Value =
+            serde_json::from_str(&synced).expect("patch 后应为合法 JSON");
 
         // DNS bootstrap 策略应被迁移为 IPv4 优先，而全局偏好仍保留在 route 层
         let cn_resolver = value
