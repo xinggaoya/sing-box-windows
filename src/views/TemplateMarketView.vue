@@ -330,17 +330,129 @@
             <n-input v-model:value="editForm.schema_version" placeholder="1.14" />
           </n-form-item>
         </div>
-        <n-form-item :label="t('templateMarket.content')" required>
-          <n-input
-            v-model:value="editForm.content"
-            type="textarea"
-            class="content-editor"
-            :rows="16"
-            monospace
-            :placeholder="t('templateMarket.contentPlaceholder', { marker: NODES_MARKER })"
-          />
-        </n-form-item>
       </n-form>
+
+      <n-alert v-if="!editorSupported" type="warning" :show-icon="false" class="mode-hint">
+        {{ t('templateMarket.visualUnsupported') }}
+      </n-alert>
+      <n-tabs v-else v-model:value="editorMode" type="segment" size="small" animated>
+        <n-tab-pane name="visual" :tab="t('templateMarket.modeVisual')">
+          <div class="visual-form">
+            <n-form label-placement="top" size="small">
+              <div class="form-row">
+                <n-form-item :label="t('templateMarket.defaultOutbound')">
+                  <n-select v-model:value="formModel.default_outbound" :options="outboundOptions" />
+                </n-form-item>
+                <n-form-item :label="t('templateMarket.urltestUrl')">
+                  <n-input
+                    v-model:value="formModel.urltest_url"
+                    :placeholder="t('templateMarket.followAppSetting')"
+                  />
+                </n-form-item>
+              </div>
+
+              <div class="section-title">{{ t('templateMarket.sectionGroups') }}</div>
+              <n-checkbox-group v-model:value="formModel.app_groups" class="group-checks">
+                <n-checkbox
+                  v-for="g in groupOptions"
+                  :key="g.value"
+                  :value="g.value"
+                  :label="g.label"
+                />
+              </n-checkbox-group>
+
+              <div class="section-title">{{ t('templateMarket.sectionDns') }}</div>
+              <div class="switch-grid">
+                <div class="switch-item">
+                  <n-checkbox v-model:checked="formModel.block_ads">{{
+                    t('templateMarket.blockAds')
+                  }}</n-checkbox>
+                </div>
+                <div class="switch-item">
+                  <n-checkbox v-model:checked="formModel.dns_hijack">{{
+                    t('templateMarket.dnsHijack')
+                  }}</n-checkbox>
+                </div>
+                <div class="switch-item">
+                  <n-checkbox v-model:checked="formModel.dns_use_mdns">{{
+                    t('templateMarket.dnsMdns')
+                  }}</n-checkbox>
+                </div>
+                <div class="switch-item">
+                  <n-checkbox v-model:checked="formModel.fake_dns_enabled">{{
+                    t('templateMarket.fakeDns')
+                  }}</n-checkbox>
+                </div>
+              </div>
+              <div class="form-row">
+                <n-form-item :label="t('templateMarket.dnsProxy')">
+                  <n-input
+                    v-model:value="formModel.dns_proxy"
+                    :placeholder="t('templateMarket.followAppSetting')"
+                  />
+                </n-form-item>
+                <n-form-item :label="t('templateMarket.dnsCn')">
+                  <n-input
+                    v-model:value="formModel.dns_cn"
+                    :placeholder="t('templateMarket.followAppSetting')"
+                  />
+                </n-form-item>
+              </div>
+              <n-form-item :label="t('templateMarket.dnsResolver')">
+                <n-input
+                  v-model:value="formModel.dns_resolver"
+                  :placeholder="t('templateMarket.followAppSetting')"
+                />
+              </n-form-item>
+
+              <div class="section-title">{{ t('templateMarket.sectionRules') }}</div>
+              <div v-for="(rule, idx) in formModel.custom_rules" :key="rule.id" class="rule-row">
+                <n-select
+                  v-model:value="rule.match_type"
+                  :options="matchTypeOptions"
+                  class="rule-match"
+                  size="small"
+                />
+                <n-input
+                  v-model:value="rule.payload"
+                  size="small"
+                  :placeholder="t('templateMarket.rulePayloadHint')"
+                />
+                <n-select
+                  v-model:value="rule.action"
+                  :options="actionOptions"
+                  class="rule-action"
+                  size="small"
+                />
+                <n-button text type="error" size="small" @click="removeRule(idx)">
+                  {{ t('templateMarket.delete') }}
+                </n-button>
+              </div>
+              <n-button size="small" secondary @click="addRule">
+                <template #icon>
+                  <n-icon><AddOutline /></n-icon>
+                </template>
+                {{ t('templateMarket.addRule') }}
+              </n-button>
+              <p class="form-hint">{{ t('templateMarket.rulePriorityHint') }}</p>
+            </n-form>
+          </div>
+        </n-tab-pane>
+        <n-tab-pane name="json" :tab="t('templateMarket.modeJson')">
+          <n-form label-placement="top">
+            <n-form-item :label="t('templateMarket.content')" required>
+              <n-input
+                v-model:value="editForm.content"
+                type="textarea"
+                class="content-editor"
+                :rows="16"
+                monospace
+                :placeholder="t('templateMarket.contentPlaceholder', { marker: NODES_MARKER })"
+              />
+            </n-form-item>
+          </n-form>
+        </n-tab-pane>
+      </n-tabs>
       <template #footer>
         <div class="modal-footer">
           <n-button v-if="!editingId" secondary @click="fillFromOfficial">
@@ -433,6 +545,7 @@
             :placeholder="t('templateMarket.serviceUrlPlaceholder')"
           />
         </n-form-item>
+        <p class="form-hint">{{ t('templateMarket.serviceUrlHint') }}</p>
       </n-form>
       <n-button secondary :loading="testing" @click="testService">
         {{ t('templateMarket.testConnection') }}
@@ -469,7 +582,12 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { templateMarketService } from '@/services/template-market-service'
 import { OFFICIAL_TEMPLATE_ID, useTemplateStore } from '@/stores/template/TemplateStore'
-import type { ConfigTemplate, MarketTemplate } from '@/types/generated'
+import type {
+  ConfigTemplate,
+  CustomRule,
+  MarketTemplate,
+  TemplateFormOptions,
+} from '@/types/generated'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -505,6 +623,69 @@ const removingId = ref<string | null>(null)
 const showEditModal = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
+/** 编辑模式：visual = 可视化表单，json = 原始 JSON */
+const editorMode = ref<'visual' | 'json'>('visual')
+/** 当前模板是否可用可视化表单表达（解析失败时仅 JSON 模式） */
+const editorSupported = ref(true)
+const formModel = ref<TemplateFormOptions>(defaultFormModel())
+
+function defaultFormModel(): TemplateFormOptions {
+  return {
+    default_outbound: 'manual',
+    urltest_url: '',
+    block_ads: false,
+    dns_hijack: true,
+    fake_dns_enabled: false,
+    dns_use_mdns: true,
+    app_groups: ['Telegram', 'YouTube', 'Netflix', 'OpenAI', 'Google'],
+    dns_proxy: '',
+    dns_cn: '',
+    dns_resolver: '',
+    custom_rules: [],
+  }
+}
+
+const outboundOptions = [
+  { label: '手动切换', value: 'manual' },
+  { label: '自动选择', value: 'auto' },
+]
+const groupOptions = ['Telegram', 'YouTube', 'Netflix', 'OpenAI', 'Google'].map((g) => ({
+  label: g,
+  value: g,
+}))
+const matchTypeOptions = [
+  { label: '域名后缀', value: 'domain_suffix' },
+  { label: '精确域名', value: 'domain' },
+  { label: '域名关键字', value: 'domain_keyword' },
+  { label: 'IP / CIDR', value: 'ip_cidr' },
+]
+const actionOptions = [
+  { label: '走代理', value: 'proxy' },
+  { label: '直连', value: 'direct' },
+  { label: '拦截', value: 'block' },
+]
+
+function addRule() {
+  const now = new Date().toISOString()
+  const rule: CustomRule = {
+    id: crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${formModel.value.custom_rules.length}`,
+    enabled: true,
+    match_type: 'domain_suffix',
+    payload: '',
+    action: 'proxy',
+    outbound: null,
+    note: null,
+    created_at: now,
+    updated_at: now,
+  }
+  formModel.value.custom_rules.push(rule)
+}
+
+function removeRule(idx: number) {
+  formModel.value.custom_rules.splice(idx, 1)
+}
 const editForm = ref({
   id: '',
   name: '',
@@ -622,10 +803,13 @@ function openCreateModal() {
     schema_version: '',
     content: '',
   }
+  formModel.value = defaultFormModel()
+  editorMode.value = 'visual'
+  editorSupported.value = true
   showEditModal.value = true
 }
 
-function openEditModal(tpl: ConfigTemplate) {
+async function openEditModal(tpl: ConfigTemplate) {
   editingId.value = tpl.id
   editForm.value = {
     id: tpl.id,
@@ -634,6 +818,16 @@ function openEditModal(tpl: ConfigTemplate) {
     author: tpl.author ?? '',
     schema_version: tpl.schema_version ?? '',
     content: tpl.content,
+  }
+  // 尝试解析回可视化表单；失败则仅提供 JSON 模式
+  try {
+    formModel.value = await templateMarketService.parseTemplateForm(tpl.content)
+    editorSupported.value = true
+    editorMode.value = 'visual'
+  } catch {
+    formModel.value = defaultFormModel()
+    editorSupported.value = false
+    editorMode.value = 'json'
   }
   showEditModal.value = true
 }
@@ -670,7 +864,19 @@ async function saveTemplate() {
     message.error(t('templateMarket.nameRequired'))
     return
   }
-  if (!validateContent(editForm.value.content)) return
+
+  let content = editForm.value.content
+  if (editorSupported.value && editorMode.value === 'visual') {
+    // 可视化模式：表单 → 官方骨架 JSON（生成的配置天然合法，无需再手写校验）
+    try {
+      content = await templateMarketService.generateTemplateFromForm(formModel.value)
+    } catch (e) {
+      message.error(String(e))
+      return
+    }
+  } else if (!validateContent(content)) {
+    return
+  }
 
   saving.value = true
   try {
@@ -678,7 +884,7 @@ async function saveTemplate() {
       id: editingId.value ?? '',
       name: editForm.value.name.trim(),
       kernel_type: 'singbox',
-      content: editForm.value.content,
+      content,
       source: 'local',
       description: editForm.value.description || null,
       author: editForm.value.author || null,
@@ -1046,6 +1252,56 @@ watch(activeTab, (tab) => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.mode-hint {
+  margin-bottom: 10px;
+}
+
+.visual-form {
+  max-height: 54vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.section-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin: 14px 0 8px;
+}
+
+.group-checks {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.switch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.switch-item {
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.rule-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 104px auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--n-text-color-3, #888);
+  margin: 8px 0 0;
 }
 
 .modal-footer {

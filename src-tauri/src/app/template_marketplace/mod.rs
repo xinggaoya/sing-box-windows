@@ -3,12 +3,14 @@ pub mod commands;
 pub mod local_store;
 pub mod market_client;
 pub mod models;
+pub mod template_form;
 pub mod validation;
 
 pub use commands::{
-    delete_config_template, export_official_template, get_config_templates,
-    get_template_market_settings, market_check_service, market_delete_template,
-    market_download_template, market_get_template_detail, market_list_templates,
-    market_publish_template, market_refresh_my_templates, market_update_template,
-    save_config_template, set_active_template, set_template_market_settings,
+    delete_config_template, export_official_template, generate_template_from_form,
+    get_config_templates, get_template_market_settings, market_check_service,
+    market_delete_template, market_download_template, market_get_template_detail,
+    market_list_templates, market_publish_template, market_refresh_my_templates,
+    market_update_template, parse_template_form, save_config_template, set_active_template,
+    set_template_market_settings,
 };

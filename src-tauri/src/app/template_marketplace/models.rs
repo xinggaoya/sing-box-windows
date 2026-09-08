@@ -55,11 +55,20 @@ pub struct ConfigTemplate {
     pub updated_at: i64,
 }
 
+/// 内置默认市场服务地址：开发构建回落本地调试服务，发布构建指向线上地址。
+pub fn default_market_service_url() -> String {
+    if cfg!(debug_assertions) {
+        "http://127.0.0.1:8787".to_string()
+    } else {
+        "http://sub.moncn.cn:8787".to_string()
+    }
+}
+
 /// 模板市场设置（generic_config KV 持久化）。
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../src/types/generated/TemplateMarketSettings.ts")]
 pub struct TemplateMarketSettings {
-    /// 市场服务地址（如 https://templates.example.com），空表示未配置
+    /// 市场服务地址；空表示使用内置默认地址
     pub service_url: String,
     /// 当前生效模板：`official` 或本地模板 ID；订阅刷新/下载时统一使用
     pub active_template_id: String,

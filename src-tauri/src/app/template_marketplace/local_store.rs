@@ -2,7 +2,8 @@ use tauri::AppHandle;
 
 use crate::app::storage::enhanced_storage_service::{get_enhanced_storage, EnhancedStorageService};
 use crate::app::template_marketplace::models::{
-    official_template, ConfigTemplate, TemplateMarketSettings, OFFICIAL_TEMPLATE_ID,
+    default_market_service_url, official_template, ConfigTemplate, TemplateMarketSettings,
+    OFFICIAL_TEMPLATE_ID,
 };
 
 /// generic_config KV 通道的键（复用 subscriptions/custom_rules 先例，避免新表/迁移）
@@ -36,11 +37,15 @@ pub async fn save_templates(app: &AppHandle, templates: &[ConfigTemplate]) -> Re
 /// 读取市场设置；未配置时返回默认值（官方模板生效）。
 pub async fn load_settings(app: &AppHandle) -> Result<TemplateMarketSettings, String> {
     let storage = storage(app).await?;
-    let settings = storage
+    let mut settings = storage
         .load_generic_config::<TemplateMarketSettings>(KEY_MARKET_SETTINGS)
         .await
         .map_err(|e| format!("读取模板市场设置失败: {e}"))?
         .unwrap_or_default();
+    // 服务地址留空时回落内置默认（开发构建为本地调试地址，发布构建为线上地址）
+    if settings.service_url.trim().is_empty() {
+        settings.service_url = default_market_service_url();
+    }
     Ok(settings)
 }
 

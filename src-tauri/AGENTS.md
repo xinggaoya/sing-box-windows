@@ -21,7 +21,7 @@ src-tauri/
 
 | Task           | Location          | Notes                               |
 | -------------- | ----------------- | ----------------------------------- |
-| 命令注册总入口 | `src/lib.rs`      | `invoke_handler`（116 个命令）暴露边界 |
+| 命令注册总入口 | `src/lib.rs`      | `invoke_handler`（118 个命令）暴露边界 |
 | 进程主入口     | `src/main.rs`     | 仅启动入口，逻辑薄                  |
 | 后端分层实现   | `src/app/`        | core/network/singbox/singbox_api/storage/system/tray |
 | gRPC API 客户端 | `src/app/singbox_api/` | 替代 experimental.clash_api    |

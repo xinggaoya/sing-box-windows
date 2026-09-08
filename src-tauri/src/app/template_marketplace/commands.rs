@@ -8,6 +8,9 @@ use crate::app::template_marketplace::models::{
     MarketTemplateList, TemplateMarketSettings, MARKET_STATUS_APPROVED, MARKET_STATUS_DELETED,
     OFFICIAL_TEMPLATE_ID, SOURCE_LOCAL, SOURCE_MARKET,
 };
+use crate::app::template_marketplace::template_form::{
+    generate_config_from_form, parse_form_from_template, TemplateFormOptions,
+};
 use crate::app::template_marketplace::validation::{
     validate_template_content, validate_template_meta,
 };
@@ -105,10 +108,9 @@ pub async fn set_template_market_settings(
     settings: TemplateMarketSettings,
 ) -> Result<TemplateMarketSettings, String> {
     let mut settings = settings;
-    if !settings.service_url.trim().is_empty() {
+    let cleared_to_default = settings.service_url.trim().is_empty();
+    if !cleared_to_default {
         settings.service_url = market_client::normalize_base_url(&settings.service_url)?;
-    } else {
-        settings.service_url.clear();
     }
     if settings.active_template_id.is_empty() {
         settings.active_template_id = OFFICIAL_TEMPLATE_ID.to_string();
@@ -122,6 +124,11 @@ pub async fn set_template_market_settings(
         }
     }
     local_store::save_settings(&app, &settings).await?;
+    // 清空存储 = 使用内置默认地址；返回有效值供前端回显
+    if cleared_to_default {
+        settings.service_url =
+            crate::app::template_marketplace::models::default_market_service_url();
+    }
     Ok(settings)
 }
 
@@ -153,6 +160,23 @@ async fn current_app_config(app: &AppHandle) -> Result<AppConfig, String> {
 async fn require_base_url(app: &AppHandle) -> Result<String, String> {
     let settings = local_store::load_settings(app).await?;
     market_client::normalize_base_url(&settings.service_url)
+}
+
+/// 由可视化表单生成模板骨架内容（不含订阅节点，留空字段跟随当前应用设置）。
+#[tauri::command]
+pub async fn generate_template_from_form(
+    app: AppHandle,
+    form: TemplateFormOptions,
+) -> Result<String, String> {
+    let app_config = current_app_config(&app).await?;
+    let config = generate_config_from_form(&app_config, &form)?;
+    serde_json::to_string_pretty(&config).map_err(|e| format!("序列化模板失败: {e}"))
+}
+
+/// 尝试把模板骨架解析回可视化表单；模板不是"表单可表达"形状时返回错误（前端回退 JSON 模式）。
+#[tauri::command]
+pub async fn parse_template_form(content: String) -> Result<TemplateFormOptions, String> {
+    parse_form_from_template(&content)
 }
 
 /// 校验市场服务可用性（地址未传时使用已保存设置）。

@@ -210,6 +210,8 @@ pub fn run() {
             crate::app::template_marketplace::commands::set_template_market_settings,
             crate::app::template_marketplace::commands::set_active_template,
             crate::app::template_marketplace::commands::export_official_template,
+            crate::app::template_marketplace::commands::generate_template_from_form,
+            crate::app::template_marketplace::commands::parse_template_form,
             crate::app::template_marketplace::commands::market_check_service,
             crate::app::template_marketplace::commands::market_list_templates,
             crate::app::template_marketplace::commands::market_get_template_detail,

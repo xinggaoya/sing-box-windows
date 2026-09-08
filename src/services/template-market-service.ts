@@ -4,6 +4,7 @@ import type {
   MarketHealth,
   MarketTemplate,
   MarketTemplateList,
+  TemplateFormOptions,
   TemplateMarketSettings,
 } from '@/types/generated'
 
@@ -40,6 +41,16 @@ export const templateMarketService = {
 
   exportOfficialTemplate() {
     return invokeWithAppContext<string>('export_official_template')
+  },
+
+  /** 由可视化表单生成模板骨架内容（留空字段跟随当前应用设置） */
+  generateTemplateFromForm(form: TemplateFormOptions) {
+    return invokeWithAppContext<string>('generate_template_from_form', { form })
+  },
+
+  /** 尝试把模板骨架解析回可视化表单；不可表达时抛错（调用方回退 JSON 模式） */
+  parseTemplateForm(content: string) {
+    return invokeWithAppContext<TemplateFormOptions>('parse_template_form', { content })
   },
 
   // --- 市场设置 ---
