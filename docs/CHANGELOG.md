@@ -26,6 +26,7 @@
 - 新增 Web Dashboard 集成
 - 恢复 RulesView 规则管理 UI
 - `fetch-kernel.mjs` 内核下载支持 Release Track（stable / oldstable / beta / testing）
+- 设置页内核版本下拉恢复可选：下载指定版本前强制弹窗确认（应用基于 1.14+ gRPC API，自行切换旧版内核可能出现兼容问题），确认后正常下载；默认仍为最新版本
 
 ### 🔧 优化改进
 

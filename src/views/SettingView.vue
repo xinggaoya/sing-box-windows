@@ -52,7 +52,7 @@
             :download-progress="downloadProgress"
             :download-message="downloadMessage"
             :on-selected-kernel-version-change="onSelectedKernelVersionChange"
-            :download-the-kernel="downloadTheKernel"
+            :download-the-kernel="confirmAndDownloadKernel"
             :show-manual-download-modal="showManualDownloadModal"
             :check-manual-install="checkManualInstall"
             :format-version="formatVersion"
@@ -314,6 +314,26 @@ const { setupUpdateProgressListener, cleanupUpdateProgressListener } = useUpdate
   updateStore,
   t,
 })
+
+// 应用基于 sing-box 1.14+ gRPC API 开发，旧内核不兼容：
+// 下载指定版本（非“最新版本”）前强制弹出确认，用户明确确认后才执行下载。
+const confirmAndDownloadKernel = () => {
+  const version = selectedKernelVersion.value
+  if (!version) {
+    void downloadTheKernel()
+    return
+  }
+  dialog.warning({
+    title: t('setting.kernel.versionConfirmTitle'),
+    content: t('setting.kernel.versionConfirmContent', { version }),
+    positiveText: t('setting.kernel.versionConfirmAction'),
+    negativeText: t('common.cancel'),
+    maskClosable: false,
+    onPositiveClick: () => {
+      void downloadTheKernel()
+    },
+  })
+}
 
 const formatVersion = (v: string) => v.replace(/^v/, '')
 const isSupportedLocale = (l: string) => languageOptions.value.some((opt) => opt.value === l)
@@ -683,7 +703,12 @@ onMounted(async () => {
   if (kernelStore.fetchLatestKernelVersion) {
     await kernelStore.fetchLatestKernelVersion()
   }
-  // 版本选择已锁定为最新版（旧内核与 1.14+ gRPC API 不兼容），不再拉取 release 列表填充下拉框
+  if (
+    kernelStore.fetchKernelReleases &&
+    (!kernelStore.availableVersions || kernelStore.availableVersions.length === 0)
+  ) {
+    await kernelStore.fetchKernelReleases()
+  }
   await updateStore.initializeStore?.()
   await setupUpdateProgressListener()
 })

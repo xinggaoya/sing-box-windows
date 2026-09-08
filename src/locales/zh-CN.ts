@@ -561,7 +561,10 @@ export default {
       selectVersion: '选择版本',
       selectVersionDesc: '选择要下载的特定内核版本',
       latest: '最新版本',
-      versionLocked: '应用基于最新内核开发，版本跟随应用发布，暂不支持手动切换（下载固定使用最新版）',
+      versionConfirmTitle: '确认下载指定版本内核？',
+      versionConfirmContent:
+        '本应用基于 sing-box 1.14+ 的 gRPC API 开发，自行下载切换旧版内核可能出现兼容性问题（如无法连接内核、功能异常等）。仍要下载 v{version} 吗？',
+      versionConfirmAction: '仍要下载',
     },
     proxyAdvanced: {
       title: '代理高级设置',

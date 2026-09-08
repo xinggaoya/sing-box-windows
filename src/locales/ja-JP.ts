@@ -615,8 +615,10 @@ export default {
       selectVersion: 'バージョンを選択',
       selectVersionDesc: 'ダウンロードする特定のカーネルバージョンを選択',
       latest: '最新版',
-      versionLocked:
-        'アプリは最新カーネル向けに開発されているため、バージョンはアプリのリリースに追従します。手動切り替えは無効で、ダウンロードは常に最新版を使用します。',
+      versionConfirmTitle: '指定バージョンのカーネルをダウンロードしますか？',
+      versionConfirmContent:
+        '本アプリは sing-box 1.14+ の gRPC API 向けに開発されています。旧バージョンのカーネルを手動で切り替えると、互換性の問題（カーネルに接続できない、動作が異常になるなど）が発生する可能性があります。v{version} をダウンロードしますか？',
+      versionConfirmAction: 'それでもダウンロード',
     },
     proxyAdvanced: {
       title: '高度なプロキシ設定',

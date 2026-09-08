@@ -114,7 +114,7 @@ src/
 ```
 src-tauri/src/
 ├── app/             # 业务分层主域
-│   ├── core/        # kernel_service（启停/版本锁定/事件中继）、proxy_service（gRPC 查询+自定义规则）
+│   ├── core/        # kernel_service（启停/版本管理/事件中继）、proxy_service（gRPC 查询+自定义规则）
 │   ├── network/     # subscription_service（下载/解析/切换/自动更新）
 │   ├── singbox/     # config_generator（配置生成与 1.14 DNS/自定义规则注入）
 │   ├── singbox_api/ # gRPC-Web 客户端（client/proto/types）
@@ -312,7 +312,7 @@ RUST_LOG=tauri=info,sing_box_windows=debug pnpm tauri dev
 不走 tauri-plugin-updater；`system/update_service.rs` 自研（GitHub Releases API 查询 + 下载安装），应用内更新仅 Windows。
 
 ### 内核版本管理
-版本选择锁定为最新 stable（`kernel_service/versioning.rs`，GitHub API + 3 镜像 + DB 缓存），设置页版本下拉禁用；下载轨道支持 stable/oldstable/beta/testing（`scripts/fetch-kernel.mjs`）。
+版本默认跟随最新 stable（`kernel_service/versioning.rs`，GitHub API + 3 镜像 + DB 缓存）；设置页版本下拉可手动指定版本，下载指定版本前强制弹窗确认兼容风险（应用基于 1.14+ gRPC API，旧内核不兼容），确认后正常下载；下载轨道支持 stable/oldstable/beta/testing（`scripts/fetch-kernel.mjs`）。
 
 ### 自定义规则 CRUD
 后端就绪（`proxy_service.rs` 5 个命令 + `storage/custom_rule.rs` 模型 + `config_generator.rs` 注入），前端 UI 暂未接线；类型经 ts-rs 导出到两侧 `types/generated/CustomRule*`。

@@ -56,7 +56,7 @@
 | gRPC API 客户端      | `src-tauri/src/app/singbox_api/`                  | 替代 experimental.clash_api              |
 | 后端入口与命令注册   | `src-tauri/src/lib.rs`                            | 84 个命令；setup 同步+异步初始化链       |
 | 内核生命周期         | `src-tauri/src/app/core/kernel_service/`          | 高复杂度热点目录                         |
-| 内核版本锁定         | `src-tauri/src/app/core/kernel_service/versioning.rs` | 固定最新版，UI 禁手动切换           |
+| 内核版本管理         | `src-tauri/src/app/core/kernel_service/versioning.rs` | 默认最新版；指定版本下载前前端强制确认兼容风险 |
 | 订阅解析与模式切换   | `src-tauri/src/app/network/subscription_service/` | parser/mode/helpers 分层明显             |
 | sing-box 配置生成    | `src-tauri/src/app/singbox/config_generator.rs`   | 1.14 DNS（mDNS/evaluate）与自定义规则注入 |
 | 自定义规则 CRUD      | `src-tauri/src/app/core/proxy_service.rs` + `app/storage/custom_rule.rs` | 后端就绪，前端暂未接线 |

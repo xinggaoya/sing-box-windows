@@ -567,8 +567,10 @@ export default {
       selectVersion: 'Select Version',
       selectVersionDesc: 'Choose a specific kernel version to download',
       latest: 'Latest',
-      versionLocked:
-        'The app targets the latest kernel; the version follows app releases. Manual switching is disabled and download always uses the latest version.',
+      versionConfirmTitle: 'Download a specific kernel version?',
+      versionConfirmContent:
+        'This app is built on the sing-box 1.14+ gRPC API. Manually downloading or switching kernel versions may cause compatibility issues (e.g., failure to connect to the kernel or abnormal behavior). Download v{version} anyway?',
+      versionConfirmAction: 'Download Anyway',
     },
     proxyAdvanced: {
       title: 'Advanced Proxy Settings',
