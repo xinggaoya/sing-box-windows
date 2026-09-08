@@ -497,7 +497,9 @@ onMounted(async () => {
 })
 const tlsSpoofAvailable = computed(() => {
   if (!systemArch.value) return true
-  return !(systemArch.value === 'aarch64' && navigator.userAgent.includes('Windows'))
+  // 后端架构标识：新后端返回 arm64，旧后端返回 aarch64
+  const isArm64 = ['arm64', 'aarch64'].includes(systemArch.value)
+  return !(isArm64 && navigator.userAgent.includes('Windows'))
 })
 
 const extraLabels = computed(() => {

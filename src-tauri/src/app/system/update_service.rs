@@ -613,7 +613,7 @@ impl PlatformDetailedInfo {
             ("linux", "amd64") => "Linux x64".to_string(),
             ("linux", "386") => "Linux x86".to_string(),
             ("linux", "arm64") => "Linux ARM64".to_string(),
-            ("linux", "armv5") => "Linux ARM".to_string(),
+            ("linux", "armv7") => "Linux ARM".to_string(),
             ("macos", "amd64") => "macOS Intel".to_string(),
             ("macos", "arm64") => "macOS Apple Silicon".to_string(),
             _ => format!("{} ({})", os, arch),

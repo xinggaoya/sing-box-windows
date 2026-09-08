@@ -4,6 +4,9 @@
 
 ### 🐛 问题修复
 
+- 修复 Windows on ARM 设备误下载 amd64 内核：架构检测改为读取宿主原生架构（`PROCESSOR_ARCHITEW6432` / `PROCESSOR_ARCHITECTURE`），x64 构建经模拟层运行时也能自动下载 arm64 原生内核（#68）
+- 修复 Windows ARM64 上 TLS spoof 开关误显示：架构标识统一为 `arm64` 后前端门禁未同步，现同时兼容 `arm64` / `aarch64` 新旧标识
+- 修复 Linux 32 位 ARM 设备"关于"页架构显示名回落为原始标识的问题（恢复显示 "Linux ARM"）
 - 修复 `tun_dns_mode` 设置未注入内核 TUN 配置的问题：该字段此前仅持久化，配置生成与运行时切换两条路径现均写入 `tun.dns_mode`（1.14 起默认 hijack 接管系统 DNS，设置页可切换 native / disabled）
 - 修复开启"IPv6 优先"后 TUN 模式 DNS 报错（`dial tcp6: cannot assign requested address`）：DNS 服务器自身域名的 bootstrap 解析不再跟随全局 IPv6 偏好，保持 IPv4 优先
 - 修复关闭主窗口后托盘代理开关状态陈旧（#67）
