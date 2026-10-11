@@ -4,7 +4,7 @@
 
     <n-space vertical>
       <!-- 规则表（GetRules 已在 sing-box 1.14 gRPC API 暴露） -->
-      <n-card :title="t('rules.routeRules', '路由规则')" size="small">
+      <n-card :title="t('rules.routeRules')" size="small">
         <template #header-extra>
           <n-space :size="8" align="center">
             <n-tag :type="kernelRunning ? 'success' : 'default'" size="small">
@@ -19,7 +19,7 @@
 
         <n-empty
           v-if="!loading && rules.length === 0"
-          :description="t('rules.empty', '暂无规则，或内核未启动')"
+          :description="t('rules.empty')"
         />
         <n-data-table
           v-else
@@ -33,9 +33,9 @@
       </n-card>
 
       <!-- 规则说明 -->
-      <n-card :title="t('rules.about', '关于')" size="small">
+      <n-card :title="t('rules.about')" size="small">
         <p class="rules-hint">
-          {{ t('rules.aboutBody', '路由规则来源 sing-box 1.14+ 官方 gRPC API GetRules。规则类型（rule_type）包含 default / logical / rule_set 三类。') }}
+          {{ t('rules.aboutBody') }}
         </p>
       </n-card>
     </n-space>
@@ -78,7 +78,7 @@ const typeColorMap: Record<string, 'default' | 'info' | 'success' | 'warning' | 
 
 const columns = computed(() => [
   {
-    title: t('rules.type', '类型'),
+    title: t('rules.columnType'),
     key: 'rule_type',
     width: 110,
     render(row: Rule) {
@@ -91,12 +91,12 @@ const columns = computed(() => [
     },
   },
   {
-    title: t('rules.payload', '条件'),
+    title: t('rules.columnPayload'),
     key: 'payload',
     ellipsis: { tooltip: true },
   },
   {
-    title: t('rules.outbound', '出站'),
+    title: t('rules.columnOutbound'),
     key: 'outbound',
     width: 180,
     ellipsis: { tooltip: true },

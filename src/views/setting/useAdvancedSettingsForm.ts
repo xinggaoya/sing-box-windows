@@ -127,24 +127,18 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
     tailscaleTaildropDirectory: 'Taildrop',
   })
 
-  const hysteria2ObfsTypeOptions = computed(() => {
-    const zh = (options.t('common.locale') as string | undefined) === 'zh-CN' ||
-      (typeof navigator !== 'undefined' && navigator.language?.startsWith('zh'))
-    return [
-      { label: zh ? 'Salamander（默认）' : 'Salamander (default)', value: 'salamander' },
-      { label: zh ? 'Gecko（1.14 新增）' : 'Gecko (1.14 new)', value: 'gecko' },
-    ]
-  })
+  // 文案取自 locale 语言包；原实现用 `navigator.language.startsWith('zh')` 二元三元，
+  // 既绕过了语言包，也让日/俄用户看到英文。
+  const hysteria2ObfsTypeOptions = computed(() => [
+    { label: options.t('setting.advanced.obfsSalamander'), value: 'salamander' },
+    { label: options.t('setting.advanced.obfsGecko'), value: 'gecko' },
+  ])
 
-  const clashModeOptions = computed(() => {
-    const zh = (options.t('common.locale') as string | undefined) === 'zh-CN' ||
-      (typeof navigator !== 'undefined' && navigator.language?.startsWith('zh'))
-    return [
-      { label: zh ? '规则（默认）' : 'Rule (default)', value: 'rule' },
-      { label: zh ? '全局代理' : 'Global', value: 'global' },
-      { label: zh ? '全局直连' : 'Direct', value: 'direct' },
-    ]
-  })
+  const clashModeOptions = computed(() => [
+    { label: options.t('setting.advanced.clashRule'), value: 'rule' },
+    { label: options.t('setting.advanced.clashGlobal'), value: 'global' },
+    { label: options.t('setting.advanced.clashDirect'), value: 'direct' },
+  ])
 
   const defaultOutboundOptions = computed(() => [
     { label: options.t('setting.singboxProfile.outboundManual'), value: 'manual' },

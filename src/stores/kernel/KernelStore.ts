@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { APP_EVENTS } from '@/constants/events'
 import { kernelService, type KernelStatus } from '@/services/kernel-service'
 import { useAppStore, type ProxyMode } from '../app/AppStore'
+import i18n from '@/locales'
 import { eventService } from '@/services/event-service'
 import type { KernelFailurePayload, KernelReadinessSnapshot, StartupDiagnosis } from '@/types/events'
 
@@ -177,7 +178,7 @@ export const useKernelStore = defineStore('kernel', () => {
       // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '内核重启失败'
+      lastError.value = error instanceof Error ? error.message : i18n.global.t('notification.kernelRestartFailed')
       return false
     } finally {
       isLoading.value = false
@@ -194,7 +195,7 @@ export const useKernelStore = defineStore('kernel', () => {
       // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '内核停止失败'
+      lastError.value = error instanceof Error ? error.message : i18n.global.t('home.kernelStopFailed')
       return false
     }
   }
@@ -209,7 +210,7 @@ export const useKernelStore = defineStore('kernel', () => {
       // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '切换代理模式失败'
+      lastError.value = error instanceof Error ? error.message : i18n.global.t('notification.proxyModeChangeFailed')
       return false
     }
   }
@@ -227,7 +228,7 @@ export const useKernelStore = defineStore('kernel', () => {
       // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '应用代理配置失败'
+      lastError.value = error instanceof Error ? error.message : i18n.global.t('home.applyProxySettingsFailed')
       return false
     }
   }
@@ -241,7 +242,7 @@ export const useKernelStore = defineStore('kernel', () => {
       }
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '切换IP版本失败'
+      lastError.value = error instanceof Error ? error.message : i18n.global.t('notification.ipVersionSwitchFailed')
       return false
     }
   }
@@ -256,7 +257,7 @@ export const useKernelStore = defineStore('kernel', () => {
       }
       return isKernelInstalled.value
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : '检查内核安装失败'
+      lastError.value = error instanceof Error ? error.message : i18n.global.t('home.kernelInstallCheckFailed')
       return false
     }
   }
@@ -271,7 +272,7 @@ export const useKernelStore = defineStore('kernel', () => {
       return latestAvailableVersion.value
     } catch (error) {
       lastError.value =
-        error instanceof Error ? error.message : 'Failed to fetch latest kernel version'
+        error instanceof Error ? error.message : i18n.global.t('notification.kernelVersionCheckFailed')
       return ''
     }
   }

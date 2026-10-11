@@ -5,6 +5,7 @@
 import { APP_EVENTS } from '@/constants/events'
 import { eventService } from './event-service'
 import { invokeWithAppContext, withAppStore } from './invoke-client'
+import i18n from '@/locales'
 import type {
   KernelFailurePayload,
   KernelReadinessSnapshot,
@@ -264,7 +265,7 @@ class KernelService {
       }
 
       await invokeWithAppContext<string | void>('apply_proxy_settings', overrides)
-      return { success: true, message: `代理模式已切换到 ${mode}` }
+      return { success: true, message: i18n.global.t('notification.proxyModeSwitchedTo', { mode }) }
     } catch (error) {
       console.error('切换代理模式失败:', error)
       return {
@@ -291,7 +292,7 @@ class KernelService {
         'apply_proxy_settings',
         Object.keys(args).length ? args : undefined,
       )
-      return { success: true, message: '代理配置已应用' }
+      return { success: true, message: i18n.global.t('notification.proxySettingsApplied') }
     } catch (error) {
       console.error('应用代理配置失败:', error)
       return {
@@ -328,13 +329,18 @@ class KernelService {
       )
       return {
         success: true,
-        message: preferIpv6 ? '已切换到IPv6优先模式' : '已切换到IPv4优先模式',
+        message: preferIpv6
+          ? i18n.global.t('notification.ipv6Preferred')
+          : i18n.global.t('notification.ipv4Preferred'),
       }
     } catch (error) {
       console.error('切换IP版本失败:', error)
       return {
         success: false,
-        message: error instanceof Error ? error.message : '切换IP版本失败',
+        message:
+            error instanceof Error
+              ? error.message
+              : i18n.global.t('notification.ipVersionSwitchFailed'),
       }
     }
   }

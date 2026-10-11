@@ -79,9 +79,11 @@ import {
   ChevronForwardOutline,
 } from '@vicons/ionicons5'
 
-const { t, te } = useI18n()
+const { t } = useI18n()
 
-const tt = (key: string, fallback: string) => (te(key) ? t(key) : fallback)
+// 这两个 key 已在全部 4 个语言包中存在（由 check-i18n.mjs 保证对齐），
+// 因此不再需要「key 缺失就回落中文」的 inline default 兜底。
+const tt = (key: string) => t(key)
 
 export interface NavItem {
   label: string
@@ -119,7 +121,7 @@ const groupedItems = computed<NavGroup[]>(() => {
 })
 
 const themeLabel = computed(() =>
-  props.isDark ? tt('nav.switchToLight', '切换到亮色') : tt('nav.switchToDark', '切换到暗色'),
+  props.isDark ? tt('nav.switchToLight') : tt('nav.switchToDark'),
 )
 const collapseLabel = computed(() => (props.collapsed ? t('nav.expand') : t('nav.collapse')))
 </script>

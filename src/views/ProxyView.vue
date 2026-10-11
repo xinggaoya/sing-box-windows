@@ -172,7 +172,7 @@ defineOptions({
   name: 'ProxyView',
 })
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const message = useMessage()
 const proxyStore = useProxyStore()
 const searchQuery = ref('')
@@ -277,21 +277,24 @@ const getLocalizedCountryNameEntries = () => {
 
 const localizedCountryNameEntries = getLocalizedCountryNameEntries()
 
+// 文案统一取自 locale 语言包（`proxy.*` / `setting.advanced.*`）。
+// 原实现用 `locale.startsWith('zh') ? '中文' : 'English'` 内联，
+// ja-JP / ru-RU 用户会直接看到英文。
 const labels = computed(() => ({
-  groupsTab: locale.value.startsWith('zh') ? '代理组' : 'Groups',
-  providersTab: locale.value.startsWith('zh') ? 'Providers' : 'Providers',
-  hideUnavailable: locale.value.startsWith('zh') ? '隐藏不可用' : 'Hide',
-  showAll: locale.value.startsWith('zh') ? '显示全部' : 'Show',
-  recommended: locale.value.startsWith('zh') ? '推荐:' : 'Rec:',
-  favorites: locale.value.startsWith('zh') ? '收藏:' : 'Fav:',
-  nodeCount: locale.value.startsWith('zh') ? '节点:' : 'Nodes:',
-  noProviders: locale.value.startsWith('zh') ? '暂无 Proxy Providers' : 'No proxy providers',
+  groupsTab: t('proxy.tabGroups'),
+  providersTab: t('proxy.tabProviders'),
+  hideUnavailable: t('proxy.filterHideUnavailable'),
+  showAll: t('proxy.filterShowAll'),
+  recommended: t('proxy.badgeRecommended'),
+  favorites: t('proxy.badgeFavorites'),
+  nodeCount: t('proxy.badgeNodeCount'),
+  noProviders: t('proxy.emptyProviders'),
 }))
 
 const orderingOptions = computed(() => [
-  { label: locale.value.startsWith('zh') ? '原始' : 'Natural', value: 'natural' },
-  { label: locale.value.startsWith('zh') ? '延迟' : 'Latency', value: 'latency' },
-  { label: locale.value.startsWith('zh') ? '名称' : 'Name', value: 'name' },
+  { label: t('setting.advanced.orderNatural'), value: 'natural' },
+  { label: t('setting.advanced.orderLatency'), value: 'latency' },
+  { label: t('setting.advanced.orderName'), value: 'name' },
 ])
 
 const filteredGroups = computed(() => {

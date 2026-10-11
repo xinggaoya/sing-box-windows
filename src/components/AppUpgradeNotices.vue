@@ -4,7 +4,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onBeforeUnmount, onMounted, watch } from 'vue'
+import { h, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from 'naive-ui'
 import type { DialogReactive } from 'naive-ui'
@@ -26,12 +26,11 @@ interface DeprecatedWarningsResult {
 const DNS_HIJACK_NOTICE_KEY = 'singbox.dnsHijackNoticeAcknowledged.v1'
 const DEPRECATED_NOTICE_KEY = 'singbox.deprecatedNoticeAcknowledged.v1'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const dialog = useDialog()
 const appStore = useAppStore()
 const kernelStore = useKernelStore()
 
-const zh = computed(() => locale.value.startsWith('zh'))
 let dnsHijackDialog: DialogReactive | null = null
 let deprecatedDialog: DialogReactive | null = null
 // pending = 未检查；done = 本次会话已检查；failed = 上次失败（内核未就绪等，等待重试）
@@ -47,7 +46,7 @@ const maybeShowDnsHijackNotice = () => {
   dnsHijackDialog = dialog.create({
     title: t('upgradeNotices.dnsHijackTitle'),
     content: t('upgradeNotices.dnsHijackBody'),
-    positiveText: zh.value ? '知道了' : 'Got it',
+    positiveText: t('common.gotIt'),
     onPositiveClick: () => {
       try {
         localStorage.setItem(DNS_HIJACK_NOTICE_KEY, '1')
@@ -97,7 +96,7 @@ const checkDeprecatedWarnings = async () => {
           { style: 'white-space: pre-line; line-height: 1.6' },
           `${t('upgradeNotices.deprecatedBody')}\n${lines.join('\n')}`,
         ),
-      positiveText: zh.value ? '知道了' : 'Got it',
+      positiveText: t('common.gotIt'),
       onPositiveClick: () => {
         try {
           localStorage.setItem(DEPRECATED_NOTICE_KEY, '1')

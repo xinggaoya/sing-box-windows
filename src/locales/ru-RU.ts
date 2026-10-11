@@ -17,6 +17,7 @@ export default {
     enabled: 'Вкл',
     disabled: 'Выкл',
   },
+    gotIt: 'Понятно',
 
   // 导航菜单
   nav: {
@@ -160,6 +161,10 @@ export default {
       unsupported: 'Операция не поддерживается на текущей платформе',
     },
   },
+    kernelStartFailed: 'Не удалось запустить ядро',
+    kernelStopFailed: 'Не удалось остановить ядро',
+    applyProxySettingsFailed: 'Не удалось применить настройки прокси',
+    kernelInstallCheckFailed: 'Не удалось проверить установку ядра',
 
   // 代理页面
   proxy: {
@@ -200,6 +205,14 @@ export default {
       testing: 'Тестируется',
     },
   },
+    tabGroups: 'Группы',
+    tabProviders: 'Провайдеры',
+    filterHideUnavailable: 'Скрыть',
+    filterShowAll: 'Показать',
+    badgeRecommended: 'Рек:',
+    badgeFavorites: 'Избр:',
+    badgeNodeCount: 'Ноды:',
+    emptyProviders: 'Провайдеры прокси отсутствуют',
 
   // 连接页面
   connections: {
@@ -326,6 +339,13 @@ export default {
     fetchSuccess: 'Успешно получено {count} правил.',
     fetchError: 'Не удалось получить правила: {error}',
   },
+    routeRules: 'Правила маршрутизации',
+    empty: 'Правил нет или ядро не запущено',
+    about: 'О странице',
+    aboutBody: 'Правила маршрутизации получаются из официального gRPC API GetRules sing-box 1.14+. Типы правил (rule_type): default / logical / rule_set.',
+    columnType: 'Тип',
+    columnPayload: 'Условие',
+    columnOutbound: 'Исходящий',
 
   // 订阅页面
   sub: {
@@ -677,6 +697,51 @@ export default {
         tunRouteExcludeAddressInvalidLine: 'Строка {line}: неверный CIDR "{value}"',
       },
     },
+    // sing-box 1.14 实验性选项 / 代理页偏好 / 看板与列表偏好
+    advanced: {
+      dashboardTitle: 'Настройки панели и списков',
+      proxyPrefs: 'Настройки страницы прокси',
+      proxyOrdering: 'Сортировка нод',
+      proxyDisplay: 'Режим отображения нод',
+      proxyHideUnavailable: 'Скрывать недоступные ноды',
+      proxyAutoClose: 'Закрывать текущие соединения после переключения',
+      latencyTimeout: 'Таймаут проверки задержки (мс)',
+      latencyUrl: 'URL проверки задержки',
+      logRetentionPrefs: 'Хранение логов',
+      logMaxRows: 'Максимум строк лога',
+      logRetentionHint: 'Управляет только числом строк лога в интерфейсе. Файл sing-box.log на диске ротируется автоматически при запуске ядра (после 10MB хранятся последние 3 файла).',
+      experimentalTitle: 'Дополнительно (экспериментально, 1.14)',
+      experimentalLabel: 'Новые возможности 1.14',
+      experimentalHint: 'Эти параметры соответствуют возможностям ядра sing-box 1.14. Для применения требуется перезапуск ядра.',
+      deprecatedNotice: 'Согласно плану удаления устаревших возможностей sing-box, поля clash_api / store_rdrc / independent_cache / download_detour будут удалены в 1.16. Конфигурации, генерируемые этим приложением, уже мигрированы; если вы используете собственные шаблоны конфигурации, скорректируйте их до обновления до 1.16. После запуска ядра появится уведомление, если обнаружены устаревшие поля.',
+      dns114Title: 'Улучшения DNS в 1.14',
+      dnsOptimisticCache: 'Оптимистический кэш DNS (снижает задержку повторных запросов)',
+      dnsUseMdns: 'Включить mDNS (*.local / link-local)',
+      dnsTimeout: 'Таймаут DNS (например, 5s)',
+      hysteria2Title: 'Защита от анализа fingerprint в Hysteria2',
+      hysteria2ObfsType: 'Тип обфускации',
+      hysteria2DisableChromeParrot: 'Отключить fingerprint Chrome QUIC (нужно для серверов с сертификатом Ed25519)',
+      tlsTitle: 'Защита от анализа TLS fingerprint',
+      enableTlsSpoof: 'Включить TLS spoof (подмена SNI; требует повышенных прав, не поддерживается на Windows ARM64)',
+      clashModeTitle: 'Режим Clash',
+      clashMode: 'Режим по умолчанию',
+      enableWebDashboard: 'Включить веб-панель sing-box-dashboard',
+      tailscaleTitle: 'Режим Tailscale (экспериментальный)',
+      enableTailscaleEndpoint: 'Включить endpoint Tailscale',
+      tailscaleRunSshServer: 'Также включить SSH-сервер Tailscale (tailnet:22)',
+      tailscaleTaildropDirectory: 'Каталог входящих Taildrop',
+      save: 'Сохранить экспериментальные параметры 1.14',
+      orderNatural: 'Как есть',
+      orderLatency: 'По задержке',
+      orderName: 'По имени',
+      displayCard: 'Карточки',
+      displayList: 'Компактный список',
+    },
+      obfsSalamander: 'Salamander (по умолчанию)',
+      obfsGecko: 'Gecko (новое в 1.14)',
+      clashRule: 'Правило (по умолчанию)',
+      clashGlobal: 'Глобально',
+      clashDirect: 'Напрямую',
     singboxProfile: {
       title: 'Генерация конфигурации подписки (расширенная)',
       originalConfigHint:
@@ -778,4 +843,10 @@ export default {
       details: 'Подробности: {details}',
     },
   },
+    kernelVersionCheckFailed: 'Не удалось получить последнюю версию ядра',
+    proxyModeSwitchedTo: 'Режим прокси переключён на {mode}',
+    proxySettingsApplied: 'Настройки прокси применены',
+    ipv6Preferred: 'Включён режим приоритета IPv6',
+    ipv4Preferred: 'Включён режим приоритета IPv4',
+    ipVersionSwitchFailed: 'Не удалось переключить версию IP',
 }

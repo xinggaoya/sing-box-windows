@@ -17,6 +17,7 @@ export default {
     enabled: 'オン',
     disabled: 'オフ',
   },
+    gotIt: '了解しました',
 
   // 导航菜单
   nav: {
@@ -159,6 +160,10 @@ export default {
       unsupported: 'この操作は現在のプラットフォームではサポートされていません',
     },
   },
+    kernelStartFailed: 'カーネルの起動に失敗しました',
+    kernelStopFailed: 'カーネルの停止に失敗しました',
+    applyProxySettingsFailed: 'プロキシ設定の適用に失敗しました',
+    kernelInstallCheckFailed: 'カーネルインストールの確認に失敗しました',
 
   // 代理页面
   proxy: {
@@ -199,6 +204,14 @@ export default {
       testing: 'テスト中',
     },
   },
+    tabGroups: 'グループ',
+    tabProviders: 'プロバイダー',
+    filterHideUnavailable: '非表示',
+    filterShowAll: '表示',
+    badgeRecommended: '推奨:',
+    badgeFavorites: 'お気に入り:',
+    badgeNodeCount: 'ノード:',
+    emptyProviders: 'Proxy Provider がありません',
 
   // 连接页面
   connections: {
@@ -325,6 +338,13 @@ export default {
     fetchSuccess: '{count} 件のルールを正常に取得しました。',
     fetchError: 'ルールの取得に失敗しました: {error}',
   },
+    routeRules: 'ルーティングルール',
+    empty: 'ルールがありません。またはカーネルが起動していません',
+    about: 'このページについて',
+    aboutBody: 'ルーティングルールは sing-box 1.14+ の公式 gRPC API GetRules から取得します。rule_type には default / logical / rule_set の 3 種類があります。',
+    columnType: '種類',
+    columnPayload: '条件',
+    columnOutbound: '送信先',
 
   // 订阅页面
   sub: {
@@ -668,6 +688,51 @@ export default {
         tunRouteExcludeAddressInvalidLine: '{line} 行目の CIDR が不正です: {value}',
       },
     },
+    // sing-box 1.14 实验性选项 / 代理页偏好 / 看板与列表偏好
+    advanced: {
+      dashboardTitle: 'ダッシュボードとリストの表示設定',
+      proxyPrefs: 'プロキシページの表示設定',
+      proxyOrdering: 'ノード並び替え',
+      proxyDisplay: 'ノード表示モード',
+      proxyHideUnavailable: '利用できないノードを隠す',
+      proxyAutoClose: 'ノード切替時に既存接続を閉じる',
+      latencyTimeout: 'レイテンシ計測のタイムアウト(ms)',
+      latencyUrl: 'レイテンシ計測 URL',
+      logRetentionPrefs: 'ログの保持設定',
+      logMaxRows: '最大ログ行数',
+      logRetentionHint: 'UIに表示するログ行数のみを制御します。ディスク上の sing-box.log はカーネル起動時に自動的にローテートされます（10MB を超えると最新 3 個を保持）。',
+      experimentalTitle: '高度（1.14 実験的）',
+      experimentalLabel: '1.14 の新機能',
+      experimentalHint: '以下のオプションは sing-box 1.14 カーネルの機能に対応します。変更後はカーネルの再起動が必要です。',
+      deprecatedNotice: 'sing-box の非推奨計画に従い、clash_api / store_rdrc / independent_cache / download_detour などのフィールドは 1.16 で削除されます。本アプリが生成する設定はすでに移行済みです。カスタム設定テンプレートを使用する場合は、1.16 へ更新する前に自行で調整してください。非推奨フィールドが検出された場合、カーネル起動時に通知が表示されます。',
+      dns114Title: 'DNS 1.14 強化',
+      dnsOptimisticCache: '楽観的 DNS キャッシュ（繰り返しクエリの遅延を削減）',
+      dnsUseMdns: 'mDNS を有効化（*.local / link-local）',
+      dnsTimeout: 'DNS タイムアウト（例: 5s）',
+      hysteria2Title: 'Hysteria2 フィンガープリント対策',
+      hysteria2ObfsType: '難読化タイプ',
+      hysteria2DisableChromeParrot: 'Chrome QUIC フィンガープリントを無効化（Ed25519 証明書サーバーで必須）',
+      tlsTitle: 'TLS フィンガープリント対策',
+      enableTlsSpoof: 'TLS spoof を有効化（SNI 偽装、管理者権限が必要、Windows ARM64 は非対応）',
+      clashModeTitle: 'Clash モード',
+      clashMode: 'デフォルトモード',
+      enableWebDashboard: 'sing-box-dashboard Web パネルを有効化',
+      tailscaleTitle: 'Tailscale モード（実験的）',
+      enableTailscaleEndpoint: 'Tailscale エンドポイントを有効化',
+      tailscaleRunSshServer: 'Tailscale SSH サーバーも有効化（tailnet:22）',
+      tailscaleTaildropDirectory: 'Taildrop 受信トレイのディレクトリ',
+      save: '1.14 実験的オプションを保存',
+      orderNatural: 'そのまま',
+      orderLatency: 'レイテンシ順',
+      orderName: '名前順',
+      displayCard: 'カード',
+      displayList: 'コンパクトリスト',
+    },
+      obfsSalamander: 'Salamander（デフォルト）',
+      obfsGecko: 'Gecko（1.14 新機能）',
+      clashRule: 'ルール（デフォルト）',
+      clashGlobal: 'グローバル',
+      clashDirect: 'ダイレクト',
     singboxProfile: {
       title: 'サブスク設定生成（高度）',
       originalConfigHint:
@@ -767,4 +832,10 @@ export default {
       details: '詳細：{details}',
     },
   },
+    kernelVersionCheckFailed: '最新カーネルバージョンの取得に失敗しました',
+    proxyModeSwitchedTo: 'プロキシモードを {mode} に切り替えました',
+    proxySettingsApplied: 'プロキシ設定を適用しました',
+    ipv6Preferred: 'IPv6 優先モードに切り替えました',
+    ipv4Preferred: 'IPv4 優先モードに切り替えました',
+    ipVersionSwitchFailed: 'IP バージョンの切り替えに失敗しました',
 }
