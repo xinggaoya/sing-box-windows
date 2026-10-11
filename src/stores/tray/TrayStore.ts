@@ -195,9 +195,11 @@ export const useTrayStore = defineStore('tray', () => {
 
   // 与首页共用同一个 TUN 切换状态机（回滚顺序、sudo 重试次数等细节只有一份实现）。
   const { applyTunSwitch } = useTunToggle({
+    // 用 getter：i18n.global.t 在 store 初始化时求值一次就被固定，
+    // 语言切换后托盘触发的错误提示会停留在旧语言
     messages: {
-      applyFailed: i18n.global.t('notification.applyProxyFailed'),
-      restartFailed: i18n.global.t('notification.kernelRestartFailed'),
+      applyFailed: () => i18n.global.t('notification.applyProxyFailed'),
+      restartFailed: () => i18n.global.t('notification.kernelRestartFailed'),
     },
     ensurePrivilege: async (target) => {
       if (!target) return 'proceed'

@@ -61,9 +61,24 @@
   静默不显示）。现由 `scripts/gen-country-codes.mjs` 生成，`pnpm test:country-codes` 与
   15 项单元测试双重守护
 
+### 🐛 修复
+
+- **i18n 切换不生效、直接显示 key 原文**（用户报告：代理页显示 `proxy.badgeRecommended`、
+  `PROXY.TABGROUPS` 而非文案）。根因有两处：
+  1. **`LocaleStore` 从未把生效语言写入 vue-i18n 实例**。`createI18n` 建好后
+     `locale` 停在初始的 `zh-CN`，而 store 与 service 层大量使用 `i18n.global.t(...)`
+     （`kernel-service`、`KernelStore`、`TrayStore` 等），它们只读实例上的 locale。
+     组件内 `useI18n()` 看起来正常，掩盖了实例层从未更新的事实。
+     现由 `LocaleStore` 在 `currentLocale` 上 `watch` 并立即应用到实例，
+     切换语言后 store/service 的提示同步生效，首帧也不会再缓存 key 原文。
+  2. **`useTunToggle` 的 `messages` 固化了 `t()` 结果**。调用方在 setup/store 初始化时
+     把 `t('...')` 求值一次存进普通对象，语言切换后不会被重新求值 —— TUN 切换失败的
+     提示会停留在旧语言。改为支持 getter（字面量仍向后兼容），`HomeView` 与
+     `TrayStore` 改用 `() => t(...)`。
+
 ### 🧪 测试与门禁
 
-- 前端测试基建（vitest + @vue/test-utils + jsdom）与 **154 项**测试，覆盖 TUN 切换回滚路径、排序分组、内核错误归因、事件精确退订、配置 schema 对称性、国旗码同步、订阅表单三来源、节点名→国旗解析等此前零覆盖且易回归的逻辑
+- 前端测试基建（vitest + @vue/test-utils + jsdom）与 **159 项**测试，覆盖 TUN 切换回滚路径、排序分组、内核错误归因、事件精确退订、配置 schema 对称性、国旗码同步、订阅表单三来源、节点名→国旗解析、**locale 同步到 vue-i18n 实例**、**注入文案的语言切换**等此前零覆盖且易回归的逻辑
 - 后端新增 **35 项**测试（163 → 198）：数据库全列往返与迁移幂等、多库各自建表、压缩包四种格式解压、配置内存快照一致性、内核存活判定优先级
 - CI 新增 4 道门禁：`cargo fmt --check`、`prettier --check`、前端测试、i18n key 对齐校验；并统一了全库格式（此前 97 个文件未按 prettier 格式化，格式化工具形同虚设）
 - 测试过程中发现并修复 **3 个回归**：TUN 状态机重构时丢失的「索要 sudo 密码后重新执行应用与重启」、配置 schema 中空数组无法清空 `tun_include_macs`、**国旗 URL 大小写回归**（重构时误加 `.toUpperCase()`，而 `flag-icons` 文件名与 `import.meta.glob` 的 key 恒为小写 —— 症状是「节点都识别出来了但一个国旗都不显示」且无任何报错）

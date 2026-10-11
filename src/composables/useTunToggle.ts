@@ -28,8 +28,19 @@ export interface TunToggleMessages {
   restartFailed: string
 }
 
+/**
+ * 文案既可直接给字面量，也可给 getter。
+ *
+ * 必填 getter：i18n 文案若在调用方 setup 时求值一次就存进普通对象，组件后续切换语言时
+ * 不会被重新求值，错误提示会一直停留在切换前的语言（`useTunToggle` 内部是普通对象，
+ * 不是 computed，追踪不到响应式依赖）。
+ */
+export type TunToggleMessageSource = {
+  [K in keyof TunToggleMessages]: TunToggleMessages[K] | (() => TunToggleMessages[K])
+}
+
 export interface TunToggleOptions {
-  messages: TunToggleMessages
+  messages: TunToggleMessageSource
   /** 提权前置；省略则直接执行核心流程 */
   ensurePrivilege?: (target: boolean) => Promise<PrivilegeOutcome>
   /** sudo 密码相关失败的处理；返回 true 表示重试成功 */
@@ -52,6 +63,15 @@ export function useTunToggle(options: TunToggleOptions) {
 
   /** 切换进行中；用于禁用 UI 开关，防止并发触发两条状态机 */
   const pending = ref(false)
+
+  /**
+   * 读取文案。传入 getter 时**每次调用都重新求值**，
+   * 因此调用方可以用 `() => t('...')` 避开 i18n 的时序问题。
+   */
+  const text = (key: keyof TunToggleMessages): string => {
+    const value = options.messages[key]
+    return typeof value === 'function' ? value() : value
+  }
 
   /** 组装一次失败的归因信息（诊断摘要 > lastError > 注入的兜底文案） */
   const describe = (raw: unknown, fallback: string): KernelFailure =>
@@ -80,13 +100,13 @@ export function useTunToggle(options: TunToggleOptions) {
 
       const applied = await kernelStore.applyProxySettings(options.applyOverrides?.(target))
       if (!applied) {
-        return describe(null, options.messages.applyFailed)
+        return describe(null, text('applyFailed'))
       }
 
       const restarted = await kernelStore.restartKernel()
       if (restarted) return null
 
-      const failure = describe(null, options.messages.restartFailed)
+      const failure = describe(null, text('restartFailed'))
       if (!mayRequestSudo || !failure.needsSudoRetry || !options.handleSudoFailure) {
         return failure
       }
@@ -98,7 +118,7 @@ export function useTunToggle(options: TunToggleOptions) {
     }
 
     // 不可达：循环最多两轮，第二轮必定在上面的分支里返回
-    return describe(null, options.messages.restartFailed)
+    return describe(null, text('restartFailed'))
   }
 
   /**
@@ -127,7 +147,7 @@ export function useTunToggle(options: TunToggleOptions) {
       return { status: 'failed', failure }
     } catch (error) {
       await appStore.toggleTun(previous)
-      return { status: 'failed', failure: describe(error, options.messages.restartFailed) }
+      return { status: 'failed', failure: describe(error, text('restartFailed')) }
     } finally {
       pending.value = false
     }

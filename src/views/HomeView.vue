@@ -272,9 +272,11 @@ const showPortModal = ref(false)
 
 // 平台无关的 TUN 切换状态机；平台提权与 sudo 密码交互通过回调注入。
 const { pending: tunTogglePending, applyTunSwitch } = useTunToggle({
+  // 用 getter 而非字面量：i18n 文案在 setup 时求值一次就会被固定在普通对象里，
+  // 组件内切换语言后不会被重新求值，错误提示会停留在旧语言
   messages: {
-    applyFailed: t('notification.proxyModeChangeFailed'),
-    restartFailed: t('home.restartFailed'),
+    applyFailed: () => t('notification.proxyModeChangeFailed'),
+    restartFailed: () => t('home.restartFailed'),
   },
   // Unix 下内核启动前需要 sudo 密码；缺失时先索要再继续
   ensurePrivilege: async (target) => {

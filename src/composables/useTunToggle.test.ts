@@ -26,6 +26,7 @@ const state = vi.hoisted(() => ({
   sudoCodes: [] as string[],
   sudoResult: true,
   privilegeCalls: 0,
+  lang: 'zh' as 'zh' | 'en',
 }))
 
 // 必须返回**稳定单例**：若每次调用新建对象，
@@ -329,6 +330,56 @@ describe('prepareTunAndRestartAsAdmin', () => {
 
     expect(ok).toBe(false)
     expect(state.tunEnabled).toBe(false)
+  })
+})
+
+describe('useTunToggle 的 i18n 文案注入', () => {
+  /**
+   * 回归：调用方此前把 `t('...')` 的结果当字面量传入，在 setup/store 初始化时
+   * 求值一次就固定在普通对象里 —— 组件内切换语言后不会被重新求值，
+   * 错误提示会一直停留在切换前的语言。改为 getter 后每次读取都重新求值。
+   */
+  it('messages 传 getter 时，失败文案随语言切换而更新', async () => {
+    setActivePinia(createPinia())
+    const { useTunToggle } = await import('@/composables/useTunToggle')
+
+    const toggle = useTunToggle({
+      messages: {
+        applyFailed: () => (state.lang === 'zh' ? '应用失败' : 'Apply failed'),
+        restartFailed: () => (state.lang === 'zh' ? '重启失败' : 'Restart failed'),
+      },
+    })
+
+    state.applyResult = false
+    let outcome = await toggle.applyTunSwitch(true)
+    expect(outcome).toEqual({
+      status: 'failed',
+      failure: expect.objectContaining({ text: '应用失败' }),
+    })
+
+    // 切换语言后，同一条失败路径应给出新语言的文案
+    state.lang = 'en'
+    outcome = await toggle.applyTunSwitch(true)
+    expect(outcome).toEqual({
+      status: 'failed',
+      failure: expect.objectContaining({ text: 'Apply failed' }),
+    })
+  })
+
+  it('messages 传字面量时保持向后兼容', async () => {
+    setActivePinia(createPinia())
+    state.applyResult = false
+    const { useTunToggle } = await import('@/composables/useTunToggle')
+
+    const toggle = useTunToggle({
+      messages: { applyFailed: '固定文案', restartFailed: '固定文案' },
+    })
+
+    const outcome = await toggle.applyTunSwitch(true)
+    expect(outcome).toEqual({
+      status: 'failed',
+      failure: expect.objectContaining({ text: '固定文案' }),
+    })
   })
 })
 

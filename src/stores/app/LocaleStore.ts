@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { supportedLocales, DEFAULT_LOCALE, type LocaleCode } from '@/locales'
+import i18n, { supportedLocales, DEFAULT_LOCALE, type LocaleCode } from '@/locales'
 import { DatabaseService } from '@/services/database-service'
 import type { LocaleConfig } from '@/types/database'
 import { flushWatchers } from '@/utils/store-init'
@@ -54,6 +54,20 @@ export const useLocaleStore = defineStore(
       return isLocaleCode(locale.value) ? locale.value : DEFAULT_LOCALE
     })
 
+    /**
+     * 将实际生效的语言写入 vue-i18n 实例。
+     *
+     * 这一步不可省略：`legacy: false` 下 `useI18n()` 能跟随实例的 locale，
+     * 但**组件作用域之外**的代码（`i18n.global.t(...)`）只会读实例上的 locale。
+     * 而 store 与 service 层大量使用 `i18n.global.t`（kernel-service、KernelStore 等）。
+     * 若不同步，实例会永远停在 createI18n 时的初始语言 —— 表现为：
+     * 切换语言后组件内文案变了、store/service 弹出的提示仍是旧语言，
+     * 更糟的是首次渲染早于 locale 就绪时会把 key 原文缓存进 computed。
+     */
+    const applyToI18n = (next: LocaleCode) => {
+      i18n.global.locale.value = next
+    }
+
     // 语言切换
     const setLocale = async (newLocale: Locale) => {
       if (!isLocaleValue(newLocale)) {
@@ -61,6 +75,8 @@ export const useLocaleStore = defineStore(
         return
       }
       locale.value = newLocale
+      // 立即生效，不必等 watch 的调度（首帧尤其重要，避免先渲染出 key 原文）
+      applyToI18n(currentLocale.value)
       // 保存会在 watch 中自动处理
     }
 
@@ -73,6 +89,9 @@ export const useLocaleStore = defineStore(
 
     // 标记是否正在初始化
     let isInitializing = false
+
+    // `locale` 也可能从数据库直接改（如启动恢复），watch 保证实例始终跟随
+    watch(currentLocale, (resolved) => applyToI18n(resolved), { immediate: true })
 
     // 监听语言变化并自动保存到数据库
     watch(
