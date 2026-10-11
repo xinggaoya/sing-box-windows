@@ -14,7 +14,7 @@
 
 ```
 ./
-├── src/                 # 前端应用（路由/页面/store/service/composables）
+├── scripts/             # 内核下载 fetch-kernel、tauri wrapper、目标矩阵、i18n 校验（均带 .test.mjs）
 ├── src-tauri/           # Rust 后端 + Tauri 打包
 │   └── src/
 │       ├── app/             # 业务分层（core/network/singbox/singbox_api/storage/system/tray/constants）
@@ -23,7 +23,6 @@
 │       ├── process/         # 内核进程管理 ProcessManager
 │       ├── types/generated/ # ts-rs 生成的 TS 类型镜像（如 CustomRule.ts）
 │       └── utils/           # 通用工具（http/file/log/process 等）
-├── scripts/             # 内核下载 fetch-kernel、tauri wrapper、目标矩阵（均带 .test.mjs）
 ├── docs/                # 开发文档（development/i18n/release-playbook/CHANGELOG 等）
 └── .github/workflows/   # ci.yml（质量门禁）+ release.yml / promote-release.yml（两阶段发布）
 ```
@@ -51,15 +50,22 @@
 | -------------------- | ------------------------------------------------- | ---------------------------------------- |
 | 前端启动链路         | `src/main.ts`, `src/boot/useAppBootstrap.ts`      | 初始化顺序与事件桥都在这里               |
 | 前端调用后端         | `src/services/invoke-client.ts`                   | 统一入口（端口注入+数据恢复等待）        |
-| 前端事件消费         | `src/services/event-service.ts` + `src/constants/events.ts` | 事件名常量约 27 个             |
+| 前端事件消费         | `src/services/event-service.ts` + `src/constants/events.ts` | 事件名常量约 27 个；统一精确退订 |
+| 应用配置字段         | `src/stores/app/composables/appConfigSchema.ts`     | 52 个字段的单一事实来源；load/save/watch 全自动生成 |
+| TUN 切换状态机       | `src/composables/useTunToggle.ts`                    | 置位→应用→重启→失败回滚；含 sudo 重试与提权 |
+| 排序/分组列表        | `src/composables/useSortableGroupedList.ts`          | 日志页与连接页共用 |
+| 内核错误归因         | `src/utils/kernel-errors.ts`                         | sudo 错误码识别 + 失败文案三级回退 |
+| store 初始化守卫     | `src/utils/store-init.ts`                             | `flushWatchers()` 取代 setTimeout 赌调度 |
 | 路由与托盘空白页     | `src/router/index.ts`, `src/views/BlankView.vue`  | `/blank` 是非标准但关键路径              |
 | gRPC API 客户端      | `src-tauri/src/app/singbox_api/`                  | 替代 experimental.clash_api              |
-| 后端入口与命令注册   | `src-tauri/src/lib.rs`                            | 84 个命令；setup 同步+异步初始化链       |
+| 后端入口与命令注册   | `src-tauri/src/lib.rs`                            | 86 个命令；setup 同步+异步初始化链       |
 | 内核生命周期         | `src-tauri/src/app/core/kernel_service/`          | 高复杂度热点目录                         |
 | 内核版本管理         | `src-tauri/src/app/core/kernel_service/versioning.rs` | 默认最新版；指定版本下载前前端强制确认兼容风险 |
 | 订阅解析与模式切换   | `src-tauri/src/app/network/subscription_service/` | parser/mode/helpers 分层明显             |
 | sing-box 配置生成    | `src-tauri/src/app/singbox/config_generator.rs`   | 1.14 DNS（mDNS/evaluate）与自定义规则注入 |
 | 自定义规则 CRUD      | `src-tauri/src/app/core/proxy_service.rs` + `app/storage/custom_rule.rs` | 后端就绪，前端暂未接线 |
+| 内核压缩包解压       | `src-tauri/src/app/core/kernel_service/archive.rs`   | zip/tar.gz/tgz/tar；阻塞 IO 在 spawn_blocking |
+| 应用配置读写         | `src-tauri/src/app/storage/database.rs` + `enhanced_storage_service.rs` | WAL + busy_timeout + user_version；AppConfig 内存快照 |
 | 存储实现             | `src-tauri/src/app/storage/`                      | SQLite + OnceCell 单例初始化             |
 | 应用内更新           | `src-tauri/src/app/system/update_service.rs`      | 自研 GitHub Release 下载，仅 Windows     |
 | 托盘                 | `src-tauri/src/app/tray/`                         | 启动偏好、状态刷新、动作分发             |
@@ -104,11 +110,15 @@ pnpm install            # 首次
 pnpm kernel:fetch       # 首次构建前必须；--all 为全平台（stable/oldstable/beta/testing 轨道）
 pnpm tauri dev
 
-# 质量门禁
+# 质量门禁（CI 跑的就是这些）
 pnpm lint
 pnpm type-check
+pnpm format:check
+pnpm test:i18n
+pnpm test
 pnpm test:kernel-targets
-cd src-tauri && cargo clippy
+cd src-tauri && cargo fmt --all -- --check
+cd src-tauri && cargo clippy --all-targets -- -D warnings
 cd src-tauri && cargo test
 
 # 构建（全部经 scripts/tauri-wrapper.mjs 包装）
@@ -126,7 +136,9 @@ pnpm tauri build:linux:rpm
 
 ## NOTES
 
-- 当前前端测试文件极少，回归验证以类型检查 + Rust 测试 + 实机联调为主；CI（`.github/workflows/ci.yml`）在 PR/push 时跑上述全部质量门禁。
+- 测试：后端 188 项（`cargo test`），前端 93 项（`vitest`，覆盖 TUN 切换状态机、排序分组、内核错误归因、事件退订、配置 schema 等易回归逻辑）。CI（`.github/workflows/ci.yml`）在 PR/push 时跑 lint / type-check / prettier / i18n key 校验 / vitest / 内核目标矩阵 / cargo fmt / clippy / cargo test 全部门禁。
+- i18n：以 `zh-CN` 为基准，`pnpm test:i18n`（`scripts/check-i18n.mjs`）校验 4 个语言包 key 完全对齐；**禁止**在组件里写 `locale.startsWith('zh') ? '中文' : 'English'` 或 `t(key, '中文兜底')`，一律走 locale 语言包。
+- 事件：统一走 `eventService`，并使用 `on*()` 返回的 unlisten 做**精确**退订；「清空某事件全部监听器」是显式的 `removeAllListenersForEvent()`。已移除 `mitt` 事件总线（事件链从 4 跳缩到 2 跳）。
 - 发布为两阶段：tag 触发 `release.yml` 产 Pre-release（多平台矩阵，含 windows-arm64），再手动触发 `promote-release.yml` 转正式；Release Notes 取自 `docs/CHANGELOG.md`。
 - 应用更新不走 tauri-plugin-updater，由 `system/update_service.rs` 自研（GitHub Releases API，应用内更新仅 Windows）。
 - `tauri-plugin-websocket` 仍在 Rust 侧注册但属遗留；运行态数据链路为：后端 gRPC 订阅 → Tauri event → 前端 `event-service`。

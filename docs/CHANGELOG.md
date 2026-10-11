@@ -7,6 +7,41 @@
 - 修复后台运行一段时间后代理静默失效（需手动重启内核）：hysteria2 等 QUIC 隧道静默死亡（UDP NAT 超时/服务端断开）后，内核进程存活但所有代理流量黑洞。守护的连通性检测此前不走代理（直连探测永远成功），自愈永不触发；现改为通过内核 mixed 端口探测代理链路，并新增直连对照排除系统断网
 - 修复自愈机制对"节点本身不可用"场景的处理：原实现一律重启内核，节点坏时会陷入无限重启循环。现改为分级自愈——先关闭全部连接（软恢复，清空黑洞隧道）→ 仍失败且手动选中的是具体节点时自动切换到"自动选择"（发通知告知）→ 最后才重启内核，且连续 2 次重启无效后熔断（暂停重启、提示用户切换节点/检查订阅，轻量自愈保留，链路恢复后自动解除）
 
+### 🐛 稳定性与并发修复
+
+- **修复 SQLite 并发写风险**：连接此前用 `SqlitePool::connect` 裸连（rollback journal + `busy_timeout=0`），而自动保存、内核守护回写自愈策略、订阅切换等多条路径会并发写，存在 `SQLITE_BUSY` 失败。现改为 WAL + `busy_timeout=5s` + 外键约束 + 连接池上限
+- **修复数据库初始化失败后后台任务永久空转**：`background_tasks` 等待存储就绪时是无超时循环，DB 初始化失败后会每秒打一条 warn 且永不停止（日志磁盘无限增长）。现改为 30 秒上限并返回错误
+- **修复「第二个数据库静默不建表」**：建表使用进程级 `OnceCell`，任何非首个数据库路径（测试库、未来多库）都不会建表。现改为按库幂等执行
+- **修复 schema 迁移静默失败不可观测**：60 条 `ALTER TABLE` 的错误被 `.ok()` 直接丢弃，迁移失败在日志里完全无迹可循，线上仅表现为「某项设置不生效」且无法自查。现改为显式查列后补列、失败时携带完整 SQL 上抛，并新增 `PRAGMA user_version` 记录 schema 版本
+- **修复 Tauri 事件监听被误杀**：`eventService.removeEventListener(name)`（不带 id）会清空该事件下**所有**监听器，而三个 kernel store 都是「先用自己的 unlisten 精确移除、再顺手调一次全局清理」，导致同事件的第二个订阅者被无提示误杀。现拆分为按 id 的精确退订与显式的 `removeAllListenersForEvent()`
+- **修复流量监听器泄漏**：`TrafficStore` 丢弃了 `onTrafficData` 返回的 unlisten，只能靠「清空整事件」退订，现已持有引用
+- **修复主进程错误处理器失效**：`main.ts` 的 `errorHandler` 写在 `mount()` 之后，挂载阶段抛出的错误根本捕获不到（白屏时无任何线索）
+- 修复 `kernel-service` 的 `stopKernel({ force })` 为幽灵参数：在前端 3 层透传但被 service 丢弃，后端 `kernel_stop_enhanced` 也不接收，调用方会误以为传参生效
+- 修复 `UpdateModal` 绕过 `eventService` 直接 `listen`，导致监听器无法被统一清理
+- 修复 22 处日志中的 emoji 被替换成字面 `?`（编码损坏）
+- 修复 `update-progress` 事件 `message` 字段缺失时前端会读到 `undefined`
+
+### ♻️ 重构
+
+- **TUN 切换状态机收敛**：「置位 → 应用代理配置 → 重启内核 → 失败回滚」此前在首页与托盘各有 3 处变体（回滚顺序、重试次数各不相同），现统一为 `useTunToggle`，平台提权与 sudo 密码交互通过回调注入
+- **内核压缩包解压统一**：下载与导入两条路径各有约 170 行几乎相同的解压代码，且行为已分叉（`.tgz` / `.tar` 只在导入路径可用）。现合并为 `archive.rs`，格式支持取并集，阻塞 IO 全部走 `spawn_blocking`（此前解压大包会阻塞 Tauri 异步运行时）
+- **应用配置改为 schema 驱动**：53 个配置字段此前在 7 处手工枚举（store 声明 / 持久化入参 / store return / 接口 / load / save / watch），加一个设置项要改 7 个地方且漏改无任何报错。现由 `appConfigSchema.ts` 单一声明，load/save/watch 自动生成
+- **HTTP 客户端按档位复用**：11 处各自 `reqwest::Client::builder()` 收敛为 `ClientProfile`；其中守护循环每 8 秒重建一个含 TLS 根证书的客户端的问题一并修复
+- **应用配置内存快照**：`db_get_app_config` 全仓 58 处调用点每次都是一次 SQLite 往返加全列映射（守护循环每 8 秒至少读 2 次），现改为写时更新快照、读时命中
+- **移除 `mitt` 事件总线**：所有使用点都是把 Tauri 事件再转发一遍的冗余链路（4 跳缩到 2 跳），message 实例改为直连 store
+- **国际化统一**：清除全部 `locale.startsWith('zh') ? '中文' : 'English'` 三元、`t(key, '中文兜底')` inline default 以及 service/store 层硬编码中文消息。语言包从 597 提升到 665 个 key，补齐日/俄语译文（日/俄用户此前在首页会看到裸 key）
+- **日志页与连接页的排序/分组逻辑**合并为 `useSortableGroupedList`
+- 删除后端死代码约 500 行（`src/error.rs`、`process/error.rs`、gRPC 迁移后遗留的 `event_relay.rs`、未注册的 `kernel_get_status_enhanced` / `kernel_get_snapshot`、未使用的 `KERNEL_READY_NOTIFY` / `ProcessStatus` / `ProcessConfig`）
+- 删除前端死代码约 1100 行（5 个 0 引用组件、3 个 0 引用 composable、2 个 0 引用 service、0 引用的类型文件、失效的 `types/index.d.ts` barrel、`page-layout.css` 中 143 行从未生效的 hero/stat 规则）
+- 5 处用 `setTimeout(100ms)` 赌 Vue 调度时机的 store 初始化守卫，改为确定性的 `flushWatchers()`
+
+### 🧪 测试与门禁
+
+- 新增前端测试基建（vitest + @vue/test-utils + jsdom）与 93 项测试，覆盖 TUN 切换回滚路径、排序分组、内核错误归因、事件精确退订、配置 schema 对称性等此前零覆盖且易回归的逻辑
+- 后端新增 25 项测试（163 → 188）：数据库全列往返与迁移幂等、压缩包四种格式解压、配置内存快照一致性
+- CI 新增 4 道门禁：`cargo fmt --check`、`prettier --check`、前端测试、i18n key 对齐校验；并统一了全库格式（此前 97 个文件未按 prettier 格式化，格式化工具形同虚设）
+- 测试过程中发现并修复 2 个回归：TUN 状态机重构时丢失的「索要 sudo 密码后重新执行应用与重启」、配置 schema 中空数组无法清空 `tun_include_macs`
+
 ## [v2.3.2] - 2026-09-08
 
 ### 🐛 问题修复

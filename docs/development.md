@@ -94,6 +94,8 @@ Sing-Box Windows 是一个跨平台桌面客户端，前端使用 Vue 3 + TypeSc
 `src-tauri/src/app/` 是后端主业务目录，当前可以按职责理解为：
 
 - `core/`
+  - `kernel_service/`：内核生命周期（orchestrator 单队列串行化 / runtime / guard 分级自愈 /
+    state 状态机 / event 事件中继 / **archive 压缩包解压**）
   - 内核启停
   - 代理模式切换
   - 运行健康检查
@@ -104,8 +106,10 @@ Sing-Box Windows 是一个跨平台桌面客户端，前端使用 Vue 3 + TypeSc
   - 自动更新
   - 配置切换与回滚
 - `storage/`
-  - SQLite 初始化与迁移
+  - SQLite 初始化与迁移（WAL + busy_timeout + `user_version` 版本记录；
+    增量列用显式查列的 `ensure_columns`，不再静默吞错）
   - 应用配置、主题、语言、窗口、更新设置持久化
+  - 应用配置内存快照（`AppConfig` 写时更新、读时命中，避免高频 SQLite 往返）
   - 与配置文件同步
 - `system/`
   - 平台能力
@@ -210,8 +214,18 @@ pnpm type-check
 # 前端 lint
 pnpm lint
 
-# Rust 静态检查
-cd src-tauri && cargo clippy
+# 前端格式化检查
+pnpm format:check
+
+# 前端单元测试
+pnpm test
+
+# i18n key 对齐校验（4 语言包）
+pnpm test:i18n
+
+# Rust 格式化 / 静态检查
+cd src-tauri && cargo fmt --all -- --check
+cd src-tauri && cargo clippy --all-targets -- -D warnings
 
 # Rust 测试
 cd src-tauri && cargo test
@@ -289,6 +303,36 @@ $env:SING_BOX_KERNEL_FETCH_MODE='force'; pnpm tauri build
 - 页面尽量通过 `stores/` 和 `services/` 与后端交互
 - 不要在页面里分散写大量原始 `invoke`
 - 新命令优先补到相应 service，再由页面调用
+- 页面/组件内**禁止**出现用户可见的硬编码文案：
+  一律 `t('xxx.yyy')` 走 locale 语言包。不要写 `locale.startsWith('zh') ? '中文' : 'English'`
+  （会让日/俄用户看到英文），也不要写 `t(key, '中文兜底')`（绕过语言包且让 key 缺失无法被 CI 发现）。
+  新增文案后跑 `pnpm test:i18n` 确保 4 个语言包 key 对齐
+
+### 事件订阅约定
+
+- 所有后端事件统一经 `services/event-service.ts` 注册，不要直接 `listen()`
+- 退订必须使用 `on*()` 返回的 unlisten（**精确**移除单个监听器）
+- 「清空某事件全部监听器」是破坏性操作，只能用显式的
+  `removeAllListenersForEvent(eventName)`，并确认确实要连带清掉其他订阅者
+- 项目已移除 `mitt` 事件总线：跨层传递状态请走 Pinia store（如 message 实例），
+  后端事件请直接订阅
+
+### 状态机与可复用逻辑
+
+- TUN 开关切换（含失败回滚、sudo 密码重试、平台提权）统一用 `composables/useTunToggle.ts`，
+  不要在页面里另写一份
+- 可排序 / 可分组列表统一用 `composables/useSortableGroupedList.ts`
+- 内核错误归因（sudo 错误码识别、失败文案三级回退）统一用 `utils/kernel-errors.ts`
+- 新增应用配置字段：只在 `stores/app/composables/appConfigSchema.ts` 追加一行声明，
+  load/save/watch 会自动生成（此前 53 个字段散落 7 处手工枚举，加一项要改 7 个地方）
+
+### 测试约定
+
+- 纯逻辑（composable / utils / schema）用 vitest 写在同目录的 `*.test.ts`
+- 已有覆盖：`useTunToggle`（回滚路径）、`useSortableGroupedList`、`kernel-errors`、
+  `event-service`、`store-init`、`appConfigSchema`
+- 后端测试与实现分离为 `*.tests.rs`，用 `#[path = "...tests.rs"] mod tests;` 引入
+- 改动 TUN 切换、配置持久化、事件退订、内核解压这几块时务必补测试
 
 ### 一个推荐写法
 
@@ -390,9 +434,14 @@ const refreshCurrentSubscription = async () => {
 ```bash
 pnpm lint
 pnpm type-check
-cd src-tauri && cargo clippy && cargo test
+cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test
 pnpm test:kernel-targets
 ```
+
+CI（`.github/workflows/ci.yml`）在 PR / push 到 master 时依次跑：
+lint → type-check → prettier → i18n key 校验 → 前端测试 → 内核目标矩阵 →
+`cargo fmt --check` → `cargo clippy -D warnings` → `cargo test`。
+本地提交前建议至少跑一遍 `pnpm lint && pnpm type-check && pnpm test`。
 
 ### 预发布
 
