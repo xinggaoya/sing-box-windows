@@ -10,7 +10,6 @@ pub mod singbox;
 
 // Core services
 pub mod core {
-    pub mod event_relay;
     pub mod kernel_auto_manage;
     pub mod kernel_service;
     pub mod proxy_service;

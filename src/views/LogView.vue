@@ -125,7 +125,11 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import ToolbarBar from '@/components/common/ToolbarBar.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { useLogStore, type LogEntry } from '@/stores/kernel/LogStore'
+import { useSortableGroupedList } from '@/composables/useSortableGroupedList'
 import { useI18n } from 'vue-i18n'
+
+/** 日志排序字段（与 LogStore.sortKey 的持久化类型一致） */
+type LogSortKey = 'seq' | 'type' | 'timestamp'
 
 defineOptions({
   name: 'LogView',
@@ -181,37 +185,17 @@ const groupingOptions = computed(() => [
   { label: t('log.groupByDate'), value: 'date' },
 ])
 
-const sortedLogs = computed(() => {
-  const list = [...logStore.filteredLogs]
-  const factor = logStore.sortDesc ? -1 : 1
-
-  return list.sort((left, right) => {
-    const leftValue = left[logStore.sortKey]
-    const rightValue = right[logStore.sortKey]
-
-    if (typeof leftValue === 'number' && typeof rightValue === 'number') {
-      return (leftValue - rightValue) * factor
-    }
-
-    return String(leftValue).localeCompare(String(rightValue)) * factor
-  })
-})
-
-const groupedLogs = computed(() => {
-  const groupingKey = logStore.groupingKey
-  if (!groupingKey) {
-    return [{ key: '', items: sortedLogs.value }]
-  }
-
-  const groups = new Map<string, typeof sortedLogs.value>()
-  sortedLogs.value.forEach((log) => {
-    const key = groupingKey === 'type' ? log.type : formatDate(log.timestamp)
-    const items = groups.get(key) || []
-    items.push(log)
-    groups.set(key, items)
-  })
-
-  return Array.from(groups.entries()).map(([key, items]) => ({ key, items }))
+// 排序/分组逻辑与连接页共用同一实现（见 useSortableGroupedList）
+const { sorted: sortedLogs, groups: groupedLogs } = useSortableGroupedList<LogEntry, LogSortKey>({
+  source: computed(() => logStore.filteredLogs),
+  // store 上是解包后的普通值，需包一层 computed 供 composable 响应式读取
+  state: {
+    sortKey: computed(() => logStore.sortKey as LogSortKey),
+    sortDesc: computed(() => logStore.sortDesc),
+    groupingKey: computed(() => (logStore.groupingKey ?? '') as LogSortKey | ''),
+  },
+  getSortValue: (log, key) => log[key],
+  getGroupKey: (log, key) => (key === 'type' ? log.type : formatDate(log.timestamp)),
 })
 
 const clearLogs = () => {

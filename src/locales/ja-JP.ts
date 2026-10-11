@@ -63,6 +63,7 @@ export default {
     nodeModeChangeSuccess: 'ノードモードの切り替え成功',
     nodeModeChangeFailed: 'ノードモードの切り替え失敗',
     restartSuccess: 'カーネルが正常に再起動しました。',
+    memory: 'メモリ使用量',
 
     // WebSocket状态
     wsStatus: {
@@ -87,12 +88,14 @@ export default {
     },
 
     // 状态描述
-    status: {
+    statusDescriptions: {
+      runningDesc: 'カーネルが実行中、プロキシサービスが利用可能',
+      disconnectedDesc: 'カーネルは起動していますが接続に異常があります、設定を確認してください',
+    },
+    kernelStatusDescriptions: {
       startingDesc: 'カーネルを起動中です、お待ちください...',
       stoppingDesc: 'カーネルを停止中です、お待ちください...',
-      runningDesc: 'カーネルが実行中、プロキシサービスが利用可能',
       stoppedDesc: 'カーネルが停止しています、プロキシサービスは利用できません',
-      disconnectedDesc: 'カーネルは起動していますが接続に異常があります、設定を確認してください',
     },
 
     // 流量统计
@@ -104,6 +107,9 @@ export default {
       downloadTotal: '総ダウンロード',
       memory: 'メモリ使用量',
       connectionsLabel: '接続',
+      up: 'アップロード',
+      down: 'ダウンロード',
+      total: '合計',
     },
 
     // 流量代理模式
@@ -407,7 +413,6 @@ export default {
     title: '設定',
     subtitle: 'アプリケーション設定とシステム設定の管理',
     appVersion: 'アプリバージョン',
-    kernelVersion: 'カーネルバージョン',
     notInstalled: 'インストールされていません',
     newVersionFound: '新しいバージョンが見つかりました',
     navigation: {
@@ -555,6 +560,7 @@ export default {
     autoStart: {
       app: 'システム起動時に起動',
       appDesc: 'システム起動時にアプリを自動的に実行',
+      error: 'システム起動時の自動起動の設定に失敗しました',
     },
 
     // 启动设置

@@ -115,9 +115,7 @@ async fn make_grpc_handle(app_handle: &AppHandle) -> Result<ApiClientHandle, Str
     let app_config = db_get_app_config(app_handle.clone())
         .await
         .map_err(|e| format!("获取应用配置失败: {}", e))?;
-    Ok(ApiClientHandle::new(ApiClientConfig::localhost(
-        app_config.api_port,
-    )))
+    ApiClientHandle::new(ApiClientConfig::localhost(app_config.api_port)).map_err(|e| e.to_string())
 }
 
 async fn set_clash_mode_via_grpc(app_handle: &AppHandle, mode: &str) -> Result<(), String> {

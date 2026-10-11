@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { APP_EVENTS } from '@/constants/events'
 import type { TrafficDataPayload } from '@/types/events'
 import { eventService } from '@/services/event-service'
 
@@ -31,6 +30,7 @@ export const useTrafficStore = defineStore(
 
     // 事件监听器状态
     let eventListenersSetup = false
+    let trafficUnlisten: (() => void) | null = null
 
     // 内存清理定时器
     let memoryCleanupTimer: number | null = null
@@ -74,7 +74,9 @@ export const useTrafficStore = defineStore(
 
       try {
         // 监听流量数据事件
-        await eventService.onTrafficData((data) => {
+        // 必须持有 unlisten：早先这里丢弃了返回的 unlisten，只能靠“清空整个事件”
+        // 来退订，一旦别的组件也订阅了traffic-data 就会被连带误杀，且会泄漏。
+        trafficUnlisten = await eventService.onTrafficData((data) => {
           if (data && typeof data === 'object' && 'up' in data && 'down' in data) {
             updateTrafficStats(data as TrafficDataPayload)
           }
@@ -96,10 +98,12 @@ export const useTrafficStore = defineStore(
       if (!eventListenersSetup) return
 
       try {
-        eventService.removeEventListener(APP_EVENTS.trafficData)
+        // 只移除本 store 自己的监听器
+        trafficUnlisten?.()
       } catch (error) {
         console.error('清理流量监听器时出错:', error)
       } finally {
+        trafficUnlisten = null
         eventListenersSetup = false
       }
     }

@@ -323,7 +323,8 @@ async fn make_handle_async(app_handle: AppHandle) -> Result<(ApiClientHandle, Ap
         .await
         .map_err(|e| format!("获取应用配置失败: {}", e))?;
     let config = ApiClientConfig::localhost(app_config.api_port);
-    Ok((ApiClientHandle::new(config.clone()), config))
+    let handle = ApiClientHandle::new(config.clone()).map_err(|e| e.to_string())?;
+    Ok((handle, config))
 }
 
 /// 获取 sing-box 内核版本号

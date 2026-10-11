@@ -5,6 +5,7 @@ import type { MessageApi } from 'naive-ui/es/message'
 import { kernelService } from '@/services/kernel-service'
 import { useAppMessaging } from './composables/messaging'
 import { createAppPersistence } from './composables/persistence'
+import { flushWatchers } from '@/utils/store-init'
 
 // 代理模式类型
 export type ProxyMode = 'system' | 'tun' | 'manual'
@@ -219,7 +220,9 @@ export const useAppStore = defineStore(
         // 注意：自动启动内核的逻辑现在由 App.vue 统一处理
         // 这里只加载数据，不执行启动逻辑，避免重复
 
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        // 等待 Vue 调度器 flush：由本次加载引发的 watch 回调必须先跑完再解除保存抑制
+        // （原先用 setTimeout(100ms) 赌调度时机，慢机器上不够用）
+        await flushWatchers()
       } finally {
         finishInitialization()
       }

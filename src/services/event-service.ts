@@ -69,7 +69,7 @@ export class EventService {
       callback(event.payload as AppEventPayloads[typeof APP_EVENTS.trafficData])
     })
     const id = this.registerListener(APP_EVENTS.trafficData, unlisten)
-    return () => this.removeEventListener(APP_EVENTS.trafficData, id)
+    return () => this.removeEventListenerById(APP_EVENTS.trafficData, id)
   }
 
   /**
@@ -82,7 +82,7 @@ export class EventService {
       callback(event.payload as AppEventPayloads[typeof APP_EVENTS.memoryData])
     })
     const id = this.registerListener(APP_EVENTS.memoryData, unlisten)
-    return () => this.removeEventListener(APP_EVENTS.memoryData, id)
+    return () => this.removeEventListenerById(APP_EVENTS.memoryData, id)
   }
 
   /**
@@ -95,7 +95,7 @@ export class EventService {
       callback(event.payload as AppEventPayloads[typeof APP_EVENTS.logData])
     })
     const id = this.registerListener(APP_EVENTS.logData, unlisten)
-    return () => this.removeEventListener(APP_EVENTS.logData, id)
+    return () => this.removeEventListenerById(APP_EVENTS.logData, id)
   }
 
   /**
@@ -108,7 +108,7 @@ export class EventService {
       callback(event.payload as AppEventPayloads[typeof APP_EVENTS.connectionsData])
     })
     const id = this.registerListener(APP_EVENTS.connectionsData, unlisten)
-    return () => this.removeEventListener(APP_EVENTS.connectionsData, id)
+    return () => this.removeEventListenerById(APP_EVENTS.connectionsData, id)
   }
 
   /**
@@ -119,11 +119,13 @@ export class EventService {
       callback()
     })
     const id = this.registerListener(APP_EVENTS.kernelReady, unlisten)
-    return () => this.removeEventListener(APP_EVENTS.kernelReady, id)
+    return () => this.removeEventListenerById(APP_EVENTS.kernelReady, id)
   }
 
   /**
    * 通用事件监听方法
+   *
+   * @returns 精确的 unlisten 函数：只移除本次注册的那个监听器，不影响其他订阅者。
    */
   public async on<K extends AppEventName>(
     eventName: K,
@@ -136,19 +138,23 @@ export class EventService {
     })
     const id = this.registerListener(eventName, unlisten)
 
-    // 返回取消监听的函数
-    return () => this.removeEventListener(eventName, id)
+    return () => this.removeEventListenerById(eventName, id)
   }
 
   /**
-   * 移除特定事件监听器
+   * 移除某个事件下的**全部**监听器。
+   *
+   * ⚠️ 这是“整事件清空”而非“移除单个监听器”。早期这里叫 `removeEventListener(name)`,
+   * 与上面的单监听器移除同名，极易误用：store 先用自己的 `unlisten()` 按 id 移除后，
+   * 又顺手调一次这个方法，结果把该事件下**其他订阅者**的监听器一并清掉
+   * （例如第二个组件刚注册好连接监听就被误杀，且不会有任何报错）。
+   *
+   * 因此：
+   * - 名字改为 `removeAllListenersForEvent`，把“清空”语义显式化；
+   * - 优先使用 `on*()` 返回的 unlisten 函数做精确移除，本方法只用于
+   *   “确认要连带清掉该事件所有订阅者”的场景（如内核重启前统一解绑）。
    */
-  public removeEventListener(eventName: AppEventName | string, id?: number) {
-    if (typeof id === 'number') {
-      this.removeEventListenerById(eventName, id)
-      return
-    }
-
+  public removeAllListenersForEvent(eventName: AppEventName | string) {
     const listeners = this.eventListeners.get(eventName)
     if (!listeners) return
 

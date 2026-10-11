@@ -69,7 +69,13 @@ pub(super) async fn start_websocket_relay(
     };
 
     let config = ApiClientConfig::localhost(port);
-    let handle = ApiClientHandle::new(config);
+    let handle = match ApiClientHandle::new(config) {
+        Ok(handle) => handle,
+        Err(error) => {
+            tracing::error!("❌ 创建 sing-box gRPC 客户端失败，事件中继不会启动: {}", error);
+            return Err(format!("创建 sing-box gRPC 客户端失败: {}", error));
+        }
+    };
     let notify = SHOULD_STOP_EVENTS
         .get_or_init(|| async { Notify::new() })
         .await;

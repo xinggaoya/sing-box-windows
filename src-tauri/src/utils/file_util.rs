@@ -1,10 +1,11 @@
-use crate::app::constants::{messages, network_config};
+use crate::app::constants::messages;
 use futures::StreamExt;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use tracing::{error, info};
 use zip::ZipArchive;
+use crate::utils::http_client;
 
 // 根据url下载文件到指定位置
 pub async fn download_file<F>(url: String, path: &str, progress_callback: F) -> Result<(), String>
@@ -19,13 +20,7 @@ where
         file_path.to_str().unwrap_or("<non-utf8-path>")
     );
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(
-            network_config::HTTP_TIMEOUT_SECONDS,
-        ))
-        .no_proxy() // 禁用代理
-        .build()
-        .map_err(|e| format!("{}: {}", messages::ERR_HTTP_CLIENT_FAILED, e))?;
+    let client = http_client::profile_client(http_client::ClientProfile::Default);
 
     let response = client
         .get(&url)

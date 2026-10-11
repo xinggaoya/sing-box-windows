@@ -2,7 +2,7 @@ use crate::utils::proxy_util::DEFAULT_BYPASS_LIST;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../src/types/generated/AppConfig.ts")]
 pub struct AppConfig {
     pub auto_start_kernel: bool,

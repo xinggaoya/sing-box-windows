@@ -126,14 +126,9 @@ import {
   AlertCircleOutline,
   OpenOutline,
 } from '@vicons/ionicons5'
-import { listen, type Event } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
-
-interface UpdateProgressPayload {
-  status: 'checking' | 'downloading' | 'completed' | 'error' | 'installing'
-  progress: number
-  message: string
-}
+import { eventService } from '@/services/event-service'
+import { APP_EVENTS, type AppEventPayloads } from '@/constants/events'
 
 interface UpdateModalProps {
   show?: boolean
@@ -262,13 +257,20 @@ const setupProgressListener = async () => {
   if (unlisten || !props.supportsInAppUpdate) return
 
   try {
-    unlisten = await listen<UpdateProgressPayload>(
-      'update-progress',
-      (event: Event<UpdateProgressPayload>) => {
-        const { status, progress, message: rawMessage } = event.payload
+    // 统一走 eventService（此前直接 listen，绕过注册表，
+    // 导致 eventService.destroy() 清不掉这里的监听器，HMR / 重初始化时会泄漏）。
+    unlisten = await eventService.on<typeof APP_EVENTS.updateProgress>(
+      APP_EVENTS.updateProgress,
+      (payload: AppEventPayloads[typeof APP_EVENTS.updateProgress]) => {
+        const { status, progress } = payload
+        // 后端每个 update-progress 都带message，但类型上声明为可选
+        // （未来新增状态可能省略），因此这里做一次兜底而不是假设它必然存在。
+        const rawMessage = payload.message ?? ''
         updateProgress.value = progress
         progressMessage.value =
-          status === 'installing' ? t('setting.update.installStarted') : rawMessage
+          status === 'installing'
+            ? t('setting.update.installStarted')
+            : rawMessage || t('setting.update.preparingDownload')
 
         if (status === 'downloading') {
           updateStatus.value = 'downloading'
@@ -279,7 +281,7 @@ const setupProgressListener = async () => {
           setTimeout(() => handleUpdateShow(false), 2000)
         } else if (status === 'error') {
           updateStatus.value = 'error'
-          updateError.value = rawMessage
+          updateError.value = rawMessage || t('setting.update.updateFailed')
           isUpdating.value = false
         } else if (status === 'installing') {
           updateStatus.value = 'installing'

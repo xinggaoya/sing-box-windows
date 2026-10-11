@@ -1,18 +1,6 @@
-use crate::app::constants::process as process_constants;
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub mod manager;
-
-// 进程状态枚举
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ProcessStatus {
-    Starting,
-    Running,
-    Stopping,
-    Stopped,
-    Failed(String),
-}
 
 // 进程错误类型
 #[derive(Debug, Clone)]
@@ -57,23 +45,3 @@ impl fmt::Display for ProcessError {
 impl std::error::Error for ProcessError {}
 
 pub type Result<T> = std::result::Result<T, ProcessError>;
-
-// 进程配置结构体
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessConfig {
-    pub graceful_timeout: u64,      // 优雅关闭超时时间(秒)
-    pub health_check_interval: u64, // 健康检查间隔(秒)
-    pub max_restart_attempts: u32,  // 最大重启尝试次数
-    pub restart_delay: u64,         // 重启延迟时间(秒)
-}
-
-impl Default for ProcessConfig {
-    fn default() -> Self {
-        Self {
-            graceful_timeout: process_constants::GRACEFUL_TIMEOUT,
-            health_check_interval: process_constants::HEALTH_CHECK_INTERVAL,
-            max_restart_attempts: process_constants::MAX_RESTART_ATTEMPTS,
-            restart_delay: process_constants::RESTART_DELAY,
-        }
-    }
-}

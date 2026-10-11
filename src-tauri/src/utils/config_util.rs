@@ -75,18 +75,30 @@ impl ConfigUtil {
     }
 
     /// 修改或添加键值对
+    ///
+    /// `target_keys` 为空时会 panic（`len() - 1` 整数下溢 + 越界），
+    /// 因此先做防御：空路径直接返回，不做任何修改。
     pub fn update_key(&mut self, target_keys: Vec<&str>, new_value: Value) {
-        let mut current = &mut self.json;
+        let Some((last_key, parents)) = target_keys.split_last() else {
+            tracing::warn!("update_key 收到空的键路径，已忽略本次修改");
+            return;
+        };
 
-        for key in &target_keys[0..target_keys.len() - 1] {
+        let mut current = &mut self.json;
+        for key in parents {
             if current.get(key).is_none() {
                 current[key] = json!({});
             }
-            current = current.get_mut(key).unwrap();
+            // 上一步刚保证了该键存在；若仍取不到（例如中间节点是标量而非对象），
+            // `get_mut` 返回 None，此时无法继续下钻，直接放弃修改而不是 panic。
+            let Some(next) = current.get_mut(key) else {
+                tracing::warn!("update_key 路径 {} 不是对象，已中断修改", key);
+                return;
+            };
+            current = next;
         }
 
-        let last_key = target_keys[target_keys.len() - 1];
-        current[last_key] = new_value;
+        current[*last_key] = new_value;
     }
 
     /// 将修改后的 JSON 写回到文件

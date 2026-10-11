@@ -13,6 +13,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 use tokio::process::Command;
 use tracing::{info, warn};
+use super::archive;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct KernelImportResult {
@@ -163,10 +164,15 @@ async fn resolve_kernel_binary_source(
         return Ok(selected_path.to_path_buf());
     }
 
+    // 解压与查找统一走 archive 模块（格式支持 zip / tar.gz / tgz / tar，
+    // 且内部在 spawn_blocking 中执行，不会阻塞异步运行时）
     let extract_dir = temp_dir.join("extract");
-    std::fs::create_dir_all(&extract_dir).map_err(|e| format!("创建解压目录失败: {}", e))?;
-    extract_archive(selected_path, &extract_dir)?;
-    find_executable_file(&extract_dir, kernel_executable_name())
+    archive::extract(selected_path, &extract_dir)
+        .await
+        .map_err(|e| e.to_string())?;
+    archive::find_executable(&extract_dir, kernel_executable_name())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 async fn stage_kernel_binary(
@@ -177,7 +183,7 @@ async fn stage_kernel_binary(
     tokio::fs::copy(source_binary_path, &staged_path)
         .await
         .map_err(|e| format!("复制导入文件失败: {}", e))?;
-    set_executable_permission(&staged_path)?;
+    archive::set_executable_permission(&staged_path).map_err(|e| e.to_string())?;
     Ok(staged_path)
 }
 
@@ -331,110 +337,4 @@ async fn wait_kernel_running(timeout: Duration) -> bool {
         tokio::time::sleep(Duration::from_millis(400)).await;
     }
     false
-}
-
-fn extract_archive(archive_path: &Path, extract_to: &Path) -> Result<(), String> {
-    let lower = archive_path.to_string_lossy().to_ascii_lowercase();
-    if lower.ends_with(".zip") {
-        extract_zip_archive(archive_path, extract_to)?;
-    } else if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
-        extract_tar_gz_archive(archive_path, extract_to)?;
-    } else if lower.ends_with(".tar") {
-        extract_tar_archive(archive_path, extract_to)?;
-    } else {
-        return Err("不支持的压缩包格式，仅支持 zip / tar.gz / tgz / tar".to_string());
-    }
-
-    Ok(())
-}
-
-fn extract_zip_archive(archive_path: &Path, extract_to: &Path) -> Result<(), String> {
-    use zip::ZipArchive;
-
-    let file = std::fs::File::open(archive_path).map_err(|e| format!("打开 ZIP 失败: {}", e))?;
-    let mut zip = ZipArchive::new(file).map_err(|e| format!("解析 ZIP 失败: {}", e))?;
-
-    for i in 0..zip.len() {
-        let mut entry = zip
-            .by_index(i)
-            .map_err(|e| format!("读取 ZIP 条目失败: {}", e))?;
-        let target = extract_to.join(entry.name());
-
-        if entry.name().ends_with('/') {
-            std::fs::create_dir_all(&target).map_err(|e| format!("创建目录失败: {}", e))?;
-            continue;
-        }
-
-        if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
-        }
-
-        let mut out = std::fs::File::create(&target).map_err(|e| format!("写入文件失败: {}", e))?;
-        std::io::copy(&mut entry, &mut out).map_err(|e| format!("解压 ZIP 失败: {}", e))?;
-    }
-
-    Ok(())
-}
-
-fn extract_tar_gz_archive(archive_path: &Path, extract_to: &Path) -> Result<(), String> {
-    use flate2::read::GzDecoder;
-    use tar::Archive;
-
-    let file = std::fs::File::open(archive_path).map_err(|e| format!("打开 tar.gz 失败: {}", e))?;
-    let decoder = GzDecoder::new(file);
-    let mut archive = Archive::new(decoder);
-    archive
-        .unpack(extract_to)
-        .map_err(|e| format!("解压 tar.gz 失败: {}", e))
-}
-
-fn extract_tar_archive(archive_path: &Path, extract_to: &Path) -> Result<(), String> {
-    use tar::Archive;
-
-    let file = std::fs::File::open(archive_path).map_err(|e| format!("打开 tar 失败: {}", e))?;
-    let mut archive = Archive::new(file);
-    archive
-        .unpack(extract_to)
-        .map_err(|e| format!("解压 tar 失败: {}", e))
-}
-
-fn find_executable_file(search_dir: &Path, executable_name: &str) -> Result<PathBuf, String> {
-    let direct_path = search_dir.join(executable_name);
-    if direct_path.exists() && direct_path.is_file() {
-        return Ok(direct_path);
-    }
-
-    for entry in walkdir::WalkDir::new(search_dir).into_iter().flatten() {
-        let path = entry.path();
-        if path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name == executable_name)
-            .unwrap_or(false)
-            && path.is_file()
-        {
-            return Ok(path.to_path_buf());
-        }
-    }
-
-    Err(format!(
-        "在压缩包内未找到内核可执行文件: {}",
-        executable_name
-    ))
-}
-
-#[cfg(unix)]
-fn set_executable_permission(file_path: &Path) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let mut perms = std::fs::metadata(file_path)
-        .map_err(|e| format!("读取文件权限失败: {}", e))?
-        .permissions();
-    perms.set_mode(perms.mode() | 0o755);
-    std::fs::set_permissions(file_path, perms).map_err(|e| format!("设置执行权限失败: {}", e))
-}
-
-#[cfg(not(unix))]
-fn set_executable_permission(_file_path: &Path) -> Result<(), String> {
-    Ok(())
 }

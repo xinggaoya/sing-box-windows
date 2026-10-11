@@ -7,12 +7,6 @@ pub mod process {
     /// Windows 创建进程时隐藏控制台窗口的标志
     #[cfg(target_os = "windows")]
     pub const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-    /// 进程超时和延迟常量（秒）
-    pub const GRACEFUL_TIMEOUT: u64 = 5;
-    pub const HEALTH_CHECK_INTERVAL: u64 = 30;
-    pub const MAX_RESTART_ATTEMPTS: u32 = 3;
-    pub const RESTART_DELAY: u64 = 1;
 }
 
 /// 文件路径常量

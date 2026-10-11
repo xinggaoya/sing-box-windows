@@ -9,6 +9,8 @@ use std::time::Duration;
 use tauri::Manager;
 use tauri::{AppHandle, Emitter, WebviewWindow};
 use tracing::{info, warn};
+use super::archive;
+use crate::utils::http_client;
 
 #[tauri::command]
 pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> Result<(), String> {
@@ -176,7 +178,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
                     json!({
                         "status": "downloading",
                         "progress": 15 + (index * 5),
-                        "message": format!("?? {} - 尝试下一个下载源...", error_details)
+                        "message": format!("🔄 {} - 尝试下一个下载源...", error_details)
                     }),
                 );
 
@@ -251,7 +253,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
     );
 
     // 解压到临时目录
-    if let Err(e) = extract_archive(&download_path, &temp_update_dir).await {
+    if let Err(e) = archive::extract(&download_path, &temp_update_dir).await {
         let error_msg = format!("解压文件失败: {}", e);
         let _ = window.emit(
             "kernel-download-progress",
@@ -277,12 +279,12 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
     info!("开始在临时目录中查找新内核: {}", executable_name);
 
     // 在临时目录中查找
-    let found_executable_path = match find_executable_file(&temp_update_dir, executable_name).await
+    let found_executable_path = match archive::find_executable(&temp_update_dir, executable_name).await
     {
         Ok(p) => p,
-        Err(e) => {
+        Err(error) => {
             let _ = std::fs::remove_dir_all(&temp_update_dir);
-            return Err(e);
+            return Err(error.to_string());
         }
     };
 
@@ -352,7 +354,11 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
                 && path.file_name().unwrap_or_default() != "logs"
                 && path.file_name().unwrap_or_default() != "update_temp"
             {
-                let name = path.file_name().unwrap().to_string_lossy();
+                // `file_name()` 对 `..` / 根目录返回 None；原先的 `unwrap()` 会直接 panic，
+                // 而这里只是“清理看起来像旧版本目录的残留”，拿不到名字就该跳过。
+                let Some(name) = path.file_name().map(|n| n.to_string_lossy()) else {
+                    continue;
+                };
                 if name.starts_with("sing-box-") {
                     let _ = std::fs::remove_dir_all(&path);
                 }
@@ -361,7 +367,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
     }
 
     if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-        if let Err(e) = set_executable_permission(&target_executable_path) {
+        if let Err(e) = archive::set_executable_permission(&target_executable_path) {
             warn!("设置执行权限失败: {}, 将继续...", e);
         }
     }
@@ -408,10 +414,8 @@ async fn download_file(
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(300))
-        .user_agent("sing-box-windows/1.8.2")
-        .build()?;
+    // 复用全局档位客户端（5 分钟超时），不再每次下载都新建（含 TLS 根证书加载）
+    let client = http_client::profile_client(http_client::ClientProfile::LongDownload);
 
     info!("开始下载: {}", url);
     let response = client.get(url).send().await?;
@@ -448,177 +452,5 @@ async fn download_file(
     }
 
     file.flush().await?;
-    Ok(())
-}
-
-async fn extract_archive(
-    archive_path: &Path,
-    extract_to: &Path,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("开始解压文件: {:?}", archive_path);
-
-    if !archive_path.exists() {
-        return Err(format!("压缩文件不存在: {:?}", archive_path).into());
-    }
-
-    let metadata = std::fs::metadata(archive_path)?;
-    let file_size = metadata.len();
-    info!("压缩文件大小: {} bytes", file_size);
-
-    if file_size == 0 {
-        return Err("压缩文件为空".into());
-    }
-
-    let file_extension = archive_path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-
-    if file_extension == "zip" {
-        extract_zip_archive(archive_path, extract_to).await?;
-    } else if file_extension == "gz" || archive_path.to_string_lossy().ends_with(".tar.gz") {
-        extract_tar_gz_archive(archive_path, extract_to).await?;
-    } else {
-        return Err(format!("不支持的压缩格式: {}", file_extension).into());
-    }
-
-    if let Ok(entries) = std::fs::read_dir(extract_to) {
-        info!("解压后的文件:");
-        for entry in entries.flatten() {
-            info!("  - {:?}", entry.path());
-        }
-    }
-
-    Ok(())
-}
-
-async fn extract_zip_archive(
-    archive_path: &Path,
-    extract_to: &Path,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use zip::ZipArchive;
-
-    info!("解压 ZIP 文件: {:?}", archive_path);
-
-    let file = std::fs::File::open(archive_path)?;
-    let mut zip = ZipArchive::new(file)?;
-
-    if !extract_to.exists() {
-        std::fs::create_dir_all(extract_to)?;
-    }
-
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i)?;
-        let file_path = extract_to.join(file.name());
-
-        if file.name().ends_with('/') {
-            if let Some(parent) = file_path.parent() {
-                if !parent.exists() {
-                    std::fs::create_dir_all(parent)?;
-                }
-            }
-            continue;
-        }
-
-        if let Some(parent) = file_path.parent() {
-            if !parent.exists() {
-                std::fs::create_dir_all(parent)?;
-            }
-        }
-
-        let mut output_file = std::fs::File::create(&file_path)?;
-        std::io::copy(&mut file, &mut output_file)?;
-    }
-
-    info!("ZIP 文件解压完成");
-    Ok(())
-}
-
-async fn extract_tar_gz_archive(
-    archive_path: &Path,
-    extract_to: &Path,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use flate2::read::GzDecoder;
-    use std::fs::File;
-    use tar::Archive;
-
-    info!("解压 TAR.GZ 文件: {:?}", archive_path);
-
-    let file = File::open(archive_path)?;
-    let gz = GzDecoder::new(file);
-    let mut archive = Archive::new(gz);
-
-    if !extract_to.exists() {
-        std::fs::create_dir_all(extract_to)?;
-    }
-
-    match archive.unpack(extract_to) {
-        Ok(_) => info!("TAR.GZ 文件解压完成"),
-        Err(e) => return Err(format!("TAR.GZ 解压失败: {}", e).into()),
-    }
-
-    Ok(())
-}
-
-async fn find_executable_file(
-    search_dir: &Path,
-    executable_name: &str,
-) -> Result<std::path::PathBuf, String> {
-    info!(
-        "在目录 {:?} 中查找可执行文件: {}",
-        search_dir, executable_name
-    );
-
-    let direct_path = search_dir.join(executable_name);
-    if direct_path.exists() && direct_path.is_file() {
-        info!("直接找到可执行文件: {:?}", direct_path);
-        return Ok(direct_path);
-    }
-
-    let mut found_files = Vec::new();
-    for entry in walkdir::WalkDir::new(search_dir).into_iter().flatten() {
-        let path = entry.path();
-        if path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name == executable_name)
-            .unwrap_or(false)
-            && path.is_file()
-        {
-            found_files.push(path.to_path_buf());
-        }
-    }
-
-    if found_files.is_empty() {
-        if let Ok(entries) = std::fs::read_dir(search_dir) {
-            warn!("未找到可执行文件，目录内容:");
-            for entry in entries.flatten() {
-                warn!("  - {:?}", entry.path());
-            }
-        }
-        return Err(format!(
-            "未找到可执行文件: {} 在目录 {:?} 中",
-            executable_name, search_dir
-        ));
-    }
-
-    Ok(found_files[0].clone())
-}
-
-#[cfg(unix)]
-fn set_executable_permission(file_path: &Path) -> Result<(), std::io::Error> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let mut perms = std::fs::metadata(file_path)?.permissions();
-    perms.set_mode(perms.mode() | 0o755);
-    std::fs::set_permissions(file_path, perms)?;
-
-    info!("已设置执行权限: {:?}", file_path);
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn set_executable_permission(_file_path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }

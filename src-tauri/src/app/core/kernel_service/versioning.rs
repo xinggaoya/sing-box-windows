@@ -5,6 +5,26 @@ use serde_json;
 use std::process::Command;
 use tauri::AppHandle;
 use tracing::{info, warn};
+use crate::utils::http_client;
+
+/// GitHub 镜像前缀。直连 api.github.com 在国内常超时，按顺序回退到各加速镜像。
+///
+/// 此前「最新版本」与「版本列表」两个函数各写了一份完全相同的 4 元素数组，
+/// 增删镜像必须改两处，漏改会导致某个功能走不到新镜像。
+const GITHUB_MIRROR_PREFIXES: [&str; 4] = [
+    "", // 直连
+    "https://v6.gh-proxy.com/",
+    "https://gh-proxy.com/",
+    "https://ghfast.top/",
+];
+
+/// 按镜像顺序拼出候选 URL 列表（直连优先，然后逐个镜像回退）
+fn github_api_candidates(path: &str) -> Vec<String> {
+    GITHUB_MIRROR_PREFIXES
+        .iter()
+        .map(|prefix| format!("{}https://api.github.com{}", prefix, path))
+        .collect()
+}
 
 pub(super) async fn get_latest_kernel_version(
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -13,22 +33,14 @@ pub(super) async fn get_latest_kernel_version(
         tag_name: String,
     }
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
-        .user_agent("sing-box-windows/1.8.2")
-        .build()?;
+    let client = http_client::profile_client(http_client::ClientProfile::GitHubApi);
 
-    let api_urls = [
-        "https://api.github.com/repos/SagerNet/sing-box/releases/latest",
-        "https://v6.gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest",
-        "https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest",
-        "https://ghfast.top/https://api.github.com/repos/SagerNet/sing-box/releases/latest",
-    ];
+    let api_urls = github_api_candidates("/repos/SagerNet/sing-box/releases/latest");
 
     for (index, api_url) in api_urls.iter().enumerate() {
         info!("尝试第 {} 个 API 源获取版本: {}", index + 1, api_url);
 
-        match client.get(*api_url).send().await {
+        match client.get(api_url).send().await {
             Ok(response) => {
                 if response.status().is_success() {
                     let release: GitHubRelease = response.json().await?;
@@ -67,22 +79,14 @@ pub(super) async fn get_kernel_releases(
         prerelease: bool,
     }
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
-        .user_agent("sing-box-windows/1.8.2")
-        .build()?;
+    let client = http_client::profile_client(http_client::ClientProfile::GitHubApi);
 
-    let api_urls = [
-        "https://api.github.com/repos/SagerNet/sing-box/releases",
-        "https://v6.gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases",
-        "https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases",
-        "https://ghfast.top/https://api.github.com/repos/SagerNet/sing-box/releases",
-    ];
+    let api_urls = github_api_candidates("/repos/SagerNet/sing-box/releases");
 
     for (index, api_url) in api_urls.iter().enumerate() {
         info!("尝试第 {} 个 API 源获取版本列表: {}", index + 1, api_url);
 
-        match client.get(*api_url).send().await {
+        match client.get(api_url).send().await {
             Ok(response) => {
                 if response.status().is_success() {
                     let releases: Vec<GitHubRelease> = response.json().await?;
@@ -238,11 +242,11 @@ pub async fn check_kernel_version(app_handle: AppHandle) -> Result<String, Strin
     Ok(version)
 }
 
-#[tauri::command]
-pub async fn check_config_validity(
-    app_handle: AppHandle,
-    config_path: String,
-) -> Result<(), String> {
+/// 调用内核二进制执行 `sing-box check`，校验指定配置的语法与可加载性。
+///
+/// 供自动管理流程在重启前做门禁校验；与 `config_validator` 的静态校验互补
+/// （后者不依赖内核可执行文件）。
+pub async fn check_config_validity(app_handle: AppHandle, config_path: String) -> Result<(), String> {
     let kernel_path = paths::get_kernel_path();
 
     if !kernel_path.exists() {

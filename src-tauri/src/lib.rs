@@ -120,11 +120,17 @@ pub fn run() {
                     })
                     .await
                 {
-                    tracing::error!("Failed to initialize enhanced storage service: {}", e);
+                    // 数据库是整个应用的数据根，初始化失败后后续所有启动步骤都被跳过。
+                    // 这里必须把原因写清楚（含路径与底层错误），否则线上只能观察到
+                    // “启动后没有任何反应”而无从排查。
+                    tracing::error!(
+                        "❌ 增强存储服务初始化失败，已跳过启动恢复/内核自动管理/后台任务/订阅自动更新: {}",
+                        e
+                    );
                     return;
                 }
 
-                tracing::info!("Enhanced storage service initialized successfully");
+                tracing::info!("✅ 增强存储服务初始化成功");
 
                 match crate::app::system::startup_restore_service::prepare_startup_restore(
                     &app_handle,

@@ -250,7 +250,7 @@ export const useProxyStore = defineStore('proxy', () => {
           testedNodes.value = next
         }
         groupTestingMap.value = { ...groupTestingMap.value, [groupName]: false }
-      }, 8000)
+      }, DEFAULT_TIMEOUT_MS)
       return true
     } catch {
       // 异常(URLTest RPC 失败):立即结束 loading,不要再 setTimeout
@@ -302,7 +302,7 @@ export const useProxyStore = defineStore('proxy', () => {
           (acc, g) => ({ ...acc, [g]: false }),
           { ...groupTestingMap.value },
         )
-      }, 8000)
+      }, DEFAULT_TIMEOUT_MS)
       return results.map((r) => ({ ok: r.ok }))
     } catch {
       // 异常:立即结束 loading

@@ -76,11 +76,6 @@ export interface KernelStartOptions {
   keepAlive?: boolean
 }
 
-export interface KernelStopOptions {
-  force?: boolean
-  timeoutMs?: number
-}
-
 export interface KernelAutoManageResult {
   state: 'missing_kernel' | 'missing_config' | 'invalid_config' | 'running' | 'error'
   message: string
@@ -145,17 +140,20 @@ class KernelService {
   }
 
   /**
-   * 停止内核
+   * 停止内核。
+   *
+   * 注意：此前这里有个 `KernelStopOptions { force, timeoutMs }`，但参数被 `_options`
+   * 丢弃、`kernel_stop_enhanced` 后端签名也不接收任何停止参数 —— 属于纯粹的“幽灵 API”，
+   * 调用方（如 `TrayStore` 的 `stopKernel({ force: true })`）会误以为传参生效。
+   * 现已移除该接口；需要更强的停止语义时应改后端 `orchestrated_stop_kernel`。
    */
-  async stopKernel(_options: KernelStopOptions = {}): Promise<KernelCommandResult> {
+  async stopKernel(): Promise<KernelCommandResult> {
     return invokeWithAppContext<KernelCommandResult>('kernel_stop_enhanced', undefined, {
       skipDataRestore: true,
     })
   }
 
-  async restartKernel(
-    options: KernelStartOptions & KernelStopOptions = {},
-  ): Promise<KernelCommandResult> {
+  async restartKernel(options: KernelStartOptions = {}): Promise<KernelCommandResult> {
     return withAppStore(async (store) => {
       await store.waitForDataRestore()
 

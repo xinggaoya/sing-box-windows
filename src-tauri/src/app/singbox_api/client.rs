@@ -69,22 +69,42 @@ pub struct ApiClientHandle {
 }
 
 impl ApiClientHandle {
-    pub fn new(config: ApiClientConfig) -> Self {
-        let http = Client::builder()
-            .timeout(Duration::from_secs(15))
+    /// 构建一个 gRPC-Web 用的 reqwest 客户端。
+    ///
+    /// 返回 `Result` 而非内部 `expect`：原先的 `expect("reqwest client")` 会在构建失败时
+    /// 直接 panic，把一个网络层错误升级为进程级崩溃；且因为 `new()` 被每条命令调用，
+    /// panic 会持续发生在任意前端请求上。
+    ///
+    /// 参数均来自常量，实际不可构建；保留 `Result` 只是为了让失败可被上层观测并降级。
+    fn build_http(timeout: Option<Duration>, idle_per_host: usize) -> ApiResult<Client> {
+        let mut builder = Client::builder()
             // 关键：禁用系统代理。Windows 上 TUN 客户端可能留下 127.0.0.1:12080
             // 之类的代理配置，会让 reqwest 走代理而不是直连内核。
-            .no_proxy()
-            // 长 server-streaming(SubscribeStatus/Connections)会通过设置
-            // `Connection: close` 单独发请求,避开 keep-alive 池化
-            // 把长 streaming 连接错误放回 idle 池导致 EOF 的问题。
-            // 见 `build_streaming_request`。
+            .no_proxy();
+
+        // ⚠️ reqwest 0.12 的 footgun：`Duration::from_secs(0)` 在 `timeout` 里表示
+        // “立即超时”而不是“无超时”，因此只有 `Some` 时才设置。
+        if let Some(timeout) = timeout {
+            builder = builder.timeout(timeout);
+        }
+
+        if idle_per_host == 0 {
+            // 关键：禁用 keep-alive 池，杜绝 hyper 把长 streaming 连接错误放回 idle 池
+            // 导致 EOF 误判。
+            builder = builder.pool_max_idle_per_host(0);
+        }
+
+        builder
             .build()
-            .expect("reqwest client");
-        Self {
+            .map_err(|error| ApiError::Http(format!("构建 gRPC-Web HTTP 客户端失败: {}", error)))
+    }
+
+    pub fn new(config: ApiClientConfig) -> ApiResult<Self> {
+        let http = Self::build_http(Some(Duration::from_secs(15)), 4)?;
+        Ok(Self {
             config: Arc::new(config),
             http,
-        }
+        })
     }
 
     pub fn config(&self) -> &ApiClientConfig {
@@ -124,17 +144,18 @@ impl ApiClientHandle {
     /// 改为独立 client 后,3 个 stream 互不干扰,每个走自己的连接池/资源。
     /// `pool_max_idle_per_host(0)` + 短 timeout 是更彻底的防御:hyper 不会把长 streaming
     /// 连接放回 idle 池导致 EOF 误判(虽然本场景下 server 端问题是主因)。
-    fn build_streaming_request(&self, method: &str, body: Vec<u8>) -> reqwest::RequestBuilder {
+    fn build_streaming_request(
+        &self,
+        method: &str,
+        body: Vec<u8>,
+    ) -> ApiResult<reqwest::RequestBuilder> {
         // ⚠️ reqwest 0.12 的 footgun:`Duration::from_secs(0)` 在 ClientBuilder::timeout
         // 里表示"立即超时"(is_timeout=true),不是"无限超时"。streaming 必须不传 timeout。
         // 同样:`Duration::from_secs(0)` 用在 `connect_timeout` 等其他 timeout 也会触发同样问题。
         // 这里**只**配置 `pool_max_idle_per_host(0)`,其他全部用 reqwest 默认,行为稳定。
-        let streaming_http = Client::builder()
-            .no_proxy()
-            // 关键:禁用 keep-alive 池,杜绝 hyper 把长 streaming 连接错误放回 idle
-            .pool_max_idle_per_host(0)
-            .build()
-            .expect("reqwest streaming client");
+        // streaming 不设 `timeout`(reqwest 0.12 中 `Duration::ZERO` 表示“立即超时”)，
+        // 且 `pool_max_idle_per_host(0)` 禁用 keep-alive 池。
+        let streaming_http = Self::build_http(None, 0)?;
         // 排障时临时打开:打印请求全貌(method+url+headers+body hex),用于对比
         // Tauri runtime 下 reqwest 实际发出的 wire 字节与隔离测试的差异。
         let url = self.method_url(method);
@@ -161,7 +182,7 @@ impl ApiClientHandle {
         if !self.config.secret.is_empty() {
             req = req.header("Authorization", format!("Bearer {}", self.config.secret));
         }
-        req
+        Ok(req)
     }
 
     /// 发起一次 unary RPC
@@ -223,7 +244,7 @@ impl ApiClientHandle {
     /// 用于恢复代理提供者/全量出站列表 UI。
     pub async fn get_outbounds(&self) -> ApiResult<super::types::OutboundList> {
         let mut stream =
-            HttpStream::new(self.build_streaming_request("SubscribeOutbounds", Vec::new())).await?;
+            HttpStream::new(self.build_streaming_request("SubscribeOutbounds", Vec::new())?).await?;
         let frame = stream.next().await?.ok_or(ApiError::Closed)?;
         super::proto::decode_outbound_list(&frame)
             .map_err(|e| ApiError::Decode(decode_error_to_string(&e)))
@@ -366,7 +387,7 @@ impl ApiClientHandle {
     /// SubscribeGroups（server-streaming）
     /// 返回的每帧是 proto Groups(含每个 group 当前 selected / 每个 item 的 url_test_delay)
     pub async fn subscribe_groups(&self) -> ApiResult<GroupsSubscription> {
-        let stream = HttpStream::new(self.build_streaming_request("SubscribeGroups", Vec::new())).await?;
+        let stream = HttpStream::new(self.build_streaming_request("SubscribeGroups", Vec::new())?).await?;
         let (tx, rx) = mpsc::channel::<Groups>(16);
         let task = tokio::spawn(spawn_groups_loop(stream, tx));
         Ok(GroupsSubscription { rx, _task: task })
@@ -380,7 +401,7 @@ impl ApiClientHandle {
         let mut body = Vec::new();
         body.extend_from_slice(&encode_field_tag(1, 0));
         body.extend_from_slice(&encode_varint_i64(interval_nanos));
-        let stream = HttpStream::new(self.build_streaming_request("SubscribeStatus", body)).await?;
+        let stream = HttpStream::new(self.build_streaming_request("SubscribeStatus", body)?).await?;
         let (tx, rx) = mpsc::channel::<Status>(32);
         let task = tokio::spawn(spawn_status_loop(stream, tx));
         Ok(StatusSubscription { rx, _task: task })
@@ -391,7 +412,7 @@ impl ApiClientHandle {
     /// 用于探测内核运行状态(替代 1.13 的 experimental.clash_api HTTP /version)。
     pub async fn subscribe_service_status(&self) -> ApiResult<ServiceStatusSubscription> {
         let stream = HttpStream::new(
-            self.build_streaming_request("SubscribeServiceStatus", Vec::new()),
+            self.build_streaming_request("SubscribeServiceStatus", Vec::new())?,
         )
         .await?;
         let (tx, rx) = mpsc::channel::<super::types::ServiceStatusSnapshot>(8);
@@ -401,7 +422,7 @@ impl ApiClientHandle {
 
     /// SubscribeLog（server-streaming）
     pub async fn subscribe_log(&self) -> ApiResult<LogSubscription> {
-        let stream = HttpStream::new(self.build_streaming_request("SubscribeLog", Vec::new())).await?;
+        let stream = HttpStream::new(self.build_streaming_request("SubscribeLog", Vec::new())?).await?;
         let (tx, rx) = mpsc::channel::<Log>(64);
         let task = tokio::spawn(spawn_log_loop(stream, tx));
         Ok(LogSubscription { rx, _task: task })
@@ -415,7 +436,7 @@ impl ApiClientHandle {
         let mut body = Vec::new();
         body.extend_from_slice(&encode_field_tag(1, 0));
         body.extend_from_slice(&encode_varint_i64(interval_nanos));
-        let stream = HttpStream::new(self.build_streaming_request("SubscribeConnections", body)).await?;
+        let stream = HttpStream::new(self.build_streaming_request("SubscribeConnections", body)?).await?;
         let (tx, rx) = mpsc::channel::<ConnectionEvents>(128);
         let task = tokio::spawn(spawn_connections_loop(stream, tx));
         Ok(ConnectionsSubscription { rx, _task: task })

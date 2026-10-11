@@ -6,6 +6,7 @@ lazy_static::lazy_static! {
         Arc::new(ProcessManager::new());
 }
 
+pub mod archive;
 pub mod download;
 pub mod embedded;
 pub mod event;
@@ -29,8 +30,5 @@ pub use runtime::{
     ResolvedProxyState,
 };
 pub use state::{KernelRuntimeConfig, KernelState, KernelStateManager, KERNEL_STATE};
-pub use status::{
-    get_system_uptime, is_kernel_running, kernel_check_health, kernel_get_snapshot,
-    kernel_get_status_enhanced,
-};
+pub use status::{get_system_uptime, is_kernel_running, kernel_check_health};
 pub use versioning::{check_config_validity, check_kernel_version, get_latest_kernel_version_cmd};

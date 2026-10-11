@@ -14,7 +14,8 @@ use std::time::Duration;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let handle = ApiClientHandle::new(ApiClientConfig::localhost(29999));
+    let handle = ApiClientHandle::new(ApiClientConfig::localhost(29999))
+        .map_err(|e| format!("failed to build gRPC client: {}", e))?;
 
     // 1) GetVersion
     let (version, api_version) = handle.get_version().await?;

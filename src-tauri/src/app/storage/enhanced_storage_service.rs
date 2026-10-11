@@ -6,7 +6,7 @@ use crate::app::storage::state_model::{
     AppConfig, LocaleConfig, StartupPreferences, Subscription, ThemeConfig, UpdateConfig,
     WindowConfig,
 };
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tauri::{AppHandle, Manager};
 use tokio::sync::OnceCell;
 
@@ -151,6 +151,8 @@ pub async fn get_enhanced_storage<R: tauri::Runtime>(
 #[derive(Debug, Clone)]
 pub struct EnhancedStorageService {
     database: Arc<DatabaseService>,
+    /// `AppConfig` 内存快照；`None` 表示尚未加载，需要回落到数据库
+    app_config_snapshot: Arc<RwLock<Option<AppConfig>>>,
 }
 
 impl EnhancedStorageService {
@@ -169,19 +171,76 @@ impl EnhancedStorageService {
         })?;
         let database = Arc::new(DatabaseService::new(database_path_str).await?);
 
-        Ok(Self { database })
+        // 启动时先把配置读进内存快照（见 `get_app_config`）
+        let initial = database.load_app_config().await?.unwrap_or_default();
+        let app_config_snapshot = Arc::new(RwLock::new(Some(initial)));
+
+        Ok(Self {
+            database,
+            app_config_snapshot,
+        })
     }
 
-    // 应用配置
-    pub async fn get_app_config(&self) -> StorageResult<AppConfig> {
-        match self.database.load_app_config().await? {
-            Some(config) => Ok(config),
-            None => Ok(AppConfig::default()),
+    /// 仅供测试：用已建好的数据库直接组装服务。
+    ///
+    /// 生产路径需要 `AppHandle` 才能定位数据目录与写启动偏好，测试里没有 Tauri 运行时，
+    /// 因此提供一条绕过 AppHandle 的组装路径（并按同一套逻辑预热快照）。
+    #[cfg(test)]
+    pub async fn from_database(database: Arc<DatabaseService>) -> Self {
+        let initial = database
+            .load_app_config()
+            .await
+            .expect("加载初始配置")
+            .unwrap_or_default();
+        Self {
+            database,
+            app_config_snapshot: Arc::new(RwLock::new(Some(initial))),
         }
     }
 
+    /// 读取 `AppConfig`：优先走内存快照。
+    ///
+    /// `db_get_app_config` 在全仓有 58 处调用点（proxy_service 8、mode 5、
+    /// subscription_service 5、versioning 5、tray 4…），每次都是一次 SQLite 往返
+    /// 加全列 `try_get` 映射；而内核守护循环每 8 秒至少读 2 次（加载自愈策略）。
+    ///
+    /// 配置是单行数据、写入频率远低于读取，因此用「写时更新快照、读时命中快照」
+    /// 把绝大多数读取降为一次内存克隆。
+    ///
+    /// 语义保持不变：快照缺失（仅在构造后的极短窗口，或读取出错后）会回落到数据库。
+    pub async fn get_app_config(&self) -> StorageResult<AppConfig> {
+        if let Ok(guard) = self.app_config_snapshot.read() {
+            if let Some(cached) = guard.as_ref() {
+                return Ok(cached.clone());
+            }
+        }
+
+        let config = self.database.load_app_config().await?.unwrap_or_default();
+        self.refresh_app_config_snapshot(config.clone());
+        Ok(config)
+    }
+
     pub async fn save_app_config(&self, config: &AppConfig) -> StorageResult<()> {
-        self.database.save_app_config(config).await
+        // 先落库再更新快照：宁可短暂读到旧值，也不能出现「快照说有、库里没有」的状态
+        self.database.save_app_config(config).await?;
+        self.refresh_app_config_snapshot(config.clone());
+        Ok(())
+    }
+
+    /// 用给定配置覆盖内存快照。
+    fn refresh_app_config_snapshot(&self, config: AppConfig) {
+        if let Ok(mut guard) = self.app_config_snapshot.write() {
+            *guard = Some(config);
+        }
+    }
+
+    /// 直接替换内存快照（不落库）。
+    ///
+    /// 仅用于 `db_get_app_config_internal` 这类「读取后再做平台修正」的路径：
+    /// 它会基于读取结果调整 `tun_enabled`，修正后的值不应被下一次普通读取
+    /// 又从库里取回覆盖。
+    pub fn set_app_config_snapshot(&self, config: AppConfig) {
+        self.refresh_app_config_snapshot(config);
     }
 
     // 通用 KV 配置（custom_rules 等结构化数据复用此通道，避免新表/迁移）
@@ -589,169 +648,5 @@ pub async fn db_save_active_subscription_index(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        normalize_app_config_for_persistence, resolve_patch_mode_for_subscription,
-        resolve_patch_mode_with_hint, sync_settings_to_config_file, ConfigPatchMode,
-    };
-    use crate::app::storage::state_model::Subscription;
-
-    fn build_subscription(use_original_config: bool) -> Subscription {
-        Subscription {
-            name: "test".to_string(),
-            url: "https://example.com/sub".to_string(),
-            is_loading: false,
-            last_update: None,
-            is_manual: false,
-            manual_content: None,
-            use_original_config,
-            config_path: Some("/tmp/sub.json".to_string()),
-            backup_path: None,
-            auto_update_interval_minutes: Some(60),
-            subscription_upload: None,
-            subscription_download: None,
-            subscription_total: None,
-            subscription_expire: None,
-            auto_update_fail_count: None,
-            last_auto_update_attempt: None,
-            last_auto_update_error: None,
-            last_auto_update_error_type: None,
-            last_auto_update_backoff_until: None,
-        }
-    }
-
-    #[test]
-    fn should_use_ports_only_for_original_subscription_without_hint() {
-        let subscription = build_subscription(true);
-        assert_eq!(
-            resolve_patch_mode_for_subscription(Some(&subscription)),
-            ConfigPatchMode::PortsOnly
-        );
-    }
-
-    #[test]
-    fn should_trust_explicit_original_hint_when_subscription_missing() {
-        assert_eq!(
-            resolve_patch_mode_with_hint(None, Some(true)),
-            ConfigPatchMode::PortsOnly
-        );
-    }
-
-    #[test]
-    fn should_trust_explicit_non_original_hint_over_subscription_state() {
-        let subscription = build_subscription(true);
-        assert_eq!(
-            resolve_patch_mode_with_hint(Some(&subscription), Some(false)),
-            ConfigPatchMode::Full
-        );
-    }
-
-    #[test]
-    fn should_normalize_blank_tun_route_exclude_address_to_none() {
-        let normalized =
-            normalize_app_config_for_persistence(crate::app::storage::state_model::AppConfig {
-                tun_route_exclude_address: Some(vec!["  ".to_string(), "".to_string()]),
-                ..crate::app::storage::state_model::AppConfig::default()
-            })
-            .expect("blank route exclude address should normalize");
-
-        assert_eq!(normalized.tun_route_exclude_address, None);
-    }
-
-    #[test]
-    fn should_reject_invalid_tun_route_exclude_address_on_save() {
-        let error =
-            normalize_app_config_for_persistence(crate::app::storage::state_model::AppConfig {
-                tun_route_exclude_address: Some(vec!["invalid".to_string()]),
-                ..crate::app::storage::state_model::AppConfig::default()
-            })
-            .expect_err("invalid route exclude address should be rejected");
-
-        assert!(
-            error.contains("invalid"),
-            "error should mention invalid CIDR, got: {}",
-            error
-        );
-    }
-
-    #[test]
-    fn sync_settings_to_config_file_should_migrate_stale_dns_bootstrap_strategy() {
-        // 模拟旧版本落盘的激活配置：prefer_ipv6 泄漏进 DNS bootstrap 解析策略
-        let stale_config = r#"{
-  "dns": {
-    "final": "dns_proxy",
-    "servers": [
-      {
-        "tag": "dns_cn",
-        "type": "h3",
-        "server": "dns.alidns.com",
-        "server_port": 443,
-        "domain_resolver": {
-          "server": "dns_resolver",
-          "strategy": "prefer_ipv6"
-        }
-      }
-    ],
-    "rules": []
-  },
-  "inbounds": [],
-  "outbounds": [],
-  "route": {
-    "rules": [],
-    "final": "自动选择",
-    "default_domain_resolver": {
-      "server": "dns_resolver",
-      "strategy": "prefer_ipv6"
-    }
-  }
-}"#;
-
-        let dir = std::env::temp_dir().join(format!(
-            "sbw-sync-test-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
-        ));
-        std::fs::create_dir_all(&dir).expect("应能创建临时目录");
-        let config_path = dir.join("config.json");
-        std::fs::write(&config_path, stale_config).expect("应能写入临时配置");
-
-        let app_config = crate::app::storage::state_model::AppConfig {
-            prefer_ipv6: true,
-            ..crate::app::storage::state_model::AppConfig::default()
-        };
-
-        let result = sync_settings_to_config_file(&config_path, &app_config, ConfigPatchMode::Full);
-        assert!(result.is_ok(), "Full patch 应成功: {:?}", result);
-
-        let synced = std::fs::read_to_string(&config_path).expect("应能读回配置");
-        let value: serde_json::Value = serde_json::from_str(&synced).expect("patch 后应为合法 JSON");
-
-        // DNS bootstrap 策略应被迁移为 IPv4 优先，而全局偏好仍保留在 route 层
-        let cn_resolver = value
-            .pointer("/dns/servers/0/domain_resolver")
-            .expect("dns_cn 应被重建并带 domain_resolver");
-        assert_eq!(
-            cn_resolver.get("strategy").and_then(|v| v.as_str()),
-            Some("prefer_ipv4"),
-            "存量配置的 DNS bootstrap 策略应迁移为 prefer_ipv4: {}",
-            synced
-        );
-        assert_eq!(
-            value
-                .pointer("/route/default_domain_resolver/strategy")
-                .and_then(|v| v.as_str()),
-            Some("prefer_ipv6")
-        );
-
-        // 幂等：再次同步内容无变化时不应改写文件
-        let before = std::fs::read_to_string(&config_path).expect("应能读取当前配置");
-        let second = sync_settings_to_config_file(&config_path, &app_config, ConfigPatchMode::Full);
-        assert!(second.is_ok(), "重复 patch 应成功: {:?}", second);
-        let after = std::fs::read_to_string(&config_path).expect("应能读取当前配置");
-        assert_eq!(before, after, "重复同步不应改变配置内容");
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-}
+#[path = "enhanced_storage_service.tests.rs"]
+mod tests;

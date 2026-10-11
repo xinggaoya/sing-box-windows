@@ -5,10 +5,98 @@ use crate::app::storage::state_model::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use sqlx::{migrate::MigrateDatabase, sqlite::Sqlite, sqlite::SqlitePool, Row};
-use tokio::sync::OnceCell;
+use sqlx::{
+    migrate::MigrateDatabase,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
+    sqlite::Sqlite,
+    sqlite::SqlitePool,
+    Row,
+};
+use std::str::FromStr;
+use std::time::Duration;
 
-static SCHEMA_INIT: OnceCell<()> = OnceCell::const_new();
+/// SQLite 写锁等待超时。应用存在多条并发写路径（内核守护每8s 回写自愈策略、
+/// 自动保存、订阅切换等），无busy_timeout 时并发写会直接返回 SQLITE_BUSY。
+const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+/// 连接池上限。SQLite 单写者模型，过多连接只会增加锁竞争。
+const SQLITE_MAX_CONNECTIONS: u32 = 4;
+/// 连接获取超时，避免池耗尽时调用方无限等待。
+const SQLITE_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(10);
+/// 进程退出时回收连接的最长等待时间。
+const SQLITE_IDLE_TIMEOUT: Duration = Duration::from_secs(300);
+
+/// 当前 schema 版本，写入 SQLite 的 `user_version`。
+///
+/// 之前没有版本概念，迁移失败也完全不可观测。现在版本号与实际列集合共同构成
+/// “数据库处于什么状态”的唯一真相，可在日志与测试中直接断言。
+/// 新增字段时：递增此值，并在对应表的 `ensure_columns` 列表中补列。
+pub const SCHEMA_VERSION: i64 = 1;
+
+/// 读取现有列名集合。
+///
+/// `PRAGMA table_info` 不支持参数化占位符，表名只能拼接 —— 调用方均传本文件内的
+/// 字面量常量（非外部输入），因此不存在注入面。
+async fn existing_columns(
+    pool: &SqlitePool,
+    table: &str,
+) -> Result<std::collections::HashSet<String>, StorageError> {
+    let rows = sqlx::query(&format!("PRAGMA table_info({})", table))
+        .fetch_all(pool)
+        .await?;
+    let mut names = std::collections::HashSet::new();
+    for row in rows {
+        names.insert(row.try_get::<String, _>("name")?);
+    }
+    Ok(names)
+}
+
+/// 幂等补列：已存在的列直接跳过，缺失才执行 `ALTER TABLE ADD COLUMN`。
+///
+/// 早期实现对每条 `ALTER` 直接 `.ok()` 丢弃错误，结果是迁移失败在日志里完全不可见，
+/// 线上仅表现为“某项设置不生效”且无法自查；`StorageError::Migration` 也因此从未被构造。
+/// 现改为：显式查列 -> 缺失才 ALTER -> 失败则带上完整 SQL 上抛。
+async fn ensure_columns(
+    pool: &SqlitePool,
+    table: &str,
+    columns: &[(&str, &str)],
+) -> Result<(), StorageError> {
+    let present = existing_columns(pool, table).await?;
+    let mut applied = 0usize;
+
+    for (column, definition) in columns {
+        if present.contains(*column) {
+            continue;
+        }
+        let sql = format!("ALTER TABLE {} ADD COLUMN {} {}", table, column, definition);
+        sqlx::query(&sql).execute(pool).await.map_err(|e| {
+            StorageError::Migration(format!("{} -> {}", sql.trim(), e))
+        })?;
+        applied += 1;
+        tracing::debug!("⬆️ schema 补列: {}.{}", table, column);
+    }
+
+    if applied > 0 {
+        tracing::info!("⬆️ {}.* 补齐 {} 个缺失列", table, applied);
+    }
+    Ok(())
+}
+
+/// 读取 `PRAGMA user_version`。
+pub async fn read_schema_version(pool: &SqlitePool) -> Result<i64, StorageError> {
+    let row: (i64,) = sqlx::query_as("PRAGMA user_version")
+        .fetch_one(pool)
+        .await?;
+    Ok(row.0)
+}
+
+/// 写入 `PRAGMA user_version`（schema 建立完成后的最后一步）。
+async fn write_schema_version(pool: &SqlitePool) -> Result<(), StorageError> {
+    sqlx::query(&format!("PRAGMA user_version = {}", SCHEMA_VERSION))
+        .execute(pool)
+        .await?;
+    tracing::info!("🗃️ schema 版本已标记为 {}", SCHEMA_VERSION);
+    Ok(())
+}
 
 #[derive(Debug, Clone)]
 pub struct DatabaseService {
@@ -17,32 +105,60 @@ pub struct DatabaseService {
 
 impl DatabaseService {
     pub async fn new(database_path: &str) -> Result<Self, StorageError> {
-        tracing::info!("??? 初始化数据库: {}", database_path);
+        tracing::info!("🗄️ 初始化数据库: {}", database_path);
         let database_url = format!("sqlite:{}", database_path);
 
         // 创建数据库
         if !Sqlite::database_exists(&database_url).await? {
-            tracing::info!("?? 创建新数据库");
+            tracing::info!("🆕 创建新数据库");
             Sqlite::create_database(&database_url).await?;
         } else {
-            tracing::info!("?? 数据库已存在");
+            tracing::info!("📂 数据库已存在");
         }
 
-        let pool = SqlitePool::connect(&database_url).await?;
-        tracing::info!("? 数据库连接成功");
+        let pool = Self::build_pool(&database_url).await?;
+        tracing::info!("✅ 数据库连接成功 (WAL, busy_timeout={}s)", SQLITE_BUSY_TIMEOUT.as_secs());
 
-        // 创建表结构（仅执行一次）
-        Self::create_tables_once(&pool).await?;
-        tracing::info!("? 数据库表创建完成");
+        // 建表/迁移按“库”而非“进程”执行：不同数据库路径（如测试用的临时库）
+        // 必须各自完成一次 schema 初始化，否则会静默缺表。
+        Self::ensure_schema(&pool).await?;
+        tracing::info!("✅ 数据库表结构就绪");
 
         Ok(Self { pool })
     }
 
-    async fn create_tables_once(pool: &SqlitePool) -> Result<(), StorageError> {
-        SCHEMA_INIT
-            .get_or_try_init(|| async { Self::create_tables(pool).await })
+    /// 构造连接池：WAL + busy_timeout + 连接数上限。
+    ///
+    /// 之前使用 `SqlitePool::connect` 裸连，走的是 SQLite 默认的 rollback journal
+    /// 与 `busy_timeout=0`，并发写会直接报 SQLITE_BUSY，WAL 缺失还会阻塞读。
+    async fn build_pool(database_url: &str) -> Result<SqlitePool, StorageError> {
+        let options = SqliteConnectOptions::from_str(database_url)?
+            // WAL：读写不互相阻塞，是多任务并发访问 SQLite 的前提。
+            .journal_mode(SqliteJournalMode::Wal)
+            // NORMAL 在 WAL 下兼顾安全与吞吐（断电时最多丢最近一次事务）。
+            .synchronous(SqliteSynchronous::Normal)
+            // 外键约束默认关闭，显式开启以免声明的外键形同虚设。
+            .foreign_keys(true)
+            .busy_timeout(SQLITE_BUSY_TIMEOUT)
+            .create_if_missing(true);
+
+        SqlitePoolOptions::new()
+            .max_connections(SQLITE_MAX_CONNECTIONS)
+            .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT)
+            .idle_timeout(SQLITE_IDLE_TIMEOUT)
+            .connect_with(options)
             .await
-            .map(|_| ())
+            .map_err(StorageError::Database)
+    }
+
+    /// 确保 schema 就绪：先建表，再补齐增量列。
+    ///
+    /// 不使用进程级 `OnceCell`，因为它会让“第二个不同路径的数据库”静默不建表。
+    /// 代价是重复建表（全部 `CREATE TABLE IF NOT EXISTS`），但那在 SQLite 上
+    /// 是幂等的、耗时可忽略，换来的是每个库都可靠。
+    async fn ensure_schema(pool: &SqlitePool) -> Result<(), StorageError> {
+        Self::create_tables(pool).await?;
+        write_schema_version(pool).await
     }
 
     async fn create_tables(pool: &SqlitePool) -> Result<(), StorageError> {
@@ -97,65 +213,66 @@ impl DatabaseService {
         .execute(pool)
         .await?;
 
-        // 检查并添加 legacy 缺失字段（升级兼容）
-        let alter_statements = [
-            "ALTER TABLE app_config ADD COLUMN auto_start_app BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN auto_hide_to_tray_on_autostart BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN tray_close_behavior TEXT DEFAULT 'hide'",
-            "ALTER TABLE app_config ADD COLUMN allow_lan_access BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN system_proxy_bypass TEXT DEFAULT 'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*'",
-            "ALTER TABLE app_config ADD COLUMN tun_auto_route BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN tun_strict_route BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN tun_mtu INTEGER DEFAULT 1500",
-            "ALTER TABLE app_config ADD COLUMN tun_ipv4 TEXT DEFAULT '172.19.0.1/30'",
-            "ALTER TABLE app_config ADD COLUMN tun_ipv6 TEXT DEFAULT 'fdfe:dcba:9876::1/126'",
-            "ALTER TABLE app_config ADD COLUMN tun_stack TEXT DEFAULT 'mixed'",
-            "ALTER TABLE app_config ADD COLUMN tun_enable_ipv6 BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN tun_route_exclude_address TEXT",
-            "ALTER TABLE app_config ADD COLUMN system_proxy_enabled BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN tun_enabled BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN active_config_path TEXT",
-            "ALTER TABLE app_config ADD COLUMN installed_kernel_version TEXT",
-            "ALTER TABLE app_config ADD COLUMN singbox_dns_proxy TEXT DEFAULT 'https://1.1.1.1/dns-query'",
-            "ALTER TABLE app_config ADD COLUMN singbox_dns_cn TEXT DEFAULT 'h3://dns.alidns.com/dns-query'",
-            "ALTER TABLE app_config ADD COLUMN singbox_dns_resolver TEXT DEFAULT '114.114.114.114'",
-            "ALTER TABLE app_config ADD COLUMN singbox_urltest_url TEXT DEFAULT 'http://cp.cloudflare.com/generate_204'",
-            "ALTER TABLE app_config ADD COLUMN singbox_default_proxy_outbound TEXT DEFAULT 'manual'",
-            "ALTER TABLE app_config ADD COLUMN singbox_block_ads BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN singbox_download_detour TEXT DEFAULT 'direct'",
-            "ALTER TABLE app_config ADD COLUMN singbox_dns_hijack BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN singbox_fake_dns_enabled BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN singbox_fake_dns_ipv4_range TEXT DEFAULT '198.18.0.0/15'",
-            "ALTER TABLE app_config ADD COLUMN singbox_fake_dns_ipv6_range TEXT DEFAULT 'fc00::/18'",
-            "ALTER TABLE app_config ADD COLUMN singbox_fake_dns_filter_mode TEXT DEFAULT 'proxy_only'",
-            "ALTER TABLE app_config ADD COLUMN singbox_enable_app_groups BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN tun_self_heal_enabled BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN tun_self_heal_cooldown_secs INTEGER DEFAULT 90",
-            // === sing-box 1.14 升级新增字段迁移 ===
-            "ALTER TABLE app_config ADD COLUMN kernel_update_track TEXT DEFAULT 'stable'",
-            "ALTER TABLE app_config ADD COLUMN singbox_dns_optimistic_cache BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN singbox_dns_timeout TEXT DEFAULT '5s'",
-            "ALTER TABLE app_config ADD COLUMN singbox_dns_use_mdns BOOLEAN DEFAULT TRUE",
-            "ALTER TABLE app_config ADD COLUMN singbox_enable_tls_spoof BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN tun_dns_mode TEXT DEFAULT 'hijack'",
-            "ALTER TABLE app_config ADD COLUMN tun_include_macs TEXT DEFAULT '[]'",
-            "ALTER TABLE app_config ADD COLUMN tun_exclude_macs TEXT DEFAULT '[]'",
-            "ALTER TABLE app_config ADD COLUMN hysteria2_disable_chrome_parrot BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN hysteria2_obfs_type TEXT DEFAULT 'salamander'",
-            "ALTER TABLE app_config ADD COLUMN clash_mode TEXT DEFAULT 'rule'",
-            "ALTER TABLE app_config ADD COLUMN enable_web_dashboard BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN enable_tailscale_endpoint BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN tailscale_run_ssh_server BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE app_config ADD COLUMN tailscale_taildrop_directory TEXT DEFAULT 'Taildrop'",
-            // 兜底：1.13 早期 schema 可能缺这些列
-            "ALTER TABLE app_config ADD COLUMN proxy_mode TEXT DEFAULT 'manual'",
-            "ALTER TABLE app_config ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP",
-            "ALTER TABLE app_config ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP",
-        ];
-
-        for statement in alter_statements {
-            sqlx::query(statement).execute(pool).await.ok();
-        }
+        // 旧库升级兼容：补齐缺失列。列已存在则跳过（显式查表，而非靠错误字符串判断）。
+        ensure_columns(
+            pool,
+            "app_config",
+            &[
+                ("auto_start_app", "BOOLEAN DEFAULT FALSE"),
+                ("auto_hide_to_tray_on_autostart", "BOOLEAN DEFAULT TRUE"),
+                ("tray_close_behavior", "TEXT DEFAULT 'hide'"),
+                ("allow_lan_access", "BOOLEAN DEFAULT FALSE"),
+                ("system_proxy_bypass", "TEXT DEFAULT 'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*'"),
+                ("tun_auto_route", "BOOLEAN DEFAULT TRUE"),
+                ("tun_strict_route", "BOOLEAN DEFAULT TRUE"),
+                ("tun_mtu", "INTEGER DEFAULT 1500"),
+                ("tun_ipv4", "TEXT DEFAULT '172.19.0.1/30'"),
+                ("tun_ipv6", "TEXT DEFAULT 'fdfe:dcba:9876::1/126'"),
+                ("tun_stack", "TEXT DEFAULT 'mixed'"),
+                ("tun_enable_ipv6", "BOOLEAN DEFAULT FALSE"),
+                ("tun_route_exclude_address", "TEXT"),
+                ("system_proxy_enabled", "BOOLEAN DEFAULT FALSE"),
+                ("tun_enabled", "BOOLEAN DEFAULT FALSE"),
+                ("active_config_path", "TEXT"),
+                ("installed_kernel_version", "TEXT"),
+                ("singbox_dns_proxy", "TEXT DEFAULT 'https://1.1.1.1/dns-query'"),
+                ("singbox_dns_cn", "TEXT DEFAULT 'h3://dns.alidns.com/dns-query'"),
+                ("singbox_dns_resolver", "TEXT DEFAULT '114.114.114.114'"),
+                ("singbox_urltest_url", "TEXT DEFAULT 'http://cp.cloudflare.com/generate_204'"),
+                ("singbox_default_proxy_outbound", "TEXT DEFAULT 'manual'"),
+                ("singbox_block_ads", "BOOLEAN DEFAULT TRUE"),
+                ("singbox_download_detour", "TEXT DEFAULT 'direct'"),
+                ("singbox_dns_hijack", "BOOLEAN DEFAULT TRUE"),
+                ("singbox_fake_dns_enabled", "BOOLEAN DEFAULT FALSE"),
+                ("singbox_fake_dns_ipv4_range", "TEXT DEFAULT '198.18.0.0/15'"),
+                ("singbox_fake_dns_ipv6_range", "TEXT DEFAULT 'fc00::/18'"),
+                ("singbox_fake_dns_filter_mode", "TEXT DEFAULT 'proxy_only'"),
+                ("singbox_enable_app_groups", "BOOLEAN DEFAULT TRUE"),
+                ("tun_self_heal_enabled", "BOOLEAN DEFAULT TRUE"),
+                ("tun_self_heal_cooldown_secs", "INTEGER DEFAULT 90"),
+                // === sing-box 1.14 升级新增字段 ===
+                ("kernel_update_track", "TEXT DEFAULT 'stable'"),
+                ("singbox_dns_optimistic_cache", "BOOLEAN DEFAULT TRUE"),
+                ("singbox_dns_timeout", "TEXT DEFAULT '5s'"),
+                ("singbox_dns_use_mdns", "BOOLEAN DEFAULT TRUE"),
+                ("singbox_enable_tls_spoof", "BOOLEAN DEFAULT FALSE"),
+                ("tun_dns_mode", "TEXT DEFAULT 'hijack'"),
+                ("tun_include_macs", "TEXT DEFAULT '[]'"),
+                ("tun_exclude_macs", "TEXT DEFAULT '[]'"),
+                ("hysteria2_disable_chrome_parrot", "BOOLEAN DEFAULT FALSE"),
+                ("hysteria2_obfs_type", "TEXT DEFAULT 'salamander'"),
+                ("clash_mode", "TEXT DEFAULT 'rule'"),
+                ("enable_web_dashboard", "BOOLEAN DEFAULT FALSE"),
+                ("enable_tailscale_endpoint", "BOOLEAN DEFAULT FALSE"),
+                ("tailscale_run_ssh_server", "BOOLEAN DEFAULT FALSE"),
+                ("tailscale_taildrop_directory", "TEXT DEFAULT 'Taildrop'"),
+                // 1.13 早期 schema 可能缺失的基础列
+                ("proxy_mode", "TEXT DEFAULT 'manual'"),
+                ("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+                ("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+            ],
+        )
+        .await?;
 
         // 主题配置表
         sqlx::query(
@@ -175,15 +292,16 @@ impl DatabaseService {
         .await?;
 
         // 主题配置表兼容字段补充
-        let alter_theme_statements = [
-            "ALTER TABLE theme_config ADD COLUMN mode TEXT DEFAULT 'system'",
-            "ALTER TABLE theme_config ADD COLUMN accent_color TEXT DEFAULT '#6366f1'",
-            "ALTER TABLE theme_config ADD COLUMN compact_mode BOOLEAN DEFAULT FALSE",
-        ];
-
-        for statement in alter_theme_statements {
-            sqlx::query(statement).execute(pool).await.ok();
-        }
+        ensure_columns(
+            pool,
+            "theme_config",
+            &[
+                ("mode", "TEXT DEFAULT 'system'"),
+                ("accent_color", "TEXT DEFAULT '#6366f1'"),
+                ("compact_mode", "BOOLEAN DEFAULT FALSE"),
+            ],
+        )
+        .await?;
 
         // 语言配置表
         sqlx::query(
@@ -235,13 +353,15 @@ impl DatabaseService {
         .await?;
 
         // 更新配置兼容字段补充（确保旧表增加新增字段）
-        let alter_update_statements = [
-            "ALTER TABLE update_config ADD COLUMN accept_prerelease BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE update_config ADD COLUMN update_channel TEXT DEFAULT 'stable'",
-        ];
-        for statement in alter_update_statements {
-            sqlx::query(statement).execute(pool).await.ok();
-        }
+        ensure_columns(
+            pool,
+            "update_config",
+            &[
+                ("accept_prerelease", "BOOLEAN DEFAULT FALSE"),
+                ("update_channel", "TEXT DEFAULT 'stable'"),
+            ],
+        )
+        .await?;
 
         // 通用配置表
         sqlx::query(
@@ -764,3 +884,7 @@ fn parse_string_array_column(raw: Option<String>) -> Vec<String> {
 fn serialize_string_vec(values: &[String]) -> String {
     serde_json::to_string(values).unwrap_or_else(|_| "[]".to_string())
 }
+
+#[cfg(test)]
+#[path = "database.tests.rs"]
+mod tests;

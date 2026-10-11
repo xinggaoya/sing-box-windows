@@ -3,12 +3,12 @@ use crate::app::constants::messages;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
-use reqwest::Client;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use tokio::net::TcpStream;
 use tokio::time::{sleep, timeout};
 use tracing::{debug, info, warn};
+use crate::utils::http_client;
 
 // 以管理员权限重启 (跨平台实现)
 #[tauri::command]
@@ -382,11 +382,7 @@ async fn perform_network_probe(strict_http: bool) -> Result<bool, String> {
         }
     }
 
-    let client = Client::builder()
-        .timeout(Duration::from_secs(6))
-        .user_agent("sing-box-windows/connectivity-check")
-        .build()
-        .map_err(|err| err.to_string())?;
+    let client = http_client::profile_client(http_client::ClientProfile::ConnectivityProbe);
 
     let mut http_success = false;
     for url in HTTP_PROBE_URLS.iter() {
@@ -434,20 +430,9 @@ pub async fn perform_proxy_probe(proxy_port: u16) -> bool {
 
 async fn perform_proxy_probe_with_timeout(proxy_port: u16, per_request_timeout: Duration) -> bool {
     let proxy_url = format!("http://127.0.0.1:{}", proxy_port);
-    let proxy = match reqwest::Proxy::all(&proxy_url) {
-        Ok(proxy) => proxy,
-        Err(err) => {
-            debug!("构造代理探测客户端失败: {}", err);
-            return false;
-        }
-    };
-
-    let client = match Client::builder()
-        .timeout(per_request_timeout)
-        .proxy(proxy)
-        .user_agent("sing-box-windows/connectivity-check")
-        .build()
-    {
+    // 按代理 URL 缓存：本函数被内核守护循环每 8 秒调用一次，
+    // 原先每次都重建一个带 native-tls-vendored 根证书的完整客户端。
+    let client = match http_client::proxy_client_for(&proxy_url, per_request_timeout) {
         Ok(client) => client,
         Err(err) => {
             debug!("构建代理探测客户端失败: {}", err);

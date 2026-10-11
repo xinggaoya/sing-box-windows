@@ -5,6 +5,7 @@ import { systemService, type AppUpdateInfo } from '@/services/system-service'
 import { getVersion } from '@tauri-apps/api/app'
 import { DatabaseService } from '@/services/database-service'
 import type { UpdateConfig } from '@/types/database'
+import { flushWatchers } from '@/utils/store-init'
 
 export type UpdateChannel = 'stable' | 'prerelease' | 'autobuild'
 type PlatformOs = 'windows' | 'linux' | 'macos' | 'unknown'
@@ -334,7 +335,8 @@ export const useUpdateStore = defineStore('update', () => {
   const initializeStore = async () => {
     isInitializing = true
     await Promise.all([loadFromBackend(), loadPlatformInfo()])
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    // 让本次加载引发的 watch 回调先跑完再解除保存抑制（原先用 setTimeout(100ms) 赌调度时机）
+    await flushWatchers()
     isInitializing = false
   }
 

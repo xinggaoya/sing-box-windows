@@ -134,7 +134,7 @@
               </td>
             </tr>
             <tr
-              v-for="connection in group.connections"
+              v-for="connection in group.items"
               :key="connection.id"
               class="connection-row"
               tabindex="0"
@@ -225,7 +225,20 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import ToolbarBar from '@/components/common/ToolbarBar.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
+import { useSortableGroupedList } from '@/composables/useSortableGroupedList'
 import { useI18n } from 'vue-i18n'
+
+/** 连接排序/分组字段（与 ConnectionStore 中持久化的 sortKey 取值一致） */
+type ConnectionSortKey =
+  | 'start'
+  | 'download'
+  | 'upload'
+  | 'downloadSpeed'
+  | 'uploadSpeed'
+  | 'host'
+  | 'process'
+  | 'rule'
+  | 'sourceIP'
 import type { ConnectionItem } from '@/types/events'
 import { formatBytes, formatSpeed } from '@/utils'
 
@@ -321,49 +334,24 @@ const filteredConnections = computed(() => {
   })
 })
 
-const sortedConnections = computed(() => {
-  const list = [...filteredConnections.value]
-  const factor = connectionStore.sortDesc ? -1 : 1
-
-  return list.sort((left, right) => {
-    const leftValue = getSortValue(left, connectionStore.sortKey)
-    const rightValue = getSortValue(right, connectionStore.sortKey)
-
-    if (typeof leftValue === 'number' && typeof rightValue === 'number') {
-      return (leftValue - rightValue) * factor
-    }
-
-    return String(leftValue).localeCompare(String(rightValue)) * factor
-  })
-})
-
-const groupedRows = computed(() => {
-  const grouping = connectionStore.groupingKey
-  if (!grouping) {
-    return [
-      {
-        type: 'group' as const,
-        key: '',
-        count: sortedConnections.value.length,
-        connections: sortedConnections.value,
-      },
-    ]
-  }
-
-  const groups = new Map<string, ConnectionItem[]>()
-  sortedConnections.value.forEach((connection) => {
-    const key = String(getGroupValue(connection, grouping) || '-')
-    const list = groups.get(key) || []
-    list.push(connection)
-    groups.set(key, list)
-  })
-
-  return Array.from(groups.entries()).map(([key, connections]) => ({
-    type: 'group' as const,
-    key,
-    count: connections.length,
-    connections,
-  }))
+// 排序/分组逻辑与日志页共用同一实现（见 useSortableGroupedList）
+const { groups: groupedRows } = useSortableGroupedList<
+  ConnectionItem,
+  ConnectionSortKey
+>({
+  source: filteredConnections,
+  state: {
+    // store 上是解包后的普通值，需包一层 computed 供 composable 响应式读取
+    sortKey: computed(() => connectionStore.sortKey as ConnectionSortKey),
+    sortDesc: computed(() => connectionStore.sortDesc),
+    groupingKey: computed(() => (connectionStore.groupingKey ?? '') as ConnectionSortKey | ''),
+  },
+  getSortValue: (connection, key) => getSortValue(connection, key),
+  // getGroupValue 的兜底分支会返回 start 时间戳(number)，统一转字符串
+  getGroupKey: (connection, key) => {
+    const value = getGroupValue(connection, key)
+    return value === null || value === undefined ? undefined : String(value)
+  },
 })
 
 const refreshConnections = async () => {

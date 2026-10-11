@@ -110,7 +110,30 @@ impl ProcessManager {
         }
     }
 
-    fn is_pid_matching_kernel_name(&self, pid: u32, kernel_name: &str) -> bool {
+    /// 校验 PID 对应的进程名是否为内核可执行文件名。
+    ///
+    /// 三个平台都需要**阻塞**系统调用（Windows: `tasklist.exe`；Linux: 读
+    /// `/proc/<pid>/comm`；macOS: `ps`），而本函数位于 `has_active_managed_kernel_pid`
+    /// 的调用链上 —— 后者又是 `is_running()` 的兜底路径，属于最高频命令。
+    /// 因此整体放进 `spawn_blocking`，不占用异步运行时的工作线程。
+    async fn is_pid_matching_kernel_name(&self, pid: u32, kernel_name: &str) -> bool {
+        let kernel_name = kernel_name.to_owned();
+        match tokio::task::spawn_blocking(move || {
+            Self::is_pid_matching_kernel_name_blocking(pid, &kernel_name)
+        })
+        .await
+        {
+            Ok(matched) => matched,
+            Err(error) => {
+                warn!("校验 PID({}) 进程名时任务异常终止: {}", pid, error);
+                // 拿不到结果时按“不匹配”处理：宁可漏清理，也不能误杀用户的内核进程
+                false
+            }
+        }
+    }
+
+    /// 阻塞实现：必须在 `spawn_blocking` 内调用。
+    fn is_pid_matching_kernel_name_blocking(pid: u32, kernel_name: &str) -> bool {
         #[cfg(target_os = "linux")]
         {
             let comm_path = format!("/proc/{}/comm", pid);
@@ -232,13 +255,13 @@ impl ProcessManager {
                 .map(|active_pids| active_pids.contains(&pid))
                 .unwrap_or_else(|err| {
                     warn!("读取 Linux 活跃内核 PID 失败: {}", err);
-                    self.is_pid_matching_kernel_name(pid, kernel_name)
+                    self.is_pid_matching_kernel_name(pid, kernel_name).await
                 });
         }
 
         #[cfg(not(target_os = "linux"))]
         {
-            self.is_pid_matching_kernel_name(pid, kernel_name)
+            self.is_pid_matching_kernel_name(pid, kernel_name).await
         }
     }
 
@@ -301,7 +324,7 @@ impl ProcessManager {
                         return true;
                     }
 
-                    if self.is_pid_matching_kernel_name(pid, kernel_name) {
+                    if self.is_pid_matching_kernel_name(pid, kernel_name).await {
                         info!("托管 PID {} 已不是活跃 {} 进程，清理记录", pid, kernel_name);
                     } else {
                         warn!(
@@ -318,7 +341,7 @@ impl ProcessManager {
             }
         }
 
-        if self.is_pid_matching_kernel_name(pid, kernel_name) {
+        if self.is_pid_matching_kernel_name(pid, kernel_name).await {
             return true;
         }
 
@@ -733,7 +756,7 @@ impl ProcessManager {
             }
         }
 
-        if !self.is_pid_matching_kernel_name(pid, kernel_name) {
+        if !self.is_pid_matching_kernel_name(pid, kernel_name).await {
             warn!(
                 "托管 PID({}) 与当前内核进程名({})不匹配，已跳过清理并清除记录",
                 pid, kernel_name

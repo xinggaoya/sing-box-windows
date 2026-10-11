@@ -6,6 +6,7 @@ import { DatabaseService } from '@/services/database-service'
 import { trayService } from '@/services/tray-service'
 import type { WindowConfig } from '@/types/database'
 import { useAppStore } from './AppStore'
+import { flushWatchers } from '@/utils/store-init'
 
 // 窗口状态类型
 export interface WindowState {
@@ -257,8 +258,8 @@ export const useWindowStore = defineStore(
     const initializeStore = async () => {
       isInitializing = true
       await loadFromBackend()
-      // 等待一下确保数据加载完成
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // 让本次加载引发的 watch 回调先跑完再解除保存抑制（原先用 setTimeout(100ms) 赌调度时机）
+      await flushWatchers()
       isInitializing = false
     }
 

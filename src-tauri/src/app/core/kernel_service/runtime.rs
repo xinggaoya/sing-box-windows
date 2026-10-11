@@ -19,15 +19,9 @@ use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use futures::FutureExt;
 use serde_json::json;
-use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::Notify;
 use tracing::{error, info, warn};
-
-lazy_static::lazy_static! {
-    pub(super) static ref KERNEL_READY_NOTIFY: Arc<Notify> = Arc::new(Notify::new());
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct ProxyOverrides {
@@ -275,7 +269,7 @@ pub(super) async fn start_kernel_impl(
     });
 
     info!(
-        "?? 启动内核增强版，代理模式: {}, API端口: {}, 代理端口: {}",
+        "🚀 启动内核增强版，代理模式: {}, API端口: {}, 代理端口: {}",
         resolved.derived_mode(),
         resolved.api_port,
         resolved.proxy.proxy_port
@@ -442,12 +436,12 @@ pub(super) async fn start_kernel_impl(
         .await
     {
         Ok(_) => {
-            info!("? 内核进程启动成功，开始稳定性校验");
+            info!("✅ 内核进程启动成功，开始稳定性校验");
 
             if let Err(e) =
                 verify_kernel_startup_stability(resolved.api_port, resolved.proxy.proxy_port).await
             {
-                error!("? 内核稳定性校验失败: {}", e);
+                error!("❌ 内核稳定性校验失败: {}", e);
 
                 // 读取内核 stderr 输出辅助诊断
                 if let Some(stderr_output) = PROCESS_MANAGER.read_stderr_output().await {
@@ -491,10 +485,10 @@ pub(super) async fn start_kernel_impl(
             )
             .await;
 
-            info!("?? 启动事件中继服务，端口: {}", resolved.api_port);
+            info!("🚀 启动事件中继服务，端口: {}", resolved.api_port);
             match start_websocket_relay(app_handle.clone(), Some(resolved.api_port)).await {
                 Ok(_) => {
-                    info!("? 事件中继启动成功");
+                    info!("✅ 事件中继启动成功");
                     KERNEL_STATE.update_readiness(|readiness| {
                         readiness.relay_ready = true;
                     });
@@ -524,7 +518,7 @@ pub(super) async fn start_kernel_impl(
                     }))
                 }
                 Err(e) => {
-                    warn!("?? 事件中继启动失败: {}, 但内核进程已启动", e);
+                    warn!("⚠️ 事件中继启动失败: {}, 但内核进程已启动", e);
                     KERNEL_STATE.update_readiness(|readiness| {
                         readiness.relay_ready = false;
                     });
@@ -566,7 +560,7 @@ pub(super) async fn start_kernel_impl(
             }
         }
         Err(e) => {
-            error!("? 内核启动失败: {}", e);
+            error!("❌ 内核启动失败: {}", e);
             KERNEL_STATE.mark_failed();
 
             let detail = e.to_string();
@@ -590,7 +584,7 @@ pub(super) async fn start_kernel_impl(
 }
 
 async fn stop_kernel_command_impl(app_handle: AppHandle) -> Result<serde_json::Value, String> {
-    info!("?? 停止内核（编排器模式）");
+    info!("🛑 停止内核（编排器模式）");
 
     match stop_kernel(Some(&app_handle)).await {
         Ok(_) => {
@@ -622,7 +616,7 @@ async fn restart_kernel_internal(
     app_handle: AppHandle,
     overrides: ProxyOverrides,
 ) -> Result<serde_json::Value, String> {
-    info!("?? 收到快速重启请求（编排器模式）");
+    info!("🔄 收到快速重启请求（编排器模式）");
 
     let resolved = resolve_proxy_runtime_state(&app_handle, overrides).await?;
 
@@ -630,9 +624,9 @@ async fn restart_kernel_internal(
     let stop_result =
         tokio::time::timeout(Duration::from_secs(4), stop_kernel(Some(&app_handle))).await;
     match stop_result {
-        Ok(Ok(_)) => info!("? 快速重启：停止阶段完成"),
+        Ok(Ok(_)) => info!("✅ 快速重启：停止阶段完成"),
         Ok(Err(e)) => {
-            warn!("? 快速重启：停止失败，继续强杀: {}", e);
+            warn!("⚠️ 快速重启：停止失败，继续强杀: {}", e);
             if let Err(e) = PROCESS_MANAGER
                 .force_kill_kernel_processes_by_name(Some(&app_handle))
                 .await
@@ -641,7 +635,7 @@ async fn restart_kernel_internal(
             }
         }
         Err(_) => {
-            warn!("? 快速重启：停止超时，强制清理");
+            warn!("⚠️ 快速重启：停止超时，强制清理");
             if let Err(e) = PROCESS_MANAGER
                 .force_kill_kernel_processes_by_name(Some(&app_handle))
                 .await
@@ -838,7 +832,7 @@ pub async fn stop_kernel(app_handle: Option<&AppHandle>) -> Result<String, Strin
     // 快速轮询确认，避免固定长等待
     for i in 1..=2 {
         if !is_kernel_running().await.unwrap_or(true) {
-            info!("? 内核停止成功（第{}次检查）", i);
+            info!("✅ 内核停止成功（第{}次检查）", i);
             KERNEL_STATE.mark_stopped();
             return Ok("内核停止成功".to_string());
         }

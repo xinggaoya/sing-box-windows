@@ -184,9 +184,9 @@ export const useKernelStore = defineStore('kernel', () => {
     }
   }
 
-  const stopKernel = async (options?: { force?: boolean }) => {
+  const stopKernel = async () => {
     try {
-      const result = await kernelService.stopKernel({ force: options?.force ?? false })
+      const result = await kernelService.stopKernel()
       if (!result.success) {
         lastError.value = result.message
         return false

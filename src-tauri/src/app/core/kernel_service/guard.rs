@@ -5,6 +5,7 @@ use crate::app::core::kernel_service::runtime::{
 use crate::app::core::kernel_service::state::KERNEL_STATE;
 use crate::app::core::kernel_service::status::is_kernel_running;
 use crate::app::core::kernel_service::utils::{emit_kernel_error_with_context, emit_kernel_stopped};
+use crate::app::singbox_api::client::ApiError;
 use crate::app::singbox_api::{ApiClientConfig, ApiClientHandle};
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
@@ -168,7 +169,7 @@ async fn heal_restart(app_handle: &AppHandle, reason: &str) -> bool {
     }
 }
 
-fn make_api_client(api_port: u16) -> ApiClientHandle {
+fn make_api_client(api_port: u16) -> Result<ApiClientHandle, ApiError> {
     ApiClientHandle::new(ApiClientConfig::localhost(api_port))
 }
 
@@ -176,7 +177,13 @@ fn make_api_client(api_port: u16) -> ApiClientHandle {
 ///
 /// 返回 false 表示 gRPC 调用失败（内核假死更严重，应直接升级到重启）。
 async fn recovery_close_all_connections(api_port: u16) -> bool {
-    let client = make_api_client(api_port);
+    let client = match make_api_client(api_port) {
+        Ok(client) => client,
+        Err(error) => {
+            tracing::warn!("L1 自愈：创建 gRPC 客户端失败: {}", error);
+            return false;
+        }
+    };
     match tokio::time::timeout(
         Duration::from_secs(GRPC_ACTION_TIMEOUT_SECS),
         client.close_all_connections(),
@@ -202,7 +209,13 @@ async fn recovery_close_all_connections(api_port: u16) -> bool {
 /// 测速并切换过去。返回被切换掉的原节点 tag；返回 None 表示无事可做
 /// （已是自动选择 / 组不存在 / gRPC 失败）。
 async fn recovery_switch_to_auto(app_handle: &AppHandle, api_port: u16) -> Option<String> {
-    let client = make_api_client(api_port);
+    let client = match make_api_client(api_port) {
+        Ok(client) => client,
+        Err(error) => {
+            tracing::warn!("L2 自愈：创建 gRPC 客户端失败: {}", error);
+            return None;
+        }
+    };
     let groups = match tokio::time::timeout(
         Duration::from_secs(GRPC_ACTION_TIMEOUT_SECS),
         client.get_groups_snapshot(),

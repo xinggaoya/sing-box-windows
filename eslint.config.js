@@ -39,6 +39,12 @@ export default withVueTs(
       '**/temp/**',
       '**/.tmp_sbd/**',
       '**/.env*',
+      // 本地AI 工具 / 编辑器产生的目录（已在 .gitignore 中），
+      // 不加会让 `pnpm lint` 的结果依赖本地未跟踪状态。
+      '**/.zcode/**',
+      '**/.claude/**',
+      '**/.cursor/**',
+      '**/.agents/**',
     ],
   },
 

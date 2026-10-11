@@ -15,6 +15,7 @@ use tracing::{info, warn};
 
 use crate::app::singbox::config_generator::remote_rule_set_sources;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
+use crate::utils::http_client;
 
 static CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
@@ -59,11 +60,7 @@ async fn warm_rule_set_cache(app_handle: &AppHandle) -> Result<(), String> {
     }
 
     // gh-proxy 直连加速；禁用系统代理，避免 TUN 残留的 127.0.0.1 代理配置导致下载失败
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("构建 HTTP 客户端失败: {}", e))?;
+    let client = http_client::profile_client(http_client::ClientProfile::RuleSet);
 
     let mut updated = 0usize;
     for source in &sources {

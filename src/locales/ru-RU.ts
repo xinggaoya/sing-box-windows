@@ -63,6 +63,7 @@ export default {
     nodeModeChangeSuccess: 'Смена режима узла выполнена успешно',
     nodeModeChangeFailed: 'Ошибка смены режима узла',
     restartSuccess: 'Ядро успешно перезапущено.',
+    memory: 'Использование памяти',
 
     // WebSocket状态
     wsStatus: {
@@ -87,12 +88,14 @@ export default {
     },
 
     // 状态描述
-    status: {
+    statusDescriptions: {
+      runningDesc: 'Ядро запущено, сервис прокси доступен',
+      disconnectedDesc: 'Ядро запущено, но соединение нарушено, пожалуйста проверьте конфигурацию',
+    },
+    kernelStatusDescriptions: {
       startingDesc: 'Запуск ядра, пожалуйста подождите...',
       stoppingDesc: 'Остановка ядра, пожалуйста подождите...',
-      runningDesc: 'Ядро запущено, сервис прокси доступен',
       stoppedDesc: 'Ядро остановлено, сервис прокси недоступен',
-      disconnectedDesc: 'Ядро запущено, но соединение нарушено, пожалуйста проверьте конфигурацию',
     },
 
     // 流量统计
@@ -415,7 +418,6 @@ export default {
     title: 'Настройки',
     subtitle: 'Управление конфигурацией приложения и системными настройками',
     appVersion: 'Версия приложения',
-    kernelVersion: 'Версия ядра',
     notInstalled: 'Не установлено',
     newVersionFound: 'Найдена новая версия',
     navigation: {
@@ -567,6 +569,7 @@ export default {
     autoStart: {
       app: 'Запуск с системой',
       appDesc: 'Автоматический запуск приложения при запуске системы',
+      error: 'Не удалось настроить автозапуск с системой',
     },
 
     // 启动设置

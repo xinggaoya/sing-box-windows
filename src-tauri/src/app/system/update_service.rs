@@ -1,5 +1,4 @@
 use crate::app::constants::{api, messages};
-use crate::app::network_config;
 use crate::utils::app_util::get_work_dir_sync;
 use semver::Version;
 use serde_json::json;
@@ -7,6 +6,7 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use tauri::{Emitter, Manager};
+use crate::utils::http_client;
 
 const RELEASES_PAGE_URL: &str = "https://github.com/xinggaoya/sing-box-windows/releases";
 
@@ -433,13 +433,7 @@ pub async fn check_update(
     include_prerelease: Option<bool>,
     update_channel: Option<String>,
 ) -> Result<UpdateInfo, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(
-            network_config::HTTP_TIMEOUT_SECONDS,
-        ))
-        .no_proxy() // 禁用代理
-        .build()
-        .map_err(|e| format!("{}: {}", messages::ERR_HTTP_CLIENT_FAILED, e))?;
+    let client = http_client::profile_client(http_client::ClientProfile::Default);
 
     let include_prerelease = include_prerelease.unwrap_or(false);
     let channel = UpdateChannel::from_inputs(update_channel.as_deref(), include_prerelease);

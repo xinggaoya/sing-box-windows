@@ -1,7 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useLocalStorage } from '@vueuse/core'
-import { APP_EVENTS } from '@/constants/events'
 import { eventService } from '@/services/event-service'
 import { connectionService } from '@/services/connection-service'
 import type { ConnectionItem, ConnectionsDataPayload, MemoryStatsPayload } from '@/types/events'
@@ -139,10 +138,11 @@ export const useConnectionStore = defineStore('connection', () => {
 
   const cleanupEventListeners = () => {
     try {
+      // 只移除本 store 自己的监听器。
+      // 之前额外调用了 `eventService.removeEventListener(EVENT)`（不带 id = 清空整事件），
+      // 会连带干掉该事件下其他订阅者的监听器。
       connectionsUnlisten?.()
       memoryUnlisten?.()
-      eventService.removeEventListener(APP_EVENTS.connectionsData)
-      eventService.removeEventListener(APP_EVENTS.memoryData)
     } finally {
       connectionsUnlisten = null
       memoryUnlisten = null

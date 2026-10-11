@@ -1,7 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useLocalStorage } from '@vueuse/core'
-import { APP_EVENTS } from '@/constants/events'
 import { eventService } from '@/services/event-service'
 import type { LogEventPayload } from '@/types/events'
 
@@ -67,8 +66,8 @@ export const useLogStore = defineStore('log', () => {
 
   const cleanupListeners = () => {
     try {
+      // 只移除本 store 自己的监听器；旧的全局清理会误杀同事件的其他订阅者。
       unlisten?.()
-      eventService.removeEventListener(APP_EVENTS.logData)
     } finally {
       unlisten = null
     }

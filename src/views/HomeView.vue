@@ -227,8 +227,10 @@ import PortSettingsDialog from '@/components/common/PortSettingsDialog.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import SectionCard from '@/components/common/SectionCard.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
+import { prepareTunAndRestartAsAdmin, useTunToggle } from '@/composables/useTunToggle'
 import { useSudoStore } from '@/stores'
 import { formatBytes, formatSpeed } from '@/utils'
+import { extractKernelErrorMessage, resolveKernelFailureText } from '@/utils/kernel-errors'
 
 defineOptions({
   name: 'HomeView',
@@ -254,12 +256,53 @@ const {
 const isAdmin = ref(false)
 const platform = ref<'windows' | 'linux' | 'macos' | 'unknown'>('unknown')
 const currentNodeProxyMode = ref('rule')
-const modeSwitchPending = ref(false)
+/** 代理模式（系统代理 / 节点模式）切换进行中 */
+const proxyModePending = ref(false)
+/** 「以管理员身份重启」确认弹窗流程进行中 */
+const tunConfirmPending = ref(false)
 const showPortModal = ref(false)
 const quickTesting = ref(false)
 
 const isWindowsPlatform = computed(() => platform.value === 'windows')
 const isUnixPlatform = computed(() => platform.value === 'linux' || platform.value === 'macos')
+
+// 平台无关的 TUN 切换状态机；平台提权与 sudo 密码交互通过回调注入。
+const {
+  pending: tunTogglePending,
+  applyTunSwitch,
+} = useTunToggle({
+  messages: {
+    applyFailed: t('notification.proxyModeChangeFailed'),
+    restartFailed: t('home.restartFailed'),
+  },
+  // Unix 下内核启动前需要 sudo 密码；缺失时先索要再继续
+  ensurePrivilege: async (target) => {
+    if (!target || !isUnixPlatform.value) return 'proceed'
+
+    const status = await sudoService.getStatus()
+    if (!status.supported) {
+      message.error(t('home.sudoPassword.unsupported'))
+      // 不阻断：交给核心流程，最终会失败并回滚
+      return 'proceed'
+    }
+    if (!status.has_saved) {
+      const ok = await sudoStore.requestPassword()
+      if (!ok) {
+        message.error(t('home.sudoPassword.required'))
+      }
+    }
+    return 'proceed'
+  },
+  handleSudoFailure: async (code) => {
+    message.error(
+      code === 'invalid' ? t('home.sudoPassword.invalid') : t('home.sudoPassword.required'),
+    )
+    return sudoStore.requestPassword()
+  },
+})
+
+// 切换期间同时禁用两处入口（模式选择器与 TUN 开关）
+const modeSwitchPending = computed(() => tunTogglePending.value || proxyModePending.value)
 
 const statusTitle = computed(() => {
   switch (statusState.value) {
@@ -318,7 +361,7 @@ const nodeProxyModes = [
 ]
 
 const getKernelFailureText = (fallback: string) =>
-  kernelStore.startupDiagnosisSummary || kernelStore.lastError || fallback
+  resolveKernelFailureText(kernelStore.startupDiagnosisSummary, kernelStore.lastError, fallback)
 
 const syncCurrentNodeProxyMode = async () => {
   try {
@@ -350,7 +393,7 @@ const toggleSystemProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
 
   try {
-    modeSwitchPending.value = true
+    proxyModePending.value = true
     await appStore.toggleSystemProxy(value)
 
     const success = await kernelStore.applyProxySettings()
@@ -362,7 +405,7 @@ const toggleSystemProxy = async (value: boolean) => {
   } catch {
     message.error(t('notification.proxyModeChangeFailed'))
   } finally {
-    modeSwitchPending.value = false
+    proxyModePending.value = false
   }
 }
 
@@ -378,7 +421,7 @@ const confirmTunSwitch = () => {
     }
 
     const handlePositiveClick = async () => {
-      modeSwitchPending.value = true
+      tunConfirmPending.value = true
       if (dialogReactive) dialogReactive.loading = true
 
       try {
@@ -386,7 +429,7 @@ const confirmTunSwitch = () => {
         finish(success)
         return success
       } finally {
-        modeSwitchPending.value = false
+        tunConfirmPending.value = false
         if (dialogReactive) dialogReactive.loading = false
       }
     }
@@ -404,118 +447,31 @@ const confirmTunSwitch = () => {
   })
 }
 
-const parseSudoCode = (raw: unknown) => {
-  const msg = raw instanceof Error ? raw.message : String(raw || '')
-  if (msg.includes('SUDO_PASSWORD_REQUIRED')) return 'required'
-  if (msg.includes('SUDO_PASSWORD_INVALID')) return 'invalid'
-  return null
-}
-
-const getErrorMessage = (error: unknown) => {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error || '')
-}
-
-const enableTunWithKernelRestart = async (options?: { allowSudoRetry?: boolean }) => {
-  try {
-    modeSwitchPending.value = true
-    await appStore.toggleTun(true)
-
-    const applied = await kernelStore.applyProxySettings()
-    if (!applied) {
-      await appStore.toggleTun(false)
-      message.error(t('notification.proxyModeChangeFailed'))
-      return false
-    }
-
-    const success = await kernelStore.restartKernel()
-    if (success) {
-      message.success(t('notification.proxyModeChanged'))
-      return true
-    }
-
-    await appStore.toggleTun(false)
-
-    if (isUnixPlatform.value) {
-      const code = parseSudoCode(getKernelFailureText(''))
-      if (code === 'required' || code === 'invalid') {
-        message.error(
-          code === 'invalid' ? t('home.sudoPassword.invalid') : t('home.sudoPassword.required'),
-        )
-
-        const allowRetry = options?.allowSudoRetry ?? true
-        const ok = await sudoStore.requestPassword()
-        if (ok && allowRetry) {
-          return enableTunWithKernelRestart({ allowSudoRetry: false })
-        }
-        return false
-      }
-    }
-
-    message.error(t('home.restartFailed'))
-    return false
-  } catch {
-    await appStore.toggleTun(false)
-    message.error(t('notification.proxyModeChangeFailed'))
-    return false
-  } finally {
-    modeSwitchPending.value = false
-  }
-}
 
 const toggleTunProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
 
-  if (value) {
-    if (isWindowsPlatform.value) {
-      await checkAdmin()
-
-      if (isAdmin.value) {
-        await enableTunWithKernelRestart()
-      } else {
-        await confirmTunSwitch()
-      }
-    } else if (isUnixPlatform.value) {
-      const status = await sudoService.getStatus()
-      if (!status.supported) {
-        message.error(t('home.sudoPassword.unsupported'))
-        return
-      }
-      if (!status.has_saved) {
-        const ok = await sudoStore.requestPassword()
-        if (!ok) return
-      }
-      await enableTunWithKernelRestart()
-    } else {
-      message.error(t('home.sudoPassword.unsupported'))
+  if (value && isWindowsPlatform.value) {
+    // Windows 需要管理员权限才能创建 TUN 网卡
+    await checkAdmin()
+    if (!isAdmin.value) {
+      // 无权限：走「确认 + 保存配置 + 管理员重启」流程
+      await confirmTunSwitch()
+      return
     }
-  } else {
-    try {
-      modeSwitchPending.value = true
-      await appStore.toggleTun(false)
+  }
 
-      const applied = await kernelStore.applyProxySettings()
-      if (!applied) {
-        await appStore.toggleTun(true)
-        message.error(t('notification.proxyModeChangeFailed'))
-        return
-      }
-
-      const success = await kernelStore.restartKernel()
-      if (success) {
-        message.success(t('notification.proxyModeChanged'))
-      } else {
-        await appStore.toggleTun(true)
-        message.error(t('notification.proxyModeChangeFailed'))
-      }
-    } catch {
-      await appStore.toggleTun(true)
-      message.error(t('notification.proxyModeChangeFailed'))
-    } finally {
-      modeSwitchPending.value = false
-    }
+  const outcome = await applyTunSwitch(value)
+  switch (outcome.status) {
+    case 'success':
+      message.success(t('notification.proxyModeChanged'))
+      break
+    case 'failed':
+      message.error(outcome.failure.text)
+      break
+    default:
+      // 'skipped'（状态未变）/ 'escalated'（已转交管理员重启）无需提示
+      break
   }
 }
 
@@ -538,7 +494,7 @@ const restartAsAdmin = async () => {
   try {
     await requestRestartAsAdmin()
   } catch (error) {
-    const details = getErrorMessage(error)
+    const details = extractKernelErrorMessage(error)
     message.error(details ? `${t('home.restartFailed')}：${details}` : t('home.restartFailed'))
   }
 }
@@ -548,28 +504,11 @@ const requestRestartAsAdmin = async () => {
 }
 
 const prepareTunModeWithAdminRestart = async () => {
-  try {
-    await appStore.toggleTun(true)
-    const applied = await kernelStore.applyProxySettings()
-    if (!applied) {
-      await appStore.toggleTun(false)
-      message.error(t('notification.proxyModeChangeFailed'))
-      return false
-    }
-    await appStore.saveToBackend()
-
-    if (appStore.isRunning) {
-      await kernelStore.stopKernel()
-    }
-
-    await requestRestartAsAdmin()
-    return true
-  } catch (error) {
-    await appStore.toggleTun(false)
-    const details = getErrorMessage(error)
-    message.error(details ? `${t('home.restartFailed')}：${details}` : t('home.restartFailed'))
-    return false
+  const success = await prepareTunAndRestartAsAdmin()
+  if (!success) {
+    message.error(t('notification.proxyModeChangeFailed'))
   }
+  return success
 }
 
 const handleNodeProxyModeChange = async (mode: string) => {
@@ -587,6 +526,8 @@ const handleNodeProxyModeChange = async (mode: string) => {
     message.success(t('home.nodeModeChangeSuccess'))
   } catch {
     message.error(t('home.nodeModeChangeFailed'))
+  } finally {
+    proxyModePending.value = false
   }
 }
 

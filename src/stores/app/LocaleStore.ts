@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { supportedLocales, DEFAULT_LOCALE, type LocaleCode } from '@/locales'
 import { DatabaseService } from '@/services/database-service'
 import type { LocaleConfig } from '@/types/database'
+import { flushWatchers } from '@/utils/store-init'
 
 // 语言类型
 export type Locale = LocaleCode | 'auto'
@@ -89,8 +90,8 @@ export const useLocaleStore = defineStore(
     const initializeStore = async () => {
       isInitializing = true
       await loadFromBackend()
-      // 等待一下确保数据加载完成
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      // 让本次加载引发的 watch 回调先跑完再解除保存抑制（原先用 setTimeout(100ms) 赌调度时机）
+      await flushWatchers()
       isInitializing = false
     }
 
