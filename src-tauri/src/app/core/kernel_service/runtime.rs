@@ -3,7 +3,7 @@ use crate::app::core::kernel_service::event::{cleanup_event_relay_tasks, start_w
 use crate::app::core::kernel_service::guard::{disable_kernel_guard, enable_kernel_guard};
 use crate::app::core::kernel_service::orchestrator::execute_kernel_operation;
 use crate::app::core::kernel_service::state::{KernelState, KERNEL_STATE};
-use crate::app::core::kernel_service::status::is_kernel_running;
+use crate::app::core::kernel_service::status::is_kernel_running_ref;
 use crate::app::core::kernel_service::utils::{
     emit_kernel_error_with_context, emit_kernel_started, emit_kernel_starting, emit_kernel_status,
     emit_kernel_stopped, resolve_config_path, KernelStatusPayload,
@@ -81,7 +81,11 @@ fn classify_runtime_start_failure(detail: &str) -> &'static str {
     }
 }
 
-async fn verify_kernel_startup_stability(api_port: u16, proxy_port: u16) -> Result<(), String> {
+async fn verify_kernel_startup_stability(
+    app_handle: &AppHandle,
+    api_port: u16,
+    proxy_port: u16,
+) -> Result<(), String> {
     // stability window: detect false-positive "started then crashed" scenarios.
     // first run may need to download metacubexd UI / rule sets,
     // use exponential backoff for cold starts; success returns quickly.
@@ -98,7 +102,7 @@ async fn verify_kernel_startup_stability(api_port: u16, proxy_port: u16) -> Resu
     let mut last_error = String::new();
 
     for attempt in 1..=MAX_CHECKS {
-        if !is_kernel_running().await.unwrap_or(false) {
+        if !is_kernel_running_ref(app_handle).await.unwrap_or(false) {
             return Err("kernel process exited immediately after startup".to_string());
         }
 
@@ -369,7 +373,7 @@ pub(super) async fn start_kernel_impl(
         }));
     }
 
-    if is_kernel_running().await.unwrap_or(false) {
+    if is_kernel_running_ref(&app_handle).await.unwrap_or(false) {
         if let Err(err) = try_cleanup_conflicting_kernel(&app_handle).await {
             KERNEL_STATE.mark_failed();
             let kernel_name = crate::platform::get_kernel_executable_name();
@@ -392,7 +396,7 @@ pub(super) async fn start_kernel_impl(
         }
 
         // 再次复核，避免平台命令执行成功但仍有残留进程占用端口。
-        if is_kernel_running().await.unwrap_or(false) {
+        if is_kernel_running_ref(&app_handle).await.unwrap_or(false) {
             KERNEL_STATE.mark_failed();
             let kernel_name = crate::platform::get_kernel_executable_name();
             let details = format!("强制清理后仍检测到 {} 进程在运行", kernel_name);
@@ -444,8 +448,12 @@ pub(super) async fn start_kernel_impl(
         Ok(_) => {
             info!("✅ 内核进程启动成功，开始稳定性校验");
 
-            if let Err(e) =
-                verify_kernel_startup_stability(resolved.api_port, resolved.proxy.proxy_port).await
+            if let Err(e) = verify_kernel_startup_stability(
+                &app_handle,
+                resolved.api_port,
+                resolved.proxy.proxy_port,
+            )
+            .await
             {
                 error!("❌ 内核稳定性校验失败: {}", e);
 
@@ -837,7 +845,8 @@ pub async fn stop_kernel(app_handle: Option<&AppHandle>) -> Result<String, Strin
 
     // 快速轮询确认，避免固定长等待
     for i in 1..=2 {
-        if !is_kernel_running().await.unwrap_or(true) {
+        let handle = app_handle.ok_or_else(|| "缺少 AppHandle，无法确认内核已停止".to_string())?;
+        if !is_kernel_running_ref(handle).await.unwrap_or(true) {
             info!("✅ 内核停止成功（第{}次检查）", i);
             KERNEL_STATE.mark_stopped();
             return Ok("内核停止成功".to_string());

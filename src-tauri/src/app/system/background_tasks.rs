@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::OnceCell;
 use tracing::{error, info, warn};
 
-use crate::app::core::kernel_service::status::kernel_check_health;
+use crate::app::core::kernel_service::status::kernel_check_health_ref;
 use crate::app::storage::enhanced_storage_service::EnhancedStorageService;
 use crate::app::system::update_service::{check_update, UpdateInfo};
 
@@ -119,7 +119,7 @@ async fn start_kernel_health_loop(app: AppHandle) -> Result<(), String> {
     wait_for_storage(&app).await?;
 
     loop {
-        match kernel_check_health(None).await {
+        match kernel_check_health_ref(&app, None).await {
             Ok(payload) => {
                 if let Err(e) = app.emit("kernel-health", &payload) {
                     error!("发送 kernel-health 事件失败: {}", e);

@@ -432,6 +432,14 @@ pub async fn db_get_app_config(app: AppHandle) -> Result<AppConfig, String> {
     db_get_app_config_internal(&app).await
 }
 
+/// 以引用读取应用配置。
+///
+/// `AppHandle` 不实现 `Copy`，因此在被多处使用（如 `is_kernel_running` 会被调用数次）
+/// 的函数里应传引用，避免第一次调用就把 handle move 掉。
+pub async fn db_get_app_config_ref(app: &AppHandle) -> Result<AppConfig, String> {
+    db_get_app_config_internal(app).await
+}
+
 pub async fn db_get_app_config_internal<R: tauri::Runtime>(
     app: &AppHandle<R>,
 ) -> Result<AppConfig, String> {

@@ -20,6 +20,11 @@
 - 修复 `UpdateModal` 绕过 `eventService` 直接 `listen`，导致监听器无法被统一清理
 - 修复 22 处日志中的 emoji 被替换成字面 `?`（编码损坏）
 - 修复 `update-progress` 事件 `message` 字段缺失时前端会读到 `undefined`
+- **统一内核存活判定**：此前「内核是否在跑」有三套彼此独立的实现且结论会互相矛盾 ——
+  `is_kernel_running` 看进程句柄、`kernel_get_status_enhanced_v2` 看 TCP 端口、
+  `KERNEL_STATE.readiness.process_alive` 谁写谁说了算。表现为「内核明明在跑、流量也正常，
+  前端却显示已停止」。现收敛为 `kernel_service::health` 唯一入口（端口 > 托管句柄 > 平台扫描），
+  端口探测抽象为 trait 后可在无真实内核的环境下完整覆盖优先级规则
 
 ### ♻️ 重构
 

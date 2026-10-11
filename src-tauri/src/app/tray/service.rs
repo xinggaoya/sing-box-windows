@@ -5,7 +5,7 @@ use super::model::{
 };
 use super::state::TrayRuntimeState;
 use crate::app::core::kernel_service::runtime::{apply_proxy_settings, kernel_restart_fast};
-use crate::app::core::kernel_service::status::is_kernel_running;
+use crate::app::core::kernel_service::status::is_kernel_running_ref;
 use crate::app::storage::enhanced_storage_service::db_save_app_config_internal;
 use crate::app::storage::state_model::AppConfig;
 use lazy_static::lazy_static;
@@ -831,7 +831,7 @@ pub async fn refresh_runtime_state_from_backend(
 ) -> Result<(), String> {
     let app_config =
         crate::app::storage::enhanced_storage_service::db_get_app_config_internal(app).await?;
-    let kernel_running = is_kernel_running().await.unwrap_or(false);
+    let kernel_running = is_kernel_running_ref(app).await.unwrap_or(false);
     let changed = with_state_write(|state| {
         apply_backend_runtime_snapshot(state, &app_config, kernel_running)
     });

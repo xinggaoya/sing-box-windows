@@ -3,7 +3,7 @@ use crate::app::core::kernel_service::runtime::{
     resolve_proxy_runtime_state, start_kernel_impl, ProxyOverrides,
 };
 use crate::app::core::kernel_service::state::KERNEL_STATE;
-use crate::app::core::kernel_service::status::is_kernel_running;
+use crate::app::core::kernel_service::status::is_kernel_running_ref;
 use crate::app::core::kernel_service::utils::{
     emit_kernel_error_with_context, emit_kernel_stopped,
 };
@@ -353,7 +353,7 @@ fn spawn_guard_loop(app_handle: AppHandle) -> JoinHandle<()> {
                 last_log_rotation_at = Instant::now();
             }
 
-            match is_kernel_running().await {
+            match is_kernel_running_ref(&app_handle).await {
                 Ok(true) => {
                     // 所有代理模式都做连通性自愈：进程活着但假死时也能恢复。
                     let policy = load_self_heal_policy(&app_handle).await;

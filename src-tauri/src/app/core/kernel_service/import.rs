@@ -2,7 +2,7 @@ use super::archive;
 use crate::app::constants::paths;
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::kernel_service::runtime::stop_kernel;
-use crate::app::core::kernel_service::status::is_kernel_running;
+use crate::app::core::kernel_service::status::is_kernel_running_ref;
 use crate::app::core::kernel_service::versioning::extract_clean_version;
 use crate::app::core::kernel_service::PROCESS_MANAGER;
 use crate::app::storage::enhanced_storage_service::{
@@ -84,7 +84,7 @@ async fn import_kernel_executable_inner(
     let imported_version = validate_kernel_binary(&staged_binary_path).await?;
 
     let kernel_path = paths::get_kernel_path();
-    let was_running_before_import = is_kernel_running().await.unwrap_or(false);
+    let was_running_before_import = is_kernel_running_ref(app_handle).await.unwrap_or(false);
     if was_running_before_import {
         stop_running_kernel_for_replace(app_handle).await?;
     }
@@ -93,7 +93,7 @@ async fn import_kernel_executable_inner(
 
     let restarted = if was_running_before_import {
         auto_manage_with_saved_config(app_handle, true, "kernel-manual-import").await;
-        let restarted = wait_kernel_running(Duration::from_secs(10)).await;
+        let restarted = wait_kernel_running(app_handle, Duration::from_secs(10)).await;
 
         if !restarted {
             if let Some(path) = backup_path.as_deref() {
@@ -231,7 +231,7 @@ async fn stop_running_kernel_for_replace(app_handle: &AppHandle) -> Result<(), S
 
     for attempt in 1..=5 {
         let _ = stop_kernel(Some(app_handle)).await;
-        if !is_kernel_running().await.unwrap_or(true) {
+        if !is_kernel_running_ref(app_handle).await.unwrap_or(true) {
             info!("内核已停止，可继续替换");
             return Ok(());
         }
@@ -246,7 +246,7 @@ async fn stop_running_kernel_for_replace(app_handle: &AppHandle) -> Result<(), S
         .map_err(|e| format!("强制终止内核进程失败: {}", e))?;
 
     tokio::time::sleep(Duration::from_millis(500)).await;
-    if is_kernel_running().await.unwrap_or(false) {
+    if is_kernel_running_ref(app_handle).await.unwrap_or(false) {
         return Err("无法停止当前内核进程，已中止导入".to_string());
     }
 
@@ -328,10 +328,10 @@ async fn restore_kernel_from_backup(kernel_path: &Path, backup_path: &Path) -> R
     move_file_with_fallback(backup_path, kernel_path).await
 }
 
-async fn wait_kernel_running(timeout: Duration) -> bool {
+async fn wait_kernel_running(app_handle: &AppHandle, timeout: Duration) -> bool {
     let start = tokio::time::Instant::now();
     while start.elapsed() < timeout {
-        if is_kernel_running().await.unwrap_or(false) {
+        if is_kernel_running_ref(app_handle).await.unwrap_or(false) {
             return true;
         }
         tokio::time::sleep(Duration::from_millis(400)).await;

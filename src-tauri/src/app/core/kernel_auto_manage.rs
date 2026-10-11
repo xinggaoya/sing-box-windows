@@ -2,7 +2,7 @@ use crate::app::constants::paths;
 use crate::app::core::kernel_service::embedded::ensure_embedded_kernel;
 use crate::app::core::kernel_service::utils::emit_kernel_error_with_context;
 use crate::app::core::kernel_service::{
-    check_config_validity, is_kernel_running, orchestrated_restart_kernel,
+    check_config_validity, is_kernel_running_ref, orchestrated_restart_kernel,
     orchestrated_start_kernel, KernelRuntimeConfig, ProxyOverrides,
 };
 use crate::app::core::tun_profile::TunProxyOptions;
@@ -132,7 +132,7 @@ async fn auto_manage_kernel_internal(
         return Ok(AutoManageResult::invalid_config(err));
     }
 
-    let was_running = is_kernel_running().await.unwrap_or(false);
+    let was_running = is_kernel_running_ref(&app_handle).await.unwrap_or(false);
     let attempted_start = !was_running || options.config.force_restart;
 
     if options.config.force_restart && was_running {

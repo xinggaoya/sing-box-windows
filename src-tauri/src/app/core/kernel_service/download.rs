@@ -1,7 +1,7 @@
 use super::archive;
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::kernel_service::runtime::stop_kernel;
-use crate::app::core::kernel_service::status::is_kernel_running;
+use crate::app::core::kernel_service::status::is_kernel_running_ref;
 use crate::app::core::kernel_service::versioning::{get_latest_kernel_version, get_system_arch};
 use crate::app::core::kernel_service::PROCESS_MANAGER;
 use crate::utils::http_client;
@@ -214,7 +214,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
         return Err("下载的文件不存在".to_string());
     }
 
-    let was_running_before_update = is_kernel_running().await.unwrap_or(false);
+    let was_running_before_update = is_kernel_running_ref(&app_handle).await.unwrap_or(false);
     if was_running_before_update {
         info!("内核更新前检测到正在运行，先尝试停止以便替换");
 
@@ -222,7 +222,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
         for i in 0..5 {
             let _ = stop_kernel(Some(&app_handle)).await; // stop_kernel 内部已有 guard disable 和 2s 等待
 
-            if !is_kernel_running().await.unwrap_or(true) {
+            if !is_kernel_running_ref(&app_handle).await.unwrap_or(true) {
                 info!("内核已成功停止");
                 break;
             }
@@ -231,7 +231,7 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
         }
 
         // 最后再次确认
-        if is_kernel_running().await.unwrap_or(false) {
+        if is_kernel_running_ref(&app_handle).await.unwrap_or(false) {
             warn!("几次尝试后内核仍在运行，尝试强制终止进程...");
             if let Err(e) = PROCESS_MANAGER
                 .kill_existing_processes(Some(&app_handle))

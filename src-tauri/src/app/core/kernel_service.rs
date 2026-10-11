@@ -11,6 +11,7 @@ pub mod download;
 pub mod embedded;
 pub mod event;
 pub mod guard;
+pub mod health;
 pub mod import;
 pub mod log_rotation;
 pub mod orchestrator;
@@ -30,5 +31,8 @@ pub use runtime::{
     ResolvedProxyState,
 };
 pub use state::{KernelRuntimeConfig, KernelState, KernelStateManager, KERNEL_STATE};
-pub use status::{get_system_uptime, is_kernel_running, kernel_check_health};
+pub use status::{
+    get_system_uptime, is_kernel_running, is_kernel_running_ref, kernel_check_health,
+    kernel_check_health_ref,
+};
 pub use versioning::{check_config_validity, check_kernel_version, get_latest_kernel_version_cmd};

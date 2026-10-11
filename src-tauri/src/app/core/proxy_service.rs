@@ -518,9 +518,9 @@ pub async fn network_quality_test(
 pub async fn kernel_get_status_enhanced_v2(
     app_handle: AppHandle,
 ) -> Result<serde_json::Value, String> {
+    use crate::app::core::kernel_service::health;
     use crate::app::core::kernel_service::state::KERNEL_STATE;
     use std::time::Duration;
-    use tokio::net::TcpStream;
 
     // 0) binary 版本戳 —— 用户可凭此确认 Rust 后端是否真的更新
     tracing::info!("[STATUS_V2_BUILD] 2026-09-01-v4-binary-version-stamp");
@@ -540,33 +540,39 @@ pub async fn kernel_get_status_enhanced_v2(
         }
     };
 
-    // 2) **纯 TCP 端口探测**(不依赖 ProcessManager)—— 端口能连 = 进程在跑
-    let api_port_open = tokio::time::timeout(
-        Duration::from_millis(500),
-        TcpStream::connect(("127.0.0.1", api_port)),
-    )
-    .await
-    .map(|r| r.is_ok())
-    .unwrap_or(false);
+    // 2) 统一健康探测（端口 > 托管句柄 > 平台扫描）
+    //    见 kernel_service::health：此前本命令用「纯 TCP 端口」而托盘/守护用
+    //    「进程句柄」，两套结论会矛盾（前端显示已停止但内核其实在跑）。
+    let managed_running = crate::app::core::kernel_service::PROCESS_MANAGER
+        .is_running()
+        .await;
+    let platform_scanned =
+        crate::platform::is_process_running(crate::platform::get_kernel_executable_name())
+            .await
+            .unwrap_or(false);
 
-    let proxy_port_open = tokio::time::timeout(
-        Duration::from_millis(500),
-        TcpStream::connect(("127.0.0.1", proxy_port)),
+    let health = health::probe_kernel(
+        api_port,
+        proxy_port,
+        health::TcpPortProbe,
+        managed_running,
+        platform_scanned,
     )
-    .await
-    .map(|r| r.is_ok())
-    .unwrap_or(false);
+    .await;
 
-    // TCP 端口能连 → process_running=true
-    // 这绕开 ProcessManager is_running() 可能的 false negative
-    let process_running = api_port_open || proxy_port_open;
+    let process_running = health.is_running();
+    let api_port_open = health.api_ready;
+    let proxy_port_open = health.proxy_port_open;
     tracing::info!(
-        "[STATUS_V2_BUILD] api_port={} open={} | proxy_port={} open={} | process_running={}",
+        "[STATUS_V2_BUILD] api_port={} open={} | proxy_port={} open={} | managed={} | scanned={} | process_running={} | source={}",
         api_port,
         api_port_open,
         proxy_port,
         proxy_port_open,
-        process_running
+        managed_running,
+        platform_scanned,
+        process_running,
+        health.source.as_str()
     );
 
     // 3) gRPC GetVersion 探测(决定 api_ready 和 kernel_state)
