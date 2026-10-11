@@ -60,7 +60,6 @@
 
           <SettingsAdvancedTab
             v-if="activeTab === 'advanced'"
-            :t="t"
             :app-store="appStore"
             :tun-stack-options="tunStackOptions"
             :using-original-config="usingOriginalConfig"
