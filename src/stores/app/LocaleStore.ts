@@ -11,8 +11,7 @@ export type Locale = LocaleCode | 'auto'
 const isLocaleCode = (value: unknown): value is LocaleCode =>
   typeof value === 'string' && supportedLocales.some((loc) => loc.code === value)
 
-const isLocaleValue = (value: unknown): value is Locale =>
-  value === 'auto' || isLocaleCode(value)
+const isLocaleValue = (value: unknown): value is Locale => value === 'auto' || isLocaleCode(value)
 
 export const useLocaleStore = defineStore(
   'locale',
@@ -83,7 +82,7 @@ export const useLocaleStore = defineStore(
         if (isInitializing) return
         await saveToBackend()
       },
-      { immediate: false }
+      { immediate: false },
     )
 
     // 初始化方法

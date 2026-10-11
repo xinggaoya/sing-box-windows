@@ -7,9 +7,9 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::{
     migrate::MigrateDatabase,
-    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
     sqlite::Sqlite,
     sqlite::SqlitePool,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
     Row,
 };
 use std::str::FromStr;
@@ -68,9 +68,10 @@ async fn ensure_columns(
             continue;
         }
         let sql = format!("ALTER TABLE {} ADD COLUMN {} {}", table, column, definition);
-        sqlx::query(&sql).execute(pool).await.map_err(|e| {
-            StorageError::Migration(format!("{} -> {}", sql.trim(), e))
-        })?;
+        sqlx::query(&sql)
+            .execute(pool)
+            .await
+            .map_err(|e| StorageError::Migration(format!("{} -> {}", sql.trim(), e)))?;
         applied += 1;
         tracing::debug!("⬆️ schema 补列: {}.{}", table, column);
     }
@@ -117,7 +118,10 @@ impl DatabaseService {
         }
 
         let pool = Self::build_pool(&database_url).await?;
-        tracing::info!("✅ 数据库连接成功 (WAL, busy_timeout={}s)", SQLITE_BUSY_TIMEOUT.as_secs());
+        tracing::info!(
+            "✅ 数据库连接成功 (WAL, busy_timeout={}s)",
+            SQLITE_BUSY_TIMEOUT.as_secs()
+        );
 
         // 建表/迁移按“库”而非“进程”执行：不同数据库路径（如测试用的临时库）
         // 必须各自完成一次 schema 初始化，否则会静默缺表。
@@ -871,10 +875,7 @@ fn parse_string_array_column(raw: Option<String>) -> Vec<String> {
     match serde_json::from_str::<Vec<String>>(&raw) {
         Ok(values) => values,
         Err(error) => {
-            tracing::warn!(
-                "检测到无效的字符串数组 JSON，已回退为空数组: {}",
-                error
-            );
+            tracing::warn!("检测到无效的字符串数组 JSON，已回退为空数组: {}", error);
             Vec::new()
         }
     }

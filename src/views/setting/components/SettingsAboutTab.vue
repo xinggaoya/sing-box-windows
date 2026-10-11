@@ -35,7 +35,9 @@
         <div class="setting-info">
           <div class="setting-label">{{ props.t('setting.about.system') }}</div>
         </div>
-        <div class="setting-value">{{ props.platformInfo?.display_name || props.t('common.loading') }}</div>
+        <div class="setting-value">
+          {{ props.platformInfo?.display_name || props.t('common.loading') }}
+        </div>
       </div>
 
       <div class="setting-row">
@@ -47,12 +49,7 @@
     </div>
 
     <div class="about-footer">
-      <n-button
-        text
-        tag="a"
-        href="https://github.com/xinggaoya/sing-box-windows"
-        target="_blank"
-      >
+      <n-button text tag="a" href="https://github.com/xinggaoya/sing-box-windows" target="_blank">
         <template #icon>
           <n-icon :size="16"><LogoGithub /></n-icon>
         </template>
@@ -63,9 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  LogoGithub,
-} from '@vicons/ionicons5'
+import { LogoGithub } from '@vicons/ionicons5'
 import type { useKernelStore, useUpdateStore } from '@/stores'
 
 type KernelStoreLike = ReturnType<typeof useKernelStore>

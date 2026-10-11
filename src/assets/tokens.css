@@ -102,10 +102,12 @@
   --space-12: 48px;
 
   /* 排版 */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'Fira Code', 'JetBrains Mono', ui-monospace, SFMono-Regular,
-    'SF Mono', Menlo, Consolas, monospace;
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono:
+    'Fira Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    monospace;
   --text-xs: 12px;
   --text-sm: 13px;
   --text-base: 14px;

@@ -133,9 +133,11 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     let rule_sets = remote_rule_set_sources(app_config)
         .iter()
         .map(|source| {
-            let initial_path = rule_set_cache_dir
-                .as_ref()
-                .map(|dir| dir.join(format!("{}.srs", source.tag)).to_string_lossy().to_string());
+            let initial_path = rule_set_cache_dir.as_ref().map(|dir| {
+                dir.join(format!("{}.srs", source.tag))
+                    .to_string_lossy()
+                    .to_string()
+            });
             let http_client = (download_via_manual && source.direct_detour)
                 .then(|| "direct-download".to_string());
             remote_rule_set_value(source, initial_path, http_client)
@@ -212,9 +214,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             servers: build_dns_servers(app_config, default_outbound),
             rules: dns_rules,
             // 1.14 启用乐观 DNS 缓存：重复查询命中过期缓存立即返回 + 后台刷新，降低尾延迟
-            optimistic: app_config
-                .singbox_dns_optimistic_cache
-                .then_some(true),
+            optimistic: app_config.singbox_dns_optimistic_cache.then_some(true),
             // per-query / per-server DNS 超时（1.14 新增）；为空时不写入
             timeout: (!app_config.singbox_dns_timeout.is_empty())
                 .then(|| app_config.singbox_dns_timeout.clone()),

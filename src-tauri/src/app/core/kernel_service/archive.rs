@@ -94,10 +94,7 @@ pub async fn extract(archive_path: &Path, extract_to: &Path) -> ArchiveResult<()
 /// 否则递归遍历；同名多个时取第一个（`WalkDir` 按字典序，结果稳定可预期）。
 ///
 /// 阻塞 IO 部分在 `spawn_blocking` 中执行。
-pub async fn find_executable(
-    search_dir: &Path,
-    executable_name: &str,
-) -> ArchiveResult<PathBuf> {
+pub async fn find_executable(search_dir: &Path, executable_name: &str) -> ArchiveResult<PathBuf> {
     let search_dir = search_dir.to_path_buf();
     let executable_name = executable_name.to_owned();
 
@@ -108,10 +105,7 @@ pub async fn find_executable(
             return Ok(direct);
         }
 
-        for entry in walkdir::WalkDir::new(&search_dir)
-            .into_iter()
-            .flatten()
-        {
+        for entry in walkdir::WalkDir::new(&search_dir).into_iter().flatten() {
             let path = entry.path();
             if path.is_file()
                 && path
@@ -146,8 +140,8 @@ pub fn set_executable_permission(file_path: &Path) -> ArchiveResult<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms =
-            std::fs::metadata(file_path).map_err(|e| ArchiveError::Extract {
+        let mut perms = std::fs::metadata(file_path)
+            .map_err(|e| ArchiveError::Extract {
                 path: file_path.to_string_lossy().to_string(),
                 message: format!("读取文件权限失败: {}", e),
             })?
@@ -285,12 +279,14 @@ fn extract_tar_blocking(
     // `Archive` 的泛型随 reader 变化，因此按格式分两个分支，
     // 而不是在同一个变量上重新赋值（类型不一致）。
     match format {
-        ArchiveFormat::TarGz => Archive::new(flate2::read::GzDecoder::new(open("打开 tar.gz 失败")?))
-            .unpack(extract_to)
-            .map_err(|e| ArchiveError::Extract {
-                path: archive_path.to_string_lossy().to_string(),
-                message: format!("解压 tar.gz 失败: {}", e),
-            })?,
+        ArchiveFormat::TarGz => {
+            Archive::new(flate2::read::GzDecoder::new(open("打开 tar.gz 失败")?))
+                .unpack(extract_to)
+                .map_err(|e| ArchiveError::Extract {
+                    path: archive_path.to_string_lossy().to_string(),
+                    message: format!("解压 tar.gz 失败: {}", e),
+                })?
+        }
         _ => Archive::new(open("打开 tar 失败")?)
             .unpack(extract_to)
             .map_err(|e| ArchiveError::Extract {

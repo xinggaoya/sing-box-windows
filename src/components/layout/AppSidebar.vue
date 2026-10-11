@@ -120,9 +120,7 @@ const groupedItems = computed<NavGroup[]>(() => {
   return [{ key: 'default', items: props.menuItems }]
 })
 
-const themeLabel = computed(() =>
-  props.isDark ? tt('nav.switchToLight') : tt('nav.switchToDark'),
-)
+const themeLabel = computed(() => (props.isDark ? tt('nav.switchToLight') : tt('nav.switchToDark')))
 const collapseLabel = computed(() => (props.collapsed ? t('nav.expand') : t('nav.collapse')))
 </script>
 

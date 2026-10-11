@@ -3,4 +3,4 @@
 /**
  * 动作：直连 / 走代理 / 拒绝。代理动作可指定具体出站 tag。
  */
-export type CustomRuleAction = "direct" | "proxy" | "block";
+export type CustomRuleAction = 'direct' | 'proxy' | 'block'

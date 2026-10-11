@@ -17,7 +17,9 @@ use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
-use crate::app::singbox_api::{ApiClientConfig, ApiClientHandle, ConnectionEvents, Groups, Log, Status};
+use crate::app::singbox_api::{
+    ApiClientConfig, ApiClientHandle, ConnectionEvents, Groups, Log, Status,
+};
 
 /// 全局通知：清理事件中继任务时通过此 Notify 让所有 task 退出
 pub(super) static SHOULD_STOP_EVENTS: tokio::sync::OnceCell<Notify> =
@@ -72,7 +74,10 @@ pub(super) async fn start_websocket_relay(
     let handle = match ApiClientHandle::new(config) {
         Ok(handle) => handle,
         Err(error) => {
-            tracing::error!("❌ 创建 sing-box gRPC 客户端失败，事件中继不会启动: {}", error);
+            tracing::error!(
+                "❌ 创建 sing-box gRPC 客户端失败，事件中继不会启动: {}",
+                error
+            );
             return Err(format!("创建 sing-box gRPC 客户端失败: {}", error));
         }
     };
@@ -297,7 +302,11 @@ struct RelayBackoff {
 
 impl RelayBackoff {
     fn new() -> Self {
-        Self { current_ms: 2_000, consecutive_failures: 0, successes: 0 }
+        Self {
+            current_ms: 2_000,
+            consecutive_failures: 0,
+            successes: 0,
+        }
     }
     /// 失败一次:sleep 当前延迟后翻倍(最大 30s),累计失败 +1
     async fn sleep(&mut self) {

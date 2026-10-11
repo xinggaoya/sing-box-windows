@@ -1,16 +1,16 @@
+use super::archive;
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::kernel_service::runtime::stop_kernel;
 use crate::app::core::kernel_service::status::is_kernel_running;
 use crate::app::core::kernel_service::versioning::{get_latest_kernel_version, get_system_arch};
 use crate::app::core::kernel_service::PROCESS_MANAGER;
+use crate::utils::http_client;
 use serde_json::json;
 use std::path::Path;
 use std::time::Duration;
 use tauri::Manager;
 use tauri::{AppHandle, Emitter, WebviewWindow};
 use tracing::{info, warn};
-use super::archive;
-use crate::utils::http_client;
 
 #[tauri::command]
 pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> Result<(), String> {
@@ -279,14 +279,14 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
     info!("开始在临时目录中查找新内核: {}", executable_name);
 
     // 在临时目录中查找
-    let found_executable_path = match archive::find_executable(&temp_update_dir, executable_name).await
-    {
-        Ok(p) => p,
-        Err(error) => {
-            let _ = std::fs::remove_dir_all(&temp_update_dir);
-            return Err(error.to_string());
-        }
-    };
+    let found_executable_path =
+        match archive::find_executable(&temp_update_dir, executable_name).await {
+            Ok(p) => p,
+            Err(error) => {
+                let _ = std::fs::remove_dir_all(&temp_update_dir);
+                return Err(error.to_string());
+            }
+        };
 
     let target_executable_path = kernel_dir.join(executable_name);
 

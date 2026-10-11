@@ -179,19 +179,17 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
       proxyAdvancedForm.tunSelfHealCooldownSecs = options.appStore.tunSelfHealCooldownSecs
       proxyAdvancedForm.tunDnsMode = options.appStore.tunDnsMode as 'hijack' | 'native' | 'disabled'
 
-      singboxProfileForm.defaultProxyOutbound = options.appStore
-        .singboxDefaultProxyOutbound as 'manual' | 'auto'
+      singboxProfileForm.defaultProxyOutbound = options.appStore.singboxDefaultProxyOutbound as
+        'manual' | 'auto'
       singboxProfileForm.downloadDetour = options.appStore.singboxDownloadDetour as
-        | 'manual'
-        | 'direct'
+        'manual' | 'direct'
       singboxProfileForm.blockAds = options.appStore.singboxBlockAds
       singboxProfileForm.dnsHijack = options.appStore.singboxDnsHijack
       singboxProfileForm.fakeDnsEnabled = options.appStore.singboxFakeDnsEnabled
       singboxProfileForm.fakeDnsIpv4Range = options.appStore.singboxFakeDnsIpv4Range
       singboxProfileForm.fakeDnsIpv6Range = options.appStore.singboxFakeDnsIpv6Range
       singboxProfileForm.fakeDnsFilterMode = options.appStore.singboxFakeDnsFilterMode as
-        | 'proxy_only'
-        | 'global_non_cn'
+        'proxy_only' | 'global_non_cn'
       singboxProfileForm.enableAppGroups = options.appStore.singboxEnableAppGroups
       singboxProfileForm.dnsProxy = options.appStore.singboxDnsProxy
       singboxProfileForm.dnsCn = options.appStore.singboxDnsCn
@@ -199,22 +197,17 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
       singboxProfileForm.urltestUrl = options.appStore.singboxUrltestUrl
 
       // 1.14 实验性字段
-      singboxExperimentalForm.dnsOptimisticCache =
-        options.appStore.singboxDnsOptimisticCache
+      singboxExperimentalForm.dnsOptimisticCache = options.appStore.singboxDnsOptimisticCache
       singboxExperimentalForm.dnsTimeout = options.appStore.singboxDnsTimeout
       singboxExperimentalForm.dnsUseMdns = options.appStore.singboxDnsUseMdns
       singboxExperimentalForm.enableTlsSpoof = options.appStore.singboxEnableTlsSpoof
       singboxExperimentalForm.hysteria2DisableChromeParrot =
         options.appStore.hysteria2DisableChromeParrot
-      singboxExperimentalForm.hysteria2ObfsType =
-        options.appStore.hysteria2ObfsType as 'salamander' | 'gecko'
-      singboxExperimentalForm.clashMode = options.appStore.clashMode as
-        | 'rule'
-        | 'global'
-        | 'direct'
+      singboxExperimentalForm.hysteria2ObfsType = options.appStore.hysteria2ObfsType as
+        'salamander' | 'gecko'
+      singboxExperimentalForm.clashMode = options.appStore.clashMode as 'rule' | 'global' | 'direct'
       singboxExperimentalForm.enableWebDashboard = options.appStore.enableWebDashboard
-      singboxExperimentalForm.enableTailscaleEndpoint =
-        options.appStore.enableTailscaleEndpoint
+      singboxExperimentalForm.enableTailscaleEndpoint = options.appStore.enableTailscaleEndpoint
       singboxExperimentalForm.tailscaleRunSshServer = options.appStore.tailscaleRunSshServer
       singboxExperimentalForm.tailscaleTaildropDirectory =
         options.appStore.tailscaleTaildropDirectory
@@ -225,7 +218,8 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
   const saveProxyAdvancedSettings = async () => {
     if (
       proxyAdvancedForm.tunSelfHealEnabled &&
-      (proxyAdvancedForm.tunSelfHealCooldownSecs < 15 || proxyAdvancedForm.tunSelfHealCooldownSecs > 600)
+      (proxyAdvancedForm.tunSelfHealCooldownSecs < 15 ||
+        proxyAdvancedForm.tunSelfHealCooldownSecs > 600)
     ) {
       options.message.error(options.t('setting.proxyAdvanced.errors.selfHealCooldownInvalid'))
       return

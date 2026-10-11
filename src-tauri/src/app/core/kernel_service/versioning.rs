@@ -1,11 +1,11 @@
 use crate::app::constants::{common::messages, paths};
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
+use crate::utils::http_client;
 use serde::Deserialize;
 use serde_json;
 use std::process::Command;
 use tauri::AppHandle;
 use tracing::{info, warn};
-use crate::utils::http_client;
 
 /// GitHub 镜像前缀。直连 api.github.com 在国内常超时，按顺序回退到各加速镜像。
 ///
@@ -246,7 +246,10 @@ pub async fn check_kernel_version(app_handle: AppHandle) -> Result<String, Strin
 ///
 /// 供自动管理流程在重启前做门禁校验；与 `config_validator` 的静态校验互补
 /// （后者不依赖内核可执行文件）。
-pub async fn check_config_validity(app_handle: AppHandle, config_path: String) -> Result<(), String> {
+pub async fn check_config_validity(
+    app_handle: AppHandle,
+    config_path: String,
+) -> Result<(), String> {
     let kernel_path = paths::get_kernel_path();
 
     if !kernel_path.exists() {

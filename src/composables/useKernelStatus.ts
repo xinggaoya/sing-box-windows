@@ -4,9 +4,8 @@ import { useKernelStore } from '@/stores/kernel/KernelStore'
 
 type KernelStore = ReturnType<typeof useKernelStore>
 
-export type KernelStatusState = 'starting' | 'stopping' | 'running' | 'disconnected' | 'stopped'
-  | 'failed'
-  | 'crashed'
+export type KernelStatusState =
+  'starting' | 'stopping' | 'running' | 'disconnected' | 'stopped' | 'failed' | 'crashed'
 
 /**
  * 将内核运行状态抽象成可复用的展示数据，保证不同组件显示一致

@@ -11,16 +11,15 @@
               {{ kernelRunning ? t('common.running') : t('common.stopped') }}
             </n-tag>
             <n-button size="small" :loading="loading" @click="refresh">
-              <template #icon><n-icon :size="14"><ReloadOutline /></n-icon></template>
+              <template #icon
+                ><n-icon :size="14"><ReloadOutline /></n-icon
+              ></template>
               {{ t('common.refresh') }}
             </n-button>
           </n-space>
         </template>
 
-        <n-empty
-          v-if="!loading && rules.length === 0"
-          :description="t('rules.empty')"
-        />
+        <n-empty v-if="!loading && rules.length === 0" :description="t('rules.empty')" />
         <n-data-table
           v-else
           :columns="columns"

@@ -55,7 +55,7 @@ interface FieldOptions<K extends keyof AppConfig, V> {
 function defineField<K extends keyof AppConfig>(
   key: K,
   defaultValue: AppConfig[K],
-  options: FieldOptions<K, AppConfig[K]> = {}
+  options: FieldOptions<K, AppConfig[K]> = {},
 ): ConfigField<K> {
   return {
     key,
@@ -76,7 +76,7 @@ function defineField<K extends keyof AppConfig>(
 function defineNarrowField<K extends keyof AppConfig, V extends AppConfig[K]>(
   key: K,
   defaultValue: V,
-  options: FieldOptions<K, V> = {}
+  options: FieldOptions<K, V> = {},
 ): ConfigField<K, V> {
   return {
     key,
@@ -106,9 +106,12 @@ const keepCurrentIfBlank = <V extends string>(raw: unknown, current: V): V =>
 const readOptionalString = (raw: unknown, current: string | null): string | null =>
   typeof raw === 'string' && raw !== '' ? raw : current
 
-/** 数组：非空则复制一份（避免与后端对象共享引用），否则沿用当前值 */
+/**
+ * 数组字段：后端给了数组就原样拷贝（**包括空数组** —— 空数组表示“用户清空了这几项”，
+ * 必须生效），只有非数组（旧库缺列）才沿用当前值。
+ */
 const readStringList = (raw: unknown, current: string[]): string[] =>
-  Array.isArray(raw) && raw.length > 0 ? [...(raw as string[])] : current
+  Array.isArray(raw) ? [...(raw as string[])] : current
 
 /** 数组字段的读取变体：空数组归一化为 null（用于 tun_route_exclude_address） */
 const readListOrCurrent = (raw: unknown, current: string[] | null): string[] | null =>
@@ -166,43 +169,33 @@ export const APP_CONFIG_FIELDS = {
   }),
 
   // --- sing-box 配置生成（订阅模板） ---
-  singboxDnsProxy: defineField(
-    'singbox_dns_proxy',
-    'https://1.1.1.1/dns-query',
-    { read: keepCurrentIfBlank },
-  ),
+  singboxDnsProxy: defineField('singbox_dns_proxy', 'https://1.1.1.1/dns-query', {
+    read: keepCurrentIfBlank,
+  }),
   singboxDnsCn: defineField('singbox_dns_cn', 'h3://dns.alidns.com/dns-query', {
     read: keepCurrentIfBlank,
   }),
   singboxDnsResolver: defineField('singbox_dns_resolver', '114.114.114.114', {
     read: keepCurrentIfBlank,
   }),
-  singboxUrltestUrl: defineField(
-    'singbox_urltest_url',
-    'http://cp.cloudflare.com/generate_204',
-    { read: keepCurrentIfBlank },
-  ),
-  singboxDefaultProxyOutbound: defineField(
-    'singbox_default_proxy_outbound',
-    'manual',
-    { read: keepCurrentIfBlank },
-  ),
+  singboxUrltestUrl: defineField('singbox_urltest_url', 'http://cp.cloudflare.com/generate_204', {
+    read: keepCurrentIfBlank,
+  }),
+  singboxDefaultProxyOutbound: defineField('singbox_default_proxy_outbound', 'manual', {
+    read: keepCurrentIfBlank,
+  }),
   singboxBlockAds: defineField('singbox_block_ads', true),
   singboxDownloadDetour: defineField('singbox_download_detour', 'direct', {
     read: keepCurrentIfBlank,
   }),
   singboxDnsHijack: defineField('singbox_dns_hijack', true),
   singboxFakeDnsEnabled: defineField('singbox_fake_dns_enabled', false),
-  singboxFakeDnsIpv4Range: defineField(
-    'singbox_fake_dns_ipv4_range',
-    '198.18.0.0/15',
-    { read: keepCurrentIfBlank },
-  ),
-  singboxFakeDnsIpv6Range: defineField(
-    'singbox_fake_dns_ipv6_range',
-    'fc00::/18',
-    { read: keepCurrentIfBlank },
-  ),
+  singboxFakeDnsIpv4Range: defineField('singbox_fake_dns_ipv4_range', '198.18.0.0/15', {
+    read: keepCurrentIfBlank,
+  }),
+  singboxFakeDnsIpv6Range: defineField('singbox_fake_dns_ipv6_range', 'fc00::/18', {
+    read: keepCurrentIfBlank,
+  }),
   singboxFakeDnsFilterMode: defineField('singbox_fake_dns_filter_mode', 'proxy_only', {
     read: keepCurrentIfBlank,
   }),
@@ -271,7 +264,7 @@ export function createAppConfigFields(): AppConfigFields {
 /** 把后端 `AppConfig` 读入字段集合 */
 export function applyAppConfigToFields(
   fields: AppConfigFields,
-  appConfig: Partial<AppConfig>
+  appConfig: Partial<AppConfig>,
 ): void {
   for (const name of APP_CONFIG_FIELD_NAMES) {
     const field = fields[name] as ConfigField

@@ -31,9 +31,8 @@ const handleGoToSettings = () => {
 
 // 监听更新可用事件
 const handleUpdateAvailable = (updateInfo: unknown) => {
-  const payload = (updateInfo && typeof updateInfo === 'object')
-    ? (updateInfo as Record<string, unknown>)
-    : null
+  const payload =
+    updateInfo && typeof updateInfo === 'object' ? (updateInfo as Record<string, unknown>) : null
   const isPrerelease = payload ? Boolean(payload.is_prerelease) : false
 
   // 如果已经有通知显示，先销毁它

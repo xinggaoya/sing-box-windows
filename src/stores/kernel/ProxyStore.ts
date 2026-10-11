@@ -95,9 +95,7 @@ export const useProxyStore = defineStore('proxy', () => {
   }
 
   const proxyGroups = computed<ProxyGroup[]>(() =>
-    rawGroups.value.group
-      .filter((g) => g.items.length > 0)
-      .map(toViewGroup),
+    rawGroups.value.group.filter((g) => g.items.length > 0).map(toViewGroup),
   )
 
   const groupCount = computed(() => proxyGroups.value.length)
@@ -186,9 +184,7 @@ export const useProxyStore = defineStore('proxy', () => {
     await proxyService.selectOutbound(group, proxy)
     // 乐观更新本地选择状态
     rawGroups.value = {
-      group: rawGroups.value.group.map((g) =>
-        g.tag === group ? { ...g, selected: proxy } : g,
-      ),
+      group: rawGroups.value.group.map((g) => (g.tag === group ? { ...g, selected: proxy } : g)),
     }
     if (autoCloseConnections.value) {
       await connectionService.closeAll().catch(() => undefined)
@@ -266,10 +262,9 @@ export const useProxyStore = defineStore('proxy', () => {
     const groupNames = proxyGroups.value.map((g) => g.name)
     batchTesting.value = true
     // 标记所有组在测速中
-    groupTestingMap.value = groupNames.reduce(
-      (acc, g) => ({ ...acc, [g]: true }),
-      { ...groupTestingMap.value },
-    )
+    groupTestingMap.value = groupNames.reduce((acc, g) => ({ ...acc, [g]: true }), {
+      ...groupTestingMap.value,
+    })
     try {
       // 并发触发所有组 URLTest,延迟刷新靠 SubscribeGroups relay 推送
       const results = await Promise.all(groupNames.map((g) => proxyService.urlTest(g)))
@@ -277,10 +272,9 @@ export const useProxyStore = defineStore('proxy', () => {
       const okGroups = groupNames.filter((_, i) => results[i]?.ok)
       const failedGroups = groupNames.filter((_, i) => !results[i]?.ok)
       if (failedGroups.length > 0) {
-        groupTestingMap.value = failedGroups.reduce(
-          (acc, g) => ({ ...acc, [g]: false }),
-          { ...groupTestingMap.value },
-        )
+        groupTestingMap.value = failedGroups.reduce((acc, g) => ({ ...acc, [g]: false }), {
+          ...groupTestingMap.value,
+        })
       }
       if (okGroups.length === 0) {
         batchTesting.value = false
@@ -298,19 +292,17 @@ export const useProxyStore = defineStore('proxy', () => {
         }
         testedNodes.value = next
         batchTesting.value = false
-        groupTestingMap.value = okGroups.reduce(
-          (acc, g) => ({ ...acc, [g]: false }),
-          { ...groupTestingMap.value },
-        )
+        groupTestingMap.value = okGroups.reduce((acc, g) => ({ ...acc, [g]: false }), {
+          ...groupTestingMap.value,
+        })
       }, DEFAULT_TIMEOUT_MS)
       return results.map((r) => ({ ok: r.ok }))
     } catch {
       // 异常:立即结束 loading
       batchTesting.value = false
-      groupTestingMap.value = groupNames.reduce(
-        (acc, g) => ({ ...acc, [g]: false }),
-        { ...groupTestingMap.value },
-      )
+      groupTestingMap.value = groupNames.reduce((acc, g) => ({ ...acc, [g]: false }), {
+        ...groupTestingMap.value,
+      })
       throw new Error('urlTest failed')
     }
   }
@@ -393,7 +385,9 @@ export const useProxyStore = defineStore('proxy', () => {
               //   保留的节点会被 getLatencyStatus 判定为 'failed'。
               if (testedNodes.value.size > 0) {
                 const newDelayByTag = new Map<string, number>()
-                for (const g of (data as { group: { items: { tag: string; urlTestDelay: number }[] }[] }).group) {
+                for (const g of (
+                  data as { group: { items: { tag: string; urlTestDelay: number }[] }[] }
+                ).group) {
                   for (const it of g.items) newDelayByTag.set(it.tag, it.urlTestDelay)
                 }
                 const next = new Set<string>()

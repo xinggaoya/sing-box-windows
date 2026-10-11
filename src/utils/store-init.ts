@@ -33,7 +33,7 @@ import { nextTick } from 'vue'
 export async function withSaveGuard<T>(
   markInitializing: () => void,
   markInitialized: () => void,
-  load: () => Promise<T>
+  load: () => Promise<T>,
 ): Promise<T> {
   markInitializing()
   try {

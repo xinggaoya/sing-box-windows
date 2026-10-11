@@ -99,13 +99,12 @@ struct SubscriptionFetchResult {
 const SUBSCRIPTION_USERINFO_COMPAT_UAS: [&str; 2] = ["clash.meta", "clash-verge/1.7.7"];
 
 fn normalized_active_config_path(path: &Option<String>) -> Option<&str> {
-    path.as_deref().map(str::trim).filter(|value| !value.is_empty())
+    path.as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
 }
 
-fn active_config_change_requires_restart(
-    previous: &Option<String>,
-    next: &Option<String>,
-) -> bool {
+fn active_config_change_requires_restart(previous: &Option<String>, next: &Option<String>) -> bool {
     normalized_active_config_path(previous) != normalized_active_config_path(next)
 }
 

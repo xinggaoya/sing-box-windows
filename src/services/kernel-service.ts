@@ -338,9 +338,9 @@ class KernelService {
       return {
         success: false,
         message:
-            error instanceof Error
-              ? error.message
-              : i18n.global.t('notification.ipVersionSwitchFailed'),
+          error instanceof Error
+            ? error.message
+            : i18n.global.t('notification.ipVersionSwitchFailed'),
       }
     }
   }

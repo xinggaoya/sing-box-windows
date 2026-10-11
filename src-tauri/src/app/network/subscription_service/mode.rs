@@ -1,5 +1,7 @@
 use crate::app::singbox_api::{ApiClientConfig, ApiClientHandle};
-use crate::app::storage::enhanced_storage_service::{db_get_app_config, db_save_app_config_internal};
+use crate::app::storage::enhanced_storage_service::{
+    db_get_app_config, db_save_app_config_internal,
+};
 use tauri::AppHandle;
 use tracing::{info, warn};
 

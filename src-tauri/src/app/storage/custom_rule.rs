@@ -56,7 +56,10 @@ impl CustomRuleAction {
     /// - Block → 用 `action` 字段（值为 `reject`）
     pub fn singbox_outbound_or_action(&self, default_outbound: &str) -> (&'static str, String) {
         match self {
-            CustomRuleAction::Direct => ("outbound", crate::app::singbox::common::TAG_DIRECT.to_string()),
+            CustomRuleAction::Direct => (
+                "outbound",
+                crate::app::singbox::common::TAG_DIRECT.to_string(),
+            ),
             CustomRuleAction::Proxy => ("outbound", default_outbound.to_string()),
             CustomRuleAction::Block => ("action", "reject".to_string()),
         }
@@ -110,9 +113,10 @@ impl CustomRule {
             return None;
         }
 
-        let (field_key, field_value) = (self.match_type.singbox_field(), Value::Array(
-            values.into_iter().map(Value::String).collect(),
-        ));
+        let (field_key, field_value) = (
+            self.match_type.singbox_field(),
+            Value::Array(values.into_iter().map(Value::String).collect()),
+        );
         let (action_key, action_value) = self.action.singbox_outbound_or_action(default_outbound);
 
         let mut obj = serde_json::Map::new();
@@ -128,7 +132,11 @@ use serde_json::Value;
 mod tests {
     use super::*;
 
-    fn rule(match_type: CustomRuleMatchType, action: CustomRuleAction, payload: &str) -> CustomRule {
+    fn rule(
+        match_type: CustomRuleMatchType,
+        action: CustomRuleAction,
+        payload: &str,
+    ) -> CustomRule {
         CustomRule {
             id: "test".to_string(),
             enabled: true,
@@ -144,7 +152,11 @@ mod tests {
 
     #[test]
     fn domain_suffix_direct_emits_outbound_direct() {
-        let r = rule(CustomRuleMatchType::DomainSuffix, CustomRuleAction::Direct, "example.com");
+        let r = rule(
+            CustomRuleMatchType::DomainSuffix,
+            CustomRuleAction::Direct,
+            "example.com",
+        );
         let v = r.to_route_rule("手动切换").unwrap();
         assert_eq!(v["domain_suffix"][0].as_str().unwrap(), "example.com");
         assert_eq!(v["outbound"].as_str().unwrap(), "direct");
@@ -152,7 +164,11 @@ mod tests {
 
     #[test]
     fn ip_cidr_block_emits_action_reject() {
-        let r = rule(CustomRuleMatchType::IpCidr, CustomRuleAction::Block, "10.0.0.0/8");
+        let r = rule(
+            CustomRuleMatchType::IpCidr,
+            CustomRuleAction::Block,
+            "10.0.0.0/8",
+        );
         let v = r.to_route_rule("手动切换").unwrap();
         assert_eq!(v["ip_cidr"][0].as_str().unwrap(), "10.0.0.0/8");
         assert_eq!(v["action"].as_str().unwrap(), "reject");
@@ -160,7 +176,11 @@ mod tests {
 
     #[test]
     fn proxy_uses_default_outbound() {
-        let r = rule(CustomRuleMatchType::Domain, CustomRuleAction::Proxy, "openai.com");
+        let r = rule(
+            CustomRuleMatchType::Domain,
+            CustomRuleAction::Proxy,
+            "openai.com",
+        );
         let v = r.to_route_rule("自动选择").unwrap();
         assert_eq!(v["outbound"].as_str().unwrap(), "自动选择");
     }
@@ -181,20 +201,32 @@ mod tests {
 
     #[test]
     fn disabled_rule_returns_none() {
-        let mut r = rule(CustomRuleMatchType::Domain, CustomRuleAction::Direct, "x.com");
+        let mut r = rule(
+            CustomRuleMatchType::Domain,
+            CustomRuleAction::Direct,
+            "x.com",
+        );
         r.enabled = false;
         assert!(r.to_route_rule("自动选择").is_none());
     }
 
     #[test]
     fn empty_payload_returns_none() {
-        let r = rule(CustomRuleMatchType::Domain, CustomRuleAction::Direct, "   ,  ");
+        let r = rule(
+            CustomRuleMatchType::Domain,
+            CustomRuleAction::Direct,
+            "   ,  ",
+        );
         assert!(r.to_route_rule("自动选择").is_none());
     }
 
     #[test]
     fn serde_roundtrip() {
-        let r = rule(CustomRuleMatchType::DomainKeyword, CustomRuleAction::Block, "ads");
+        let r = rule(
+            CustomRuleMatchType::DomainKeyword,
+            CustomRuleAction::Block,
+            "ads",
+        );
         let json = serde_json::to_string(&r).unwrap();
         let back: CustomRule = serde_json::from_str(&json).unwrap();
         assert_eq!(back.match_type, CustomRuleMatchType::DomainKeyword);

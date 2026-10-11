@@ -79,7 +79,11 @@
           class="sort-select"
           :placeholder="proxyLabels.grouping"
         />
-        <n-button size="small" quaternary @click="connectionStore.sortDesc = !connectionStore.sortDesc">
+        <n-button
+          size="small"
+          quaternary
+          @click="connectionStore.sortDesc = !connectionStore.sortDesc"
+        >
           <template #icon>
             <n-icon>
               <ArrowDownOutline v-if="connectionStore.sortDesc" />
@@ -103,7 +107,8 @@
           ↓ {{ formatBytes(connectionStore.connectionsTotal.download) }}
         </n-tag>
         <n-tag size="small" round :bordered="false" type="default">
-          {{ proxyLabels.quickFilter }}: {{ connectionStore.quickFilterEnabled ? labelsOnOff.on : labelsOnOff.off }}
+          {{ proxyLabels.quickFilter }}:
+          {{ connectionStore.quickFilterEnabled ? labelsOnOff.on : labelsOnOff.off }}
         </n-tag>
       </template>
     </ToolbarBar>
@@ -181,28 +186,88 @@
 
     <EmptyState
       v-else
-      :title="connectionStore.activeTab === 'active' ? t('connections.noActiveConnections') : proxyLabels.noClosed"
+      :title="
+        connectionStore.activeTab === 'active'
+          ? t('connections.noActiveConnections')
+          : proxyLabels.noClosed
+      "
       :icon="LinkOutline"
     />
 
-    <n-modal v-model:show="detailVisible" preset="card" :title="proxyLabels.detailTitle" style="width: 720px">
+    <n-modal
+      v-model:show="detailVisible"
+      preset="card"
+      :title="proxyLabels.detailTitle"
+      style="width: 720px"
+    >
       <div v-if="selectedConnection" class="detail-grid">
-        <div><strong>ID</strong><span>{{ selectedConnection.id }}</span></div>
-        <div><strong>{{ t('connections.rule') }}</strong><span>{{ getRuleText(selectedConnection) }}</span></div>
-        <div><strong>{{ t('connections.source') }}</strong><span>{{ getSourceText(selectedConnection) }}</span></div>
-        <div><strong>{{ t('connections.destination') }}</strong><span>{{ getDestinationText(selectedConnection) }}</span></div>
-        <div><strong>{{ t('connections.process') }}</strong><span>{{ getProcessText(selectedConnection) }}</span></div>
-        <div><strong>{{ t('connections.inbound') }}</strong><span>{{ selectedConnection.metadata.inboundName || selectedConnection.metadata.inboundUser || '-' }}</span></div>
-        <div><strong>{{ t('connections.network') }}</strong><span>{{ selectedConnection.metadata.network || '-' }}</span></div>
-        <div><strong>{{ t('connections.type') }}</strong><span>{{ selectedConnection.metadata.type || '-' }}</span></div>
-        <div><strong>{{ t('connections.sniffHost') }}</strong><span>{{ selectedConnection.metadata.sniffHost || '-' }}</span></div>
-        <div><strong>{{ t('connections.remote') }}</strong><span>{{ selectedConnection.metadata.remoteDestination || '-' }}</span></div>
-        <div><strong>{{ t('connections.upload') }}</strong><span>{{ formatBytes(selectedConnection.upload) }}</span></div>
-        <div><strong>{{ t('connections.download') }}</strong><span>{{ formatBytes(selectedConnection.download) }}</span></div>
-        <div><strong>{{ t('connections.uploadSpeed') }}</strong><span>{{ formatSpeed(selectedConnection.uploadSpeed || 0) }}</span></div>
-        <div><strong>{{ t('connections.downloadSpeed') }}</strong><span>{{ formatSpeed(selectedConnection.downloadSpeed || 0) }}</span></div>
-        <div><strong>{{ t('connections.chain') }}</strong><span>{{ getChainText(selectedConnection) }}</span></div>
-        <div><strong>{{ t('connections.started') }}</strong><span>{{ formatTimeAgo(selectedConnection.start) }}</span></div>
+        <div>
+          <strong>ID</strong><span>{{ selectedConnection.id }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.rule') }}</strong
+          ><span>{{ getRuleText(selectedConnection) }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.source') }}</strong
+          ><span>{{ getSourceText(selectedConnection) }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.destination') }}</strong
+          ><span>{{ getDestinationText(selectedConnection) }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.process') }}</strong
+          ><span>{{ getProcessText(selectedConnection) }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.inbound') }}</strong
+          ><span>{{
+            selectedConnection.metadata.inboundName ||
+            selectedConnection.metadata.inboundUser ||
+            '-'
+          }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.network') }}</strong
+          ><span>{{ selectedConnection.metadata.network || '-' }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.type') }}</strong
+          ><span>{{ selectedConnection.metadata.type || '-' }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.sniffHost') }}</strong
+          ><span>{{ selectedConnection.metadata.sniffHost || '-' }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.remote') }}</strong
+          ><span>{{ selectedConnection.metadata.remoteDestination || '-' }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.upload') }}</strong
+          ><span>{{ formatBytes(selectedConnection.upload) }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.download') }}</strong
+          ><span>{{ formatBytes(selectedConnection.download) }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.uploadSpeed') }}</strong
+          ><span>{{ formatSpeed(selectedConnection.uploadSpeed || 0) }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.downloadSpeed') }}</strong
+          ><span>{{ formatSpeed(selectedConnection.downloadSpeed || 0) }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.chain') }}</strong
+          ><span>{{ getChainText(selectedConnection) }}</span>
+        </div>
+        <div>
+          <strong>{{ t('connections.started') }}</strong
+          ><span>{{ formatTimeAgo(selectedConnection.start) }}</span>
+        </div>
       </div>
     </n-modal>
   </div>
@@ -321,10 +386,13 @@ const filteredConnections = computed(() => {
       getDestinationText(connection).toLowerCase().includes(query) ||
       getSourceText(connection).toLowerCase().includes(query) ||
       getRuleText(connection).toLowerCase().includes(query) ||
-      (connection.metadata.process || connection.metadata.processPath || '').toLowerCase().includes(query)
+      (connection.metadata.process || connection.metadata.processPath || '')
+        .toLowerCase()
+        .includes(query)
 
     const matchesSource =
-      !connectionStore.sourceIPFilter || connection.metadata.sourceIP === connectionStore.sourceIPFilter
+      !connectionStore.sourceIPFilter ||
+      connection.metadata.sourceIP === connectionStore.sourceIPFilter
 
     const matchesQuickFilter =
       !connectionStore.quickFilterEnabled ||
@@ -335,10 +403,7 @@ const filteredConnections = computed(() => {
 })
 
 // 排序/分组逻辑与日志页共用同一实现（见 useSortableGroupedList）
-const { groups: groupedRows } = useSortableGroupedList<
-  ConnectionItem,
-  ConnectionSortKey
->({
+const { groups: groupedRows } = useSortableGroupedList<ConnectionItem, ConnectionSortKey>({
   source: filteredConnections,
   state: {
     // store 上是解包后的普通值，需包一层 computed 供 composable 响应式读取
@@ -452,7 +517,8 @@ onBeforeUnmount(() => {
 
 const formatTimeAgo = (time: string) => {
   const diff = nowTick.value - new Date(time).getTime()
-  if (diff < 60_000) return t('connections.secondsAgo', { count: Math.max(1, Math.floor(diff / 1000)) })
+  if (diff < 60_000)
+    return t('connections.secondsAgo', { count: Math.max(1, Math.floor(diff / 1000)) })
   if (diff < 3_600_000) return t('connections.minutesAgo', { count: Math.floor(diff / 60_000) })
   if (diff < 86_400_000) return t('connections.hoursAgo', { count: Math.floor(diff / 3_600_000) })
   return new Date(time).toLocaleString()

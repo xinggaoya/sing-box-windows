@@ -15,7 +15,12 @@
 
     <ToolbarBar>
       <template #filters>
-        <n-input v-model:value="logStore.searchQuery" :placeholder="t('log.searchLogs')" clearable size="small">
+        <n-input
+          v-model:value="logStore.searchQuery"
+          :placeholder="t('log.searchLogs')"
+          clearable
+          size="small"
+        >
           <template #prefix>
             <n-icon><SearchOutline /></n-icon>
           </template>
@@ -46,9 +51,15 @@
         </n-button>
       </template>
       <template #stats>
-        <n-tag size="small" round :bordered="false">{{ t('log.records') }}: {{ logStore.logs.length }}</n-tag>
-        <n-tag size="small" round :bordered="false" type="warning">{{ labels.filtered }}: {{ sortedLogs.length }}</n-tag>
-        <n-tag size="small" round :bordered="false" type="info">{{ labels.status }}: {{ logStore.paused ? labels.paused : labels.streaming }}</n-tag>
+        <n-tag size="small" round :bordered="false"
+          >{{ t('log.records') }}: {{ logStore.logs.length }}</n-tag
+        >
+        <n-tag size="small" round :bordered="false" type="warning"
+          >{{ labels.filtered }}: {{ sortedLogs.length }}</n-tag
+        >
+        <n-tag size="small" round :bordered="false" type="info"
+          >{{ labels.status }}: {{ logStore.paused ? labels.paused : labels.streaming }}</n-tag
+        >
       </template>
     </ToolbarBar>
 
@@ -98,11 +109,25 @@
 
     <EmptyState v-else :title="t('log.noLogs')" :icon="DocumentTextOutline" />
 
-    <n-modal v-model:show="detailVisible" preset="card" :title="t('log.detailTitle')" style="width: 720px">
+    <n-modal
+      v-model:show="detailVisible"
+      preset="card"
+      :title="t('log.detailTitle')"
+      style="width: 720px"
+    >
       <div v-if="selectedLog" class="detail-grid">
-        <div><strong>{{ t('log.sequence') }}</strong><span>#{{ selectedLog.seq }}</span></div>
-        <div><strong>{{ t('log.level') }}</strong><span>{{ selectedLog.type.toUpperCase() }}</span></div>
-        <div><strong>{{ t('log.time') }}</strong><span>{{ formatTime(selectedLog.timestamp) }}</span></div>
+        <div>
+          <strong>{{ t('log.sequence') }}</strong
+          ><span>#{{ selectedLog.seq }}</span>
+        </div>
+        <div>
+          <strong>{{ t('log.level') }}</strong
+          ><span>{{ selectedLog.type.toUpperCase() }}</span>
+        </div>
+        <div>
+          <strong>{{ t('log.time') }}</strong
+          ><span>{{ formatTime(selectedLog.timestamp) }}</span>
+        </div>
         <div class="detail-payload">
           <strong>{{ t('log.content') }}</strong>
           <span>{{ selectedLog.payload }}</span>
@@ -205,7 +230,11 @@ const clearLogs = () => {
 
 const copyLogs = async () => {
   try {
-    await navigator.clipboard.writeText(sortedLogs.value.map((log) => `${formatTime(log.timestamp)} [${log.type}] ${log.payload}`).join('\n'))
+    await navigator.clipboard.writeText(
+      sortedLogs.value
+        .map((log) => `${formatTime(log.timestamp)} [${log.type}] ${log.payload}`)
+        .join('\n'),
+    )
     message.success(t('log.copiedSuccess'))
   } catch {
     message.error(t('log.copyFailed'))

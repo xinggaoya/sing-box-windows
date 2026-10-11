@@ -369,10 +369,9 @@ impl EnhancedStorageService {
 }
 
 fn resolve_app_data_dir<R: tauri::Runtime>(app_handle: &AppHandle<R>) -> std::path::PathBuf {
-    app_handle
-        .path()
-        .app_data_dir()
-        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")))
+    app_handle.path().app_data_dir().unwrap_or_else(|_| {
+        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+    })
 }
 
 fn resolve_startup_preferences_path<R: tauri::Runtime>(

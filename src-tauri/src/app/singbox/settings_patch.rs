@@ -618,10 +618,7 @@ fn ensure_sniff_route_rule(rules: &mut Vec<Value>) -> usize {
 
 /// 确保 `services` 数组存在且包含 1.14 gRPC api 服务（形状与 config_generator 注入的
 /// 保持一致），已有 api 服务时同步端口 / dashboard 开关。
-fn ensure_api_service(
-    config_obj: &mut serde_json::Map<String, Value>,
-    app_config: &AppConfig,
-) {
+fn ensure_api_service(config_obj: &mut serde_json::Map<String, Value>, app_config: &AppConfig) {
     let mut api_service = json!({
         "type": "api",
         "listen": "127.0.0.1",

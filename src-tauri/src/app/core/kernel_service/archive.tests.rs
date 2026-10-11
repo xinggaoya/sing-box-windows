@@ -11,7 +11,11 @@ use std::path::{Path, PathBuf};
 /// 为每个测试建独立临时目录（按测试名隔离，避免并行测试互相干扰）
 fn temp_dir(name: &str) -> PathBuf {
     let mut dir = std::env::temp_dir();
-    dir.push(format!("singbox-archive-test-{}-{}", name, std::process::id()));
+    dir.push(format!(
+        "singbox-archive-test-{}-{}",
+        name,
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("创建临时目录");
     dir
@@ -47,8 +51,10 @@ fn make_tar(target: &Path, gzip: bool) {
 
     if gzip {
         let raw = std::fs::read(target).expect("读回 tar");
-        let mut encoder =
-            flate2::write::GzEncoder::new(std::fs::File::create(target).expect("重建文件"), flate2::Compression::fast());
+        let mut encoder = flate2::write::GzEncoder::new(
+            std::fs::File::create(target).expect("重建文件"),
+            flate2::Compression::fast(),
+        );
         encoder.write_all(&raw).expect("写入 gzip");
         encoder.finish().expect("收尾 gzip");
     }
@@ -58,7 +64,10 @@ fn make_tar(target: &Path, gzip: bool) {
 
 #[test]
 fn detects_all_supported_formats() {
-    assert_eq!(ArchiveFormat::detect(Path::new("a.zip")), Some(ArchiveFormat::Zip));
+    assert_eq!(
+        ArchiveFormat::detect(Path::new("a.zip")),
+        Some(ArchiveFormat::Zip)
+    );
     assert_eq!(
         ArchiveFormat::detect(Path::new("sing-box-linux-amd64.tar.gz")),
         Some(ArchiveFormat::TarGz)
@@ -81,8 +90,14 @@ fn rejects_unsupported_extension() {
 
 #[test]
 fn detection_is_case_insensitive() {
-    assert_eq!(ArchiveFormat::detect(Path::new("KERNEL.ZIP")), Some(ArchiveFormat::Zip));
-    assert_eq!(ArchiveFormat::detect(Path::new("KERNEL.TAR.GZ")), Some(ArchiveFormat::TarGz));
+    assert_eq!(
+        ArchiveFormat::detect(Path::new("KERNEL.ZIP")),
+        Some(ArchiveFormat::Zip)
+    );
+    assert_eq!(
+        ArchiveFormat::detect(Path::new("KERNEL.TAR.GZ")),
+        Some(ArchiveFormat::TarGz)
+    );
 }
 
 // ---------------- 解压 ----------------
@@ -97,8 +112,14 @@ async fn extracts_zip_with_nested_paths() {
     extract(&archive, &out).await.expect("ZIP 解压应成功");
 
     let kernel = out.join("bin").join("sing-box");
-    assert_eq!(std::fs::read_to_string(&kernel).unwrap(), "fake-kernel-binary");
-    assert_eq!(std::fs::read_to_string(out.join("README.txt")).unwrap(), "readme");
+    assert_eq!(
+        std::fs::read_to_string(&kernel).unwrap(),
+        "fake-kernel-binary"
+    );
+    assert_eq!(
+        std::fs::read_to_string(out.join("README.txt")).unwrap(),
+        "readme"
+    );
 
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -155,7 +176,11 @@ async fn errors_on_missing_archive() {
     let out = root.join("out");
 
     let error = extract(&root.join("nope.zip"), &out).await.unwrap_err();
-    assert!(matches!(error, ArchiveError::NotFound(_)), "实际: {}", error);
+    assert!(
+        matches!(error, ArchiveError::NotFound(_)),
+        "实际: {}",
+        error
+    );
 
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -211,7 +236,9 @@ async fn finds_executable_recursively() {
     std::fs::create_dir_all(&nested).expect("建目录");
     std::fs::write(nested.join("sing-box"), b"x").expect("写内核");
 
-    let found = find_executable(&root, "sing-box").await.expect("应递归找到");
+    let found = find_executable(&root, "sing-box")
+        .await
+        .expect("应递归找到");
     assert_eq!(found, nested.join("sing-box"));
 
     let _ = std::fs::remove_dir_all(&root);
@@ -222,7 +249,11 @@ async fn errors_when_executable_absent() {
     let root = temp_dir("exec-missing");
 
     let error = find_executable(&root, "sing-box").await.unwrap_err();
-    assert!(matches!(error, ArchiveError::Extract { .. }), "实际: {}", error);
+    assert!(
+        matches!(error, ArchiveError::Extract { .. }),
+        "实际: {}",
+        error
+    );
 
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -234,7 +265,11 @@ async fn ignores_directory_named_like_executable() {
     std::fs::create_dir_all(root.join("sing-box")).expect("建同名目录");
 
     let error = find_executable(&root, "sing-box").await.unwrap_err();
-    assert!(matches!(error, ArchiveError::Extract { .. }), "实际: {}", error);
+    assert!(
+        matches!(error, ArchiveError::Extract { .. }),
+        "实际: {}",
+        error
+    );
 
     let _ = std::fs::remove_dir_all(&root);
 }

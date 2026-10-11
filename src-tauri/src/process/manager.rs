@@ -1003,7 +1003,9 @@ impl ProcessManager {
                 Ok(())
             }
             crate::app::singbox::config_validator::ValidationOutcome::Invalid {
-                summary, raw, ..
+                summary,
+                raw,
+                ..
             } => {
                 KERNEL_STATE.update_readiness(|readiness| {
                     readiness.config_validated = Some(false);

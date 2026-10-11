@@ -1,5 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { AppConfig, ThemeConfig, LocaleConfig, WindowConfig, UpdateConfig, Subscription } from '@/types/database'
+import type {
+  AppConfig,
+  ThemeConfig,
+  LocaleConfig,
+  WindowConfig,
+  UpdateConfig,
+  Subscription,
+} from '@/types/database'
 
 // 数据库存储服务 - 替代原有的前端持久化
 export class DatabaseService {

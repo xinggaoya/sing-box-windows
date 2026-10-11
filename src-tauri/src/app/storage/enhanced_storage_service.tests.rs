@@ -11,7 +11,11 @@ use std::path::PathBuf;
 
 fn temp_db_path(name: &str) -> PathBuf {
     let mut dir = std::env::temp_dir();
-    dir.push(format!("singbox-storage-test-{}-{}", name, std::process::id()));
+    dir.push(format!(
+        "singbox-storage-test-{}-{}",
+        name,
+        std::process::id()
+    ));
     std::fs::create_dir_all(&dir).expect("创建临时目录");
     let path = dir.join("test.db");
     let _ = std::fs::remove_file(&path);
@@ -208,12 +212,11 @@ fn should_normalize_blank_tun_route_exclude_address_to_none() {
 
 #[test]
 fn should_reject_invalid_tun_route_exclude_address_on_save() {
-    let error =
-        normalize_app_config_for_persistence(crate::app::storage::state_model::AppConfig {
-            tun_route_exclude_address: Some(vec!["invalid".to_string()]),
-            ..crate::app::storage::state_model::AppConfig::default()
-        })
-        .expect_err("invalid route exclude address should be rejected");
+    let error = normalize_app_config_for_persistence(crate::app::storage::state_model::AppConfig {
+        tun_route_exclude_address: Some(vec!["invalid".to_string()]),
+        ..crate::app::storage::state_model::AppConfig::default()
+    })
+    .expect_err("invalid route exclude address should be rejected");
 
     assert!(
         error.contains("invalid"),

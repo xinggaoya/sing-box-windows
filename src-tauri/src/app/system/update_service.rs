@@ -1,12 +1,12 @@
 use crate::app::constants::{api, messages};
 use crate::utils::app_util::get_work_dir_sync;
+use crate::utils::http_client;
 use semver::Version;
 use serde_json::json;
 use std::env;
 use std::fs;
 use std::path::Path;
 use tauri::{Emitter, Manager};
-use crate::utils::http_client;
 
 const RELEASES_PAGE_URL: &str = "https://github.com/xinggaoya/sing-box-windows/releases";
 

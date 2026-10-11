@@ -276,7 +276,10 @@ async fn update_singbox_config_ports(
 
         // 更新 sing-box 1.14+ 官方 gRPC API 服务（type=api）的监听端口。
         // 兼容两种结构：顶层 services 数组或实验性 experimental.api 兜底。
-        if let Some(services) = config_obj.get_mut("services").and_then(|v| v.as_array_mut()) {
+        if let Some(services) = config_obj
+            .get_mut("services")
+            .and_then(|v| v.as_array_mut())
+        {
             for service in services.iter_mut() {
                 if service.get("type").and_then(|t| t.as_str()) == Some("api") {
                     service

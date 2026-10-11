@@ -64,33 +64,41 @@ export function useTunToggle(options: TunToggleOptions) {
   /**
    * 核心流程（不含回滚）。返回 `null` 表示成功，否则返回失败归因。
    *
-   * `allowSudoRetry` 只在第一次调用时为 true：密码错误最多索要一次，
-   * 避免「密码一直不对 → 无限弹框」的循环。
+   * sudo 重试最多一次（`allowSudoRetry` + 循环上限双重保证）：密码一直不对时
+   * 无限弹框比直接失败更糟。
    */
   const runOnce = async (
     target: boolean,
-    allowSudoRetry: boolean
+    allowSudoRetry: boolean,
   ): Promise<KernelFailure | null> => {
     // 1) 置位开关（`toggleTun` 是幂等的，重试时重复调用安全）
     await appStore.toggleTun(target)
 
-    // 2) 应用代理配置
-    const overrides = options.applyOverrides?.(target)
-    const applied = await kernelStore.applyProxySettings(overrides)
-    if (!applied) {
-      return describe(null, options.messages.applyFailed)
-    }
+    // 2)~4) 应用配置 -> 重启内核 -> 必要时索要密码后重来一轮
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const mayRequestSudo = attempt === 0 && allowSudoRetry
 
-    // 3) 重启内核
-    const restarted = await kernelStore.restartKernel()
-    if (restarted) return null
+      const applied = await kernelStore.applyProxySettings(options.applyOverrides?.(target))
+      if (!applied) {
+        return describe(null, options.messages.applyFailed)
+      }
 
-    const failure = describe(null, options.messages.restartFailed)
-    if (failure.needsSudoRetry && allowSudoRetry && options.handleSudoFailure) {
+      const restarted = await kernelStore.restartKernel()
+      if (restarted) return null
+
+      const failure = describe(null, options.messages.restartFailed)
+      if (!mayRequestSudo || !failure.needsSudoRetry || !options.handleSudoFailure) {
+        return failure
+      }
+
+      // 用户重新提供了密码 —— 必须重新执行「应用配置 + 重启内核」，
+      // 仅索要密码并不生效（密码只是写入 sudo 缓存，内核仍需重启才会用上）。
       const retried = await options.handleSudoFailure(failure.sudoCode!)
-      if (retried) return null
+      if (!retried) return failure
     }
-    return failure
+
+    // 不可达：循环最多两轮，第二轮必定在上面的分支里返回
+    return describe(null, options.messages.restartFailed)
   }
 
   /**

@@ -62,7 +62,7 @@ export function parseSudoCode(raw: unknown): SudoFailureCode | null {
 export function resolveKernelFailureText(
   diagnosisSummary: string | null | undefined,
   lastError: string | null | undefined,
-  fallback: string
+  fallback: string,
 ): string {
   return diagnosisSummary || lastError || fallback
 }
@@ -97,13 +97,14 @@ export function describeKernelFailure(
     diagnosisSummary?: string | null
     lastError?: string | null
     fallback: string
-  }
+  },
 ): KernelFailure {
   const rawText = extractKernelErrorMessage(raw)
   // 优先用“本次操作真实抛出的消息”——它比历史 lastError 更贴近当前失败原因；
   // 只有当本次没有可读消息时才回退到诊断摘要 / lastError。
   const text =
-    rawText || resolveKernelFailureText(options.diagnosisSummary, options.lastError, options.fallback)
+    rawText ||
+    resolveKernelFailureText(options.diagnosisSummary, options.lastError, options.fallback)
   const sudoCode = parseSudoCode(text)
 
   return {

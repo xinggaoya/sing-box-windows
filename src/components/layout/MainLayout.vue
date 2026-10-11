@@ -207,7 +207,6 @@ const handleUpdateSkip = async () => {
   await updateStore.skipCurrentVersion()
   message.success(t('setting.update.skipSuccess'))
 }
-
 </script>
 
 <style scoped>

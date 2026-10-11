@@ -95,13 +95,22 @@
     </div>
 
     <div class="kernel-sub-actions">
-      <n-button text size="small" :disabled="props.downloading" @click="props.showManualDownloadModal">
-        <template #icon><n-icon :size="14"><FolderOpenOutline /></n-icon></template>
+      <n-button
+        text
+        size="small"
+        :disabled="props.downloading"
+        @click="props.showManualDownloadModal"
+      >
+        <template #icon
+          ><n-icon :size="14"><FolderOpenOutline /></n-icon
+        ></template>
         {{ props.t('setting.kernel.manualDownload') }}
       </n-button>
       <span class="sub-divider"></span>
       <n-button text size="small" :disabled="props.downloading" @click="props.checkManualInstall">
-        <template #icon><n-icon :size="14"><RefreshOutline /></n-icon></template>
+        <template #icon
+          ><n-icon :size="14"><RefreshOutline /></n-icon
+        ></template>
         {{ props.t('setting.kernel.checkInstall') }}
       </n-button>
     </div>

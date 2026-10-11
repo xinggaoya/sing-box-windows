@@ -7,14 +7,7 @@ import type { ConnectionItem, ConnectionsDataPayload, MemoryStatsPayload } from 
 
 type ConnectionTab = 'active' | 'closed'
 type ConnectionSortKey =
-  | 'start'
-  | 'download'
-  | 'upload'
-  | 'downloadSpeed'
-  | 'uploadSpeed'
-  | 'host'
-  | 'rule'
-  | 'process'
+  'start' | 'download' | 'upload' | 'downloadSpeed' | 'uploadSpeed' | 'host' | 'rule' | 'process'
 
 export const useConnectionStore = defineStore('connection', () => {
   const MAX_CLOSED_CONNECTIONS = 500

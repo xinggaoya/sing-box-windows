@@ -483,7 +483,9 @@ pub fn decode_service_list(buf: &[u8]) -> Result<super::types::ServiceList, Deco
 /// proto 字段号：
 ///   tcp_rtt_ms (1) / download_speed_bps (2) / download_latency_ms (3) /
 ///   upload_speed_bps (4) / upload_latency_ms (5)
-pub fn decode_network_quality_result(buf: &[u8]) -> Result<super::types::NetworkQualityResult, DecodeError> {
+pub fn decode_network_quality_result(
+    buf: &[u8],
+) -> Result<super::types::NetworkQualityResult, DecodeError> {
     let mut dec = Decoder::new(buf);
     let mut r = super::types::NetworkQualityResult::default();
     while !dec.eof() {
@@ -507,7 +509,9 @@ pub fn decode_network_quality_result(buf: &[u8]) -> Result<super::types::Network
 ///   DeprecatedWarnings.warnings (1) -> repeated DeprecatedWarning
 ///   DeprecatedWarning.message (1) / impending (2, bool) / migrationLink (3) /
 ///   description (4) / deprecatedVersion (5) / scheduledVersion (6)
-pub fn decode_deprecated_warnings(buf: &[u8]) -> Result<super::types::DeprecatedWarnings, DecodeError> {
+pub fn decode_deprecated_warnings(
+    buf: &[u8],
+) -> Result<super::types::DeprecatedWarnings, DecodeError> {
     use super::types::DeprecatedWarning;
     let mut dec = Decoder::new(buf);
     let mut list = super::types::DeprecatedWarnings::default();
@@ -590,7 +594,17 @@ mod tests {
     #[test]
     fn skip_unknown_fixed_width_fields() {
         // field 15 wire-type 1 (fixed64) + 8 字节体,后跟 field 1 wire-type 0 varint 42
-        let mut buf = vec![(15 << 3) | 1, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+        let mut buf = vec![
+            (15 << 3) | 1,
+            0x11,
+            0x22,
+            0x33,
+            0x44,
+            0x55,
+            0x66,
+            0x77,
+            0x88,
+        ];
         buf.push(1 << 3); // field 1, wire type 0
         buf.push(42);
         let mut dec = Decoder::new(&buf);

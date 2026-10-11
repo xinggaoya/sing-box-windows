@@ -4,7 +4,9 @@ use crate::app::core::kernel_service::runtime::{
 };
 use crate::app::core::kernel_service::state::KERNEL_STATE;
 use crate::app::core::kernel_service::status::is_kernel_running;
-use crate::app::core::kernel_service::utils::{emit_kernel_error_with_context, emit_kernel_stopped};
+use crate::app::core::kernel_service::utils::{
+    emit_kernel_error_with_context, emit_kernel_stopped,
+};
 use crate::app::singbox_api::client::ApiError;
 use crate::app::singbox_api::{ApiClientConfig, ApiClientHandle};
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
@@ -345,9 +347,8 @@ fn spawn_guard_loop(app_handle: AppHandle) -> JoinHandle<()> {
 
             // 周期性检查内核日志大小并滚动，避免长期运行无限增长（不只在启动时滚动一次）。
             if last_log_rotation_at.elapsed() >= Duration::from_secs(LOG_ROTATION_INTERVAL_SECS) {
-                let log_path = std::path::PathBuf::from(
-                    crate::app::singbox::common::kernel_log_output_path(),
-                );
+                let log_path =
+                    std::path::PathBuf::from(crate::app::singbox::common::kernel_log_output_path());
                 log_rotation::rotate_if_needed(&log_path);
                 last_log_rotation_at = Instant::now();
             }
@@ -366,9 +367,9 @@ fn spawn_guard_loop(app_handle: AppHandle) -> JoinHandle<()> {
                     let proxy_port = GUARDED_PROXY_PORT.load(Ordering::Relaxed);
                     if proxy_port == 0 {
                         // 未登记 mixed 端口（异常兜底）：退回直连探测，行为同旧版。
-                        match crate::app::system::system_service::check_network_connectivity(
-                            Some(false),
-                        )
+                        match crate::app::system::system_service::check_network_connectivity(Some(
+                            false,
+                        ))
                         .await
                         {
                             Ok(true) => {
@@ -419,8 +420,10 @@ fn spawn_guard_loop(app_handle: AppHandle) -> JoinHandle<()> {
                     // 对照探测：区分"内核隧道死亡"与"本机/上游断网"。
                     // 直连也失败时说明网络本身不可用，重启内核无济于事，
                     // 清零计数等待网络恢复，避免断网期间反复重启内核。
-                    match crate::app::system::system_service::check_network_connectivity(Some(false))
-                        .await
+                    match crate::app::system::system_service::check_network_connectivity(Some(
+                        false,
+                    ))
+                    .await
                     {
                         Ok(true) => {}
                         _ => {

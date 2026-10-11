@@ -127,11 +127,7 @@ onMounted(async () => {
     // 数据恢复失败也不阻塞提示流程
   }
   maybeShowDnsHijackNotice()
-  stopStatusWatch = watch(
-    () => kernelStore.status.api_ready,
-    handleApiReady,
-    { immediate: true },
-  )
+  stopStatusWatch = watch(() => kernelStore.status.api_ready, handleApiReady, { immediate: true })
 })
 
 onBeforeUnmount(() => {

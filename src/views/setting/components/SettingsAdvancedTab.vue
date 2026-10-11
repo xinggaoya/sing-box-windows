@@ -16,7 +16,9 @@
         <div class="setting-desc">{{ props.t('setting.network.portsDesc') }}</div>
       </div>
       <n-button size="small" secondary @click="props.showPortSettings">
-        <template #icon><n-icon :size="14"><SettingsOutline /></n-icon></template>
+        <template #icon
+          ><n-icon :size="14"><SettingsOutline /></n-icon
+        ></template>
         {{ props.t('setting.network.configure') }}
       </n-button>
     </div>
@@ -26,10 +28,7 @@
         <div class="setting-label">{{ props.t('setting.network.allowLanAccess') }}</div>
         <div class="setting-desc">{{ props.t('setting.network.allowLanAccessDesc') }}</div>
       </div>
-      <n-switch
-        :value="props.appStore.allowLanAccess"
-        @update:value="props.onLanAccessChange"
-      />
+      <n-switch :value="props.appStore.allowLanAccess" @update:value="props.onLanAccessChange" />
     </div>
 
     <h3 class="setting-section-title">{{ props.t('setting.proxyAdvanced.title') }}</h3>
@@ -59,7 +58,10 @@
               <n-input-number v-model:value="proxyAdvancedForm.tunMtu" :min="576" :max="9000" />
             </n-form-item>
             <n-form-item :label="props.t('setting.proxyAdvanced.tunStack')">
-              <n-select v-model:value="proxyAdvancedForm.tunStack" :options="props.tunStackOptions" />
+              <n-select
+                v-model:value="proxyAdvancedForm.tunStack"
+                :options="props.tunStackOptions"
+              />
             </n-form-item>
           </div>
 
@@ -79,19 +81,27 @@
 
           <div class="setting-toggles-grid">
             <div class="setting-toggle-item">
-              <span class="setting-toggle-label">{{ props.t('setting.proxyAdvanced.enableIpv6') }}</span>
+              <span class="setting-toggle-label">{{
+                props.t('setting.proxyAdvanced.enableIpv6')
+              }}</span>
               <n-switch v-model:value="proxyAdvancedForm.tunEnableIpv6" />
             </div>
             <div class="setting-toggle-item">
-              <span class="setting-toggle-label">{{ props.t('setting.proxyAdvanced.autoRoute') }}</span>
+              <span class="setting-toggle-label">{{
+                props.t('setting.proxyAdvanced.autoRoute')
+              }}</span>
               <n-switch v-model:value="proxyAdvancedForm.tunAutoRoute" />
             </div>
             <div class="setting-toggle-item">
-              <span class="setting-toggle-label">{{ props.t('setting.proxyAdvanced.strictRoute') }}</span>
+              <span class="setting-toggle-label">{{
+                props.t('setting.proxyAdvanced.strictRoute')
+              }}</span>
               <n-switch v-model:value="proxyAdvancedForm.tunStrictRoute" />
             </div>
             <div class="setting-toggle-item">
-              <span class="setting-toggle-label">{{ props.t('setting.proxyAdvanced.tunSelfHeal') }}</span>
+              <span class="setting-toggle-label">{{
+                props.t('setting.proxyAdvanced.tunSelfHeal')
+              }}</span>
               <n-switch v-model:value="proxyAdvancedForm.tunSelfHealEnabled" />
             </div>
           </div>
@@ -154,19 +164,27 @@
 
           <div class="setting-toggles-grid">
             <div class="setting-toggle-item">
-              <span class="setting-toggle-label">{{ props.t('setting.singboxProfile.blockAds') }}</span>
+              <span class="setting-toggle-label">{{
+                props.t('setting.singboxProfile.blockAds')
+              }}</span>
               <n-switch v-model:value="singboxProfileForm.blockAds" />
             </div>
             <div class="setting-toggle-item">
-              <span class="setting-toggle-label">{{ props.t('setting.singboxProfile.dnsHijack') }}</span>
+              <span class="setting-toggle-label">{{
+                props.t('setting.singboxProfile.dnsHijack')
+              }}</span>
               <n-switch v-model:value="singboxProfileForm.dnsHijack" />
             </div>
             <div class="setting-toggle-item">
-              <span class="setting-toggle-label">{{ props.t('setting.singboxProfile.enableAppGroups') }}</span>
+              <span class="setting-toggle-label">{{
+                props.t('setting.singboxProfile.enableAppGroups')
+              }}</span>
               <n-switch v-model:value="singboxProfileForm.enableAppGroups" />
             </div>
             <div class="setting-toggle-item">
-              <span class="setting-toggle-label">{{ props.t('setting.singboxProfile.fakeDnsEnabled') }}</span>
+              <span class="setting-toggle-label">{{
+                props.t('setting.singboxProfile.fakeDnsEnabled')
+              }}</span>
               <n-switch v-model:value="singboxProfileForm.fakeDnsEnabled" />
             </div>
           </div>
@@ -293,12 +311,7 @@
         <div class="form-section-title">{{ extraLabels.logRetentionPrefs }}</div>
         <div class="setting-form-grid">
           <n-form-item :label="extraLabels.logMaxRows">
-            <n-input-number
-              v-model:value="logStore.maxLogs"
-              :min="100"
-              :max="5000"
-              :step="100"
-            />
+            <n-input-number v-model:value="logStore.maxLogs" :min="100" :max="5000" :step="100" />
           </n-form-item>
         </div>
         <div class="setting-hint">{{ extraLabels.logRetentionHint }}</div>
@@ -309,7 +322,11 @@
     <h3 class="setting-section-title">{{ extraLabels.experimentalTitle }}</h3>
     <div class="collapsible-header" @click="toggleSection('experimental')">
       <span class="collapsible-label">{{ extraLabels.experimentalLabel }}</span>
-      <n-icon :size="16" class="collapse-arrow" :class="{ expanded: expandedSections.experimental }">
+      <n-icon
+        :size="16"
+        class="collapse-arrow"
+        :class="{ expanded: expandedSections.experimental }"
+      >
         <ChevronDownOutline />
       </n-icon>
     </div>
@@ -338,10 +355,7 @@
             </div>
           </div>
           <n-form-item :label="extraLabels.dnsTimeout">
-            <n-input
-              v-model:value="singboxExperimentalForm.dnsTimeout"
-              :placeholder="'5s'"
-            />
+            <n-input v-model:value="singboxExperimentalForm.dnsTimeout" :placeholder="'5s'" />
           </n-form-item>
 
           <!-- Hysteria2 抗指纹 -->
@@ -420,11 +434,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import {
-  SettingsOutline,
-  InformationCircleOutline,
-  ChevronDownOutline,
-} from '@vicons/ionicons5'
+import { SettingsOutline, InformationCircleOutline, ChevronDownOutline } from '@vicons/ionicons5'
 import { useMessage } from 'naive-ui'
 import type { useAppStore } from '@/stores'
 import { useAdvancedSettingsForm } from '@/views/setting/useAdvancedSettingsForm'

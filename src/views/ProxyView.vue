@@ -39,7 +39,12 @@
               <n-tag size="tiny" round :bordered="false">{{ group.type }}</n-tag>
             </div>
             <div class="sidebar-item-now" v-if="group.now">
-              <img v-if="getNodeFlagUrl(group.now)" class="node-flag" :src="getNodeFlagUrl(group.now)" alt="" />
+              <img
+                v-if="getNodeFlagUrl(group.now)"
+                class="node-flag"
+                :src="getNodeFlagUrl(group.now)"
+                alt=""
+              />
               <span>{{ getDisplayNodeName(group.now) }}</span>
             </div>
           </div>
@@ -54,13 +59,28 @@
 
       <div class="node-panel">
         <div class="node-toolbar">
-          <n-input v-model:value="searchQuery" size="small" :placeholder="t('proxy.searchNode')" clearable>
+          <n-input
+            v-model:value="searchQuery"
+            size="small"
+            :placeholder="t('proxy.searchNode')"
+            clearable
+          >
             <template #prefix>
               <n-icon><SearchOutline /></n-icon>
             </template>
           </n-input>
-          <n-select v-model:value="proxyStore.ordering" size="small" :options="orderingOptions" style="width: 120px" />
-          <n-button size="small" quaternary :type="favoritesOnly ? 'primary' : 'default'" @click="favoritesOnly = !favoritesOnly">
+          <n-select
+            v-model:value="proxyStore.ordering"
+            size="small"
+            :options="orderingOptions"
+            style="width: 120px"
+          />
+          <n-button
+            size="small"
+            quaternary
+            :type="favoritesOnly ? 'primary' : 'default'"
+            @click="favoritesOnly = !favoritesOnly"
+          >
             <template #icon>
               <n-icon>
                 <Star v-if="favoritesOnly" />
@@ -91,9 +111,17 @@
           <span class="summary-sep">|</span>
           <span class="summary-text">{{ activeGroup.all.length }} {{ t('proxy.nodes') }}</span>
           <span class="summary-sep">|</span>
-          <span class="summary-text">{{ labels.favorites }} {{ activeGroup.all.filter(n => proxyStore.isFavorite(n)).length }}</span>
+          <span class="summary-text"
+            >{{ labels.favorites }}
+            {{ activeGroup.all.filter((n) => proxyStore.isFavorite(n)).length }}</span
+          >
           <div class="summary-spacer"></div>
-          <n-button size="tiny" secondary @click="testActiveGroup" :loading="proxyStore.groupTestingMap[activeGroup.name]">
+          <n-button
+            size="tiny"
+            secondary
+            @click="testActiveGroup"
+            :loading="proxyStore.groupTestingMap[activeGroup.name]"
+          >
             {{ t('proxy.testNode') }}
           </n-button>
           <n-button size="tiny" tertiary @click="switchRecommended(activeGroup)">
@@ -111,10 +139,20 @@
           >
             <div class="node-card-top">
               <span class="node-card-name">
-                <img v-if="getNodeFlagUrl(node)" class="node-flag" :src="getNodeFlagUrl(node)" alt="" />
+                <img
+                  v-if="getNodeFlagUrl(node)"
+                  class="node-flag"
+                  :src="getNodeFlagUrl(node)"
+                  alt=""
+                />
                 <span>{{ getDisplayNodeName(node) }}</span>
               </span>
-              <n-button text size="tiny" class="node-fav-btn" @click.stop="proxyStore.toggleFavorite(node)">
+              <n-button
+                text
+                size="tiny"
+                class="node-fav-btn"
+                @click.stop="proxyStore.toggleFavorite(node)"
+              >
                 <n-icon size="14">
                   <Star v-if="proxyStore.isFavorite(node)" style="color: #f59e0b" />
                   <StarOutline v-else />
@@ -122,12 +160,7 @@
               </n-button>
             </div>
             <div class="node-card-bottom">
-              <n-tag
-                size="small"
-                round
-                :bordered="false"
-                :type="latencyTagType(node)"
-              >
+              <n-tag size="small" round :bordered="false" :type="latencyTagType(node)">
                 {{ formatLatency(node) }}
               </n-tag>
             </div>
@@ -190,22 +223,264 @@ const countryCodeAliases: Record<string, string> = {
 
 const countryDisplayLocales = ['zh-CN', 'zh-Hans', 'zh-TW', 'zh-Hant', 'ja-JP', 'en-US']
 const allCountryCodes = [
-  'AC','AD','AE','AF','AG','AI','AL','AM','AO','AQ','AR','AS','AT','AU','AW','AX','AZ',
-  'BA','BB','BD','BE','BF','BG','BH','BI','BJ','BL','BM','BN','BO','BQ','BR','BS','BT',
-  'BV','BW','BY','BZ','CA','CC','CD','CF','CG','CH','CI','CK','CL','CM','CN','CO','CP',
-  'CR','CU','CV','CW','CX','CY','CZ','DE','DG','DJ','DK','DM','DO','DZ','EA','EC','EE',
-  'EG','EH','ER','ES','ET','EU','FI','FJ','FK','FM','FO','FR','GA','GB','GD','GE','GF',
-  'GG','GH','GI','GL','GM','GN','GP','GQ','GR','GS','GT','GU','GW','GY','HK','HM','HN',
-  'HR','HT','HU','IC','ID','IE','IL','IM','IN','IO','IQ','IR','IS','IT','JE','JM','JO',
-  'JP','KE','KG','KH','KI','KM','KN','KP','KR','KW','KY','KZ','LA','LB','LC','LI','LK',
-  'LR','LS','LT','LU','LV','LY','MA','MC','MD','ME','MF','MG','MH','MK','ML','MM','MN',
-  'MO','MP','MQ','MR','MS','MT','MU','MV','MW','MX','MY','MZ','NA','NC','NE','NF','NG',
-  'NI','NL','NO','NP','NR','NU','NZ','OM','PA','PE','PF','PG','PH','PK','PL','PM','PN',
-  'PR','PS','PT','PW','PY','QA','RE','RO','RS','RU','RW','SA','SB','SC','SD','SE','SG',
-  'SH','SI','SJ','SK','SL','SM','SN','SO','SR','SS','ST','SV','SX','SY','SZ','TA','TC',
-  'TD','TF','TG','TH','TJ','TK','TL','TM','TN','TO','TR','TT','TV','TW','TZ','UA','UG',
-  'UM','UN','US','UY','UZ','VA','VC','VE','VG','VI','VN','VU','WF','WS','XK','YE','YT',
-  'ZA','ZM','ZW',
+  'AC',
+  'AD',
+  'AE',
+  'AF',
+  'AG',
+  'AI',
+  'AL',
+  'AM',
+  'AO',
+  'AQ',
+  'AR',
+  'AS',
+  'AT',
+  'AU',
+  'AW',
+  'AX',
+  'AZ',
+  'BA',
+  'BB',
+  'BD',
+  'BE',
+  'BF',
+  'BG',
+  'BH',
+  'BI',
+  'BJ',
+  'BL',
+  'BM',
+  'BN',
+  'BO',
+  'BQ',
+  'BR',
+  'BS',
+  'BT',
+  'BV',
+  'BW',
+  'BY',
+  'BZ',
+  'CA',
+  'CC',
+  'CD',
+  'CF',
+  'CG',
+  'CH',
+  'CI',
+  'CK',
+  'CL',
+  'CM',
+  'CN',
+  'CO',
+  'CP',
+  'CR',
+  'CU',
+  'CV',
+  'CW',
+  'CX',
+  'CY',
+  'CZ',
+  'DE',
+  'DG',
+  'DJ',
+  'DK',
+  'DM',
+  'DO',
+  'DZ',
+  'EA',
+  'EC',
+  'EE',
+  'EG',
+  'EH',
+  'ER',
+  'ES',
+  'ET',
+  'EU',
+  'FI',
+  'FJ',
+  'FK',
+  'FM',
+  'FO',
+  'FR',
+  'GA',
+  'GB',
+  'GD',
+  'GE',
+  'GF',
+  'GG',
+  'GH',
+  'GI',
+  'GL',
+  'GM',
+  'GN',
+  'GP',
+  'GQ',
+  'GR',
+  'GS',
+  'GT',
+  'GU',
+  'GW',
+  'GY',
+  'HK',
+  'HM',
+  'HN',
+  'HR',
+  'HT',
+  'HU',
+  'IC',
+  'ID',
+  'IE',
+  'IL',
+  'IM',
+  'IN',
+  'IO',
+  'IQ',
+  'IR',
+  'IS',
+  'IT',
+  'JE',
+  'JM',
+  'JO',
+  'JP',
+  'KE',
+  'KG',
+  'KH',
+  'KI',
+  'KM',
+  'KN',
+  'KP',
+  'KR',
+  'KW',
+  'KY',
+  'KZ',
+  'LA',
+  'LB',
+  'LC',
+  'LI',
+  'LK',
+  'LR',
+  'LS',
+  'LT',
+  'LU',
+  'LV',
+  'LY',
+  'MA',
+  'MC',
+  'MD',
+  'ME',
+  'MF',
+  'MG',
+  'MH',
+  'MK',
+  'ML',
+  'MM',
+  'MN',
+  'MO',
+  'MP',
+  'MQ',
+  'MR',
+  'MS',
+  'MT',
+  'MU',
+  'MV',
+  'MW',
+  'MX',
+  'MY',
+  'MZ',
+  'NA',
+  'NC',
+  'NE',
+  'NF',
+  'NG',
+  'NI',
+  'NL',
+  'NO',
+  'NP',
+  'NR',
+  'NU',
+  'NZ',
+  'OM',
+  'PA',
+  'PE',
+  'PF',
+  'PG',
+  'PH',
+  'PK',
+  'PL',
+  'PM',
+  'PN',
+  'PR',
+  'PS',
+  'PT',
+  'PW',
+  'PY',
+  'QA',
+  'RE',
+  'RO',
+  'RS',
+  'RU',
+  'RW',
+  'SA',
+  'SB',
+  'SC',
+  'SD',
+  'SE',
+  'SG',
+  'SH',
+  'SI',
+  'SJ',
+  'SK',
+  'SL',
+  'SM',
+  'SN',
+  'SO',
+  'SR',
+  'SS',
+  'ST',
+  'SV',
+  'SX',
+  'SY',
+  'SZ',
+  'TA',
+  'TC',
+  'TD',
+  'TF',
+  'TG',
+  'TH',
+  'TJ',
+  'TK',
+  'TL',
+  'TM',
+  'TN',
+  'TO',
+  'TR',
+  'TT',
+  'TV',
+  'TW',
+  'TZ',
+  'UA',
+  'UG',
+  'UM',
+  'UN',
+  'US',
+  'UY',
+  'UZ',
+  'VA',
+  'VC',
+  'VE',
+  'VG',
+  'VI',
+  'VN',
+  'VU',
+  'WF',
+  'WS',
+  'XK',
+  'YE',
+  'YT',
+  'ZA',
+  'ZM',
+  'ZW',
 ]
 
 const countryNameOverrides: Array<[RegExp, string]> = [
@@ -308,8 +583,8 @@ const filteredGroups = computed(() => {
   })
 })
 
-const activeGroup = computed(() =>
-  proxyStore.proxyGroups.find((g) => g.name === proxyStore.selectedGroup) || null,
+const activeGroup = computed(
+  () => proxyStore.proxyGroups.find((g) => g.name === proxyStore.selectedGroup) || null,
 )
 
 const activeGroupNodes = computed(() => {
@@ -427,7 +702,9 @@ const getDisplayNodeName = (nodeName?: string | null) =>
 const getNodeFlagUrl = (nodeName?: string | null) => {
   if (!nodeName) return ''
   const countryCode = getNodeCountryCode(nodeName)
-  return countryCode ? flagIconUrls[`../../node_modules/flag-icons/flags/4x3/${countryCode}.svg`] || '' : ''
+  return countryCode
+    ? flagIconUrls[`../../node_modules/flag-icons/flags/4x3/${countryCode}.svg`] || ''
+    : ''
 }
 
 const formatLatency = (proxyName: string) => {
@@ -436,9 +713,9 @@ const formatLatency = (proxyName: string) => {
     return `${proxyStore.getLatency(proxyName)}ms`
   }
   if (status === 'failed') {
-    return t('proxy.testFailed')  // "测速失败" / "Test failed" / "Ошибка теста"
+    return t('proxy.testFailed') // "测速失败" / "Test failed" / "Ошибка теста"
   }
-  return t('proxy.clickToTest')  // "点击测试" / "Click to test"
+  return t('proxy.clickToTest') // "点击测试" / "Click to test"
 }
 
 const latencyTagType = (proxyName: string) => {
@@ -450,8 +727,8 @@ const latencyTagType = (proxyName: string) => {
     if (latency < 500) return 'warning' as const
     return 'error' as const
   }
-  if (status === 'failed') return 'error' as const  // 红色:测过但失败
-  return 'default' as const  // 灰色:未测
+  if (status === 'failed') return 'error' as const // 红色:测过但失败
+  return 'default' as const // 灰色:未测
 }
 
 // 进入代理页时,setupGroupsDataListener 内部会自检 activeConfigPath 是否变更,

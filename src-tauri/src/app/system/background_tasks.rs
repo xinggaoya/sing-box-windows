@@ -81,9 +81,7 @@ async fn start_update_loop(app: AppHandle) -> Result<(), String> {
                     )
                     .await
                     {
-                        Ok(info) => {
-                            handle_update_result(&app, &config.skip_version, info).await
-                        }
+                        Ok(info) => handle_update_result(&app, &config.skip_version, info).await,
                         Err(e) => warn!("后台检查更新失败: {}", e),
                     }
                 }

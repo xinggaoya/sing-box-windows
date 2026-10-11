@@ -1,11 +1,11 @@
 use crate::app::constants::messages;
+use crate::utils::http_client;
 use futures::StreamExt;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use tracing::{error, info};
 use zip::ZipArchive;
-use crate::utils::http_client;
 
 // 根据url下载文件到指定位置
 pub async fn download_file<F>(url: String, path: &str, progress_callback: F) -> Result<(), String>

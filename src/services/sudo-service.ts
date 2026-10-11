@@ -13,15 +13,10 @@ export const sudoService = {
   },
 
   setPassword(password: string) {
-    return invokeWithAppContext<void>(
-      'sudo_set_password',
-      { password },
-      { skipDataRestore: true }
-    )
+    return invokeWithAppContext<void>('sudo_set_password', { password }, { skipDataRestore: true })
   },
 
   clearPassword() {
     return invokeWithAppContext<void>('sudo_clear_password', undefined, { skipDataRestore: true })
   },
 }
-

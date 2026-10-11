@@ -16,7 +16,6 @@ const vendorChunkGroups: Array<[string, string[]]> = [
       '/node_modules/vue-i18n/',
       '/node_modules/pinia/',
       '/node_modules/@vueuse/',
-      '/node_modules/mitt/',
     ],
   ],
   [
@@ -77,6 +76,20 @@ export default defineConfig(({ mode: _mode }) => ({
       output: {
         manualChunks,
       },
+    },
+  },
+  // Vitest：与 vite 共用别名 / 插件，保证测试环境与运行时一致。
+  // 环境选 jsdom —— 项目大量使用 `useLocalStorage`（@vueuse）与 DOM API。
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.{test,spec}.ts'],
+    globals: false,
+    restoreMocks: true,
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,vue}'],
+      exclude: ['src/**/*.test.ts', 'src/types/generated/**', 'src/main.ts', 'src/locales/**'],
+      reporter: ['text-summary'],
     },
   },
 }))

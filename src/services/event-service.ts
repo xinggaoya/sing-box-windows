@@ -63,7 +63,7 @@ export class EventService {
    * 监听流量数据事件
    */
   public async onTrafficData(
-    callback: (data: AppEventPayloads[typeof APP_EVENTS.trafficData]) => void
+    callback: (data: AppEventPayloads[typeof APP_EVENTS.trafficData]) => void,
   ): Promise<() => void> {
     const unlisten = await listen(APP_EVENTS.trafficData, (event) => {
       callback(event.payload as AppEventPayloads[typeof APP_EVENTS.trafficData])
@@ -76,7 +76,7 @@ export class EventService {
    * 监听内存数据事件
    */
   public async onMemoryData(
-    callback: (data: AppEventPayloads[typeof APP_EVENTS.memoryData]) => void
+    callback: (data: AppEventPayloads[typeof APP_EVENTS.memoryData]) => void,
   ): Promise<() => void> {
     const unlisten = await listen(APP_EVENTS.memoryData, (event) => {
       callback(event.payload as AppEventPayloads[typeof APP_EVENTS.memoryData])
@@ -89,7 +89,7 @@ export class EventService {
    * 监听日志数据事件
    */
   public async onLogData(
-    callback: (data: AppEventPayloads[typeof APP_EVENTS.logData]) => void
+    callback: (data: AppEventPayloads[typeof APP_EVENTS.logData]) => void,
   ): Promise<() => void> {
     const unlisten = await listen(APP_EVENTS.logData, (event) => {
       callback(event.payload as AppEventPayloads[typeof APP_EVENTS.logData])
@@ -102,7 +102,7 @@ export class EventService {
    * 监听连接数据事件
    */
   public async onConnectionsData(
-    callback: (data: AppEventPayloads[typeof APP_EVENTS.connectionsData]) => void
+    callback: (data: AppEventPayloads[typeof APP_EVENTS.connectionsData]) => void,
   ): Promise<() => void> {
     const unlisten = await listen(APP_EVENTS.connectionsData, (event) => {
       callback(event.payload as AppEventPayloads[typeof APP_EVENTS.connectionsData])
@@ -129,7 +129,7 @@ export class EventService {
    */
   public async on<K extends AppEventName>(
     eventName: K,
-    callback: (data: AppEventPayloads[K]) => void
+    callback: (data: AppEventPayloads[K]) => void,
   ): Promise<() => void>
   public async on(eventName: string, callback: (data: unknown) => void): Promise<() => void>
   public async on(eventName: string, callback: (data: unknown) => void): Promise<() => void> {

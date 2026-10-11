@@ -23,17 +23,17 @@ src/
 
 ## WHERE TO LOOK
 
-| Task               | Location                     | Notes                          |
-| ------------------ | ---------------------------- | ------------------------------ |
-| 应用启动初始化顺序 | `boot/useAppBootstrap.ts`    | store 初始化、事件桥、清理函数 |
-| 后端命令调用封装   | `services/invoke-client.ts`  | 自动上下文注入（端口等）       |
-| 后端事件监听       | `services/event-service.ts`  | traffic/log/connection 入口    |
-| 内核业务前端编排   | `services/kernel-service.ts` | 命令调用最集中                 |
-| 路由行为（含托盘） | `router/index.ts`            | `/blank` 逻辑关键              |
-| 节点选择 / 测速   | `services/proxy-service.ts` + `stores/kernel/ProxyStore.ts` | gRPC API（sing-box 1.14+） |
-| 规则页（只读展示） | `views/RulesView.vue`        | 调 gRPC `get_rules`，仅展示    |
-| 设计系统 / 主题    | `assets/tokens.css` + `stores/app/ThemeStore.ts` | Indigo 三层 token，主题覆盖 `--primary-*` |
-| 资源清理          | `composables/useCleanup.ts`  | 组件卸载统一清理监听/定时器    |
+| Task               | Location                                                    | Notes                                     |
+| ------------------ | ----------------------------------------------------------- | ----------------------------------------- |
+| 应用启动初始化顺序 | `boot/useAppBootstrap.ts`                                   | store 初始化、事件桥、清理函数            |
+| 后端命令调用封装   | `services/invoke-client.ts`                                 | 自动上下文注入（端口等）                  |
+| 后端事件监听       | `services/event-service.ts`                                 | traffic/log/connection 入口               |
+| 内核业务前端编排   | `services/kernel-service.ts`                                | 命令调用最集中                            |
+| 路由行为（含托盘） | `router/index.ts`                                           | `/blank` 逻辑关键                         |
+| 节点选择 / 测速    | `services/proxy-service.ts` + `stores/kernel/ProxyStore.ts` | gRPC API（sing-box 1.14+）                |
+| 规则页（只读展示） | `views/RulesView.vue`                                       | 调 gRPC `get_rules`，仅展示               |
+| 设计系统 / 主题    | `assets/tokens.css` + `stores/app/ThemeStore.ts`            | Indigo 三层 token，主题覆盖 `--primary-*` |
+| 资源清理           | `composables/useCleanup.ts`                                 | 组件卸载统一清理监听/定时器               |
 
 ## CONVENTIONS (FRONTEND ONLY)
 

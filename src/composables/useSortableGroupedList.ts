@@ -47,7 +47,7 @@ export interface GroupedItem<T> {
 }
 
 export function useSortableGroupedList<T, K extends string>(
-  options: SortGroupOptions<T, K>
+  options: SortGroupOptions<T, K>,
 ): SortGroupResult<T> {
   const { source, state, getSortValue, getGroupKey, emptyGroupLabel = '-' } = options
 

@@ -53,8 +53,14 @@ async fn try_streaming(label: &str, client: reqwest::Client, use_close_header: b
         Ok(r) => r,
         Err(e) => {
             println!("  [SEND FAILED] {e}");
-            println!("    is_connect={} is_timeout={} is_request={} is_body={} is_decode={}",
-                e.is_connect(), e.is_timeout(), e.is_request(), e.is_body(), e.is_decode());
+            println!(
+                "    is_connect={} is_timeout={} is_request={} is_body={} is_decode={}",
+                e.is_connect(),
+                e.is_timeout(),
+                e.is_request(),
+                e.is_body(),
+                e.is_decode()
+            );
             if let Some(src) = e.source() {
                 println!("    source: {src}");
                 let mut cur = src.source();
@@ -86,7 +92,13 @@ async fn try_streaming(label: &str, client: reqwest::Client, use_close_header: b
                     .take(10)
                     .map(|b| format!("{:02x}", b))
                     .collect();
-                println!("  [+{:>4}ms] chunk {}: {}B head={}", t0.elapsed().as_millis(), chunks, chunk.len(), head.join(" "));
+                println!(
+                    "  [+{:>4}ms] chunk {}: {}B head={}",
+                    t0.elapsed().as_millis(),
+                    chunks,
+                    chunk.len(),
+                    head.join(" ")
+                );
                 if chunks >= 15 {
                     println!("  [OK] 15 frames in {}ms", t0.elapsed().as_millis());
                     return;

@@ -97,7 +97,10 @@ fn test_restart_stats_accumulates_and_records_reason_and_time() {
     manager.record_restart("process-crashed");
     let after_one = manager.get_restart_stats();
     assert_eq!(after_one.restart_count, 1);
-    assert_eq!(after_one.last_restart_reason.as_deref(), Some("process-crashed"));
+    assert_eq!(
+        after_one.last_restart_reason.as_deref(),
+        Some("process-crashed")
+    );
     assert!(after_one.last_restart_at.is_some());
 
     manager.record_restart("tun-connectivity");

@@ -126,7 +126,10 @@ mod tests {
         for i in 1..=ROTATE_KEEP {
             assert!(rotated_path(&log, i).exists(), "应存在 .{}", i);
         }
-        assert!(!rotated_path(&log, ROTATE_KEEP + 1).exists(), "不应保留超出份数");
+        assert!(
+            !rotated_path(&log, ROTATE_KEEP + 1).exists(),
+            "不应保留超出份数"
+        );
         assert!(!log.exists(), "原文件应已被重命名");
         fs::remove_dir_all(&dir).ok();
     }

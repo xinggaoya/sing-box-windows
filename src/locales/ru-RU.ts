@@ -17,7 +17,7 @@ export default {
     enabled: 'Вкл',
     disabled: 'Выкл',
   },
-    gotIt: 'Понятно',
+  gotIt: 'Понятно',
 
   // 导航菜单
   nav: {
@@ -161,10 +161,10 @@ export default {
       unsupported: 'Операция не поддерживается на текущей платформе',
     },
   },
-    kernelStartFailed: 'Не удалось запустить ядро',
-    kernelStopFailed: 'Не удалось остановить ядро',
-    applyProxySettingsFailed: 'Не удалось применить настройки прокси',
-    kernelInstallCheckFailed: 'Не удалось проверить установку ядра',
+  kernelStartFailed: 'Не удалось запустить ядро',
+  kernelStopFailed: 'Не удалось остановить ядро',
+  applyProxySettingsFailed: 'Не удалось применить настройки прокси',
+  kernelInstallCheckFailed: 'Не удалось проверить установку ядра',
 
   // 代理页面
   proxy: {
@@ -205,14 +205,14 @@ export default {
       testing: 'Тестируется',
     },
   },
-    tabGroups: 'Группы',
-    tabProviders: 'Провайдеры',
-    filterHideUnavailable: 'Скрыть',
-    filterShowAll: 'Показать',
-    badgeRecommended: 'Рек:',
-    badgeFavorites: 'Избр:',
-    badgeNodeCount: 'Ноды:',
-    emptyProviders: 'Провайдеры прокси отсутствуют',
+  tabGroups: 'Группы',
+  tabProviders: 'Провайдеры',
+  filterHideUnavailable: 'Скрыть',
+  filterShowAll: 'Показать',
+  badgeRecommended: 'Рек:',
+  badgeFavorites: 'Избр:',
+  badgeNodeCount: 'Ноды:',
+  emptyProviders: 'Провайдеры прокси отсутствуют',
 
   // 连接页面
   connections: {
@@ -339,13 +339,14 @@ export default {
     fetchSuccess: 'Успешно получено {count} правил.',
     fetchError: 'Не удалось получить правила: {error}',
   },
-    routeRules: 'Правила маршрутизации',
-    empty: 'Правил нет или ядро не запущено',
-    about: 'О странице',
-    aboutBody: 'Правила маршрутизации получаются из официального gRPC API GetRules sing-box 1.14+. Типы правил (rule_type): default / logical / rule_set.',
-    columnType: 'Тип',
-    columnPayload: 'Условие',
-    columnOutbound: 'Исходящий',
+  routeRules: 'Правила маршрутизации',
+  empty: 'Правил нет или ядро не запущено',
+  about: 'О странице',
+  aboutBody:
+    'Правила маршрутизации получаются из официального gRPC API GetRules sing-box 1.14+. Типы правил (rule_type): default / logical / rule_set.',
+  columnType: 'Тип',
+  columnPayload: 'Условие',
+  columnOutbound: 'Исходящий',
 
   // 订阅页面
   sub: {
@@ -709,20 +710,25 @@ export default {
       latencyUrl: 'URL проверки задержки',
       logRetentionPrefs: 'Хранение логов',
       logMaxRows: 'Максимум строк лога',
-      logRetentionHint: 'Управляет только числом строк лога в интерфейсе. Файл sing-box.log на диске ротируется автоматически при запуске ядра (после 10MB хранятся последние 3 файла).',
+      logRetentionHint:
+        'Управляет только числом строк лога в интерфейсе. Файл sing-box.log на диске ротируется автоматически при запуске ядра (после 10MB хранятся последние 3 файла).',
       experimentalTitle: 'Дополнительно (экспериментально, 1.14)',
       experimentalLabel: 'Новые возможности 1.14',
-      experimentalHint: 'Эти параметры соответствуют возможностям ядра sing-box 1.14. Для применения требуется перезапуск ядра.',
-      deprecatedNotice: 'Согласно плану удаления устаревших возможностей sing-box, поля clash_api / store_rdrc / independent_cache / download_detour будут удалены в 1.16. Конфигурации, генерируемые этим приложением, уже мигрированы; если вы используете собственные шаблоны конфигурации, скорректируйте их до обновления до 1.16. После запуска ядра появится уведомление, если обнаружены устаревшие поля.',
+      experimentalHint:
+        'Эти параметры соответствуют возможностям ядра sing-box 1.14. Для применения требуется перезапуск ядра.',
+      deprecatedNotice:
+        'Согласно плану удаления устаревших возможностей sing-box, поля clash_api / store_rdrc / independent_cache / download_detour будут удалены в 1.16. Конфигурации, генерируемые этим приложением, уже мигрированы; если вы используете собственные шаблоны конфигурации, скорректируйте их до обновления до 1.16. После запуска ядра появится уведомление, если обнаружены устаревшие поля.',
       dns114Title: 'Улучшения DNS в 1.14',
       dnsOptimisticCache: 'Оптимистический кэш DNS (снижает задержку повторных запросов)',
       dnsUseMdns: 'Включить mDNS (*.local / link-local)',
       dnsTimeout: 'Таймаут DNS (например, 5s)',
       hysteria2Title: 'Защита от анализа fingerprint в Hysteria2',
       hysteria2ObfsType: 'Тип обфускации',
-      hysteria2DisableChromeParrot: 'Отключить fingerprint Chrome QUIC (нужно для серверов с сертификатом Ed25519)',
+      hysteria2DisableChromeParrot:
+        'Отключить fingerprint Chrome QUIC (нужно для серверов с сертификатом Ed25519)',
       tlsTitle: 'Защита от анализа TLS fingerprint',
-      enableTlsSpoof: 'Включить TLS spoof (подмена SNI; требует повышенных прав, не поддерживается на Windows ARM64)',
+      enableTlsSpoof:
+        'Включить TLS spoof (подмена SNI; требует повышенных прав, не поддерживается на Windows ARM64)',
       clashModeTitle: 'Режим Clash',
       clashMode: 'Режим по умолчанию',
       enableWebDashboard: 'Включить веб-панель sing-box-dashboard',
@@ -737,11 +743,11 @@ export default {
       displayCard: 'Карточки',
       displayList: 'Компактный список',
     },
-      obfsSalamander: 'Salamander (по умолчанию)',
-      obfsGecko: 'Gecko (новое в 1.14)',
-      clashRule: 'Правило (по умолчанию)',
-      clashGlobal: 'Глобально',
-      clashDirect: 'Напрямую',
+    obfsSalamander: 'Salamander (по умолчанию)',
+    obfsGecko: 'Gecko (новое в 1.14)',
+    clashRule: 'Правило (по умолчанию)',
+    clashGlobal: 'Глобально',
+    clashDirect: 'Напрямую',
     singboxProfile: {
       title: 'Генерация конфигурации подписки (расширенная)',
       originalConfigHint:
@@ -831,22 +837,25 @@ export default {
     kernelErrors: {
       KERNEL_CONFIG_INVALID: 'Недопустимая конфигурация ядра. Проверьте конфигурацию и повторите.',
       KERNEL_BINARY_MISSING: 'Файл ядра не найден. Сначала установите ядро.',
-      KERNEL_START_UNSTABLE: 'Ядро завершилось вскоре после запуска. Проверьте конфигурацию или занятость порта.',
+      KERNEL_START_UNSTABLE:
+        'Ядро завершилось вскоре после запуска. Проверьте конфигурацию или занятость порта.',
       KERNEL_GUARD_RESTART_FAILED: 'Ядро остановлено неожиданно, авто-перезапуск не удался.',
       KERNEL_GUARD_SELF_HEAL_FAILED: 'Не удалось выполнить самоисцеление и перезапуск ядра.',
       KERNEL_STOP_FAILED: 'Не удалось остановить ядро.',
       KERNEL_AUTO_MANAGE_FAILED: 'Сбой авто-управления ядром.',
-      KERNEL_CONFLICT_DETECTED: 'Обнаружен зависший процесс ядра. Попытка принудительной остановки перед продолжением.',
-      KERNEL_CONFLICT_FORCE_STOP_FAILED: 'Не удалось принудительно остановить зависший процесс ядра. Завершите процесс вручную и повторите.',
+      KERNEL_CONFLICT_DETECTED:
+        'Обнаружен зависший процесс ядра. Попытка принудительной остановки перед продолжением.',
+      KERNEL_CONFLICT_FORCE_STOP_FAILED:
+        'Не удалось принудительно остановить зависший процесс ядра. Завершите процесс вручную и повторите.',
       KERNEL_RUNTIME_ERROR: 'Ошибка выполнения ядра',
       KERNEL_OPERATION_FAILED: 'Сбой операции ядра: {operation}',
       details: 'Подробности: {details}',
     },
   },
-    kernelVersionCheckFailed: 'Не удалось получить последнюю версию ядра',
-    proxyModeSwitchedTo: 'Режим прокси переключён на {mode}',
-    proxySettingsApplied: 'Настройки прокси применены',
-    ipv6Preferred: 'Включён режим приоритета IPv6',
-    ipv4Preferred: 'Включён режим приоритета IPv4',
-    ipVersionSwitchFailed: 'Не удалось переключить версию IP',
+  kernelVersionCheckFailed: 'Не удалось получить последнюю версию ядра',
+  proxyModeSwitchedTo: 'Режим прокси переключён на {mode}',
+  proxySettingsApplied: 'Настройки прокси применены',
+  ipv6Preferred: 'Включён режим приоритета IPv6',
+  ipv4Preferred: 'Включён режим приоритета IPv4',
+  ipVersionSwitchFailed: 'Не удалось переключить версию IP',
 }

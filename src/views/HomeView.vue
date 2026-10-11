@@ -72,10 +72,7 @@
           <n-tag size="small">{{ kernelStore.startupDiagnosis.kind }}</n-tag>
         </div>
         <div class="diagnosis-detail">{{ kernelStore.startupDiagnosis.detail }}</div>
-        <ul
-          v-if="kernelStore.startupDiagnosis.suggested_actions?.length"
-          class="diagnosis-actions"
-        >
+        <ul v-if="kernelStore.startupDiagnosis.suggested_actions?.length" class="diagnosis-actions">
           <li v-for="action in kernelStore.startupDiagnosis.suggested_actions" :key="action">
             {{ action }}
           </li>
@@ -267,10 +264,7 @@ const isWindowsPlatform = computed(() => platform.value === 'windows')
 const isUnixPlatform = computed(() => platform.value === 'linux' || platform.value === 'macos')
 
 // 平台无关的 TUN 切换状态机；平台提权与 sudo 密码交互通过回调注入。
-const {
-  pending: tunTogglePending,
-  applyTunSwitch,
-} = useTunToggle({
+const { pending: tunTogglePending, applyTunSwitch } = useTunToggle({
   messages: {
     applyFailed: t('notification.proxyModeChangeFailed'),
     restartFailed: t('home.restartFailed'),
@@ -370,8 +364,7 @@ const syncCurrentNodeProxyMode = async () => {
     if (mode === 'global' || mode === 'rule' || mode === 'direct') {
       currentNodeProxyMode.value = mode
     }
-  } catch {
-  }
+  } catch {}
 }
 
 // 一键测速
@@ -446,7 +439,6 @@ const confirmTunSwitch = () => {
     })
   })
 }
-
 
 const toggleTunProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
@@ -626,7 +618,9 @@ onMounted(async () => {
 
 .hero-card.running .hero-status-dot {
   background: var(--success-color);
-  box-shadow: 0 0 16px var(--success-color), 0 0 4px var(--success-color);
+  box-shadow:
+    0 0 16px var(--success-color),
+    0 0 4px var(--success-color);
   animation: pulse-green 2s ease-in-out infinite;
 }
 

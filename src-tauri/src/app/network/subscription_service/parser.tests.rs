@@ -101,10 +101,16 @@ fn parse_uri_list_hysteria2_with_obfs() {
     assert_eq!(nodes[0]["password"].as_str().unwrap(), "password123");
     assert_eq!(nodes[0]["server"].as_str().unwrap(), "example.com");
     assert_eq!(nodes[0]["server_port"].as_u64().unwrap(), 443);
-    assert_eq!(nodes[0]["tls"]["server_name"].as_str().unwrap(), "example.com");
+    assert_eq!(
+        nodes[0]["tls"]["server_name"].as_str().unwrap(),
+        "example.com"
+    );
     assert_eq!(nodes[0]["tls"]["alpn"][0].as_str().unwrap(), "h3");
     assert_eq!(nodes[0]["obfs"]["type"].as_str().unwrap(), "salamander");
-    assert_eq!(nodes[0]["obfs"]["password"].as_str().unwrap(), "obfs-secret");
+    assert_eq!(
+        nodes[0]["obfs"]["password"].as_str().unwrap(),
+        "obfs-secret"
+    );
     assert_eq!(nodes[0]["up_mbps"].as_u64().unwrap(), 100);
     assert_eq!(nodes[0]["down_mbps"].as_u64().unwrap(), 200);
     assert!(nodes[0]["tcp_fast_open"].as_bool().unwrap());
@@ -154,7 +160,10 @@ fn parse_uri_list_tuic_with_options() {
     assert!(nodes[0]["zero_rtt_handshake"].as_bool().unwrap());
     assert_eq!(nodes[0]["heartbeat"].as_str().unwrap(), "10s");
     assert_eq!(nodes[0]["network"].as_str().unwrap(), "tcp");
-    assert_eq!(nodes[0]["tls"]["server_name"].as_str().unwrap(), "edge.example.com");
+    assert_eq!(
+        nodes[0]["tls"]["server_name"].as_str().unwrap(),
+        "edge.example.com"
+    );
     assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
     assert_eq!(nodes[0]["tls"]["alpn"][0].as_str().unwrap(), "h3");
     assert_eq!(nodes[0]["tls"]["alpn"][1].as_str().unwrap(), "hq-29");
@@ -170,7 +179,10 @@ fn parse_uri_list_anytls_basic() {
     assert_eq!(nodes[0]["server"].as_str().unwrap(), "example.com");
     assert_eq!(nodes[0]["server_port"].as_u64().unwrap(), 443);
     assert_eq!(nodes[0]["password"].as_str().unwrap(), "secret");
-    assert_eq!(nodes[0]["tls"]["server_name"].as_str().unwrap(), "cdn.example.com");
+    assert_eq!(
+        nodes[0]["tls"]["server_name"].as_str().unwrap(),
+        "cdn.example.com"
+    );
 }
 
 #[test]
@@ -283,7 +295,10 @@ proxies:
     assert_eq!(nodes[0]["up_mbps"].as_u64().unwrap(), 50);
     assert_eq!(nodes[0]["down_mbps"].as_u64().unwrap(), 50);
     assert_eq!(nodes[0]["obfs"]["type"].as_str().unwrap(), "salamander");
-    assert_eq!(nodes[0]["obfs"]["password"].as_str().unwrap(), "obfs-secret-pass");
+    assert_eq!(
+        nodes[0]["obfs"]["password"].as_str().unwrap(),
+        "obfs-secret-pass"
+    );
 }
 
 #[test]
@@ -353,10 +368,7 @@ proxies:
 "#;
     let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
     assert_eq!(nodes.len(), 4);
-    let types: Vec<&str> = nodes
-        .iter()
-        .map(|n| n["type"].as_str().unwrap())
-        .collect();
+    let types: Vec<&str> = nodes.iter().map(|n| n["type"].as_str().unwrap()).collect();
     assert!(types.contains(&"vmess"));
     assert!(types.contains(&"hysteria2"));
     assert!(types.contains(&"tuic"));
@@ -378,9 +390,17 @@ fn parse_vless_uri_tls_propagates_insecure_and_alpn() {
     let nodes = extract_nodes_from_subscription(content).expect("should parse");
     assert_eq!(nodes.len(), 1);
     assert_eq!(nodes[0]["type"].as_str().unwrap(), "vless");
-    assert_eq!(nodes[0]["tls"]["server_name"].as_str().unwrap(), "update.microsoft.com");
-    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap(), "insecure must be true");
-    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    assert_eq!(
+        nodes[0]["tls"]["server_name"].as_str().unwrap(),
+        "update.microsoft.com"
+    );
+    assert!(
+        nodes[0]["tls"]["insecure"].as_bool().unwrap(),
+        "insecure must be true"
+    );
+    let alpn = nodes[0]["tls"]["alpn"]
+        .as_array()
+        .expect("alpn must be array");
     assert_eq!(alpn[0].as_str().unwrap(), "h2");
     assert_eq!(alpn[1].as_str().unwrap(), "h3");
 }
@@ -388,7 +408,8 @@ fn parse_vless_uri_tls_propagates_insecure_and_alpn() {
 #[test]
 fn parse_vless_uri_tls_defaults_insecure_false() {
     // 不带 allowInsecure 时，insecure 必须显式为 false（不是缺失）。
-    let content = "vless://26a1d547-b031-4139-9fc5-6671e1d0408a@a.com:443?security=tls&sni=example.com#V";
+    let content =
+        "vless://26a1d547-b031-4139-9fc5-6671e1d0408a@a.com:443?security=tls&sni=example.com#V";
     let nodes = extract_nodes_from_subscription(content).expect("should parse");
     assert_eq!(nodes.len(), 1);
     assert!(!nodes[0]["tls"]["insecure"].as_bool().unwrap());
@@ -405,8 +426,14 @@ fn parse_vless_uri_reality_has_no_insecure_and_no_utls() {
     let tls = &nodes[0]["tls"];
     assert!(tls["reality"]["enabled"].as_bool().unwrap());
     // 修复后 reality 分支独立构造，不再走 build_tls_config，因此不应有 insecure 字段
-    assert!(tls.get("insecure").is_none(), "reality must not emit insecure field");
-    assert!(tls.get("alpn").is_none(), "reality must not emit alpn field");
+    assert!(
+        tls.get("insecure").is_none(),
+        "reality must not emit insecure field"
+    );
+    assert!(
+        tls.get("alpn").is_none(),
+        "reality must not emit alpn field"
+    );
 }
 
 #[test]
@@ -419,7 +446,9 @@ fn parse_vmess_uri_propagates_allow_insecure_and_alpn() {
     let nodes = extract_nodes_from_subscription(&content).expect("should parse");
     assert_eq!(nodes.len(), 1);
     assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
-    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    let alpn = nodes[0]["tls"]["alpn"]
+        .as_array()
+        .expect("alpn must be array");
     assert_eq!(alpn.len(), 2);
     assert_eq!(alpn[0].as_str().unwrap(), "h2");
 }
@@ -439,7 +468,9 @@ fn parse_trojan_uri_propagates_allow_insecure_and_alpn() {
     let nodes = extract_nodes_from_subscription(content).expect("should parse");
     assert_eq!(nodes.len(), 1);
     assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
-    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    let alpn = nodes[0]["tls"]["alpn"]
+        .as_array()
+        .expect("alpn must be array");
     assert_eq!(alpn[0].as_str().unwrap(), "h2");
     assert_eq!(alpn[1].as_str().unwrap(), "h3");
 }
@@ -461,7 +492,9 @@ proxies:
     let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
     assert_eq!(nodes.len(), 1);
     assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
-    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    let alpn = nodes[0]["tls"]["alpn"]
+        .as_array()
+        .expect("alpn must be array");
     assert_eq!(alpn[0].as_str().unwrap(), "h2");
     assert_eq!(alpn[1].as_str().unwrap(), "h3");
 }
@@ -487,7 +520,9 @@ proxies:
     let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
     assert_eq!(nodes.len(), 1);
     assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
-    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    let alpn = nodes[0]["tls"]["alpn"]
+        .as_array()
+        .expect("alpn must be array");
     assert_eq!(alpn.len(), 2);
     assert_eq!(alpn[0].as_str().unwrap(), "h2");
     assert_eq!(alpn[1].as_str().unwrap(), "h3");
@@ -509,7 +544,9 @@ proxies:
     let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
     assert_eq!(nodes.len(), 1);
     assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
-    let alpn = nodes[0]["tls"]["alpn"].as_array().expect("alpn must be array");
+    let alpn = nodes[0]["tls"]["alpn"]
+        .as_array()
+        .expect("alpn must be array");
     assert_eq!(alpn[0].as_str().unwrap(), "h2");
     assert_eq!(alpn[1].as_str().unwrap(), "h3");
 }
@@ -535,10 +572,7 @@ proxies:
     assert_eq!(nodes.len(), 1);
     assert_eq!(nodes[0]["type"].as_str().unwrap(), "hysteria2");
     assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
-    assert_eq!(
-        nodes[0]["tls"]["alpn"][0].as_str().unwrap(),
-        "h3"
-    );
+    assert_eq!(nodes[0]["tls"]["alpn"][0].as_str().unwrap(), "h3");
     assert_eq!(nodes[0]["obfs"]["type"].as_str().unwrap(), "salamander");
     assert_eq!(nodes[0]["obfs"]["password"].as_str().unwrap(), "obf");
 }

@@ -74,4 +74,3 @@ export const useSudoStore = defineStore('sudo', () => {
     submit,
   }
 })
-

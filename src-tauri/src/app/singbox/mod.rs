@@ -4,6 +4,6 @@
 
 pub mod common;
 pub mod config_generator;
-pub mod config_validator;
 mod config_schema;
+pub mod config_validator;
 pub mod settings_patch;

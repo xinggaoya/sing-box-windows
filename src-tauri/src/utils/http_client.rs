@@ -281,10 +281,7 @@ pub fn profile_client(profile: ClientProfile) -> &'static Client {
 }
 
 /// 获取走指定代理的缓存客户端（见 [`HttpClientManager::client_for_proxy`]）
-pub fn proxy_client_for(
-    proxy_url: &str,
-    timeout: Duration,
-) -> Result<Arc<Client>, reqwest::Error> {
+pub fn proxy_client_for(proxy_url: &str, timeout: Duration) -> Result<Arc<Client>, reqwest::Error> {
     HTTP_CLIENT_MANAGER.client_for_proxy(proxy_url, timeout)
 }
 

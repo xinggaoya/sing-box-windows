@@ -3,12 +3,12 @@ use crate::app::constants::messages;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
+use crate::utils::http_client;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use tokio::net::TcpStream;
 use tokio::time::{sleep, timeout};
 use tracing::{debug, info, warn};
-use crate::utils::http_client;
 
 // 以管理员权限重启 (跨平台实现)
 #[tauri::command]
@@ -447,7 +447,11 @@ async fn perform_proxy_probe_with_timeout(proxy_port: u16, per_request_timeout: 
                     debug!("代理链路检测成功: {}", url);
                     return true;
                 }
-                debug!("代理链路检测失败: {} -> 状态 {}", url, response.status().as_u16());
+                debug!(
+                    "代理链路检测失败: {} -> 状态 {}",
+                    url,
+                    response.status().as_u16()
+                );
             }
             Err(err) => debug!("代理链路检测异常: {} -> {}", url, err),
         }

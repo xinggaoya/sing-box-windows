@@ -47,7 +47,7 @@ export const useWindowStore = defineStore(
       }
     }
 
-    const resolveWindowSize = async (): Promise<{ width: number, height: number }> => {
+    const resolveWindowSize = async (): Promise<{ width: number; height: number }> => {
       try {
         const size = await getAppWindow().innerSize()
         return { width: size.width, height: size.height }
@@ -90,7 +90,7 @@ export const useWindowStore = defineStore(
 
       // 隐藏到托盘时立即清理所有消息，避免进入空白页后消息无法自行消失
       appStore.clearMessages()
-      
+
       // 保存到数据库
       await saveToBackend()
 
@@ -129,7 +129,7 @@ export const useWindowStore = defineStore(
       await appWindow.show()
       await appWindow.setFocus()
       windowState.value.isVisible = true
-      
+
       // 保存到数据库
       await saveToBackend()
 
@@ -160,7 +160,7 @@ export const useWindowStore = defineStore(
       }
 
       windowState.value.isFullscreen = !isFullscreen
-      
+
       // 保存到数据库
       await saveToBackend()
     }
@@ -170,7 +170,7 @@ export const useWindowStore = defineStore(
       const appWindow = getAppWindow()
       await appWindow.maximize()
       windowState.value.isMaximized = true
-      
+
       // 保存到数据库
       await saveToBackend()
 
@@ -214,7 +214,7 @@ export const useWindowStore = defineStore(
         windowState.value.isVisible = isVisible
         windowState.value.isFullscreen = isFullscreen
         windowState.value.isMaximized = isMaximized
-        
+
         // 保存到数据库
         await saveToBackend()
       } catch (error) {
@@ -243,7 +243,7 @@ export const useWindowStore = defineStore(
 
     // 标记是否正在初始化
     let isInitializing = false
-    
+
     // 监听窗口状态变化并自动保存到数据库
     watch(
       () => windowState.value.isMaximized,
@@ -251,7 +251,7 @@ export const useWindowStore = defineStore(
         // 初始化期间不保存
         if (isInitializing) return
         await saveToBackend()
-      }
+      },
     )
 
     // 初始化方法

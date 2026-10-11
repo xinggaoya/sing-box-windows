@@ -28,7 +28,11 @@
         :disabled="props.updateStore.isChecking"
         @click="props.handleCheckUpdate"
       >
-        {{ props.checkingUpdate ? props.t('setting.update.checking') : props.t('setting.update.checkNow') }}
+        {{
+          props.checkingUpdate
+            ? props.t('setting.update.checking')
+            : props.t('setting.update.checkNow')
+        }}
       </n-button>
     </div>
 
@@ -177,10 +181,7 @@
         <span class="preview-label">{{ props.t('setting.backup.subscriptionCount') }}</span>
         <span class="preview-value">{{ props.backupPreview.subscriptions_count }}</span>
       </div>
-      <div
-        class="preview-row"
-        :class="{ warning: props.backupPreview.warnings.length > 0 }"
-      >
+      <div class="preview-row" :class="{ warning: props.backupPreview.warnings.length > 0 }">
         <span class="preview-label">{{ props.t('setting.backup.warningCount') }}</span>
         <span class="preview-value">{{ props.backupPreview.warnings.length }}</span>
       </div>
@@ -197,10 +198,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  DownloadOutline,
-  OpenOutline,
-} from '@vicons/ionicons5'
+import { DownloadOutline, OpenOutline } from '@vicons/ionicons5'
 import type { UpdateChannel } from '@/stores/app/UpdateStore'
 import type { useUpdateStore } from '@/stores'
 import type { BackupImportResult } from '@/services/system-service'

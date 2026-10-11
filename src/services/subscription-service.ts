@@ -45,7 +45,11 @@ const mapPersistResult = (result: BackendSubscriptionPersistResult): Subscriptio
 })
 
 export const subscriptionService = {
-  downloadSubscription(url: string, useOriginalConfig: boolean, options: SubscriptionPersistOptions = {}) {
+  downloadSubscription(
+    url: string,
+    useOriginalConfig: boolean,
+    options: SubscriptionPersistOptions = {},
+  ) {
     return invokeWithAppContext<BackendSubscriptionPersistResult>(
       'download_subscription',
       {
@@ -59,7 +63,11 @@ export const subscriptionService = {
     ).then(mapPersistResult)
   },
 
-  addManualSubscription(content: string, useOriginalConfig: boolean, options: SubscriptionPersistOptions = {}) {
+  addManualSubscription(
+    content: string,
+    useOriginalConfig: boolean,
+    options: SubscriptionPersistOptions = {},
+  ) {
     return invokeWithAppContext<BackendSubscriptionPersistResult>(
       'add_manual_subscription',
       {
@@ -85,19 +93,11 @@ export const subscriptionService = {
   },
 
   deleteConfig(configPath: string) {
-    return invokeWithAppContext<void>(
-      'delete_subscription_config',
-      { configPath },
-      undefined,
-    )
+    return invokeWithAppContext<void>('delete_subscription_config', { configPath }, undefined)
   },
 
   rollbackConfig(configPath: string) {
-    return invokeWithAppContext<string>(
-      'rollback_subscription_config',
-      { configPath },
-      undefined,
-    )
+    return invokeWithAppContext<string>('rollback_subscription_config', { configPath }, undefined)
   },
 
   getCurrentConfig() {

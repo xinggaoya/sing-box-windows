@@ -5,7 +5,11 @@ import { kernelService, type KernelStatus } from '@/services/kernel-service'
 import { useAppStore, type ProxyMode } from '../app/AppStore'
 import i18n from '@/locales'
 import { eventService } from '@/services/event-service'
-import type { KernelFailurePayload, KernelReadinessSnapshot, StartupDiagnosis } from '@/types/events'
+import type {
+  KernelFailurePayload,
+  KernelReadinessSnapshot,
+  StartupDiagnosis,
+} from '@/types/events'
 
 const DEFAULT_STATUS: KernelStatus = {
   process_running: false,
@@ -178,7 +182,8 @@ export const useKernelStore = defineStore('kernel', () => {
       // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : i18n.global.t('notification.kernelRestartFailed')
+      lastError.value =
+        error instanceof Error ? error.message : i18n.global.t('notification.kernelRestartFailed')
       return false
     } finally {
       isLoading.value = false
@@ -195,7 +200,8 @@ export const useKernelStore = defineStore('kernel', () => {
       // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : i18n.global.t('home.kernelStopFailed')
+      lastError.value =
+        error instanceof Error ? error.message : i18n.global.t('home.kernelStopFailed')
       return false
     }
   }
@@ -210,7 +216,8 @@ export const useKernelStore = defineStore('kernel', () => {
       // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : i18n.global.t('notification.proxyModeChangeFailed')
+      lastError.value =
+        error instanceof Error ? error.message : i18n.global.t('notification.proxyModeChangeFailed')
       return false
     }
   }
@@ -228,7 +235,8 @@ export const useKernelStore = defineStore('kernel', () => {
       // await refreshStatus() // 移除主动刷新，依赖事件推送
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : i18n.global.t('home.applyProxySettingsFailed')
+      lastError.value =
+        error instanceof Error ? error.message : i18n.global.t('home.applyProxySettingsFailed')
       return false
     }
   }
@@ -242,7 +250,8 @@ export const useKernelStore = defineStore('kernel', () => {
       }
       return true
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : i18n.global.t('notification.ipVersionSwitchFailed')
+      lastError.value =
+        error instanceof Error ? error.message : i18n.global.t('notification.ipVersionSwitchFailed')
       return false
     }
   }
@@ -257,7 +266,8 @@ export const useKernelStore = defineStore('kernel', () => {
       }
       return isKernelInstalled.value
     } catch (error) {
-      lastError.value = error instanceof Error ? error.message : i18n.global.t('home.kernelInstallCheckFailed')
+      lastError.value =
+        error instanceof Error ? error.message : i18n.global.t('home.kernelInstallCheckFailed')
       return false
     }
   }
@@ -272,7 +282,9 @@ export const useKernelStore = defineStore('kernel', () => {
       return latestAvailableVersion.value
     } catch (error) {
       lastError.value =
-        error instanceof Error ? error.message : i18n.global.t('notification.kernelVersionCheckFailed')
+        error instanceof Error
+          ? error.message
+          : i18n.global.t('notification.kernelVersionCheckFailed')
       return ''
     }
   }

@@ -120,11 +120,7 @@ export function createAppPersistence(fields: AppConfigFields) {
   }
 
   // 监听列表由字段声明表推导，不再手工枚举
-  const stopAutoSave = watch(
-    appConfigFieldRefs(fields),
-    scheduleSave,
-    { deep: true },
-  )
+  const stopAutoSave = watch(appConfigFieldRefs(fields), scheduleSave, { deep: true })
 
   const waitForSaveCompletion = async () => {
     await nextTick()
@@ -163,7 +159,10 @@ export function createAppPersistence(fields: AppConfigFields) {
  *
  * 保留该字段仅为向后兼容（1.13 及更早的配置只存proxy_mode）。
  */
-function deriveLegacyProxyMode(tunEnabled: boolean, systemProxyEnabled: boolean): AppConfig['proxy_mode'] {
+function deriveLegacyProxyMode(
+  tunEnabled: boolean,
+  systemProxyEnabled: boolean,
+): AppConfig['proxy_mode'] {
   if (tunEnabled) return 'tun'
   if (systemProxyEnabled) return 'system'
   return 'manual'

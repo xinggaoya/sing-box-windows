@@ -46,13 +46,12 @@ async fn creates_all_tables_on_fresh_database() {
         "update_config",
         "generic_config",
     ] {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1",
-        )
-        .bind(table)
-        .fetch_one(&pool)
-        .await
-        .expect("查询 sqlite_master");
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1")
+                .bind(table)
+                .fetch_one(&pool)
+                .await
+                .expect("查询 sqlite_master");
         assert_eq!(row.0, 1, "表 {} 缺失", table);
     }
 
@@ -240,10 +239,7 @@ async fn app_config_round_trips_every_field() {
 async fn load_app_config_returns_none_when_empty() {
     let (path, service) = temp_service("empty-load").await;
 
-    let loaded = service
-        .load_app_config()
-        .await
-        .expect("空库读取不应报错");
+    let loaded = service.load_app_config().await.expect("空库读取不应报错");
     assert!(loaded.is_none(), "空库应返回 None");
 
     let _ = std::fs::remove_file(&path);

@@ -58,10 +58,7 @@
           <div class="setting-label">{{ props.t('setting.theme.compactMode') }}</div>
           <div class="setting-desc">{{ props.t('setting.theme.compactDesc') }}</div>
         </div>
-        <n-switch
-          :value="props.themeStore.compactMode"
-          @update:value="props.onCompactModeChange"
-        />
+        <n-switch :value="props.themeStore.compactMode" @update:value="props.onCompactModeChange" />
       </div>
     </div>
 
@@ -91,7 +88,7 @@
       <n-switch :value="props.autoStart" @update:value="props.onAutoStartChange" />
     </div>
 
-    <div v-if="props.autoStart" class="setting-row" style="padding-left: 24px;">
+    <div v-if="props.autoStart" class="setting-row" style="padding-left: 24px">
       <div class="setting-info">
         <div class="setting-label">
           {{ props.t('setting.startup.autoHideToTrayOnAutostart') }}
@@ -124,11 +121,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import {
-  SunnyOutline,
-  MoonOutline,
-  DesktopOutline,
-} from '@vicons/ionicons5'
+import { SunnyOutline, MoonOutline, DesktopOutline } from '@vicons/ionicons5'
 import type { Locale } from '@/stores/app/LocaleStore'
 import type { ThemeMode } from '@/stores/app/ThemeStore'
 import type { TrayCloseBehavior } from '@/stores/app/AppStore'
@@ -254,7 +247,9 @@ const themeModes = computed(() => [
 
 .accent-dot.active {
   border-color: var(--text-primary);
-  box-shadow: 0 0 0 2px var(--bg-elevated), var(--shadow-sm);
+  box-shadow:
+    0 0 0 2px var(--bg-elevated),
+    var(--shadow-sm);
 }
 
 /* 自定义颜色选择器固定宽度，避免撑满整行 */

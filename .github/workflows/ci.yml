@@ -66,8 +66,23 @@ jobs:
       - name: Frontend type-check
         run: pnpm type-check
 
+      - name: Prettier format check
+        run: pnpm format:check
+
+      - name: i18n key sync check
+        # 以 zh-CN 为基准校验各语言包 key 对齐。
+        # 缺失的 key 会让用户直接看到裸 key（如 `home.memory`），这类问题
+        # 靠 review 很容易漏，必须进 CI。
+        run: pnpm test:i18n
+
+      - name: Frontend unit test
+        run: pnpm test
+
       - name: Kernel targets test
         run: pnpm test:kernel-targets
+
+      - name: Rust format check
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
       - name: Rust clippy
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
