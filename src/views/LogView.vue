@@ -152,6 +152,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import { useLogStore, type LogEntry } from '@/stores/kernel/LogStore'
 import { useSortableGroupedList } from '@/composables/useSortableGroupedList'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime, formatDate as formatLocalDate } from '@/utils'
 
 /** 日志排序字段（与 LogStore.sortKey 的持久化类型一致） */
 type LogSortKey = 'seq' | 'type' | 'timestamp'
@@ -264,8 +265,10 @@ const getLogTagType = (type: string) => {
   return 'default'
 }
 
-const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString()
-const formatDate = (timestamp: number) => new Date(timestamp).toLocaleDateString()
+// 时间格式化统一走 @/utils（此前此处与 subscription-utils 各有一份等价实现）。
+// 用别名导入避免与本文件的局部 `formatDate` 同名。
+const formatTime = (timestamp: number) => formatDateTime(timestamp)
+const formatDate = (timestamp: number) => formatLocalDate(timestamp)
 </script>
 
 <style scoped>

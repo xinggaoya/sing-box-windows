@@ -305,7 +305,7 @@ type ConnectionSortKey =
   | 'rule'
   | 'sourceIP'
 import type { ConnectionItem } from '@/types/events'
-import { formatBytes, formatSpeed } from '@/utils'
+import { formatBytes, formatRelativeTime, formatSpeed } from '@/utils'
 
 defineOptions({
   name: 'ConnectionsView',
@@ -515,14 +515,8 @@ onBeforeUnmount(() => {
   }
 })
 
-const formatTimeAgo = (time: string) => {
-  const diff = nowTick.value - new Date(time).getTime()
-  if (diff < 60_000)
-    return t('connections.secondsAgo', { count: Math.max(1, Math.floor(diff / 1000)) })
-  if (diff < 3_600_000) return t('connections.minutesAgo', { count: Math.floor(diff / 60_000) })
-  if (diff < 86_400_000) return t('connections.hoursAgo', { count: Math.floor(diff / 3_600_000) })
-  return new Date(time).toLocaleString()
-}
+// 相对时间统一走 @/utils；nowTick 让「x 秒前」持续走动
+const formatTimeAgo = (time: string) => formatRelativeTime(time, t, nowTick.value)
 
 watch(
   () => connectionStore.activeTab,

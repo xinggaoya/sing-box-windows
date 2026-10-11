@@ -294,6 +294,7 @@ import {
 import type { FormInst, FormRules, DropdownOption } from 'naive-ui'
 import PageHeader from '@/components/common/PageHeader.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import { formatDateTime } from '@/utils'
 
 defineOptions({
   name: 'SubView',
@@ -739,7 +740,7 @@ const applySubscriptionUserinfo = (
 
 const formatTrafficSummary = (item: Subscription) => formatTrafficSummaryText(item, t)
 const formatExpireTime = (timestamp?: number) => formatExpireTimeText(timestamp, t)
-const formatTime = (timestamp: number): string => formatLocalTime(timestamp)
+const formatTime = (timestamp: number): string => formatDateTime(timestamp)
 const formatAutoUpdateHealth = (item: Subscription) => formatAutoUpdateHealthText(item, t)
 
 const regenerateConfigFor = async (item: Subscription) => {
