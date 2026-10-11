@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 仅用于捕获 naive-ui 的 useMessage() 实例并经 mitt 转发。
+ * 仅用于捕获 naive-ui 的 useMessage() 实例并写入 AppStore。
  *
  * useMessage() 必须在 <n-message-provider> 的直接子级上下文中调用，
  * 因此用一个不渲染任何内容的子组件来获取实例，再通过事件总线交给
@@ -8,12 +8,16 @@
  */
 import { onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import mitt from '@/utils/mitt'
+import { useAppStore } from '@/stores'
 
 const message = useMessage()
 
+const appStore = useAppStore()
+
 onMounted(() => {
-  mitt.emit('message-instance-ready', message)
+  // 直接写入 store：此前经 mitt 转发给 useAppBootstrap 再写 store，
+  // 多绕两跳且让「谁持有 message 实例」这件事分散在 3 个文件里。
+  appStore.setMessageInstance(message)
 })
 </script>
 

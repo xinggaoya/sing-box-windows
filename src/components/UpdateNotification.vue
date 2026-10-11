@@ -8,7 +8,8 @@ import { onMounted, onBeforeUnmount, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification, NButton } from 'naive-ui'
 import type { NotificationReactive } from 'naive-ui'
-import mitt from '@/utils/mitt'
+import { APP_EVENTS } from '@/constants/events'
+import { eventService } from '@/services/event-service'
 import { useRouter } from 'vue-router'
 
 const { t } = useI18n()
@@ -66,12 +67,18 @@ const handleUpdateAvailable = (updateInfo: unknown) => {
   })
 }
 
-onMounted(() => {
-  mitt.on('update-available', handleUpdateAvailable)
+// 直接订阅后端事件；此前经 mitt 从 useAppBootstrap 转发过来，多绕两跳
+let unlistenUpdateAvailable: (() => void) | null = null
+
+onMounted(async () => {
+  unlistenUpdateAvailable = await eventService.on(APP_EVENTS.updateAvailable, (payload) =>
+    handleUpdateAvailable(payload),
+  )
 })
 
 onBeforeUnmount(() => {
-  mitt.off('update-available', handleUpdateAvailable)
+  unlistenUpdateAvailable?.()
+  unlistenUpdateAvailable = null
 
   // 清理活跃的通知
   if (activeNotification) {

@@ -49,7 +49,6 @@
     "eslint": "^10.8.0",
     "eslint-plugin-oxlint": "^1.76.0",
     "eslint-plugin-vue": "^10.10.0",
-    "mitt": "^3.0.1",
     "naive-ui": "^2.44.1",
     "npm-run-all2": "^9.0.3",
     "oxlint": "^1.76.0",

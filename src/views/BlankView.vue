@@ -10,7 +10,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import mitt from '@/utils/mitt'
+import { useAppStore } from '@/stores'
 
 const { t } = useI18n()
 const showIndicator = ref(false)
@@ -19,7 +19,7 @@ let indicatorTimer: number | null = null
 
 onMounted(() => {
   // 进入空白页时清理消息，避免提示在托盘模式下悬挂
-  mitt.emit('clear-ui-messages')
+  useAppStore().clearMessages()
 
   indicatorTimer = window.setTimeout(() => {
     showIndicator.value = true

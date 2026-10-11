@@ -1,7 +1,6 @@
 import { watch, type Ref } from 'vue'
 import { Window } from '@tauri-apps/api/window'
 import type { Router } from 'vue-router'
-import mitt from '@/utils/mitt'
 import { subscriptionService } from '@/services/subscription-service'
 import { eventService } from '@/services/event-service'
 import { APP_EVENTS } from '@/constants/events'
@@ -101,20 +100,6 @@ export function useAppBootstrap(deps: AppBootstrapDeps) {
     }
   }
 
-  const setupMessageBus = () => {
-    const handleMessageReady = (message: unknown) => {
-      appStore.setMessageInstance(message as ReturnType<typeof import('naive-ui').useMessage>)
-    }
-    const handleClearMessages = () => {
-      appStore.clearMessages()
-    }
-    mitt.on('message-instance-ready', handleMessageReady)
-    mitt.on('clear-ui-messages', handleClearMessages)
-
-    cleanupFns.push(() => mitt.off('message-instance-ready', handleMessageReady))
-    cleanupFns.push(() => mitt.off('clear-ui-messages', handleClearMessages))
-  }
-
   const setupLocaleWatcher = () => {
     const stopWatchingLocale = watch(
       () => localeStore.currentLocale,
@@ -141,11 +126,13 @@ export function useAppBootstrap(deps: AppBootstrapDeps) {
   }
 
   const setupBackendEventBridge = () => {
-    // 更新可用事件 -> 同步到更新 Store
+    // 更新可用事件 -> 同步到更新 Store。
+    // 原先还会 `mitt.emit('update-available')` 二次转发给 UpdateNotification，
+    // 结果后端 emit 要经过 Tauri event -> eventService -> mitt -> 组件共 4 跳；
+    // UpdateNotification 现直接订阅同一个 Tauri 事件。
     eventService
       .on(APP_EVENTS.updateAvailable, (payload) => {
         updateStore.applyUpdateInfo(payload)
-        mitt.emit('update-available', payload)
       })
       .then((unlisten) => cleanupFns.push(unlisten))
       .catch((error) => {
@@ -162,15 +149,8 @@ export function useAppBootstrap(deps: AppBootstrapDeps) {
         console.error('注册 kernel-health 事件失败:', error)
       })
 
-    // 订阅刷新事件 -> 触发前端刷新或提示
-    eventService
-      .on(APP_EVENTS.subscriptionUpdated, () => {
-        mitt.emit('subscription-updated')
-      })
-      .then((unlisten) => cleanupFns.push(unlisten))
-      .catch((error) => {
-        console.error('注册 subscription-updated 事件失败:', error)
-      })
+    // `subscription-updated` 由 SubStore 直接订阅（见 stores/subscription/SubStore.ts），
+    // 此处不再经 mitt 二次转发。
   }
 
   const initialize = async () => {
@@ -191,7 +171,6 @@ export function useAppBootstrap(deps: AppBootstrapDeps) {
     await localeStore.initializeStore()
     await updateStore.initializeStore()
 
-    setupMessageBus()
     setupLocaleWatcher()
     setupRouteWatcher()
 

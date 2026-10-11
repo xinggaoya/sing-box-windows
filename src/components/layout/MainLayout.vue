@@ -58,7 +58,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useThemeStore } from '@/stores/app/ThemeStore'
 import { useWindowStore } from '@/stores/app/WindowStore'
@@ -76,7 +76,6 @@ import {
   FolderOutline,
 } from '@vicons/ionicons5'
 import { useMessage } from 'naive-ui'
-import mitt from 'mitt'
 import UpdateModal from '@/components/UpdateModal.vue'
 import AppHeader from './AppHeader.vue'
 import AppSidebar, { type NavItem } from './AppSidebar.vue'
@@ -90,7 +89,6 @@ const router = useRouter()
 const route = useRoute()
 const collapsed = ref(false)
 const message = useMessage()
-const mittInstance = mitt()
 
 // Stores
 const themeStore = useThemeStore()
@@ -184,59 +182,6 @@ const onSelect = (key: string) => {
 }
 
 // 更新处理
-const handleShowUpdateModal = (data: unknown) => {
-  if (!data || typeof data !== 'object') return
-
-  const payload = data as Record<string, unknown>
-  updateInfo.value = {
-    latestVersion:
-      typeof payload.latestVersion === 'string'
-        ? payload.latestVersion
-        : typeof payload.latest_version === 'string'
-          ? payload.latest_version
-          : '',
-    currentVersion:
-      typeof payload.currentVersion === 'string' ? payload.currentVersion : updateStore.appVersion,
-    downloadUrl:
-      typeof payload.downloadUrl === 'string'
-        ? payload.downloadUrl
-        : typeof payload.download_url === 'string'
-          ? payload.download_url
-          : '',
-    releasePageUrl:
-      typeof payload.releasePageUrl === 'string'
-        ? payload.releasePageUrl
-        : typeof payload.release_page_url === 'string'
-          ? payload.release_page_url
-          : updateStore.releasePageUrl,
-    releaseNotes:
-      typeof payload.releaseNotes === 'string'
-        ? payload.releaseNotes
-        : typeof payload.release_notes === 'string'
-          ? payload.release_notes
-          : '',
-    releaseDate:
-      typeof payload.releaseDate === 'string'
-        ? payload.releaseDate
-        : typeof payload.release_date === 'string'
-          ? payload.release_date
-          : '',
-    fileSize:
-      typeof payload.fileSize === 'number'
-        ? payload.fileSize
-        : typeof payload.file_size === 'number'
-          ? payload.file_size
-          : 0,
-    supportsInAppUpdate:
-      typeof payload.supportsInAppUpdate === 'boolean'
-        ? payload.supportsInAppUpdate
-        : typeof payload.supports_in_app_update === 'boolean'
-          ? payload.supports_in_app_update
-          : updateStore.supportsInAppUpdate,
-  }
-  showUpdateModal.value = true
-}
-
 const handleUpdate = async () => {
   try {
     if (updateInfo.value.supportsInAppUpdate) {
@@ -263,14 +208,6 @@ const handleUpdateSkip = async () => {
   message.success(t('setting.update.skipSuccess'))
 }
 
-// 生命周期
-onMounted(() => {
-  mittInstance.on('show-update-modal', handleShowUpdateModal)
-})
-
-onUnmounted(() => {
-  mittInstance.off('show-update-modal', handleShowUpdateModal)
-})
 </script>
 
 <style scoped>

@@ -2,7 +2,8 @@ import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { DatabaseService } from '@/services/database-service'
 import type { Subscription } from '@/types/database'
-import mitt from '@/utils/mitt'
+import { APP_EVENTS } from '@/constants/events'
+import { eventService } from '@/services/event-service'
 import { DEFAULT_AUTO_UPDATE_MINUTES, type FrontendSubscription } from './types'
 import { flushWatchers } from '@/utils/store-init'
 
@@ -249,8 +250,9 @@ export const useSubStore = defineStore(
         isInitializing = false
         hasInitialized = true
 
-        // 监听后端自动刷新事件，重新拉取列表/激活状态
-        mitt.on('subscription-updated', async () => {
+        // 监听后端自动刷新事件，重新拉取列表/激活状态。
+        // 直连 Tauri 事件；此前经 mitt 从 useAppBootstrap 转发，多绕两跳。
+        await eventService.on(APP_EVENTS.subscriptionUpdated, async () => {
           await loadFromBackend()
         })
       })()

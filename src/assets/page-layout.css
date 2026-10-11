@@ -14,148 +14,13 @@
   gap: clamp(16px, 2vw, 24px);
 }
 
-/* ---------- Hero 头部卡片 ---------- */
-.page-hero {
-  border-radius: var(--radius-xl);
-  padding: clamp(20px, 2.4vw, 32px);
-  background: var(--hero-bg);
-  border: 1px solid var(--hero-border);
-  box-shadow: var(--hero-shadow);
-  display: flex;
-  flex-direction: column;
-  gap: clamp(16px, 1.8vw, 24px);
-}
-
-.hero-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-6);
-}
-
-.hero-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  min-width: 0;
-}
-
-.hero-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-  color: var(--primary-contrast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 12px 28px var(--primary-soft-strong);
-  flex-shrink: 0;
-}
-
-.hero-meta {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.hero-title {
-  margin: 0;
-  font-size: clamp(22px, 2.6vw, 28px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-}
-
-.hero-subtitle {
-  margin: 0;
-  font-size: var(--text-base);
-  color: var(--text-secondary);
-}
-
-.hero-actions {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-/* ---------- 统计指标网格 ---------- */
-.hero-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--space-4);
-}
-
-.stat-card {
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  box-shadow: var(--panel-shadow);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.stat-card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.stat-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--green-400), var(--green-600));
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.stat-card[data-accent='pink'] .stat-icon {
-  background: linear-gradient(135deg, #f472b6, #ec4899);
-}
-
-.stat-card[data-accent='blue'] .stat-icon {
-  background: linear-gradient(135deg, var(--blue-400), var(--blue-600));
-}
-
-.stat-card[data-accent='amber'] .stat-icon {
-  background: linear-gradient(135deg, var(--amber-400), var(--orange-500));
-}
-
-.stat-card[data-accent='purple'] .stat-icon {
-  background: linear-gradient(135deg, var(--indigo-300), var(--indigo-500));
-}
-
-.stat-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.stat-value {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.3;
-}
-
-.stat-label {
-  font-size: var(--text-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-}
+/*
+ * 说明：本文件原先还有一整段 `.page-hero` / `.hero-row` / `.hero-title` /
+ * `.hero-actions` / `.stat-*` 规则，但它们从未被任何页面使用 —— 唯一使用
+ * hero 布局的 `HomeView.vue` 用的是自己的 scoped 版本（且字号、颜色、gap 都与
+ * 这里不同）。两套定义并存时 scoped 优先级更高，全局 token 实际从未生效，
+ * 属于设计系统被静默绕过。现已删除，hero 样式由 HomeView 单一来源维护。
+ */
 
 /* ---------- 通用卡片容器 ---------- */
 .surface-card {
@@ -170,7 +35,6 @@
   padding: clamp(16px, 1.8vw, 24px);
 }
 
-.filter-card,
 .content-card {
   border-radius: var(--radius-xl);
   background: var(--panel-bg);
@@ -178,7 +42,6 @@
   box-shadow: var(--panel-shadow);
 }
 
-.filter-card .n-card__content,
 .content-card .n-card__content {
   padding: clamp(14px, 1.6vw, 20px);
 }
@@ -222,13 +85,6 @@
   max-width: 360px;
 }
 
-/* ---------- 页面区段 ---------- */
-.page-section {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(14px, 1.6vw, 20px);
-}
-
 /* ---------- Chip 小标签 ---------- */
 .chip {
   display: inline-flex;
@@ -256,7 +112,7 @@
   }
 
   .surface-card .n-card__content,
-  .filter-card .n-card__content,
+  .content-card .n-card__content,
   .content-card .n-card__content {
     padding: var(--space-4);
   }
@@ -301,7 +157,7 @@
 }
 
 .compact-mode .surface-card .n-card__content,
-.compact-mode .filter-card .n-card__content,
+.compact-mode .content-card .n-card__content,
 .compact-mode .content-card .n-card__content {
   padding: var(--space-3);
 }
