@@ -5,23 +5,17 @@ import type { MessageApi } from 'naive-ui/es/message'
 import { kernelService } from '@/services/kernel-service'
 import { useAppMessaging } from './composables/messaging'
 import { createAppPersistence } from './composables/persistence'
+import {
+  appConfigRefs,
+  createAppConfigFields,
+  type TrayCloseBehavior,
+} from './composables/appConfigSchema'
 import { flushWatchers } from '@/utils/store-init'
 
 // 代理模式类型
 export type ProxyMode = 'system' | 'tun' | 'manual'
-export type TrayCloseBehavior = 'hide' | 'lightweight'
-
-const DEFAULT_SYSTEM_PROXY_BYPASS =
-  'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*'
-const DEFAULT_TUN_IPV4 = '172.19.0.1/30'
-const DEFAULT_TUN_IPV6 = 'fdfe:dcba:9876::1/126'
-const DEFAULT_TUN_MTU = 1500
-const DEFAULT_SINGBOX_DNS_PROXY = 'https://1.1.1.1/dns-query'
-const DEFAULT_SINGBOX_DNS_CN = 'h3://dns.alidns.com/dns-query'
-const DEFAULT_SINGBOX_DNS_RESOLVER = '114.114.114.114'
-const DEFAULT_SINGBOX_URLTEST_URL = 'http://cp.cloudflare.com/generate_204'
-const DEFAULT_SINGBOX_FAKE_DNS_IPV4_RANGE = '198.18.0.0/15'
-const DEFAULT_SINGBOX_FAKE_DNS_IPV6_RANGE = 'fc00::/18'
+// TrayCloseBehavior 由 schema 声明（收窄的窄类型字段），此处转出保持既有导入路径可用
+export type { TrayCloseBehavior } from './composables/appConfigSchema'
 
 export const useAppStore = defineStore(
   'app',
@@ -45,93 +39,18 @@ export const useAppStore = defineStore(
     // 连接中状态（正在启动内核但尚未完成事件流就绪）
     const isConnecting = ref(false)
 
-    // 托盘实例ID - 由TrayStore使用
-    const trayInstanceId = ref<string | null>(null)
-
-    // 代理模式 - 独立的System Proxy和TUN开关
-    const systemProxyEnabled = ref(false)
-    const tunEnabled = ref(false)
-
-    // 向后兼容：从独立开关派生proxyMode
-    const proxyMode = computed<ProxyMode>(() => {
-      if (tunEnabled.value) return 'tun'
-      if (systemProxyEnabled.value) return 'system'
-      return 'manual'
-    })
-
-    const autoStartKernel = ref(true)
-
-    // 系统开机自启动设置
-    const autoStartApp = ref(false)
-    const autoHideToTrayOnAutostart = ref(true)
-    const trayCloseBehavior = ref<TrayCloseBehavior>('hide')
-
-    // IP版本设置
-    const preferIpv6 = ref(false)
-
-    // 是否允许局域网设备访问本机代理入站
-    const allowLanAccess = ref(false)
-
-    // 端口配置
-    const proxyPort = ref(12080) // 代理端口
-    const apiPort = ref(12081) // API端口
-    const systemProxyBypass = ref(DEFAULT_SYSTEM_PROXY_BYPASS)
-    const tunIpv4 = ref(DEFAULT_TUN_IPV4)
-    const tunIpv6 = ref(DEFAULT_TUN_IPV6)
-    const tunMtu = ref(DEFAULT_TUN_MTU)
-    const tunAutoRoute = ref(true)
-    const tunStrictRoute = ref(true)
-    const tunStack = ref<'system' | 'gvisor' | 'mixed'>('mixed')
-    const tunEnableIpv6 = ref(false)
-    const tunRouteExcludeAddress = ref<string[] | null>(null)
-    const activeConfigPath = ref<string | null>(null)
-    const installedKernelVersion = ref<string | null>(null)
-
-    // sing-box 配置生成（订阅模板）高级选项
-    const singboxDnsProxy = ref(DEFAULT_SINGBOX_DNS_PROXY)
-    const singboxDnsCn = ref(DEFAULT_SINGBOX_DNS_CN)
-    const singboxDnsResolver = ref(DEFAULT_SINGBOX_DNS_RESOLVER)
-    const singboxUrltestUrl = ref(DEFAULT_SINGBOX_URLTEST_URL)
-    const singboxDefaultProxyOutbound = ref<'manual' | 'auto'>('manual')
-    const singboxBlockAds = ref(true)
-    const singboxDownloadDetour = ref<'manual' | 'direct'>('manual')
-    const singboxDnsHijack = ref(true)
-    const singboxFakeDnsEnabled = ref(false)
-    const singboxFakeDnsIpv4Range = ref(DEFAULT_SINGBOX_FAKE_DNS_IPV4_RANGE)
-    const singboxFakeDnsIpv6Range = ref(DEFAULT_SINGBOX_FAKE_DNS_IPV6_RANGE)
-    const singboxFakeDnsFilterMode = ref<'proxy_only' | 'global_non_cn'>('proxy_only')
-    const singboxEnableAppGroups = ref(true)
-    const tunSelfHealEnabled = ref(true)
-    const tunSelfHealCooldownSecs = ref(90)
-
-    // === sing-box 1.14 升级新增字段 ===
-    const kernelUpdateTrack = ref<string>('stable')
-    const singboxDnsOptimisticCache = ref(true)
-    const singboxDnsTimeout = ref<string>('5s')
-    const singboxDnsUseMdns = ref(true)
-    const singboxEnableTlsSpoof = ref(false)
-    const tunDnsMode = ref<string>('hijack')
-    const tunIncludeMacs = ref<string[]>([])
-    const tunExcludeMacs = ref<string[]>([])
-    const hysteria2DisableChromeParrot = ref(false)
-    const hysteria2ObfsType = ref<string>('salamander')
-    const clashMode = ref<string>('rule')
-    const enableWebDashboard = ref(false)
-    const enableTailscaleEndpoint = ref(false)
-    const tailscaleRunSshServer = ref(false)
-    const tailscaleTaildropDirectory = ref<string>('Taildrop')
+    // ---------------------------------------------------------------------
+    // 可持久化配置字段
+    //
+    // 字段清单、默认值、后端键名与特殊转换全部由 schema 声明（见 appConfigSchema.ts）：
+    // 此前这 53 个字段在 AppStore 声明 / 持久化入参 / store return、
+    // persistence 的接口 / load / save / watch 共 7 处手工枚举，
+    // 加一个配置项要改 7 个地方且漏改无任何报错。
+    // ---------------------------------------------------------------------
+    const fields = createAppConfigFields()
 
     const {
-      isDataRestored,
-      startInitialization,
-      finishInitialization,
-      loadFromBackend,
-      saveToBackend,
-      waitForDataRestore,
-      waitForSaveCompletion,
-      markDataRestored,
-      stopAutoSave,
-    } = createAppPersistence({
+      trayInstanceId,
       systemProxyEnabled,
       tunEnabled,
       autoStartKernel,
@@ -142,7 +61,6 @@ export const useAppStore = defineStore(
       allowLanAccess,
       proxyPort,
       apiPort,
-      trayInstanceId,
       systemProxyBypass,
       tunIpv4,
       tunIpv6,
@@ -169,7 +87,6 @@ export const useAppStore = defineStore(
       singboxEnableAppGroups,
       tunSelfHealEnabled,
       tunSelfHealCooldownSecs,
-      // === sing-box 1.14 新增字段 ===
       kernelUpdateTrack,
       singboxDnsOptimisticCache,
       singboxDnsTimeout,
@@ -185,7 +102,26 @@ export const useAppStore = defineStore(
       enableTailscaleEndpoint,
       tailscaleRunSshServer,
       tailscaleTaildropDirectory,
+    } = appConfigRefs(fields)
+
+    // 向后兼容：从独立开关派生 proxyMode
+    const proxyMode = computed<ProxyMode>(() => {
+      if (tunEnabled.value) return 'tun'
+      if (systemProxyEnabled.value) return 'system'
+      return 'manual'
     })
+
+    const {
+      isDataRestored,
+      startInitialization,
+      finishInitialization,
+      loadFromBackend,
+      saveToBackend,
+      waitForDataRestore,
+      waitForSaveCompletion,
+      markDataRestored,
+      stopAutoSave,
+    } = createAppPersistence(fields)
 
     // 同步开机自启设置与系统状态
     const syncAutoStartWithSystem = async () => {

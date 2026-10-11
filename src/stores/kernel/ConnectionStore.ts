@@ -24,7 +24,6 @@ export const useConnectionStore = defineStore('connection', () => {
   const latestConnectionMsg = ref<ConnectionsDataPayload | null>(null)
   const latestMemory = ref<MemoryStatsPayload | null>(null)
   const paused = ref(false)
-  const loading = ref(false)
   const closingMap = ref<Record<string, boolean>>({})
   const isClosingAll = ref(false)
 
@@ -198,7 +197,6 @@ export const useConnectionStore = defineStore('connection', () => {
     latestConnectionMsg,
     latestMemory,
     paused,
-    loading,
     closingMap,
     isClosingAll,
     activeTab,
