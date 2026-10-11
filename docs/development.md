@@ -330,7 +330,9 @@ $env:SING_BOX_KERNEL_FETCH_MODE='force'; pnpm tauri build
 
 - 纯逻辑（composable / utils / schema）用 vitest 写在同目录的 `*.test.ts`
 - 已有覆盖：`useTunToggle`（回滚路径）、`useSortableGroupedList`、`kernel-errors`、
-  `event-service`、`store-init`、`appConfigSchema`
+  `event-service`、`store-init`、`appConfigSchema`、`constants/countries`（国旗码同步）
+- 新增 locale key 后跑 `pnpm test:i18n`；升级 `flag-icons` 后跑
+  `node scripts/gen-country-codes.mjs --write`
 - 后端测试与实现分离为 `*.tests.rs`，用 `#[path = "...tests.rs"] mod tests;` 引入
 - 改动 TUN 切换、配置持久化、事件退订、内核解压这几块时务必补测试
 

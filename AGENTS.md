@@ -59,7 +59,7 @@
 | 路由与托盘空白页     | `src/router/index.ts`, `src/views/BlankView.vue`  | `/blank` 是非标准但关键路径              |
 | gRPC API 客户端      | `src-tauri/src/app/singbox_api/`                  | 替代 experimental.clash_api              |
 | 后端入口与命令注册   | `src-tauri/src/lib.rs`                            | 86 个命令；setup 同步+异步初始化链       |
-| 内核生命周期         | `src-tauri/src/app/core/kernel_service/`          | 高复杂度热点目录                         |
+| 内核生命周期         | `src-tauri/src/app/core/kernel_service/`          | orchestrator/runtime/guard/state/event/archive/health |
 | 内核存活判定         | `src-tauri/src/app/core/kernel_service/health.rs` | 唯一判定入口：端口 > 托管句柄 > 平台扫描 |
 | 内核版本管理         | `src-tauri/src/app/core/kernel_service/versioning.rs` | 默认最新版；指定版本下载前前端强制确认兼容风险 |
 | 订阅解析与模式切换   | `src-tauri/src/app/network/subscription_service/` | parser/mode/helpers 分层明显             |
@@ -138,7 +138,7 @@ pnpm tauri build:linux:rpm
 
 ## NOTES
 
-- 测试：后端 188 项（`cargo test`），前端 93 项（`vitest`，覆盖 TUN 切换状态机、排序分组、内核错误归因、事件退订、配置 schema 等易回归逻辑）。CI（`.github/workflows/ci.yml`）在 PR/push 时跑 lint / type-check / prettier / i18n key 校验 / vitest / 内核目标矩阵 / cargo fmt / clippy / cargo test 全部门禁。
+- 测试：后端 198 项（`cargo test`），前端 108 项（`vitest`，覆盖 TUN 切换状态机、排序分组、内核错误归因、事件退订、配置 schema、国旗码同步等易回归逻辑）。CI（`.github/workflows/ci.yml`）在 PR/push 时跑 lint / type-check / prettier / i18n key 校验 / vitest / 内核目标矩阵 / cargo fmt / clippy / cargo test 全部门禁。
 - i18n：以 `zh-CN` 为基准，`pnpm test:i18n`（`scripts/check-i18n.mjs`）校验 4 个语言包 key 完全对齐；**禁止**在组件里写 `locale.startsWith('zh') ? '中文' : 'English'` 或 `t(key, '中文兜底')`，一律走 locale 语言包。
 - 事件：统一走 `eventService`，并使用 `on*()` 返回的 unlisten 做**精确**退订；「清空某事件全部监听器」是显式的 `removeAllListenersForEvent()`。已移除 `mitt` 事件总线（事件链从 4 跳缩到 2 跳）。
 - 发布为两阶段：tag 触发 `release.yml` 产 Pre-release（多平台矩阵，含 windows-arm64），再手动触发 `promote-release.yml` 转正式；Release Notes 取自 `docs/CHANGELOG.md`。
