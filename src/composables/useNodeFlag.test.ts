@@ -3,6 +3,7 @@ import {
   getDisplayNodeName,
   getFlagIconCountryCode,
   getNodeCountryCode,
+  getNodeFlagUrl,
   isInformationalNodeName,
   normalizeCountryLabel,
   stripLeadingFlagEmoji,
@@ -144,5 +145,32 @@ describe('getDisplayNodeName', () => {
     expect(getDisplayNodeName(null)).toBe('-')
     expect(getDisplayNodeName(undefined)).toBe('-')
     expect(getDisplayNodeName('')).toBe('-')
+  })
+})
+
+describe('getNodeFlagUrl', () => {
+  // 回归：`flag-icons` 的文件名恒为**小写**（`hk.svg`），`import.meta.glob` 的 key
+  // 也是小写；而 `getFlagIconCountryCode` 返回的也是小写。三者必须一致，
+  // 否则索引全部匹配不到 —— 表现是「节点都识别出来了但一个国旗都不显示」，
+  // 没有任何报错，极难定位。
+  it('小写国家码能取到国旗 URL（大小写一致性回归）', () => {
+    // Vite 会把这些小 SVG 内联成 data: URI，也可能是静态路径；
+    // 断言「非空」即可 —— 空串正是不匹配时的症状。
+    expect(getNodeFlagUrl('香港 01')).not.toBe('')
+    expect(getNodeFlagUrl('HK-01')).not.toBe('')
+    expect(getNodeFlagUrl('日本 02')).not.toBe('')
+  })
+
+  it('无法识别国家时返回空串而非 undefined', () => {
+    expect(getNodeFlagUrl('神秘节点')).toBe('')
+    expect(getNodeFlagUrl(null)).toBe('')
+  })
+
+  it('同一国家的不同写法命中同一张图（大小写不敏感）', () => {
+    expect(getNodeFlagUrl('香港 01')).toBe(getNodeFlagUrl('HK-01'))
+  })
+
+  it('信息条目不返回国旗', () => {
+    expect(getNodeFlagUrl('剩余流量：1TB')).toBe('')
   })
 })

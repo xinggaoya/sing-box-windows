@@ -256,7 +256,6 @@ const { isAdmin, isWindowsPlatform, isUnixPlatform, detectPlatform, checkAdmin }
 
 const {
   currentNodeProxyMode,
-  proxyModePending,
   quickTesting,
   nodeProxyModes,
   proxyAddress,
@@ -265,6 +264,8 @@ const {
   quickTestAll,
 } = useNodeProxyMode()
 
+/** 系统代理开关进行中：与 TUN 切换互斥，避免两条状态机并发改入站 */
+const proxyModePending = ref(false)
 /** 「以管理员身份重启」确认弹窗流程进行中 */
 const tunConfirmPending = ref(false)
 const showPortModal = ref(false)

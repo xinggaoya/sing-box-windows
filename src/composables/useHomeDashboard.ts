@@ -64,8 +64,6 @@ export function useNodeProxyMode() {
 
   /** 当前节点模式（global / rule / direct） */
   const currentNodeProxyMode = ref('rule')
-  /** 切换进行中：禁用模式选择器 */
-  const proxyModePending = ref(false)
   /** 一键测速进行中 */
   const quickTesting = ref(false)
 
@@ -88,11 +86,17 @@ export function useNodeProxyMode() {
     }
   }
 
+  /**
+   * 切换节点模式（Clash mode）。
+   *
+   * 注意：切换期间不禁用 UI —— 原实现也没有，节点模式只影响内核内部路由策略，
+   * 不涉及入站变更，没有并发冲突风险。系统代理 / TUN 开关的互斥由 HomeView 的
+   * `proxyModePending` 负责。
+   */
   const handleNodeProxyModeChange = async (mode: string) => {
     if (currentNodeProxyMode.value === mode) return
 
     try {
-      proxyModePending.value = true
       const result = await kernelService.switchNodeProxyMode(mode as 'global' | 'rule')
       await syncCurrentNodeProxyMode()
 
@@ -103,8 +107,6 @@ export function useNodeProxyMode() {
       message.success(t('home.nodeModeChangeSuccess'))
     } catch {
       message.error(t('home.nodeModeChangeFailed'))
-    } finally {
-      proxyModePending.value = false
     }
   }
 
@@ -128,7 +130,6 @@ export function useNodeProxyMode() {
 
   return {
     currentNodeProxyMode,
-    proxyModePending,
     quickTesting,
     nodeProxyModes,
     proxyAddress,

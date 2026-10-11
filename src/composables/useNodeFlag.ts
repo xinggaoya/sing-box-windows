@@ -40,7 +40,9 @@ function buildFlagIconIndex(): Map<string, string> {
 
   const index = new Map<string, string>()
   for (const [path, url] of Object.entries(flagIconUrls)) {
-    const code = path.match(/\/([A-Z0-9-]+)\.svg$/i)?.[1]?.toUpperCase()
+    // ⚠️ `flag-icons` 的文件名恒为**小写**（`hk.svg`），glob 的 key 也是小写。
+    // 这里必须保持小写，否则索引全部匹配不到 —— 国旗会静默不显示。
+    const code = path.match(/\/([a-z0-9-]+)\.svg$/i)?.[1]?.toLowerCase()
     if (code) index.set(code, url)
   }
   flagIconIndex = index
@@ -159,5 +161,6 @@ export function getNodeFlagUrl(nodeName?: string | null): string {
   if (!nodeName) return ''
   const countryCode = getNodeCountryCode(nodeName)
   if (!countryCode) return ''
-  return buildFlagIconIndex().get(countryCode.toUpperCase()) ?? ''
+  // `getFlagIconCountryCode` 返回小写，与索引键一致
+  return buildFlagIconIndex().get(countryCode) ?? ''
 }
