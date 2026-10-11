@@ -308,6 +308,16 @@ $env:SING_BOX_KERNEL_FETCH_MODE='force'; pnpm tauri build
   （会让日/俄用户看到英文），也不要写 `t(key, '中文兜底')`（绕过语言包且让 key 缺失无法被 CI 发现）。
   新增文案后跑 `pnpm test:i18n` 确保 4 个语言包 key 对齐
 
+### 页面拆分约定
+
+- 单个 `.vue` 超过约 600 行时，把成块逻辑抽成 `composables/` 下的独立职责单元，
+  把 `<style scoped>` 内容抽到 `src/assets/views/<View>.css`
+- 样式迁移必须用 `<style scoped>@import '@/assets/views/X.css';</style>`，
+  **不要**改成 `<script>` 里的 `import './X.css'` —— 后者会让样式变成全局，
+  丢掉 SFC 的 `data-v-*` 隔离
+- 抽出的 composable 接受 UI 依赖（`MessageApi`、`DialogApi`、`FormInst` 引用）作为参数，
+  不自己在内部创建，以便测试注入
+
 ### 事件订阅约定
 
 - 所有后端事件统一经 `services/event-service.ts` 注册，不要直接 `listen()`
@@ -330,7 +340,8 @@ $env:SING_BOX_KERNEL_FETCH_MODE='force'; pnpm tauri build
 
 - 纯逻辑（composable / utils / schema）用 vitest 写在同目录的 `*.test.ts`
 - 已有覆盖：`useTunToggle`（回滚路径）、`useSortableGroupedList`、`kernel-errors`、
-  `event-service`、`store-init`、`appConfigSchema`、`constants/countries`（国旗码同步）
+  `event-service`、`store-init`、`appConfigSchema`、`constants/countries`（国旗码同步）、
+  `useSubscriptionForm`（三来源分支）、`useNodeFlag`（节点名→国旗解析）
 - 新增 locale key 后跑 `pnpm test:i18n`；升级 `flag-icons` 后跑
   `node scripts/gen-country-codes.mjs --write`
 - 后端测试与实现分离为 `*.tests.rs`，用 `#[path = "...tests.rs"] mod tests;` 引入

@@ -211,13 +211,12 @@ import {
   ArrowUpOutline,
   ArrowDownOutline,
 } from '@vicons/ionicons5'
+import { useHomeEnvironment, useNodeProxyMode } from '@/composables/useHomeDashboard'
 import { useAppStore } from '@/stores'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { useTrafficStore } from '@/stores/kernel/TrafficStore'
 import { useConnectionStore } from '@/stores/kernel/ConnectionStore'
 import { useProxyStore } from '@/stores/kernel/ProxyStore'
-import { kernelService } from '@/services/kernel-service'
-import { proxyService } from '@/services/proxy-service'
 import { sudoService } from '@/services/sudo-service'
 import { systemService } from '@/services/system-service'
 import PortSettingsDialog from '@/components/common/PortSettingsDialog.vue'
@@ -250,18 +249,25 @@ const {
   isRunning: kernelRunning,
   isLoading: kernelLoading,
 } = useKernelStatus(kernelStore)
-const isAdmin = ref(false)
-const platform = ref<'windows' | 'linux' | 'macos' | 'unknown'>('unknown')
-const currentNodeProxyMode = ref('rule')
-/** 代理模式（系统代理 / 节点模式）切换进行中 */
-const proxyModePending = ref(false)
+// 运行环境探测（平台 / 管理员权限）与节点模式（Clash mode）逻辑已抽到 composables：
+// 前者决定 TUN 可用性，后者决定 sing-box 内部路由策略，与代理开关是三件不同的事。
+const { isAdmin, isWindowsPlatform, isUnixPlatform, detectPlatform, checkAdmin } =
+  useHomeEnvironment()
+
+const {
+  currentNodeProxyMode,
+  proxyModePending,
+  quickTesting,
+  nodeProxyModes,
+  proxyAddress,
+  syncCurrentNodeProxyMode,
+  handleNodeProxyModeChange,
+  quickTestAll,
+} = useNodeProxyMode()
+
 /** 「以管理员身份重启」确认弹窗流程进行中 */
 const tunConfirmPending = ref(false)
 const showPortModal = ref(false)
-const quickTesting = ref(false)
-
-const isWindowsPlatform = computed(() => platform.value === 'windows')
-const isUnixPlatform = computed(() => platform.value === 'linux' || platform.value === 'macos')
 
 // 平台无关的 TUN 切换状态机；平台提权与 sudo 密码交互通过回调注入。
 const { pending: tunTogglePending, applyTunSwitch } = useTunToggle({
@@ -339,48 +345,8 @@ const statusDescription = computed(() => {
 
 const systemProxyEnabled = computed(() => appStore.systemProxyEnabled)
 const tunProxyEnabled = computed(() => appStore.tunEnabled)
-const proxyAddress = computed(() => `127.0.0.1:${appStore.proxyPort}`)
-
-const nodeProxyModes = [
-  {
-    value: 'global',
-    nameKey: 'home.nodeMode.global',
-    icon: GlobeOutline,
-  },
-  {
-    value: 'rule',
-    nameKey: 'home.nodeMode.rule',
-    icon: RadioOutline,
-  },
-]
-
 const getKernelFailureText = (fallback: string) =>
   resolveKernelFailureText(kernelStore.startupDiagnosisSummary, kernelStore.lastError, fallback)
-
-const syncCurrentNodeProxyMode = async () => {
-  try {
-    const status = await proxyService.getClashModeStatus()
-    const mode = status.currentMode
-    if (mode === 'global' || mode === 'rule' || mode === 'direct') {
-      currentNodeProxyMode.value = mode
-    }
-  } catch {}
-}
-
-// 一键测速
-const quickTestAll = async () => {
-  if (quickTesting.value) return
-  try {
-    quickTesting.value = true
-    await proxyStore.fetchProxies()
-    await proxyStore.testAllGroups()
-    message.success(t('proxy.batchTestComplete'))
-  } catch {
-    message.error(t('proxy.testErrorMessage'))
-  } finally {
-    quickTesting.value = false
-  }
-}
 
 const toggleSystemProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
@@ -503,41 +469,8 @@ const prepareTunModeWithAdminRestart = async () => {
   return success
 }
 
-const handleNodeProxyModeChange = async (mode: string) => {
-  if (currentNodeProxyMode.value === mode) return
-
-  try {
-    const result = await kernelService.switchNodeProxyMode(mode as 'global' | 'rule')
-    await syncCurrentNodeProxyMode()
-
-    if (result.includes('重启后生效')) {
-      message.warning(result)
-      return
-    }
-
-    message.success(t('home.nodeModeChangeSuccess'))
-  } catch {
-    message.error(t('home.nodeModeChangeFailed'))
-  } finally {
-    proxyModePending.value = false
-  }
-}
-
-const checkAdmin = async () => {
-  try {
-    isAdmin.value = await systemService.checkAdmin()
-  } catch {
-    isAdmin.value = false
-  }
-}
-
 onMounted(async () => {
-  try {
-    const raw = await systemService.getPlatformInfo()
-    platform.value = raw === 'windows' || raw === 'linux' || raw === 'macos' ? raw : 'unknown'
-  } catch {
-    platform.value = 'unknown'
-  }
+  await detectPlatform()
   checkAdmin()
   await kernelStore.initializeStore()
   await proxyStore.fetchProxies().catch(() => undefined)
@@ -546,458 +479,8 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.home-page {
-  max-width: var(--content-max-width, 1440px);
-  margin: 0 auto;
-}
-
-/* ============ Hero 主控卡 ============ */
-.hero-card {
-  position: relative;
-  border-radius: var(--radius-xl);
-  padding: clamp(18px, 2vw, 24px);
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-}
-
-.hero-glow {
-  position: absolute;
-  top: -60px;
-  right: -60px;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  opacity: 0;
-  transition: opacity var(--transition-slow);
-  pointer-events: none;
-}
-
-.hero-card.running .hero-glow {
-  background: radial-gradient(circle, var(--green-500-soft), transparent 70%);
-  opacity: 1;
-}
-
-.hero-card.failed .hero-glow,
-.hero-card.stopped .hero-glow {
-  background: radial-gradient(circle, var(--red-500-soft), transparent 70%);
-  opacity: 1;
-}
-
-.hero-card.pending .hero-glow,
-.hero-card.disconnected .hero-glow {
-  background: radial-gradient(circle, var(--amber-500-soft), transparent 70%);
-  opacity: 1;
-}
-
-.hero-inner {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-  flex-wrap: wrap;
-}
-
-.hero-status {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  min-width: 0;
-}
-
-.hero-status-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: var(--radius-pill);
-  background: var(--text-tertiary);
-  flex-shrink: 0;
-  transition: all var(--transition-base);
-}
-
-.hero-card.running .hero-status-dot {
-  background: var(--success-color);
-  box-shadow:
-    0 0 16px var(--success-color),
-    0 0 4px var(--success-color);
-  animation: pulse-green 2s ease-in-out infinite;
-}
-
-.hero-card.pending .hero-status-dot,
-.hero-card.disconnected .hero-status-dot {
-  background: var(--warning-color);
-  box-shadow: 0 0 12px var(--warning-color);
-}
-
-.hero-card.stopped .hero-status-dot,
-.hero-card.failed .hero-status-dot {
-  background: var(--error-color);
-  box-shadow: 0 0 12px var(--error-color);
-}
-
-.hero-card.crashed .hero-status-dot {
-  background: var(--orange-500);
-  box-shadow: 0 0 12px var(--orange-500);
-}
-
-@keyframes pulse-green {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
-}
-
-.hero-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.hero-title {
-  margin: 0;
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.hero-card.running .hero-title {
-  color: var(--success-color);
-}
-
-.hero-card.failed .hero-title,
-.hero-card.stopped .hero-title {
-  color: var(--error-color);
-}
-
-.hero-subtitle {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--text-tertiary);
-}
-
-/* 实时速率 */
-.hero-speeds {
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-}
-
-.speed-metric {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.speed-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.speed-icon.up {
-  background: var(--green-500-soft);
-  color: var(--success-color);
-}
-
-.speed-icon.down {
-  background: var(--primary-soft);
-  color: var(--primary-color);
-}
-
-.speed-data {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.speed-value {
-  font-family: var(--font-mono);
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-
-.speed-label {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-}
-
-.speed-divider {
-  width: 1px;
-  height: 30px;
-  background: var(--panel-border);
-}
-
-.hero-actions {
-  display: flex;
-  gap: var(--space-2);
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-/* ============ 诊断告警 ============ */
-.diagnosis-alert {
-  border-radius: var(--radius-lg);
-}
-
-.diagnosis-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.diagnosis-meta {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.diagnosis-detail {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.diagnosis-actions {
-  margin: 0;
-  padding-left: 18px;
-}
-
-/* ============ 控制台卡片 ============ */
-.control-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-3);
-}
-
-.control-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius-lg);
-  background: var(--panel-bg);
-  box-shadow: var(--shadow-xs);
-  transition:
-    transform var(--transition-fast),
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
-  text-align: left;
-  min-width: 0;
-}
-
-button.control-card {
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-
-.control-card:hover:not(:disabled) {
-  transform: translateY(-2px);
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-md);
-}
-
-.control-card:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.control-card:focus-visible,
-.mode-chip:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
-}
-
-.control-card.active {
-  border-color: var(--primary-color);
-  box-shadow: 0 4px 14px var(--primary-soft-strong);
-}
-
-.control-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.control-icon.purple {
-  background: linear-gradient(135deg, var(--indigo-400), var(--indigo-600));
-}
-
-.control-icon.green {
-  background: linear-gradient(135deg, var(--green-400), var(--green-600));
-}
-
-.control-icon.blue {
-  background: linear-gradient(135deg, var(--blue-400), var(--blue-600));
-}
-
-.control-icon.gray {
-  background: var(--bg-surface-2);
-  color: var(--text-tertiary);
-}
-
-.control-icon .spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.control-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.control-name {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.control-meta {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.control-meta.mono {
-  font-family: var(--font-mono);
-}
-
-/* 节点模式卡 */
-.mode-content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  flex: 1;
-  min-width: 0;
-}
-
-.mode-chips {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.mode-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 12px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--bg-surface-2);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.mode-chip:hover {
-  color: var(--text-primary);
-}
-
-.mode-chip.active {
-  background: var(--primary-color);
-  color: var(--primary-contrast);
-  box-shadow: 0 2px 8px var(--primary-soft-strong);
-}
-
-/* ============ 主网格：流量监控 + 运行信息 ============ */
-.main-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: var(--space-4);
-  min-height: 0;
-}
-
-.chart-inner {
-  height: 240px;
-  padding: var(--space-2) var(--space-4) var(--space-4);
-}
-
-/* 运行信息卡 */
-.info-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.info-rows {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  justify-content: center;
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-}
-
-.info-row + .info-row {
-  border-top: 1px dashed var(--border-color);
-}
-
-.info-label {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  flex-shrink: 0;
-}
-
-.info-value-wrap {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.info-value {
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-@media (max-width: 1080px) {
-  .main-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .hero-actions {
-    margin-left: 0;
-  }
-}
+/* 页面样式已抽到 `@/assets/views/HomeView.css`，用 @import 而非 script import：
+ * 这样外部文件里的规则仍会经过 SFC 的 scoped 变换（加上 data-v-* 属性），
+ * 保持与内联 <style scoped> 完全一致的隔离语义。 */
+@import '@/assets/views/HomeView.css';
 </style>

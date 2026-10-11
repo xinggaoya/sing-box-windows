@@ -67,6 +67,10 @@
 | 自定义规则 CRUD      | `src-tauri/src/app/core/proxy_service.rs` + `app/storage/custom_rule.rs` | 后端就绪，前端暂未接线 |
 | 内核压缩包解压       | `src-tauri/src/app/core/kernel_service/archive.rs`   | zip/tar.gz/tgz/tar；阻塞 IO 在 spawn_blocking |
 | 国家 / 地区常量     | `src/constants/countries.ts`                       | 国旗码由 scripts/gen-country-codes.mjs 生成 + 测试守护 |
+| 节点名 → 国旗解析   | `src/composables/useNodeFlag.ts`                   | 地名正则 → 本地化国名 → 裸 token 三层兜底 |
+| 首页运行环境/节点模式| `src/composables/useHomeDashboard.ts`               | 平台+管理员探测、节点模式、一键测速 |
+| 订阅表单（三来源）  | `src/composables/useSubscriptionForm.ts`            | URL / 手动 JSON / 手动 URI 的校验与提交 |
+| 页面样式           | `src/assets/views/*.css`                            | 用 `@import` 而非 script import，保留 scoped 语义 |
 | 应用配置读写         | `src-tauri/src/app/storage/database.rs` + `enhanced_storage_service.rs` | WAL + busy_timeout + user_version；AppConfig 内存快照 |
 | 存储实现             | `src-tauri/src/app/storage/`                      | SQLite + OnceCell 单例初始化             |
 | 应用内更新           | `src-tauri/src/app/system/update_service.rs`      | 自研 GitHub Release 下载，仅 Windows     |

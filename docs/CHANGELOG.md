@@ -38,6 +38,15 @@
 - **日志页与连接页的排序/分组逻辑**合并为 `useSortableGroupedList`
 - 删除后端死代码约 500 行（`src/error.rs`、`process/error.rs`、gRPC 迁移后遗留的 `event_relay.rs`、未注册的 `kernel_get_status_enhanced` / `kernel_get_snapshot`、未使用的 `KERNEL_READY_NOTIFY` / `ProcessStatus` / `ProcessConfig`）
 - 删除前端死代码约 1100 行（5 个 0 引用组件、3 个 0 引用 composable、2 个 0 引用 service、0 引用的类型文件、失效的 `types/index.d.ts` barrel、`page-layout.css` 中 143 行从未生效的 hero/stat 规则）
+- **超大视图拆分**：HomeView / SubView / ProxyView 合计 3059 → 1490 行。
+  - 三个视图的 `<style scoped>`（935 行）迁到 `src/assets/views/*.css`，
+    用 `<style scoped>@import ...</style>` 而非 script import ——
+    这样外部文件里的规则仍经过 SFC 的 scoped 变换，隔离语义与内联完全一致（已验证构建产物）
+  - HomeView：运行环境探测（平台/管理员权限）与节点模式（Clash mode）+ 一键测速
+    → `useHomeDashboard`
+  - SubView：三种来源（URL / 手动 JSON / 手动 URI）的表单状态、校验、提交
+    → `useSubscriptionForm`
+  - ProxyView：节点名 → 国家码 → 国旗的三层解析 → `useNodeFlag`
 - 5 处用 `setTimeout(100ms)` 赌 Vue 调度时机的 store 初始化守卫，改为确定性的 `flushWatchers()`
 - 统一三份重复的时间格式化实现，并修正其隐性问题：原先用 `toLocaleString()` 不传 locale，
   跟随的是浏览器环境语言而非应用内选定语言
