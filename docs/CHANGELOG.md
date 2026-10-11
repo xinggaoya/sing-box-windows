@@ -39,6 +39,15 @@
 - 删除后端死代码约 500 行（`src/error.rs`、`process/error.rs`、gRPC 迁移后遗留的 `event_relay.rs`、未注册的 `kernel_get_status_enhanced` / `kernel_get_snapshot`、未使用的 `KERNEL_READY_NOTIFY` / `ProcessStatus` / `ProcessConfig`）
 - 删除前端死代码约 1100 行（5 个 0 引用组件、3 个 0 引用 composable、2 个 0 引用 service、0 引用的类型文件、失效的 `types/index.d.ts` barrel、`page-layout.css` 中 143 行从未生效的 hero/stat 规则）
 - 5 处用 `setTimeout(100ms)` 赌 Vue 调度时机的 store 初始化守卫，改为确定性的 `flushWatchers()`
+- **`proxy_service` 按职责拆分**：原单文件 942 行同时承担 inbound 写入 / OS 代理 / gRPC 桥接 /
+  状态查询 / 自定义规则 CRUD，现拆为 `inbound_writer` / `grpc_bridge` / `status` /
+  `custom_rule_crud`，聚合文件保持既有调用路径
+- **`tray/service` 按职责拆分**：原单文件 926 行承担文案 / 菜单 / 窗口 / 动作 / 运行态同步，
+  现拆为 5 个子模块（最大 281 行）
+- **国家码改为生成 + 测试守护**：原先 258 行国家码硬编码在 `ProxyView.vue` 且已与 `flag-icons`
+  漂移（包多出 ARAB / ASEAN / GB-ENG 等 16 个码，视图多出包已移除的 AC / EA / TA，导致国旗
+  静默不显示）。现由 `scripts/gen-country-codes.mjs` 生成，`pnpm test:country-codes` 与
+  15 项单元测试双重守护
 
 ### 🧪 测试与门禁
 

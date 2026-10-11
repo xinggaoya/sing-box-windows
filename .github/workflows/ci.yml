@@ -78,6 +78,11 @@ jobs:
       - name: Frontend unit test
         run: pnpm test
 
+      - name: Country codes sync check
+        # 断言 src/constants/countries.ts 的国家码与 flag-icons 包一致，
+        # 防止升级依赖后忘记重新生成而让国旗图标静默失效
+        run: pnpm test:country-codes
+
       - name: Kernel targets test
         run: pnpm test:kernel-targets
 

@@ -25,7 +25,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "format:check": "prettier --check src/"
+    "format:check": "prettier --check src/",
+    "test:country-codes": "node scripts/gen-country-codes.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

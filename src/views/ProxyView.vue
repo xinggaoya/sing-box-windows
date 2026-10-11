@@ -197,6 +197,14 @@ import {
   StarOutline,
 } from '@vicons/ionicons5'
 import { useProxyStore, type ProxyGroup } from '@/stores/kernel/ProxyStore'
+import {
+  ALL_COUNTRY_CODES,
+  COUNTRY_CODE_ALIASES,
+  COUNTRY_DISPLAY_LOCALES,
+  COUNTRY_NAME_PATTERNS,
+  INFORMATIONAL_NODE_PATTERNS,
+  PROXY_PREFIX_COUNTRY_CODES,
+} from '@/constants/countries'
 import { useI18n } from 'vue-i18n'
 import ToolbarBar from '@/components/common/ToolbarBar.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -217,297 +225,9 @@ const flagIconUrls = import.meta.glob('../../node_modules/flag-icons/flags/4x3/*
   import: 'default',
 }) as Record<string, string>
 
-const countryCodeAliases: Record<string, string> = {
-  UK: 'GB',
-}
-
-const countryDisplayLocales = ['zh-CN', 'zh-Hans', 'zh-TW', 'zh-Hant', 'ja-JP', 'en-US']
-const allCountryCodes = [
-  'AC',
-  'AD',
-  'AE',
-  'AF',
-  'AG',
-  'AI',
-  'AL',
-  'AM',
-  'AO',
-  'AQ',
-  'AR',
-  'AS',
-  'AT',
-  'AU',
-  'AW',
-  'AX',
-  'AZ',
-  'BA',
-  'BB',
-  'BD',
-  'BE',
-  'BF',
-  'BG',
-  'BH',
-  'BI',
-  'BJ',
-  'BL',
-  'BM',
-  'BN',
-  'BO',
-  'BQ',
-  'BR',
-  'BS',
-  'BT',
-  'BV',
-  'BW',
-  'BY',
-  'BZ',
-  'CA',
-  'CC',
-  'CD',
-  'CF',
-  'CG',
-  'CH',
-  'CI',
-  'CK',
-  'CL',
-  'CM',
-  'CN',
-  'CO',
-  'CP',
-  'CR',
-  'CU',
-  'CV',
-  'CW',
-  'CX',
-  'CY',
-  'CZ',
-  'DE',
-  'DG',
-  'DJ',
-  'DK',
-  'DM',
-  'DO',
-  'DZ',
-  'EA',
-  'EC',
-  'EE',
-  'EG',
-  'EH',
-  'ER',
-  'ES',
-  'ET',
-  'EU',
-  'FI',
-  'FJ',
-  'FK',
-  'FM',
-  'FO',
-  'FR',
-  'GA',
-  'GB',
-  'GD',
-  'GE',
-  'GF',
-  'GG',
-  'GH',
-  'GI',
-  'GL',
-  'GM',
-  'GN',
-  'GP',
-  'GQ',
-  'GR',
-  'GS',
-  'GT',
-  'GU',
-  'GW',
-  'GY',
-  'HK',
-  'HM',
-  'HN',
-  'HR',
-  'HT',
-  'HU',
-  'IC',
-  'ID',
-  'IE',
-  'IL',
-  'IM',
-  'IN',
-  'IO',
-  'IQ',
-  'IR',
-  'IS',
-  'IT',
-  'JE',
-  'JM',
-  'JO',
-  'JP',
-  'KE',
-  'KG',
-  'KH',
-  'KI',
-  'KM',
-  'KN',
-  'KP',
-  'KR',
-  'KW',
-  'KY',
-  'KZ',
-  'LA',
-  'LB',
-  'LC',
-  'LI',
-  'LK',
-  'LR',
-  'LS',
-  'LT',
-  'LU',
-  'LV',
-  'LY',
-  'MA',
-  'MC',
-  'MD',
-  'ME',
-  'MF',
-  'MG',
-  'MH',
-  'MK',
-  'ML',
-  'MM',
-  'MN',
-  'MO',
-  'MP',
-  'MQ',
-  'MR',
-  'MS',
-  'MT',
-  'MU',
-  'MV',
-  'MW',
-  'MX',
-  'MY',
-  'MZ',
-  'NA',
-  'NC',
-  'NE',
-  'NF',
-  'NG',
-  'NI',
-  'NL',
-  'NO',
-  'NP',
-  'NR',
-  'NU',
-  'NZ',
-  'OM',
-  'PA',
-  'PE',
-  'PF',
-  'PG',
-  'PH',
-  'PK',
-  'PL',
-  'PM',
-  'PN',
-  'PR',
-  'PS',
-  'PT',
-  'PW',
-  'PY',
-  'QA',
-  'RE',
-  'RO',
-  'RS',
-  'RU',
-  'RW',
-  'SA',
-  'SB',
-  'SC',
-  'SD',
-  'SE',
-  'SG',
-  'SH',
-  'SI',
-  'SJ',
-  'SK',
-  'SL',
-  'SM',
-  'SN',
-  'SO',
-  'SR',
-  'SS',
-  'ST',
-  'SV',
-  'SX',
-  'SY',
-  'SZ',
-  'TA',
-  'TC',
-  'TD',
-  'TF',
-  'TG',
-  'TH',
-  'TJ',
-  'TK',
-  'TL',
-  'TM',
-  'TN',
-  'TO',
-  'TR',
-  'TT',
-  'TV',
-  'TW',
-  'TZ',
-  'UA',
-  'UG',
-  'UM',
-  'UN',
-  'US',
-  'UY',
-  'UZ',
-  'VA',
-  'VC',
-  'VE',
-  'VG',
-  'VI',
-  'VN',
-  'VU',
-  'WF',
-  'WS',
-  'XK',
-  'YE',
-  'YT',
-  'ZA',
-  'ZM',
-  'ZW',
-]
-
-const countryNameOverrides: Array<[RegExp, string]> = [
-  [/东京|東京|大阪/i, 'JP'],
-  [/香港|hong\s*kong/i, 'HK'],
-  [/台湾|台灣|taiwan/i, 'TW'],
-  [/美国|美國|洛杉矶|洛杉磯|西雅图|西雅圖|纽约|紐約|america|united\s*states/i, 'US'],
-  [/英国|英國|伦敦|倫敦|britain|united\s*kingdom/i, 'GB'],
-  [/首尔|首爾|korea/i, 'KR'],
-  [/澳洲/i, 'AU'],
-  [/沙特阿拉伯|沙特|saudi/i, 'SA'],
-  [/阿联酋|阿聯酋|uae|united\s*arab\s*emirates/i, 'AE'],
-]
-
-const proxyPrefixCountryCodes = new Set(['CF', 'CL', 'SS'])
-const informationalNodePatterns = [
-  /^剩余流量[:：]/,
-  /^距离下次重置剩余[:：]/,
-  /^套餐到期[:：]/,
-  /^官网[:：]/,
-  /^星云[:：]/,
-  /^https?:\/\//i,
-]
-
 const getFlagIconCountryCode = (code: string) => {
   if (code === 'EU') return 'eu'
-  const normalizedCode = countryCodeAliases[code] || code
+  const normalizedCode = COUNTRY_CODE_ALIASES[code] || code
   if (!/^[A-Z]{2}$/.test(normalizedCode)) return ''
   return normalizedCode.toLowerCase()
 }
@@ -516,7 +236,7 @@ const stripLeadingFlagEmoji = (nodeName: string) =>
   nodeName.replace(/^[\u{1f1e6}-\u{1f1ff}]{2}\s*/u, '').trim()
 
 const isInformationalNodeName = (nodeName: string) =>
-  informationalNodePatterns.some((pattern) => pattern.test(stripLeadingFlagEmoji(nodeName)))
+  INFORMATIONAL_NODE_PATTERNS.some((pattern) => pattern.test(stripLeadingFlagEmoji(nodeName)))
 
 const normalizeCountryLabel = (value: string) =>
   value
@@ -528,9 +248,9 @@ const getLocalizedCountryNameEntries = () => {
   const entries: Array<{ code: string; label: string }> = []
   const seen = new Set<string>()
 
-  countryDisplayLocales.forEach((displayLocale) => {
+  COUNTRY_DISPLAY_LOCALES.forEach((displayLocale) => {
     const displayNames = new Intl.DisplayNames([displayLocale], { type: 'region' })
-    allCountryCodes.forEach((countryCode) => {
+    ALL_COUNTRY_CODES.forEach((countryCode) => {
       let label: string | undefined
       try {
         label = displayNames.of(countryCode)
@@ -669,7 +389,7 @@ const getNodeCountryCode = (nodeName: string) => {
   const normalizedName = stripLeadingFlagEmoji(nodeName)
   if (isInformationalNodeName(normalizedName)) return ''
 
-  const override = countryNameOverrides.find(([pattern]) => pattern.test(normalizedName))
+  const override = COUNTRY_NAME_PATTERNS.find(([pattern]) => pattern.test(normalizedName))
   if (override) {
     return getFlagIconCountryCode(override[1])
   }
@@ -690,7 +410,7 @@ const getNodeCountryCode = (nodeName: string) => {
   if (!countryCodes.length) return ''
 
   const preferredCode =
-    countryCodes.length > 1 && proxyPrefixCountryCodes.has(countryCodes[0])
+    countryCodes.length > 1 && PROXY_PREFIX_COUNTRY_CODES.has(countryCodes[0])
       ? countryCodes[1]
       : countryCodes[0]
   return getFlagIconCountryCode(preferredCode)

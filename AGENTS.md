@@ -14,7 +14,7 @@
 
 ```
 ./
-├── scripts/             # 内核下载 fetch-kernel、tauri wrapper、目标矩阵、i18n 校验（均带 .test.mjs）
+├── scripts/             # 内核下载 fetch-kernel、tauri wrapper、目标矩阵、i18n 校验、国家码生成
 ├── src-tauri/           # Rust 后端 + Tauri 打包
 │   └── src/
 │       ├── app/             # 业务分层（core/network/singbox/singbox_api/storage/system/tray/constants）
@@ -66,6 +66,7 @@
 | sing-box 配置生成    | `src-tauri/src/app/singbox/config_generator.rs`   | 1.14 DNS（mDNS/evaluate）与自定义规则注入 |
 | 自定义规则 CRUD      | `src-tauri/src/app/core/proxy_service.rs` + `app/storage/custom_rule.rs` | 后端就绪，前端暂未接线 |
 | 内核压缩包解压       | `src-tauri/src/app/core/kernel_service/archive.rs`   | zip/tar.gz/tgz/tar；阻塞 IO 在 spawn_blocking |
+| 国家 / 地区常量     | `src/constants/countries.ts`                       | 国旗码由 scripts/gen-country-codes.mjs 生成 + 测试守护 |
 | 应用配置读写         | `src-tauri/src/app/storage/database.rs` + `enhanced_storage_service.rs` | WAL + busy_timeout + user_version；AppConfig 内存快照 |
 | 存储实现             | `src-tauri/src/app/storage/`                      | SQLite + OnceCell 单例初始化             |
 | 应用内更新           | `src-tauri/src/app/system/update_service.rs`      | 自研 GitHub Release 下载，仅 Windows     |
