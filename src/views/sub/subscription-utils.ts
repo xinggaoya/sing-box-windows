@@ -1,5 +1,3 @@
-import { formatDateTime } from '@/utils'
-
 import type { FrontendSubscription } from '@/stores/subscription/types'
 
 type TranslateFn = (key: string, params?: Record<string, unknown>) => string
@@ -75,9 +73,6 @@ export const formatExpireTime = (timestamp: number | undefined, t: TranslateFn) 
   if (Number.isNaN(date.getTime())) return ''
   return t('sub.expireAt', { time: date.toLocaleString() })
 }
-
-/** 本地化日期时间；实现统一到 @/utils，此处仅保留既有导出名 */
-export const formatLocalTime = (timestamp: number) => formatDateTime(timestamp)
 
 const formatDurationMinutes = (totalMinutes: number) => {
   if (totalMinutes <= 0) return '0m'

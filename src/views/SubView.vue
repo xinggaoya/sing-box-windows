@@ -265,7 +265,6 @@ import {
   formatExpireTime as formatExpireTimeText,
   formatIntervalLabel as formatIntervalLabelText,
   formatAutoUpdateHealth as formatAutoUpdateHealthText,
-  formatLocalTime,
   formatTrafficSummary as formatTrafficSummaryText,
   generateConfigFileName,
   hasSubscriptionTraffic,
