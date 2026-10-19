@@ -182,6 +182,9 @@
         />
       </div>
     </div>
+
+    <!-- 出站总览：内核中所有出站（含分组）的平铺快照 -->
+    <OutboundOverviewCard class="outbound-overview" />
   </div>
 </template>
 
@@ -201,6 +204,7 @@ import { getDisplayNodeName, getNodeFlagUrl } from '@/composables/useNodeFlag'
 import { useI18n } from 'vue-i18n'
 import ToolbarBar from '@/components/common/ToolbarBar.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import OutboundOverviewCard from '@/components/proxy/OutboundOverviewCard.vue'
 
 defineOptions({
   name: 'ProxyView',

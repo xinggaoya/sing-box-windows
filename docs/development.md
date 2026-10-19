@@ -151,6 +151,7 @@ sing-box-windows/
 ├── src-tauri/
 │   ├── src/
 │   │   ├── app/            # 后端业务主目录
+│   │   │   └── singbox/   # 配置语义与渲染（config_intent / config_render / ownership）
 │   │   ├── entity/         # 数据模型
 │   │   ├── platform/       # 平台抽象
 │   │   ├── process/        # 进程管理
@@ -402,6 +403,36 @@ const refreshCurrentSubscription = async () => {
 
 这里是高风险修改点，改动前建议先理解初始化顺序。
 
+## 跨语言类型生成（ts-rs）
+
+Rust 侧的结构体通过 `ts-rs` 导出成 TypeScript，**仓库根 `src/types/generated/` 是唯一事实来源**（git 跟踪，两侧都不手改）。
+
+### 生成方式
+
+```bash
+cd src-tauri
+cargo test --lib        # ts-rs 的 derive 在测试编译时写出 .ts 文件
+```
+
+生成目录是 `src/types/generated/`，已加入 `.prettierignore`（机器产物不参与格式化）。
+
+### 三个必须记住的坑
+
+1. **`export_to` 的相对路径基准是 crate 源码根 `src-tauri/src/`**，不是仓库根。
+   所以要写到仓库根的 `src/types/generated/`，必须写 `../../src/types/generated/X.ts`。
+   `src-tauri/src/types/generated/` 已被 `.gitignore` 忽略，是历史遗留的本地中间产物。
+2. **serde 的 rename 会被 ts-rs 继承，但 `#[ts(...)]` 优先级更高**。
+   ts-rs 11 默认开启 `serde-compat`，`#[serde(rename_all = "camelCase")]` 单独写也能生成 camelCase 字段；
+   但一旦两边写法不一致，最终以 `#[ts(...)]` 为准，且继承行为依赖 feature 开关。
+   约定：**凡是带 serde rename 的结构体都显式写 `#[ts(rename_all = ...)]`**，不依赖隐式行为。
+3. **i64 / u64 默认会被映射成 `bigint`**，与实际 JSON 载荷不符，
+   需要显式 `#[ts(type = "number")]`；`Option<u64>` 写 `#[ts(type = "number | null")]`。
+
+### 守护
+
+`src/types/generated/grpc-types.test.ts` 会扫描 Rust 源码，校验导出路径格式、
+serde/ts rename 同步、生成类型不含 `bigint`、前端没有手写同名 interface、barrel 导出齐全。
+
 ## 多语言开发
 
 - 语言文件位于 `src/locales/`
@@ -501,6 +532,8 @@ lint → type-check → prettier → i18n key 校验 → 前端测试 → 内核
 - 不要绕过 `scripts/tauri-wrapper.mjs` 直接改资源打包
 - 不要为了过类型检查使用类型压制
 - 不要把多平台内核一起塞进单平台安装包
+- **改 sing-box 配置语义时，生成路径与补丁路径都要看**：配置语义只有一份（`src-tauri/src/app/singbox/config_intent.rs`），渲染细节共享（`config_render.rs`），生成路径**不应**再回调补丁路径。改完必须让 `src-tauri/src/app/singbox/testdata/config_golden/` 的黄金样本逐字段不变
+- **不要用结构猜测判断"这份配置是不是本程序的"**：走 `ownership.rs` 的归属判定；判定为外来配置时只同步端口，改坏用户导入的原始配置不会报错，只表现为"能连但走错线路"
 - `src-tauri/src/lib.rs` 当前存在重复 websocket plugin 注册风险，修改时先确认影响
 
 ## 参考文档

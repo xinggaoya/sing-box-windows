@@ -14,6 +14,7 @@ use tauri::{AppHandle, Manager};
 use tracing::{info, warn};
 
 use crate::app::singbox::config_generator::remote_rule_set_sources;
+use crate::app::singbox::config_intent::ConfigIntent;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
 use crate::utils::http_client;
 
@@ -57,7 +58,9 @@ async fn warm_rule_set_cache(app_handle: &AppHandle) -> Result<(), String> {
         None => return Ok(()),
     };
     let app_config = db_get_app_config(app_handle.clone()).await?;
-    let sources = remote_rule_set_sources(&app_config);
+    // rule-set 清单由配置语义（ConfigIntent）决定，与配置生成 / 补丁两条路径共用同一份定义
+    let intent = ConfigIntent::from_app_config(&app_config);
+    let sources = remote_rule_set_sources(&intent);
     if sources.is_empty() {
         return Ok(());
     }

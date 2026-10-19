@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../src/types/generated/AppConfig.ts")]
+#[ts(export, export_to = "../../src/types/generated/AppConfig.ts")]
 pub struct AppConfig {
     pub auto_start_kernel: bool,
     pub auto_start_app: bool,
@@ -182,7 +182,7 @@ impl Default for StartupPreferences {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../src/types/generated/ThemeConfig.ts")]
+#[ts(export, export_to = "../../src/types/generated/ThemeConfig.ts")]
 pub struct ThemeConfig {
     pub is_dark: bool,
     pub mode: String,
@@ -202,7 +202,7 @@ impl Default for ThemeConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../src/types/generated/LocaleConfig.ts")]
+#[ts(export, export_to = "../../src/types/generated/LocaleConfig.ts")]
 pub struct LocaleConfig {
     pub locale: String,
 }
@@ -216,7 +216,7 @@ impl Default for LocaleConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../src/types/generated/WindowConfig.ts")]
+#[ts(export, export_to = "../../src/types/generated/WindowConfig.ts")]
 pub struct WindowConfig {
     pub is_maximized: bool,
     pub width: u32,
@@ -234,9 +234,11 @@ impl Default for WindowConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../src/types/generated/UpdateConfig.ts")]
+#[ts(export, export_to = "../../src/types/generated/UpdateConfig.ts")]
 pub struct UpdateConfig {
     pub auto_check: bool,
+    /// 时间戳在 JSON 里是普通数字；ts-rs 默认会把 i64 映射成 `bigint`，需显式覆写。
+    #[ts(type = "number")]
     pub last_check: i64,
     pub last_version: Option<String>,
     pub skip_version: Option<String>,
@@ -258,26 +260,35 @@ impl Default for UpdateConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../src/types/generated/Subscription.ts")]
+#[ts(export, export_to = "../../src/types/generated/Subscription.ts")]
 pub struct Subscription {
     pub name: String,
     pub url: String,
     pub is_loading: bool,
+    /// 时间戳 / 流量数值在 JSON 里是普通数字；ts-rs 默认把 u64 映射成 `bigint`，需显式覆写。
+    #[ts(type = "number | null")]
     pub last_update: Option<u64>,
     pub is_manual: bool,
     pub manual_content: Option<String>,
     pub use_original_config: bool,
     pub config_path: Option<String>,
     pub backup_path: Option<String>,
+    #[ts(type = "number | null")]
     pub auto_update_interval_minutes: Option<u64>,
+    #[ts(type = "number | null")]
     pub subscription_upload: Option<u64>,
+    #[ts(type = "number | null")]
     pub subscription_download: Option<u64>,
+    #[ts(type = "number | null")]
     pub subscription_total: Option<u64>,
+    #[ts(type = "number | null")]
     pub subscription_expire: Option<u64>,
     // 自动更新健康状态（用于失败退避与可观测性）
     pub auto_update_fail_count: Option<u32>,
+    #[ts(type = "number | null")]
     pub last_auto_update_attempt: Option<u64>,
     pub last_auto_update_error: Option<String>,
     pub last_auto_update_error_type: Option<String>,
+    #[ts(type = "number | null")]
     pub last_auto_update_backoff_until: Option<u64>,
 }

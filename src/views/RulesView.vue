@@ -2,8 +2,8 @@
   <div class="page-shell rules-page">
     <PageHeader :title="t('rules.title')" :subtitle="t('rules.subtitle')" />
 
-    <n-space vertical>
-      <!-- 规则表（GetRules 已在 sing-box 1.14 gRPC API 暴露） -->
+    <n-space vertical :size="12">
+      <!-- Tab 1：运行时规则（GetRules，只读） -->
       <n-card :title="t('rules.routeRules')" size="small">
         <template #header-extra>
           <n-space :size="8" align="center">
@@ -29,13 +29,20 @@
           :max-height="520"
           size="small"
         />
-      </n-card>
 
-      <!-- 规则说明 -->
-      <n-card :title="t('rules.about')" size="small">
         <p class="rules-hint">
           {{ t('rules.aboutBody') }}
         </p>
+      </n-card>
+
+      <!-- Tab 2：自定义规则（本地持久化 + 写配置文件 + 重启内核生效） -->
+      <n-card :title="t('rules.custom.title')" size="small">
+        <template #header-extra>
+          <n-tag type="info" size="small" :bordered="false">
+            {{ t('rules.custom.badge') }}
+          </n-tag>
+        </template>
+        <CustomRulePanel />
       </n-card>
     </n-space>
   </div>
@@ -46,21 +53,14 @@ import { computed, h, onMounted, ref } from 'vue'
 import { ReloadOutline } from '@vicons/ionicons5'
 import { NTag } from 'naive-ui'
 import PageHeader from '@/components/common/PageHeader.vue'
+import CustomRulePanel from '@/components/rules/CustomRulePanel.vue'
 import { useI18n } from 'vue-i18n'
 import { invokeWithAppContext } from '@/services/invoke-client'
+import type { Rule } from '@/types/generated/Rule'
+import type { RuleList } from '@/types/generated/RuleList'
 
 defineOptions({ name: 'RulesView' })
 const { t } = useI18n()
-
-interface Rule {
-  rule_type: string
-  payload: string
-  outbound: string
-}
-
-interface RuleList {
-  rules: Rule[]
-}
 
 const rules = ref<Rule[]>([])
 const loading = ref(false)
@@ -108,6 +108,7 @@ const refresh = async () => {
   try {
     const result = await invokeWithAppContext<RuleList>('get_rules')
     rules.value = Array.isArray(result?.rules) ? result.rules : []
+    kernelRunning.value = true
   } catch (error) {
     console.warn('[RulesView] get_rules failed:', error)
     kernelRunning.value = false
@@ -123,7 +124,7 @@ onMounted(() => {
 
 <style scoped>
 .rules-hint {
-  margin: 0;
+  margin: var(--space-3) 0 0;
   color: var(--text-color-secondary, #6b7280);
   font-size: 13px;
   line-height: 1.6;

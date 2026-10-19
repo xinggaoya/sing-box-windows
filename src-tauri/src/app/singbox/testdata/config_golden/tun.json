@@ -1,0 +1,353 @@
+{
+  "dns": {
+    "final": "dns_proxy",
+    "optimistic": true,
+    "rules": [
+      {
+        "domain_suffix": [
+          "local",
+          "254.169.in-addr.arpa",
+          "8.e.f.ip6.arpa",
+          "9.e.f.ip6.arpa",
+          "a.e.f.ip6.arpa",
+          "b.e.f.ip6.arpa"
+        ],
+        "server": "dns_mdns"
+      },
+      {
+        "clash_mode": "direct",
+        "server": "dns_cn"
+      },
+      {
+        "action": "reject",
+        "rule_set": "geosite-category-ads-all"
+      },
+      {
+        "clash_mode": "global",
+        "server": "dns_proxy"
+      },
+      {
+        "rule_set": [
+          "geosite-cn",
+          "geoip-cn"
+        ],
+        "server": "dns_cn"
+      },
+      {
+        "rule_set": "geosite-geolocation-!cn",
+        "server": "dns_proxy"
+      }
+    ],
+    "servers": [
+      {
+        "detour": "手动切换",
+        "path": "/dns-query",
+        "server": "1.1.1.1",
+        "server_port": 443,
+        "tag": "dns_proxy",
+        "type": "https"
+      },
+      {
+        "domain_resolver": {
+          "server": "dns_resolver",
+          "strategy": "ipv4_only"
+        },
+        "path": "/dns-query",
+        "server": "dns.alidns.com",
+        "server_port": 443,
+        "tag": "dns_cn",
+        "type": "h3"
+      },
+      {
+        "server": "114.114.114.114",
+        "server_port": 53,
+        "tag": "dns_resolver",
+        "type": "udp"
+      },
+      {
+        "tag": "dns_mdns",
+        "type": "mdns"
+      }
+    ],
+    "timeout": "5s"
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true
+    }
+  },
+  "http_clients": [
+    {
+      "detour": "direct",
+      "tag": "default"
+    }
+  ],
+  "inbounds": [
+    {
+      "listen": "127.0.0.1",
+      "listen_port": 12080,
+      "set_system_proxy": false,
+      "tag": "mixed-in",
+      "type": "mixed"
+    },
+    {
+      "address": [
+        "172.19.0.1/30"
+      ],
+      "auto_route": true,
+      "dns_mode": "disabled",
+      "mtu": 9000,
+      "route_exclude_address": [
+        "10.0.0.0/8",
+        "100.64.0.0/10",
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "::1/128",
+        "fc00::/7",
+        "fe80::/10"
+      ],
+      "stack": "gvisor",
+      "strict_route": true,
+      "tag": "tun-in",
+      "type": "tun"
+    }
+  ],
+  "log": {
+    "disabled": false,
+    "level": "info",
+    "output": "<LOG_PATH>",
+    "timestamp": true
+  },
+  "outbounds": [
+    {
+      "idle_timeout": "10m",
+      "interrupt_exist_connections": true,
+      "interval": "3m",
+      "outbounds": [
+        "direct"
+      ],
+      "tag": "自动选择",
+      "tolerance": 50,
+      "type": "urltest",
+      "url": "http://cp.cloudflare.com/generate_204"
+    },
+    {
+      "outbounds": [
+        "自动选择"
+      ],
+      "tag": "手动切换",
+      "type": "selector"
+    },
+    {
+      "outbounds": [
+        "手动切换",
+        "自动选择"
+      ],
+      "tag": "Telegram",
+      "type": "selector"
+    },
+    {
+      "outbounds": [
+        "手动切换",
+        "自动选择"
+      ],
+      "tag": "YouTube",
+      "type": "selector"
+    },
+    {
+      "outbounds": [
+        "手动切换",
+        "自动选择"
+      ],
+      "tag": "Netflix",
+      "type": "selector"
+    },
+    {
+      "outbounds": [
+        "手动切换",
+        "自动选择"
+      ],
+      "tag": "OpenAI",
+      "type": "selector"
+    },
+    {
+      "outbounds": [
+        "手动切换",
+        "自动选择"
+      ],
+      "tag": "Google",
+      "type": "selector"
+    },
+    {
+      "tag": "direct",
+      "type": "direct"
+    },
+    {
+      "tag": "block",
+      "type": "block"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "default_domain_resolver": {
+      "server": "dns_resolver",
+      "strategy": "ipv4_only"
+    },
+    "default_http_client": "default",
+    "final": "手动切换",
+    "rule_set": [
+      {
+        "format": "binary",
+        "tag": "geosite-category-ads-all",
+        "type": "remote",
+        "update_interval": "1d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"
+      },
+      {
+        "format": "binary",
+        "tag": "geosite-cn",
+        "type": "remote",
+        "update_interval": "1d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs"
+      },
+      {
+        "format": "binary",
+        "tag": "geosite-geolocation-!cn",
+        "type": "remote",
+        "update_interval": "1d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs"
+      },
+      {
+        "format": "binary",
+        "tag": "geosite-telegram",
+        "type": "remote",
+        "update_interval": "7d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs"
+      },
+      {
+        "format": "binary",
+        "tag": "geosite-youtube",
+        "type": "remote",
+        "update_interval": "7d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-youtube.srs"
+      },
+      {
+        "format": "binary",
+        "tag": "geosite-netflix",
+        "type": "remote",
+        "update_interval": "7d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs"
+      },
+      {
+        "format": "binary",
+        "tag": "geosite-openai",
+        "type": "remote",
+        "update_interval": "7d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs"
+      },
+      {
+        "format": "binary",
+        "tag": "geosite-google",
+        "type": "remote",
+        "update_interval": "7d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs"
+      },
+      {
+        "format": "binary",
+        "tag": "geosite-private",
+        "type": "remote",
+        "update_interval": "7d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-private.srs"
+      },
+      {
+        "format": "binary",
+        "tag": "geoip-cn",
+        "type": "remote",
+        "update_interval": "1d",
+        "url": "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs"
+      }
+    ],
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "action": "hijack-dns",
+        "protocol": "dns"
+      },
+      {
+        "clash_mode": "global",
+        "outbound": "手动切换"
+      },
+      {
+        "clash_mode": "direct",
+        "outbound": "direct"
+      },
+      {
+        "action": "reject",
+        "rule_set": "geosite-category-ads-all"
+      },
+      {
+        "outbound": "Telegram",
+        "rule_set": "geosite-telegram"
+      },
+      {
+        "outbound": "YouTube",
+        "rule_set": "geosite-youtube"
+      },
+      {
+        "outbound": "Netflix",
+        "rule_set": "geosite-netflix"
+      },
+      {
+        "outbound": "OpenAI",
+        "rule_set": "geosite-openai"
+      },
+      {
+        "outbound": "Google",
+        "rule_set": "geosite-google"
+      },
+      {
+        "outbound": "direct",
+        "rule_set": "geosite-private"
+      },
+      {
+        "ip_cidr": [
+          "10.0.0.0/8",
+          "100.64.0.0/10",
+          "127.0.0.0/8",
+          "169.254.0.0/16",
+          "172.16.0.0/12",
+          "192.168.0.0/16",
+          "::1/128",
+          "fc00::/7",
+          "fe80::/10"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "outbound": "direct",
+        "rule_set": [
+          "geosite-cn",
+          "geoip-cn"
+        ]
+      },
+      {
+        "outbound": "手动切换",
+        "rule_set": "geosite-geolocation-!cn"
+      }
+    ]
+  },
+  "services": [
+    {
+      "dashboard": {
+        "enabled": false
+      },
+      "listen": "127.0.0.1",
+      "listen_port": 12081,
+      "type": "api"
+    }
+  ]
+}

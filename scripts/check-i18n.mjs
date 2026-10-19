@@ -96,4 +96,73 @@ if (process.argv.includes('--fix')) {
   console.log('提示：在对应语言包中补齐上述缺失 key，并删除多余 key。')
 }
 
+/**
+ * 校验「组件里实际用到的 key」是否存在于基准语言包。
+ *
+ * 为什么需要这一项：跨语言 key 对齐只能保证"4 个语言包彼此一致"，
+ * 但如果所有语言包**同时漏掉**某个 key，它照样能通过对齐检查——
+ * 而组件里 `t('rules.routeRules')` 就会直接把 key 原文渲染给用户。
+ *
+ * 历史教训：`rules.routeRules` / `rules.empty` / `rules.columnType` 等 7 个 key
+ * 实际被放在语言包顶层（与 `rules` 平级），而组件用 `t('rules.xxx')` 引用，
+ * 规则页对所有语言的用户都显示裸 key。本次一并修复并加入门禁。
+ */
+const SRC_DIR = join(__dirname, '..', 'src')
+
+/** 递归收集 src/ 下的 .ts / .vue 文件（排除生成目录与测试文件） */
+function listSourceFiles(dir) {
+  const out = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === 'generated') continue
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      out.push(...listSourceFiles(full))
+    } else if (/\.(ts|vue)$/.test(entry.name) && !entry.name.endsWith('.test.ts')) {
+      out.push(full)
+    }
+  }
+  return out
+}
+
+/**
+ * 抽取静态的 `t('...')` / `i18n.t('...')` 调用里的 key。
+ *
+ * 只处理字面量：动态 key（模板字符串、变量）无法静态判断，跳过。
+ */
+function extractUsedKeys(source) {
+  const keys = new Set()
+  const patterns = [/\bt\(\s*'([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)'/g, /\bt\(\s*"([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)"/g]
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      keys.add(match[1])
+    }
+  }
+  return keys
+}
+
+const usedKeys = new Map()
+for (const file of listSourceFiles(SRC_DIR)) {
+  const source = readFileSync(file, 'utf8')
+  for (const key of extractUsedKeys(source)) {
+    if (!usedKeys.has(key)) usedKeys.set(key, [])
+    usedKeys.get(key).push(file)
+  }
+}
+
+const unknownKeys = [...usedKeys.entries()]
+  .filter(([key]) => !baseKeys.has(key))
+  .sort(([a], [b]) => a.localeCompare(b))
+
+console.log(`组件实际引用: ${usedKeys.size} 个 key（基准语言包中不存在 ${unknownKeys.length} 个）\n`)
+
+if (unknownKeys.length > 0) {
+  hasFailure = true
+  console.log('❌ 引用了基准语言包中不存在的 key（用户会看到裸 key）:')
+  for (const [key, files] of unknownKeys) {
+    console.log(`     - ${key}`)
+    for (const file of files) console.log(`         ${file.replace(join(__dirname, '..'), '.')}`)
+  }
+  console.log()
+}
+
 process.exit(hasFailure ? 1 : 0)

@@ -3,4 +3,4 @@
 /**
  * 匹配类型（对应 sing-box route rule 的字段）。新增类型时需同步 `to_route_rule` 实现。
  */
-export type CustomRuleMatchType = 'domain' | 'domain_suffix' | 'domain_keyword' | 'ip_cidr'
+export type CustomRuleMatchType = "domain" | "domain_suffix" | "domain_keyword" | "ip_cidr";

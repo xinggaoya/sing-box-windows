@@ -4,6 +4,9 @@
 
 pub mod common;
 pub mod config_generator;
+pub mod config_intent;
+pub mod config_render;
 mod config_schema;
 pub mod config_validator;
+pub mod ownership;
 pub mod settings_patch;

@@ -143,9 +143,10 @@ async fn generic_config_round_trip() {
 }
 
 use super::{
-    normalize_app_config_for_persistence, resolve_patch_mode_for_subscription,
+    normalize_app_config_for_persistence, read_config_value, resolve_patch_mode_for_subscription,
     resolve_patch_mode_with_hint, sync_settings_to_config_file, ConfigPatchMode,
 };
+use crate::app::singbox::ownership::Ownership;
 use crate::app::storage::state_model::Subscription;
 
 fn build_subscription(use_original_config: bool) -> Subscription {
@@ -273,7 +274,15 @@ fn sync_settings_to_config_file_should_migrate_stale_dns_bootstrap_strategy() {
         ..crate::app::storage::state_model::AppConfig::default()
     };
 
-    let result = sync_settings_to_config_file(&config_path, &app_config, ConfigPatchMode::Full);
+    // 这份配置带本程序的 DNS server tag → 归属为本程序，Full patch 才允许改写
+    let ownership = Ownership::inferred(&read_config_value(&config_path));
+    assert!(
+        ownership.managed,
+        "带 dns_cn 的存量配置应被识别为本程序的配置"
+    );
+
+    let result =
+        sync_settings_to_config_file(&config_path, &app_config, ConfigPatchMode::Full, &ownership);
     assert!(result.is_ok(), "Full patch 应成功: {:?}", result);
 
     let synced = std::fs::read_to_string(&config_path).expect("应能读回配置");
@@ -298,7 +307,8 @@ fn sync_settings_to_config_file_should_migrate_stale_dns_bootstrap_strategy() {
 
     // 幂等：再次同步内容无变化时不应改写文件
     let before = std::fs::read_to_string(&config_path).expect("应能读取当前配置");
-    let second = sync_settings_to_config_file(&config_path, &app_config, ConfigPatchMode::Full);
+    let second =
+        sync_settings_to_config_file(&config_path, &app_config, ConfigPatchMode::Full, &ownership);
     assert!(second.is_ok(), "重复 patch 应成功: {:?}", second);
     let after = std::fs::read_to_string(&config_path).expect("应能读取当前配置");
     assert_eq!(before, after, "重复同步不应改变配置内容");

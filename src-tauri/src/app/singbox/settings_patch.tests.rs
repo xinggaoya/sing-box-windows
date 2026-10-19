@@ -1,8 +1,8 @@
 use super::*;
 use crate::app::core::tun_profile::default_tun_route_exclude_addresses;
+use crate::app::singbox::common::DNS_CN;
 use crate::app::storage::state_model::AppConfig;
 use serde_json::{json, Value};
-
 fn assert_inbounds_do_not_contain_legacy_fields(config: &Value) {
     let inbounds = config
         .get("inbounds")
@@ -388,5 +388,113 @@ fn apply_app_settings_should_keep_dns_bootstrap_ipv4_first_when_prefer_ipv6() {
         Some("prefer_ipv4"),
         "apply 后 DNS bootstrap 策略不应跟随全局 prefer_ipv6: {:?}",
         cn_server
+    );
+}
+
+/// 一份机场原始配置：入口 / DNS / 路由全都是它自己的，与本程序无关
+fn foreign_subscription_config() -> Value {
+    json!({
+        "inbounds": [
+            {
+                "type": "socks",
+                "tag": "socks-in",
+                "listen": "127.0.0.1",
+                "listen_port": 1080
+            }
+        ],
+        "dns": {
+            "servers": [
+                { "tag": "remote-dns", "type": "https", "server": "1.1.1.1" }
+            ],
+            "rules": [
+                { "domain_suffix": ["example.com"], "server": "remote-dns" }
+            ]
+        },
+        "outbounds": [
+            { "type": "selector", "tag": "proxy", "outbounds": ["node-a"] },
+            { "type": "vless", "tag": "node-a", "server": "1.2.3.4", "server_port": 443 }
+        ],
+        "route": {
+            "rule_set": [
+                {
+                    "type": "remote",
+                    "tag": "geosite-cn",
+                    "format": "binary",
+                    "url": "https://example.com/cn.srs"
+                }
+            ],
+            "rules": [
+                { "ip_cidr": ["10.0.0.0/8"], "outbound": "direct" }
+            ],
+            "final": "proxy"
+        }
+    })
+}
+
+#[test]
+fn apply_intent_should_not_touch_foreign_config() {
+    // 归属不属于本程序 → 入口 / dns / route.rules 必须逐字段不变。
+    // 改坏用户导入的原始配置不会报错，只会表现为"能连但走错线路"。
+    let mut config = foreign_subscription_config();
+    let before = config.clone();
+
+    let intent = ConfigIntent::from_app_config(&AppConfig::default());
+    apply_intent_to_config(&mut config, &intent, &Ownership::empty());
+
+    assert_eq!(
+        config.get("inbounds"),
+        before.get("inbounds"),
+        "外来配置的入口不应被重建"
+    );
+    assert_eq!(
+        config.get("dns"),
+        before.get("dns"),
+        "外来配置的 dns 不应被改写"
+    );
+    assert_eq!(
+        config.get("route").and_then(|route| route.get("rules")),
+        before.get("route").and_then(|route| route.get("rules")),
+        "外来配置的 route.rules 不应被改写"
+    );
+    assert_eq!(
+        config.pointer("/route/final"),
+        before.pointer("/route/final"),
+        "外来配置的路由终点不应被改写"
+    );
+}
+
+#[test]
+fn apply_intent_should_manage_config_owned_by_app() {
+    // 归属为本程序 → 入口按设置重建，路由终点跟随设置
+    let intent = ConfigIntent::from_app_config(&AppConfig::default());
+
+    // 带本程序标记的配置
+    let mut owned = json!({
+        "inbounds": [
+            { "type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 7890 }
+        ],
+        "dns": { "servers": [], "rules": [] },
+        "outbounds": [],
+        "route": { "rule_set": [], "rules": [], "final": "proxy" }
+    });
+    let ownership = Ownership::inferred(&owned);
+    assert!(ownership.managed, "带 mixed-in 入口的配置应被接管");
+
+    apply_intent_to_config(&mut owned, &intent, &ownership);
+
+    let inbounds = owned
+        .get("inbounds")
+        .and_then(|v| v.as_array())
+        .expect("inbounds 应存在");
+    assert_eq!(inbounds.len(), 1);
+    assert_eq!(
+        inbounds[0].get("tag").and_then(|v| v.as_str()),
+        Some("mixed-in"),
+        "入口应被重建为本程序的结构"
+    );
+    assert_eq!(
+        owned.pointer("/route/final").and_then(|v| v.as_str()),
+        Some(intent.default_outbound),
+        "路由终点应跟随设置"
     );
 }

@@ -1,16 +1,17 @@
 use super::common::{
-    build_dns_server_config, dns_bootstrap_strategy, dns_strategy, kernel_log_output_path,
-    node_domain_resolver_strategy, normalize_default_outbound, normalize_download_detour,
-    normalize_fake_dns_filter_mode, DNS_CN, DNS_FAKEIP, DNS_MDNS, DNS_PROXY, DNS_RESOLVER,
-    FAKE_DNS_FILTER_GLOBAL_NON_CN, PRIVATE_IP_CIDRS, RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN,
-    RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI,
-    RS_GEOSITE_PRIVATE, RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
+    build_dns_server_config, kernel_log_output_path, DNS_CN, DNS_MDNS, DNS_PROXY, DNS_RESOLVER,
+    PRIVATE_IP_CIDRS, RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN,
+    RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE,
+    RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
+};
+use super::config_intent::ConfigIntent;
+use super::config_render::{
+    build_fakeip_dns_server, build_inbounds, sync_fake_dns_route_rules, sync_fake_dns_rules,
 };
 use super::config_schema::{
     CacheFileConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, HttpClientConfig, LogConfig,
     RemoteRuleSetConfig, RouteConfig, SingBoxConfig,
 };
-use crate::app::singbox::settings_patch::apply_app_settings_to_config;
 use crate::app::storage::state_model::AppConfig;
 use serde_json::{json, Value};
 // 兼容旧引用：这些 tag 之前是 `config_generator` 的 `pub const`，保留同名导出以降低未来重构的破坏性。
@@ -26,17 +27,30 @@ pub use super::common::{
 /// - DNS：国内用国内 DNS，非国内用 DoH（尽量避免污染）。
 /// - 启用 sing-box 1.14+ 官方 `type: api` 服务，供前端通过 gRPC-Web 交互（节点选择、测速、连接管理等）。
 pub fn generate_base_config(app_config: &AppConfig) -> Value {
-    let dns_strategy = dns_strategy(app_config);
+    let intent = ConfigIntent::from_app_config(app_config);
+    render_skeleton(&intent)
+}
 
-    let default_outbound = normalize_default_outbound(app_config);
-    let download_detour = normalize_download_detour(app_config);
+/// 从配置意图渲染一份完整的 sing-box 配置骨架。
+///
+/// 生成路径与补丁路径共用同一份配置语义（见 [`ConfigIntent`]），
+/// 因此这里**不再回调** `settings_patch::apply_app_settings_to_config`：
+/// 那条链路的"清理旧字段 / 补 api 服务"逻辑对本就全新的配置没有意义，
+/// 而让"生成"依赖"补丁"正是双模型的根源。
+///
+/// 入口（inbounds）由 [`config_render::build_inbounds`] 产出，与补丁路径共用同一实现。
+fn render_skeleton(intent: &ConfigIntent) -> Value {
+    let dns_strategy = intent.dns_strategy;
+
+    let default_outbound = intent.default_outbound;
+    let download_detour = intent.download_detour;
 
     let mut outbounds: Vec<Value> = vec![
         json!({
             "type": "urltest",
             "tag": TAG_AUTO,
             "outbounds": [TAG_DIRECT],
-            "url": app_config.singbox_urltest_url,
+            "url": intent.urltest_url,
             // 保障切换节点时主动中断旧连接，避免连接数长期堆积
             "interrupt_exist_connections": true,
             // 缩短空闲回收时间，配合上面的中断行为防止连接滞留
@@ -53,7 +67,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     ];
 
     // 应用分流组：默认开启（对大多数用户比较实用），可在设置页关闭。
-    if app_config.singbox_enable_app_groups {
+    if intent.enable_app_groups {
         outbounds.extend([
             json!({
                 "type": "selector",
@@ -99,7 +113,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     // 本地多播,落到 CN/代理解析都会失败。域名列表与 sing-box v1.14.0
     // dns/transport/mdns 的 mdnsLocalZones 一一对应（不用 geosite-private,
     // 那里面还混着 *.lan 等非 mDNS 名称,发去多播组不会有应答）。
-    if app_config.singbox_dns_use_mdns {
+    if intent.dns_use_mdns {
         dns_rules.insert(
             0,
             json!({
@@ -116,11 +130,11 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         );
     }
 
-    if app_config.singbox_block_ads {
+    if intent.block_ads {
         dns_rules.insert(2, json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
     }
 
-    apply_fake_dns_rules(&mut dns_rules, app_config);
+    sync_fake_dns_rules(&mut dns_rules, intent);
 
     // 远程 rule-set 与本地缓存副本（1.14 initial_path）共用同一份清单，
     // 见 `remote_rule_set_sources`。缓存目录未初始化时不写 initial_path。
@@ -130,7 +144,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     // 单独走 `http_clients["direct-download"]`（直连），保持 1.13 时代 `download_detour` 的语义。
     let download_via_manual = download_detour == TAG_MANUAL;
     let rule_set_cache_dir = crate::app::system::rule_set_cache_service::cache_dir().cloned();
-    let rule_sets = remote_rule_set_sources(app_config)
+    let rule_sets = remote_rule_set_sources(intent)
         .iter()
         .map(|source| {
             let initial_path = rule_set_cache_dir.as_ref().map(|dir| {
@@ -146,7 +160,7 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
 
     let mut route_rules: Vec<Value> = vec![json!({ "action": "sniff" })];
 
-    if app_config.singbox_dns_hijack {
+    if intent.dns_hijack {
         route_rules.push(json!({ "protocol": "dns", "action": "hijack-dns" }));
     }
 
@@ -155,11 +169,11 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         json!({ "clash_mode": "direct", "outbound": TAG_DIRECT }),
     ]);
 
-    if app_config.singbox_block_ads {
+    if intent.block_ads {
         route_rules.push(json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
     }
 
-    if app_config.singbox_enable_app_groups {
+    if intent.enable_app_groups {
         route_rules.extend([
             json!({ "rule_set": RS_GEOSITE_TELEGRAM, "outbound": TAG_TELEGRAM }),
             json!({ "rule_set": RS_GEOSITE_YOUTUBE, "outbound": TAG_YOUTUBE }),
@@ -178,16 +192,16 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         json!({ "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN, "outbound": default_outbound }),
     ]);
 
-    if app_config.singbox_fake_dns_enabled {
-        // fakeip 生成的地址段需要显式直连，确保连接能够回到内核并完成域名逆向映射。
-        route_rules.push(json!({
-            "ip_cidr": [
-                normalize_fakeip_range(&app_config.singbox_fake_dns_ipv4_range, "198.18.0.0/15"),
-                normalize_fakeip_range(&app_config.singbox_fake_dns_ipv6_range, "fc00::/18")
-            ],
-            "outbound": TAG_DIRECT
-        }));
-    }
+    // fakeip 生成的地址段需要显式直连，确保连接能够回到内核并完成域名逆向映射。
+    // 与补丁路径共用 `config_render::sync_fake_dns_route_rules`，保证两条路径的规则形态一致。
+    sync_fake_dns_route_rules(
+        &mut route_rules,
+        intent,
+        &[(
+            intent.fake_dns.ipv4_range.clone(),
+            intent.fake_dns.ipv6_range.clone(),
+        )],
+    );
 
     // 注意：这里的 outbounds 只是骨架，订阅节点注入后会补齐 TAG_AUTO/TAG_MANUAL
     // 以及各业务分流组的候选列表。
@@ -207,21 +221,20 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
             cache_file: CacheFileConfig {
                 enabled: true,
                 // 1.14 替代 `store_rdrc`：Fake DNS 依赖反向域名映射缓存，开启持久化可降低切换网络后的映射丢失。
-                store_dns: app_config.singbox_fake_dns_enabled.then_some(true),
+                store_dns: intent.fake_dns_enabled().then_some(true),
             },
         },
         dns: DnsConfig {
-            servers: build_dns_servers(app_config, default_outbound),
+            servers: build_dns_servers(intent, default_outbound),
             rules: dns_rules,
             // 1.14 启用乐观 DNS 缓存：重复查询命中过期缓存立即返回 + 后台刷新，降低尾延迟
-            optimistic: app_config.singbox_dns_optimistic_cache.then_some(true),
+            optimistic: intent.dns_optimistic.then_some(true),
             // per-query / per-server DNS 超时（1.14 新增）；为空时不写入
-            timeout: (!app_config.singbox_dns_timeout.is_empty())
-                .then(|| app_config.singbox_dns_timeout.clone()),
-            reverse_mapping: app_config.singbox_fake_dns_enabled.then_some(true),
+            timeout: (!intent.dns_timeout.is_empty()).then(|| intent.dns_timeout.clone()),
+            reverse_mapping: intent.fake_dns_enabled().then_some(true),
             final_server: DNS_PROXY.to_string(),
         },
-        inbounds: Vec::new(),
+        inbounds: build_inbounds(intent, None),
         outbounds,
         route: RouteConfig {
             rule_set: rule_sets,
@@ -263,9 +276,6 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
 
     let mut config = serde_json::to_value(base).expect("SingBoxConfig 序列化失败");
 
-    // 统一由 settings_patch 负责把端口/TUN/IPv6 偏好写入配置，确保行为一致。
-    apply_app_settings_to_config(&mut config, app_config);
-
     // 注入 sing-box 1.14+ 官方 gRPC API 服务（替代实验性的 Clash API）。
     // 端口从 AppConfig.api_port 读取，与历史 Clash API 默认端口一致（28955）。
     // 监听地址固定本机，避免对外暴露控制端口。
@@ -274,30 +284,29 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
         let mut api_service = json!({
             "type": "api",
             "listen": "127.0.0.1",
-            "listen_port": app_config.api_port,
-            "dashboard": { "enabled": app_config.enable_web_dashboard }
+            "listen_port": intent.api_port,
+            "dashboard": { "enabled": intent.web_dashboard }
         });
-        if app_config.enable_web_dashboard {
+        if intent.web_dashboard {
             // 启用 dashboard 时同时提供 secret（用 listen_port 派生一个本地 secret）
             // 防止 dashboard 在公网意外暴露时无鉴权
-            api_service["secret"] = json!(format!("{:x}", app_config.api_port));
+            api_service["secret"] = json!(format!("{:x}", intent.api_port));
         }
         root.insert("services".to_string(), json!([api_service]));
 
         // 1.14 新增：可选的 Tailscale endpoint（实验性，需要 Tailscale auth key）
-        if app_config.enable_tailscale_endpoint {
+        if let Some(tailscale) = intent.tailscale.as_ref() {
             let mut tailscale_endpoint = json!({
                 "type": "tailscale",
                 "tag": "tailscale-endpoint"
             });
             // Tailscale SSH server（1.14 新增）— 需 tailnet ACL 配合
-            if app_config.tailscale_run_ssh_server {
+            if tailscale.run_ssh_server {
                 tailscale_endpoint["ssh_server"] = json!({ "enabled": true });
             }
             // Taildrop 收件箱目录（1.14 新增）
-            if !app_config.tailscale_taildrop_directory.is_empty() {
-                tailscale_endpoint["taildrop_directory"] =
-                    json!(app_config.tailscale_taildrop_directory);
+            if !tailscale.taildrop_directory.is_empty() {
+                tailscale_endpoint["taildrop_directory"] = json!(tailscale.taildrop_directory);
             }
             root.insert("endpoints".to_string(), json!([tailscale_endpoint]));
         }
@@ -306,14 +315,14 @@ pub fn generate_base_config(app_config: &AppConfig) -> Value {
     config
 }
 
-fn build_dns_servers(app_config: &AppConfig, default_outbound: &str) -> Vec<DnsServerConfig> {
+fn build_dns_servers(intent: &ConfigIntent, default_outbound: &str) -> Vec<DnsServerConfig> {
     // DNS server 自身域名的解析用独立的 bootstrap 策略，不跟随全局 prefer_ipv6，
     // 避免无 IPv6 路由时 dns.alidns.com 的 AAAA 优先导致 DNS 拨号整体失败。
-    let bootstrap_strategy = dns_bootstrap_strategy(app_config);
+    let bootstrap_strategy = intent.dns_bootstrap_strategy;
     let mut servers = vec![
         build_dns_server_with_fallback(
             DNS_PROXY,
-            &app_config.singbox_dns_proxy,
+            &intent.dns_proxy,
             Some(bootstrap_strategy),
             Some(default_outbound),
             Some(DNS_RESOLVER),
@@ -321,7 +330,7 @@ fn build_dns_servers(app_config: &AppConfig, default_outbound: &str) -> Vec<DnsS
         ),
         build_dns_server_with_fallback(
             DNS_CN,
-            &app_config.singbox_dns_cn,
+            &intent.dns_cn,
             Some(bootstrap_strategy),
             Some(TAG_DIRECT),
             Some(DNS_RESOLVER),
@@ -329,7 +338,7 @@ fn build_dns_servers(app_config: &AppConfig, default_outbound: &str) -> Vec<DnsS
         ),
         build_dns_server_with_fallback(
             DNS_RESOLVER,
-            &app_config.singbox_dns_resolver,
+            &intent.dns_resolver,
             Some(bootstrap_strategy),
             Some(TAG_DIRECT),
             None,
@@ -337,14 +346,16 @@ fn build_dns_servers(app_config: &AppConfig, default_outbound: &str) -> Vec<DnsS
         ),
     ];
 
-    if app_config.singbox_fake_dns_enabled {
-        servers.push(build_fakeip_dns_server(app_config));
-    }
-
     // 1.14 mDNS server（*.local / link-local 反向解析）；由 build_dns_rules 里的
     // mDNS 域名后缀规则引用
-    if app_config.singbox_dns_use_mdns {
+    if intent.dns_use_mdns {
         servers.push(build_mdns_dns_server());
+    }
+
+    // 假 DNS server 放在最后：补丁路径的 `sync_fake_dns_server` 采用
+    // "先移除旧的、再追加到末尾"的写法，两条路径的 server 顺序必须一致。
+    if intent.fake_dns_enabled() {
+        servers.push(build_fakeip_dns_server(intent));
     }
 
     servers
@@ -381,92 +392,6 @@ fn build_dns_server_with_fallback(
     })
 }
 
-fn build_fakeip_dns_server(app_config: &AppConfig) -> DnsServerConfig {
-    DnsServerConfig {
-        tag: DNS_FAKEIP.to_string(),
-        server_type: Some("fakeip".to_string()),
-        server: None,
-        server_port: None,
-        path: None,
-        interface: None,
-        inet4_range: Some(normalize_fakeip_range(
-            &app_config.singbox_fake_dns_ipv4_range,
-            "198.18.0.0/15",
-        )),
-        inet6_range: Some(normalize_fakeip_range(
-            &app_config.singbox_fake_dns_ipv6_range,
-            "fc00::/18",
-        )),
-        domain_resolver: None,
-        detour: None,
-    }
-}
-
-fn normalize_fakeip_range(raw: &str, fallback: &str) -> String {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        fallback.to_string()
-    } else {
-        trimmed.to_string()
-    }
-}
-
-fn apply_fake_dns_rules(dns_rules: &mut Vec<Value>, app_config: &AppConfig) {
-    // 先清理所有历史 fakeip 规则（含旧 query_type + server 风格 + 新的 evaluate + tag 风格），
-    // 再按当前开关重建，避免重复叠加。
-    // - 旧风格：`{ "server": "dns_fakeip", ... }`
-    // - 新风格：`{ "action": "evaluate", "server": "dns_fakeip", "tag": "fakeip-result" }`
-    dns_rules.retain(|rule| {
-        let server = rule.get("server").and_then(|v| v.as_str());
-        let tag = rule.get("tag").and_then(|v| v.as_str());
-        // 保留条件：不是直接用 fakeip server，也未带 fakeip-result tag
-        server != Some(DNS_FAKEIP) && tag != Some(FAKEIP_RESULT_TAG)
-    });
-
-    if !app_config.singbox_fake_dns_enabled {
-        return;
-    }
-
-    // 1.14 推荐写法：用 `evaluate` action 触发 fakeip server 给响应打 tag，
-    // 后续 `match_response` 规则可基于 tag 拦截/转发。
-    // 这里用 query_type 限定 A/AAAA 走 fakeip（其他类型如 HTTPS 不需要 fake ip）。
-    match normalize_fake_dns_filter_mode(app_config) {
-        FAKE_DNS_FILTER_GLOBAL_NON_CN => {
-            // 全局非 CN：保留前面的 CN 规则，其他 A/AAAA 查询统一触发 fakeip evaluate。
-            dns_rules.push(json!({
-                "query_type": ["A", "AAAA"],
-                "action": "evaluate",
-                "server": DNS_FAKEIP,
-                "tag": FAKEIP_RESULT_TAG
-            }));
-        }
-        _ => {
-            // 仅代理流量：仅对非 CN 域名触发 fakeip evaluate，国内域名仍按原逻辑直连解析。
-            let rule = json!({
-                "query_type": ["A", "AAAA"],
-                "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN,
-                "action": "evaluate",
-                "server": DNS_FAKEIP,
-                "tag": FAKEIP_RESULT_TAG
-            });
-
-            let insert_idx = dns_rules
-                .iter()
-                .position(|item| {
-                    item.get("rule_set").and_then(|v| v.as_str())
-                        == Some(RS_GEOSITE_GEOLOCATION_NOT_CN)
-                })
-                .unwrap_or(dns_rules.len());
-            dns_rules.insert(insert_idx, rule);
-        }
-    }
-}
-
-/// fakeip evaluate 规则打 tag 的常量，与 fakeip 响应匹配使用。
-/// 后续如要加 `match_response` 规则拦截特定 fakeip 响应（如 `ip_cidr: 198.18.0.0/15` + `action: reject`），
-/// 直接引用这个 tag 即可。
-const FAKEIP_RESULT_TAG: &str = "fakeip-result";
-
 fn remote_rule_set_value(
     source: &RemoteRuleSetSource,
     initial_path: Option<String>,
@@ -498,9 +423,9 @@ pub struct RemoteRuleSetSource {
 
 /// 当前配置将生成的全部远程 rule-set（顺序与 route.rule_set 一致）。
 /// `rule_set_cache_service::warm_rule_set_cache` 也用这份清单预热本地副本。
-pub fn remote_rule_set_sources(app_config: &AppConfig) -> Vec<RemoteRuleSetSource> {
+pub fn remote_rule_set_sources(intent: &ConfigIntent) -> Vec<RemoteRuleSetSource> {
     let mut sources = Vec::new();
-    if app_config.singbox_block_ads {
+    if intent.block_ads {
         sources.push(RemoteRuleSetSource {
             tag: RS_GEOSITE_ADS,
             url: "https://gh-proxy.com/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
@@ -522,7 +447,7 @@ pub fn remote_rule_set_sources(app_config: &AppConfig) -> Vec<RemoteRuleSetSourc
             direct_detour: false,
         },
     ]);
-    if app_config.singbox_enable_app_groups {
+    if intent.enable_app_groups {
         sources.extend([
             RemoteRuleSetSource {
                 tag: RS_GEOSITE_TELEGRAM,
@@ -578,14 +503,16 @@ pub fn generate_config_with_nodes(
     app_config: &AppConfig,
     nodes: &[Value],
 ) -> Result<Value, String> {
-    let mut config = generate_base_config(app_config);
-    inject_nodes(&mut config, app_config, nodes)?;
+    // 配置语义只翻译一次：生成骨架与注入节点共用同一份 intent
+    let intent = ConfigIntent::from_app_config(app_config);
+    let mut config = render_skeleton(&intent);
+    inject_nodes(&mut config, &intent, nodes)?;
     Ok(config)
 }
 
 pub fn inject_nodes(
     config: &mut Value,
-    app_config: &AppConfig,
+    intent: &ConfigIntent,
     nodes: &[Value],
 ) -> Result<(), String> {
     let outbounds = ensure_outbounds_array(config)?;
@@ -603,7 +530,7 @@ pub fn inject_nodes(
     // 注意：订阅里可能会夹带“提示节点/占位节点”（如 server=0.0.0.0），放进 urltest 会导致启动时默认选中无效节点，表现为全部无法联网。
     let mut group_node_tags = Vec::<String>::with_capacity(nodes.len());
 
-    let resolver_strategy = node_domain_resolver_strategy(app_config);
+    let resolver_strategy = intent.node_resolver_strategy;
 
     for (idx, node) in nodes.iter().cloned().enumerate() {
         let mut node_obj = node
@@ -903,3 +830,7 @@ pub fn inject_custom_rules(
 #[cfg(test)]
 #[path = "config_generator.tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "config_golden.tests.rs"]
+mod golden_tests;

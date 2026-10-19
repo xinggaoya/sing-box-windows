@@ -1,6 +1,7 @@
 use super::DatabaseService;
 use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::tun_profile::normalize_tun_route_exclude_address;
+use crate::app::singbox::ownership::{self, Ownership};
 use crate::app::storage::error::{StorageError, StorageResult};
 use crate::app::storage::state_model::{
     AppConfig, LocaleConfig, StartupPreferences, Subscription, ThemeConfig, UpdateConfig,
@@ -42,10 +43,10 @@ fn sync_settings_to_config_file(
     config_path: &std::path::Path,
     app_config: &AppConfig,
     patch_mode: ConfigPatchMode,
+    ownership: &Ownership,
 ) -> Result<(), String> {
-    use crate::app::singbox::settings_patch::{
-        apply_app_settings_to_config, apply_port_settings_only,
-    };
+    use crate::app::singbox::config_intent::ConfigIntent;
+    use crate::app::singbox::settings_patch::{apply_intent_to_config, apply_port_settings_only};
 
     // 读取现有配置
     let content =
@@ -57,7 +58,10 @@ fn sync_settings_to_config_file(
 
     // 应用全局设置
     match patch_mode {
-        ConfigPatchMode::Full => apply_app_settings_to_config(&mut config, app_config),
+        ConfigPatchMode::Full => {
+            let intent = ConfigIntent::from_app_config(app_config);
+            apply_intent_to_config(&mut config, &intent, ownership);
+        }
         ConfigPatchMode::PortsOnly => apply_port_settings_only(&mut config, app_config),
     }
 
@@ -70,6 +74,56 @@ fn sync_settings_to_config_file(
     std::fs::write(config_path, updated).map_err(|e| format!("写入配置文件失败: {}", e))?;
 
     Ok(())
+}
+
+/// 解析某份配置文件的归属。
+///
+/// 优先级：
+/// 1. `generic_config` 里落库的归属记录（生成配置时写入）；
+/// 2. 按配置内容推断（本程序生成的配置带 `mixed-in` 入口 / 本程序的 DNS server tag）。
+///
+/// 两者都判定为"不是本程序的配置"时返回空归属，调用方据此退化为
+/// `PortsOnly`（只改端口与监听地址），而不是继续猜结构改坏用户的原始配置。
+async fn resolve_ownership(app: &AppHandle, config_path: &std::path::Path) -> Ownership {
+    let path_key = config_path.to_string_lossy().to_string();
+    let config = read_config_value(config_path);
+    let storage = get_enhanced_storage(app).await.ok();
+
+    if let Some(storage) = storage.as_ref() {
+        if let Ok(Some(record)) = storage
+            .load_generic_config::<Ownership>(&ownership::storage_key(&path_key))
+            .await
+        {
+            // 校验：配置里仍应保留本程序的签名；被用户手改掉就按"外来修改"重新推断
+            if record.managed && ownership::looks_managed(&config) {
+                return record;
+            }
+            tracing::warn!("配置归属记录与实际内容不一致，按外来修改处理: {}", path_key);
+        }
+    }
+
+    let inferred = Ownership::inferred(&config);
+    // 空壳归属（一个 tag 都没认领）没有信息量，落库后会让后续补丁拿空清单过滤，
+    // 导致 DNS 地址 / 测速 URL 等设置静默不生效——这种记录不落库。
+    if inferred.managed && !inferred.claims_nothing() {
+        if let Some(storage) = storage.as_ref() {
+            if let Err(error) = storage
+                .save_generic_config(&ownership::storage_key(&path_key), &inferred)
+                .await
+            {
+                tracing::warn!("保存配置归属记录失败: {}", error);
+            }
+        }
+    }
+    inferred
+}
+
+/// 读取配置文件内容；读取或解析失败时返回 `Null`（归属判定会退化为"空壳配置"）
+fn read_config_value(config_path: &std::path::Path) -> serde_json::Value {
+    std::fs::read_to_string(config_path)
+        .ok()
+        .and_then(|content| serde_json::from_str(&content).ok())
+        .unwrap_or(serde_json::Value::Null)
 }
 
 async fn resolve_patch_mode_for_active_config(
@@ -112,10 +166,16 @@ pub(crate) async fn apply_runtime_config_update(
     if let Some(path) = effective_config.active_config_path.as_deref() {
         let config_path = std::path::PathBuf::from(path);
         if config_path.exists() {
-            let patch_mode =
+            let mut patch_mode =
                 resolve_patch_mode_for_active_config(app, path, use_original_config_hint).await;
+            let ownership = resolve_ownership(app, &config_path).await;
+            // 归属不在本程序 → 不能按设置改写用户导入的原始配置，退化为只同步端口
+            if patch_mode == ConfigPatchMode::Full && !ownership.managed {
+                tracing::warn!("活动配置未由本程序接管，退化为仅同步端口: {}", path);
+                patch_mode = ConfigPatchMode::PortsOnly;
+            }
             if let Err(error) =
-                sync_settings_to_config_file(&config_path, effective_config, patch_mode)
+                sync_settings_to_config_file(&config_path, effective_config, patch_mode, &ownership)
             {
                 tracing::warn!("同步活动配置文件失败: {}", error);
             }
@@ -635,7 +695,19 @@ pub async fn db_save_active_subscription_index(
 
     if let Some(config_path) = target_config_path {
         if config_path.exists() {
-            match sync_settings_to_config_file(&config_path, &app_config, patch_mode) {
+            let ownership = resolve_ownership(&app, &config_path).await;
+            // 归属不在本程序 → 退化为只同步端口，避免改坏用户导入的原始配置
+            let patch_mode = match patch_mode {
+                ConfigPatchMode::Full if !ownership.managed => {
+                    tracing::warn!(
+                        "订阅配置未由本程序接管，退化为仅同步端口: {:?}",
+                        config_path
+                    );
+                    ConfigPatchMode::PortsOnly
+                }
+                other => other,
+            };
+            match sync_settings_to_config_file(&config_path, &app_config, patch_mode, &ownership) {
                 Ok(_) => {
                     tracing::info!("已将全局设置同步到配置文件: {:?}", config_path);
                 }

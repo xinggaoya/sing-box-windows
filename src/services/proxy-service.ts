@@ -1,35 +1,23 @@
 import { invokeWithAppContext } from './invoke-client'
 
-// === gRPC API 返回类型（对应后端 singbox_api::types） ===
+// === gRPC API 返回类型 ===
+//
+// 全部来自 `src/types/generated/`（由 Rust 侧 ts-rs 导出，是前后端唯一事实来源）。
+// ⚠️ 禁止在此手写这些结构的 TypeScript 声明——后端改字段名前端不会报错，
+// 只会静默拿到 undefined。守护规则见 `src/types/generated/grpc-types.test.ts`。
 
-/** 节点项（对应 proto GroupItem） */
-export interface GroupItem {
-  tag: string
-  type: string
-  urlTestTime: number
-  urlTestDelay: number
-}
+import type { Groups } from '@/types/generated/Groups'
+import type { Group } from '@/types/generated/Group'
+import type { GroupItem } from '@/types/generated/GroupItem'
+import type { OutboundList } from '@/types/generated/OutboundList'
+import type { RuleList } from '@/types/generated/RuleList'
+import type { ServiceList } from '@/types/generated/ServiceList'
+import type { ServiceStatusSnapshot } from '@/types/generated/ServiceStatusSnapshot'
+import type { NetworkQualityResult } from '@/types/generated/NetworkQualityResult'
+import type { ClashModeStatus } from '@/types/generated/ClashModeStatus'
+import type { DeprecatedWarnings } from '@/types/generated/DeprecatedWarnings'
 
-/** 节点组（对应 proto Group） */
-export interface ProxyGroup {
-  tag: string
-  type: string
-  selectable: boolean
-  selected: string
-  isExpand: boolean
-  items: GroupItem[]
-}
-
-/** 完整节点组集合（对应 proto Groups） */
-export interface GroupsData {
-  group: ProxyGroup[]
-}
-
-/** Clash 模式状态（对应 proto ClashModeStatus） */
-export interface ClashModeStatus {
-  modeList: string[]
-  currentMode: string
-}
+export type { Groups, Group, GroupItem, OutboundList, RuleList, ServiceList, ServiceStatusSnapshot }
 
 /** 节点测速结果（前端封装，对应 /SelectOutbound + /URLTest 调用结果） */
 export interface UrlTestResult {
@@ -97,8 +85,8 @@ export class ProxyService {
   }
 
   /** 获取所有节点组（一次快照） */
-  async getGroups(): Promise<GroupsData> {
-    return invokeWithAppContext<GroupsData>('get_groups')
+  async getGroups(): Promise<Groups> {
+    return invokeWithAppContext<Groups>('get_groups')
   }
 
   /** 切换代理节点（gRPC SelectOutbound） */
@@ -143,6 +131,42 @@ export class ProxyService {
   /** 获取内核启动时间戳（秒） */
   async getStartedAt(): Promise<number> {
     return invokeWithAppContext<number>('get_started_at')
+  }
+
+  // === sing-box 1.14 新增 gRPC 接口 ===
+
+  /** 获取所有路由规则（GetRules） */
+  async getRules(): Promise<RuleList> {
+    return invokeWithAppContext<RuleList>('get_rules')
+  }
+
+  /** 获取全量出站快照（GetOutbounds）
+   *
+   * 与 `getGroups()` 的区别：Groups 是「分组视图」，Outbounds 是「内核里所有出站」的平铺列表，
+   * 包含分组本身。用于出站总览与全量按延迟排序。
+   */
+  async getOutbounds(): Promise<OutboundList> {
+    return invokeWithAppContext<OutboundList>('get_outbounds')
+  }
+
+  /** 获取运行中的服务列表（GetServices） */
+  async getServices(): Promise<ServiceList> {
+    return invokeWithAppContext<ServiceList>('get_services')
+  }
+
+  /** 探测内核服务运行状态（SubscribeServiceStatus 首帧） */
+  async probeServiceStatus(): Promise<ServiceStatusSnapshot> {
+    return invokeWithAppContext<ServiceStatusSnapshot>('probe_service_status')
+  }
+
+  /** 网络质量测试（NetworkQualityTest）：RTT / 上下行带宽与延迟 */
+  async networkQualityTest(): Promise<NetworkQualityResult> {
+    return invokeWithAppContext<NetworkQualityResult>('network_quality_test')
+  }
+
+  /** 获取已弃用字段告警（GetDeprecatedWarnings） */
+  async getDeprecatedWarnings(): Promise<DeprecatedWarnings> {
+    return invokeWithAppContext<DeprecatedWarnings>('get_deprecated_warnings')
   }
 }
 

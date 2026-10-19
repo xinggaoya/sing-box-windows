@@ -257,6 +257,7 @@ pub fn run() {
             crate::app::core::proxy_service::grpc_bridge::get_services,
             crate::app::core::proxy_service::grpc_bridge::get_outbounds,
             crate::app::core::proxy_service::grpc_bridge::get_deprecated_warnings,
+            crate::app::core::proxy_service::grpc_bridge::probe_service_status,
             crate::app::core::proxy_service::status::network_quality_test,
             // Network - Subscription service commands
             crate::app::network::subscription_service::download_subscription,

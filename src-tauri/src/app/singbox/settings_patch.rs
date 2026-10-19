@@ -1,43 +1,72 @@
+//! 配置补丁路径：把 `AppConfig` 的设置同步到**已有**配置上。
+//!
+//! ## 两条路径，一条语义
+//!
+//! 配置有两个入口：
+//!
+//! - **生成路径**（`config_generator::generate_base_config`）：从零拼一份配置
+//! - **补丁路径**（本模块）：在已有配置上按 tag 打补丁
+//!
+//! 两者读同一批设置、产出同一份配置语义。语义由 [`ConfigIntent`] 唯一承载，
+//! 渲染细节由 [`config_render`] 共享——本模块只负责"**在已有结构上改哪些字段**"。
+//!
+//! ## 归属（Ownership）
+//!
+//! 补丁的前提是"这份配置是本程序的"。此前靠结构猜测判断，
+//! 猜错就会把用户导入的原始配置改坏（入口被重建、路由终点被改写）。
+//! 现在改为显式的 [`Ownership`]：
+//!
+//! - 归属为本程序 → 按设置完整同步
+//! - 归属为外来配置 → 调用方退化为 [`apply_port_settings_only`]，只改端口与监听地址
+
 use super::common::{
-    build_dns_server_config, dns_bootstrap_strategy, dns_strategy, ensure_kernel_log_output,
-    normalize_default_outbound, normalize_dns_mode, normalize_fake_dns_filter_mode, DNS_CN,
-    DNS_FAKEIP, DNS_PROXY, DNS_RESOLVER, FAKE_DNS_FILTER_GLOBAL_NON_CN, RS_GEOSITE_ADS,
+    build_dns_server_config, ensure_kernel_log_output, RS_GEOSITE_ADS,
     RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI,
     RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX,
     TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
 };
-use crate::app::core::tun_profile::{
-    default_tun_route_exclude_addresses, normalize_persisted_tun_route_exclude_address,
+use super::config_intent::ConfigIntent;
+use super::config_render::{
+    build_inbounds, ensure_sniff_route_rule, extract_existing_tun_route_exclude_address,
+    extract_fake_dns_server_range_pair, sync_fake_dns_route_rules, sync_fake_dns_rules,
+    sync_fake_dns_server,
 };
+use super::ownership::Ownership;
 use crate::app::storage::state_model::AppConfig;
 use serde_json::{json, Map, Value};
 
-fn proxy_listen_address(app_config: &AppConfig) -> &'static str {
-    if app_config.allow_lan_access {
-        "0.0.0.0"
-    } else {
-        "127.0.0.1"
-    }
-}
-
 /// 将应用设置（端口 / System Proxy / TUN / IPv6 偏好等）同步到 sing-box 配置。
 ///
-/// 说明：
-/// - 这是“设置页面操作会影响配置”的核心入口之一。
-/// - 该函数会覆盖/重建 `inbounds`，确保 mixed/tun 与端口设置始终与 AppConfig 一致。
-/// - 1.14 起 `experimental.clash_api` 已被 `services: [api]` 完全替代（由 config_generator.rs 注入），
-///   此处不再写 `clash_api` 字段；同时清空历史配置残留，避免启动时 deprecation 噪音。
+/// 兼容入口：内部先把 `AppConfig` 翻译成 [`ConfigIntent`]（配置语义的唯一来源），
+/// 再按配置内容推断归属后落盘。
+///
+/// 需要精确控制归属时（例如归属已落库、或明确知道这份配置是外来配置），
+/// 请直接调用 [`apply_intent_to_config`]。
 pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) {
+    let intent = ConfigIntent::from_app_config(app_config);
+    let ownership = Ownership::inferred(config);
+    apply_intent_to_config(config, &intent, &ownership);
+}
+
+/// 按配置意图 + 归属同步到已有配置。
+///
+/// - `ownership.managed == false`（外来配置）：**不动**入口 / DNS / 路由 / 出站，
+///   只做内核版本兼容清理与 gRPC API 服务兜底。
+/// - `ownership.managed == true`：按设置完整同步。
+pub fn apply_intent_to_config(config: &mut Value, intent: &ConfigIntent, ownership: &Ownership) {
     if let Some(config_obj) = config.as_object_mut() {
         ensure_kernel_log_output(config_obj);
-        apply_inbounds_settings(config_obj, app_config);
 
-        // 针对“本程序生成的订阅配置”，尝试同步高级选项。
-        // 采用“按 tag 定位并局部更新”的方式：如果用户导入的是原始订阅配置（结构不同），则不会强行改动。
-        apply_profile_settings_if_present(config_obj, app_config);
+        // 入口 / DNS / 路由 / 出站的重建只对本程序拥有的配置做，
+        // 否则会把用户导入的原始配置改坏。
+        if ownership.managed {
+            apply_inbounds_settings(config_obj, intent);
+            apply_owned_profile_settings(config_obj, intent, ownership);
+        }
 
         // 1.14 替代 `experimental.clash_api`：完全清理历史残留，
-        // 实际 gRPC API 由 `services: [api]` 提供（config_generator.rs 注入）。
+        // 实际 gRPC API 由 `services: [api]` 提供。
+        // 外来配置同样要清理——1.14 内核已不接受该字段，留着会直接启动失败。
         if let Some(experimental) = config_obj
             .get_mut("experimental")
             .and_then(|v| v.as_object_mut())
@@ -48,57 +77,70 @@ pub fn apply_app_settings_to_config(config: &mut Value, app_config: &AppConfig) 
         // 兜底补齐 1.14 gRPC api 服务：api 服务此前只在配置生成时注入,升级前的
         // 旧 config.json（订阅刷新失败/离线时不会被再生成）被删掉 clash_api 后
         // 就没有任何 API 通道,内核能启动但状态/代理组/模式切换全部不可用。
-        ensure_api_service(config_obj, app_config);
+        // 外来配置也必须补——否则 UI 完全控制不了内核。
+        ensure_api_service(config_obj, intent);
 
         // cache_file：1.14 替代 `store_rdrc` → `store_dns`（1.16 移除 store_rdrc）。
-        let experimental = config_obj
-            .entry("experimental".to_string())
-            .or_insert(json!({}));
-        if let Some(exp_obj) = experimental.as_object_mut() {
-            let cache_file = exp_obj.entry("cache_file".to_string()).or_insert(json!({}));
-            if let Some(cache_obj) = cache_file.as_object_mut() {
-                cache_obj.insert("enabled".to_string(), json!(true));
-                // 兼容老字段（用户可能从 1.13 升级上来）→ 1.14 同时接受，1.16 后忽略
-                cache_obj.remove("store_rdrc");
-                if app_config.singbox_fake_dns_enabled {
-                    cache_obj.insert("store_dns".to_string(), json!(true));
-                } else {
-                    cache_obj.remove("store_dns");
+        if ownership.managed {
+            let experimental = config_obj
+                .entry("experimental".to_string())
+                .or_insert(json!({}));
+            if let Some(exp_obj) = experimental.as_object_mut() {
+                let cache_file = exp_obj.entry("cache_file".to_string()).or_insert(json!({}));
+                if let Some(cache_obj) = cache_file.as_object_mut() {
+                    cache_obj.insert("enabled".to_string(), json!(true));
+                    // 兼容老字段（用户可能从 1.13 升级上来）→ 1.14 同时接受，1.16 后忽略
+                    cache_obj.remove("store_rdrc");
+                    if intent.fake_dns_enabled() {
+                        cache_obj.insert("store_dns".to_string(), json!(true));
+                    } else {
+                        cache_obj.remove("store_dns");
+                    }
                 }
             }
         }
 
         // `dns.strategy` 已在 sing-box 1.12 废弃；迁移到 domain_resolver 对象策略。
-        let dns = config_obj.entry("dns".to_string()).or_insert(json!({}));
-        if let Some(dns_obj) = dns.as_object_mut() {
+        // 1.14 移除 `independent_cache`（强制按 transport 隔离缓存）。
+        // 这两项是内核版本兼容清理，对外来配置同样执行——留着会直接启动失败。
+        if let Some(dns_obj) = config_obj.get_mut("dns").and_then(|v| v.as_object_mut()) {
             dns_obj.remove("strategy");
-            // 1.14 移除 `independent_cache`（强制按 transport 隔离缓存）
             dns_obj.remove("independent_cache");
-            if app_config.singbox_fake_dns_enabled {
-                dns_obj.insert("reverse_mapping".to_string(), json!(true));
-            } else {
-                dns_obj.remove("reverse_mapping");
-            }
-            // 1.14 新增：乐观 DNS 缓存
-            if app_config.singbox_dns_optimistic_cache {
-                dns_obj.insert("optimistic".to_string(), json!(true));
-            } else {
-                dns_obj.remove("optimistic");
-            }
-            // 1.14 新增：per-server DNS 超时
-            if !app_config.singbox_dns_timeout.is_empty() {
-                dns_obj.insert(
-                    "timeout".to_string(),
-                    Value::String(app_config.singbox_dns_timeout.clone()),
-                );
-            } else {
-                dns_obj.remove("timeout");
+
+            if ownership.managed {
+                if intent.fake_dns_enabled() {
+                    dns_obj.insert("reverse_mapping".to_string(), json!(true));
+                } else {
+                    dns_obj.remove("reverse_mapping");
+                }
+                // 1.14 新增：乐观 DNS 缓存
+                if intent.dns_optimistic {
+                    dns_obj.insert("optimistic".to_string(), json!(true));
+                } else {
+                    dns_obj.remove("optimistic");
+                }
+                // 1.14 新增：per-server DNS 超时
+                if !intent.dns_timeout.is_empty() {
+                    dns_obj.insert("timeout".to_string(), json!(intent.dns_timeout.clone()));
+                } else {
+                    dns_obj.remove("timeout");
+                }
             }
         }
     }
 }
 
+/// 最小侵入补丁：只同步端口与监听地址。
+///
+/// 用于"使用订阅原始配置"的场景——用户导入的配置结构由机场决定，
+/// 本程序只该改自己负责的入口参数，不应动其余部分。
 pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
+    let intent = ConfigIntent::from_app_config(app_config);
+    apply_port_settings_only_with_intent(config, &intent);
+}
+
+/// 最小侵入补丁（intent 版本）
+pub fn apply_port_settings_only_with_intent(config: &mut Value, intent: &ConfigIntent) {
     if let Some(config_obj) = config.as_object_mut() {
         // 1.14 替代 clash_api：清空 external_controller 残留（端口同步在 services: [api] 处理）
         if let Some(experimental) = config_obj
@@ -112,7 +154,7 @@ pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
                 if clash_api.contains_key("external_controller") {
                     clash_api.insert(
                         "external_controller".to_string(),
-                        json!(format!("127.0.0.1:{}", app_config.api_port)),
+                        json!(format!("127.0.0.1:{}", intent.api_port)),
                     );
                 }
             }
@@ -134,13 +176,9 @@ pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
                     );
                     if is_mixed || is_mixed_in {
                         if inbound_obj.contains_key("listen_port") {
-                            inbound_obj
-                                .insert("listen_port".to_string(), json!(app_config.proxy_port));
+                            inbound_obj.insert("listen_port".to_string(), json!(intent.proxy_port));
                         }
-                        inbound_obj.insert(
-                            "listen".to_string(),
-                            json!(proxy_listen_address(app_config)),
-                        );
+                        inbound_obj.insert("listen".to_string(), json!(intent.proxy_listen));
                     }
                 }
             }
@@ -148,29 +186,38 @@ pub fn apply_port_settings_only(config: &mut Value, app_config: &AppConfig) {
     }
 }
 
-fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_config: &AppConfig) {
-    let default_outbound = normalize_default_outbound(app_config);
+/// 同步"本程序生成的配置"里的高级选项。
+///
+/// 每一项都按归属过滤：只改本程序认领的 tag，用户自己加的同名结构不受影响。
+fn apply_owned_profile_settings(
+    config_obj: &mut Map<String, Value>,
+    intent: &ConfigIntent,
+    ownership: &Ownership,
+) {
+    let default_outbound = intent.default_outbound;
     let mut fake_dns_route_cleanup_pairs = vec![
         (
-            normalize_fakeip_range(&app_config.singbox_fake_dns_ipv4_range, "198.18.0.0/15"),
-            normalize_fakeip_range(&app_config.singbox_fake_dns_ipv6_range, "fc00::/18"),
+            intent.fake_dns.ipv4_range.clone(),
+            intent.fake_dns.ipv6_range.clone(),
         ),
         ("198.18.0.0/15".to_string(), "fc00::/18".to_string()),
     ];
 
     // 1) 更新 urltest 的 URL
-    if let Some(outbounds) = config_obj
-        .get_mut("outbounds")
-        .and_then(|v| v.as_array_mut())
-    {
-        for outbound in outbounds.iter_mut() {
-            if outbound.get("tag").and_then(|t| t.as_str()) == Some(TAG_AUTO) {
-                if let Some(obj) = outbound.as_object_mut() {
-                    // 强制启用切换时中断旧连接，避免长时间后台运行连接数膨胀
-                    obj.insert("interrupt_exist_connections".to_string(), json!(true));
-                    // 缩短空闲回收时间，防止长尾连接占满列表
-                    obj.insert("idle_timeout".to_string(), json!("10m"));
-                    obj.insert("url".to_string(), json!(app_config.singbox_urltest_url));
+    if ownership.owns_group(TAG_AUTO) {
+        if let Some(outbounds) = config_obj
+            .get_mut("outbounds")
+            .and_then(|v| v.as_array_mut())
+        {
+            for outbound in outbounds.iter_mut() {
+                if outbound.get("tag").and_then(|t| t.as_str()) == Some(TAG_AUTO) {
+                    if let Some(obj) = outbound.as_object_mut() {
+                        // 强制启用切换时中断旧连接，避免长时间后台运行连接数膨胀
+                        obj.insert("interrupt_exist_connections".to_string(), json!(true));
+                        // 缩短空闲回收时间，防止长尾连接占满列表
+                        obj.insert("idle_timeout".to_string(), json!("10m"));
+                        obj.insert("url".to_string(), json!(intent.urltest_url));
+                    }
                 }
             }
         }
@@ -193,13 +240,13 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     .to_string();
                 if let Some(obj) = server.as_object_mut() {
                     match tag {
-                        t if t == DNS_PROXY => {
+                        t if t == super::common::DNS_PROXY && ownership.owns_dns_server(&t) => {
                             if let Ok(cfg) = build_dns_server_config(
-                                DNS_PROXY,
-                                &app_config.singbox_dns_proxy,
-                                Some(dns_bootstrap_strategy(app_config)),
+                                super::common::DNS_PROXY,
+                                &intent.dns_proxy,
+                                Some(intent.dns_bootstrap_strategy),
                                 Some(default_outbound),
-                                Some(DNS_RESOLVER),
+                                Some(super::common::DNS_RESOLVER),
                             ) {
                                 if let Ok(new_server) = serde_json::to_value(cfg) {
                                     if let Some(new_obj) = new_server.as_object() {
@@ -208,13 +255,13 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                                 }
                             }
                         }
-                        t if t == DNS_CN => {
+                        t if t == super::common::DNS_CN && ownership.owns_dns_server(&t) => {
                             if let Ok(cfg) = build_dns_server_config(
-                                DNS_CN,
-                                &app_config.singbox_dns_cn,
-                                Some(dns_bootstrap_strategy(app_config)),
+                                super::common::DNS_CN,
+                                &intent.dns_cn,
+                                Some(intent.dns_bootstrap_strategy),
                                 Some(TAG_DIRECT),
-                                Some(DNS_RESOLVER),
+                                Some(super::common::DNS_RESOLVER),
                             ) {
                                 if let Ok(new_server) = serde_json::to_value(cfg) {
                                     if let Some(new_obj) = new_server.as_object() {
@@ -223,11 +270,11 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                                 }
                             }
                         }
-                        t if t == DNS_RESOLVER => {
+                        t if t == super::common::DNS_RESOLVER && ownership.owns_dns_server(&t) => {
                             if let Ok(cfg) = build_dns_server_config(
-                                DNS_RESOLVER,
-                                &app_config.singbox_dns_resolver,
-                                Some(dns_bootstrap_strategy(app_config)),
+                                super::common::DNS_RESOLVER,
+                                &intent.dns_resolver,
+                                Some(intent.dns_bootstrap_strategy),
                                 Some(TAG_DIRECT),
                                 None,
                             ) {
@@ -243,7 +290,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                 }
             }
 
-            sync_fake_dns_server(servers, app_config);
+            sync_fake_dns_server(servers, intent);
         }
 
         // 3) 广告拦截：同步 dns.rules（如果存在/可定位）
@@ -256,7 +303,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                 }
             }
 
-            if app_config.singbox_block_ads {
+            if intent.block_ads {
                 if ads_rule_index.is_none() {
                     // 尽量插入在前面：优先拦截广告域名的解析
                     rules.insert(0, json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
@@ -270,7 +317,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                 rules.remove(i);
             }
 
-            sync_fake_dns_rules(rules, app_config);
+            sync_fake_dns_rules(rules, intent);
         }
     }
 
@@ -280,8 +327,8 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
         route_obj.insert(
             "default_domain_resolver".to_string(),
             json!({
-                "server": DNS_RESOLVER,
-                "strategy": dns_strategy(app_config)
+                "server": super::common::DNS_RESOLVER,
+                "strategy": intent.dns_strategy
             }),
         );
         // 兼容旧配置残留字段，避免触发 1.14 前置报错。
@@ -300,11 +347,11 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
             }
 
             // 按开关移除不再需要的规则集，避免后台持续下载无用文件
-            if !app_config.singbox_block_ads {
+            if !intent.block_ads {
                 rule_sets
                     .retain(|rs| rs.get("tag").and_then(|v| v.as_str()) != Some(RS_GEOSITE_ADS));
             }
-            if !app_config.singbox_enable_app_groups {
+            if !intent.enable_app_groups {
                 rule_sets.retain(|rs| {
                     let tag = rs.get("tag").and_then(|v| v.as_str()).unwrap_or("");
                     !matches!(
@@ -351,7 +398,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     break;
                 }
             }
-            if app_config.singbox_dns_hijack {
+            if intent.dns_hijack {
                 if hijack_index.is_none() {
                     // 放在 sniff 后面通常更合适
                     let insert_index = (sniff_index + 1).min(rules.len());
@@ -374,7 +421,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                     break;
                 }
             }
-            if app_config.singbox_block_ads {
+            if intent.block_ads {
                 if ads_index.is_none() {
                     rules.push(json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
                 }
@@ -383,7 +430,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
             }
 
             // 业务分流组：关闭后移除相关规则，避免"空组/无意义分流"
-            if !app_config.singbox_enable_app_groups {
+            if !intent.enable_app_groups {
                 rules.retain(|rule| {
                     let rs = rule.get("rule_set").and_then(|v| v.as_str()).unwrap_or("");
                     !matches!(
@@ -397,7 +444,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
                 });
             }
 
-            sync_fake_dns_route_rules(rules, app_config, &fake_dns_route_cleanup_pairs);
+            sync_fake_dns_route_rules(rules, intent, &fake_dns_route_cleanup_pairs);
         }
     }
 
@@ -406,7 +453,7 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
         .get_mut("outbounds")
         .and_then(|v| v.as_array_mut())
     {
-        if !app_config.singbox_enable_app_groups {
+        if !intent.enable_app_groups {
             outbounds.retain(|ob| {
                 let tag = ob.get("tag").and_then(|v| v.as_str()).unwrap_or("");
                 !matches!(
@@ -418,217 +465,26 @@ fn apply_profile_settings_if_present(config_obj: &mut Map<String, Value>, app_co
     }
 }
 
-fn normalize_fakeip_range(raw: &str, fallback: &str) -> String {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        fallback.to_string()
-    } else {
-        trimmed.to_string()
-    }
-}
-
-fn build_fake_dns_server_value(app_config: &AppConfig) -> Value {
-    json!({
-        "tag": DNS_FAKEIP,
-        "type": "fakeip",
-        "inet4_range": normalize_fakeip_range(&app_config.singbox_fake_dns_ipv4_range, "198.18.0.0/15"),
-        "inet6_range": normalize_fakeip_range(&app_config.singbox_fake_dns_ipv6_range, "fc00::/18")
-    })
-}
-
-fn extract_fake_dns_server_range_pair(server: &Value) -> Option<(String, String)> {
-    if server.get("tag").and_then(|v| v.as_str()) != Some(DNS_FAKEIP) {
-        return None;
-    }
-
-    let inet4_range = server.get("inet4_range").and_then(|v| v.as_str())?.trim();
-    let inet6_range = server.get("inet6_range").and_then(|v| v.as_str())?.trim();
-    if inet4_range.is_empty() || inet6_range.is_empty() {
-        return None;
-    }
-
-    Some((inet4_range.to_string(), inet6_range.to_string()))
-}
-
-fn sync_fake_dns_server(servers: &mut Vec<Value>, app_config: &AppConfig) {
-    servers.retain(|server| server.get("tag").and_then(|v| v.as_str()) != Some(DNS_FAKEIP));
-    if app_config.singbox_fake_dns_enabled {
-        servers.push(build_fake_dns_server_value(app_config));
-    }
-}
-
-fn sync_fake_dns_rules(rules: &mut Vec<Value>, app_config: &AppConfig) {
-    rules.retain(|rule| rule.get("server").and_then(|v| v.as_str()) != Some(DNS_FAKEIP));
-
-    if !app_config.singbox_fake_dns_enabled {
-        return;
-    }
-
-    match normalize_fake_dns_filter_mode(app_config) {
-        FAKE_DNS_FILTER_GLOBAL_NON_CN => {
-            rules.push(json!({
-                "query_type": ["A", "AAAA"],
-                "server": DNS_FAKEIP
-            }));
-        }
-        _ => {
-            let rule = json!({
-                "query_type": ["A", "AAAA"],
-                "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN,
-                "server": DNS_FAKEIP
-            });
-
-            let insert_idx = rules
-                .iter()
-                .position(|item| {
-                    item.get("rule_set").and_then(|v| v.as_str())
-                        == Some(RS_GEOSITE_GEOLOCATION_NOT_CN)
-                })
-                .unwrap_or(rules.len());
-            rules.insert(insert_idx, rule);
-        }
-    }
-}
-
-fn sync_fake_dns_route_rules(
-    rules: &mut Vec<Value>,
-    app_config: &AppConfig,
-    cleanup_pairs: &[(String, String)],
-) {
-    rules.retain(|rule| !is_fake_dns_route_rule(rule, cleanup_pairs));
-
-    if !app_config.singbox_fake_dns_enabled {
-        return;
-    }
-
-    rules.push(json!({
-        "ip_cidr": [
-            normalize_fakeip_range(&app_config.singbox_fake_dns_ipv4_range, "198.18.0.0/15"),
-            normalize_fakeip_range(&app_config.singbox_fake_dns_ipv6_range, "fc00::/18")
-        ],
-        "outbound": TAG_DIRECT
-    }));
-}
-
-fn is_fake_dns_route_rule(rule: &Value, cleanup_pairs: &[(String, String)]) -> bool {
-    let Some(ip_cidr) = rule.get("ip_cidr").and_then(|v| v.as_array()) else {
-        return false;
-    };
-    let outbound = rule.get("outbound").and_then(|v| v.as_str()).unwrap_or("");
-    if outbound != TAG_DIRECT {
-        return false;
-    }
-
-    if ip_cidr.len() != 2 {
-        return false;
-    }
-
-    cleanup_pairs.iter().any(|(inet4, inet6)| {
-        [inet4.as_str(), inet6.as_str()]
-            .iter()
-            .all(|cidr| ip_cidr.iter().any(|v| v.as_str() == Some(*cidr)))
-    })
-}
-
-fn apply_inbounds_settings(config_obj: &mut Map<String, Value>, app_config: &AppConfig) {
-    let mut tun_addresses = vec![app_config.tun_ipv4.clone()];
-    if app_config.tun_enable_ipv6 {
-        tun_addresses.push(app_config.tun_ipv6.clone());
-    }
-    let tun_route_exclude_address =
-        resolve_tun_route_exclude_address_for_patch(config_obj, app_config);
-
-    let mut inbounds = Vec::new();
-
-    // mixed 是桌面端最通用的入口（HTTP + SOCKS），便于系统代理/浏览器直接使用。
-    inbounds.push(json!({
-        "type": "mixed",
-        "tag": "mixed-in",
-        "listen": proxy_listen_address(app_config),
-        "listen_port": app_config.proxy_port,
-        "set_system_proxy": app_config.system_proxy_enabled
-    }));
-
-    // TUN 模式依赖 sing-box 配置里显式存在 tun inbound，所以这里根据设置开关动态添加/移除。
-    if app_config.tun_enabled {
-        inbounds.push(json!({
-            "type": "tun",
-            "tag": "tun-in",
-            "address": tun_addresses,
-            "auto_route": app_config.tun_auto_route,
-            "strict_route": app_config.tun_strict_route,
-            "stack": app_config.tun_stack,
-            "mtu": app_config.tun_mtu,
-            // 1.14 新增：对系统 DNS 的接管方式（hijack 默认改写系统 DNS，disabled 保持不接管）
-            "dns_mode": normalize_dns_mode(&app_config.tun_dns_mode),
-            "route_exclude_address": tun_route_exclude_address
-        }));
-    }
-
+fn apply_inbounds_settings(config_obj: &mut Map<String, Value>, intent: &ConfigIntent) {
+    // TUN 路由排除网段：用户显式设置优先，否则沿用配置里已有的值，最后回退平台默认。
+    let existing = extract_existing_tun_route_exclude_address(config_obj);
+    let inbounds = build_inbounds(intent, existing);
     config_obj.insert("inbounds".to_string(), json!(inbounds));
-}
-
-fn resolve_tun_route_exclude_address_for_patch(
-    config_obj: &Map<String, Value>,
-    app_config: &AppConfig,
-) -> Vec<String> {
-    if let Some(explicit) = app_config.tun_route_exclude_address.clone() {
-        return explicit;
-    }
-
-    extract_existing_tun_route_exclude_address(config_obj)
-        .unwrap_or_else(default_tun_route_exclude_addresses)
-}
-
-fn extract_existing_tun_route_exclude_address(
-    config_obj: &Map<String, Value>,
-) -> Option<Vec<String>> {
-    config_obj
-        .get("inbounds")
-        .and_then(|value| value.as_array())
-        .and_then(|inbounds| {
-            inbounds.iter().find(|inbound| {
-                inbound.get("tag").and_then(|value| value.as_str()) == Some("tun-in")
-            })
-        })
-        .and_then(|tun_in| tun_in.get("route_exclude_address"))
-        .and_then(|value| value.as_array())
-        .map(|route_exclude_address| {
-            route_exclude_address
-                .iter()
-                .filter_map(|value| value.as_str().map(|cidr| cidr.to_string()))
-                .collect::<Vec<_>>()
-        })
-        .and_then(|route_exclude_address| {
-            normalize_persisted_tun_route_exclude_address(Some(route_exclude_address))
-        })
-}
-
-fn ensure_sniff_route_rule(rules: &mut Vec<Value>) -> usize {
-    if let Some(index) = rules
-        .iter()
-        .position(|rule| rule.get("action").and_then(|v| v.as_str()) == Some("sniff"))
-    {
-        index
-    } else {
-        rules.insert(0, json!({ "action": "sniff" }));
-        0
-    }
 }
 
 /// 确保 `services` 数组存在且包含 1.14 gRPC api 服务（形状与 config_generator 注入的
 /// 保持一致），已有 api 服务时同步端口 / dashboard 开关。
-fn ensure_api_service(config_obj: &mut serde_json::Map<String, Value>, app_config: &AppConfig) {
+fn ensure_api_service(config_obj: &mut serde_json::Map<String, Value>, intent: &ConfigIntent) {
     let mut api_service = json!({
         "type": "api",
         "listen": "127.0.0.1",
-        "listen_port": app_config.api_port,
-        "dashboard": { "enabled": app_config.enable_web_dashboard }
+        "listen_port": intent.api_port,
+        "dashboard": { "enabled": intent.web_dashboard }
     });
-    if app_config.enable_web_dashboard {
-        // 启用 dashboard 时同时提供 secret（用 listen_port 派生,与生成器一致）,
-        // 防止 dashboard 意外暴露时无鉴权
-        api_service["secret"] = json!(format!("{:x}", app_config.api_port));
+    if intent.web_dashboard {
+        // 启用 dashboard 时同时提供 secret（用 listen_port 派生一个本地 secret）
+        // 防止 dashboard 在公网意外暴露时无鉴权
+        api_service["secret"] = json!(format!("{:x}", intent.api_port));
     }
 
     let services = config_obj

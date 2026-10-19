@@ -2,8 +2,9 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useLocalStorage } from '@vueuse/core'
 import { connectionService } from '@/services/connection-service'
-import { proxyService, type ProxyGroup as ApiGroup } from '@/services/proxy-service'
-import type { GroupsData } from '@/services/proxy-service'
+import { proxyService } from '@/services/proxy-service'
+import type { Group as ApiGroup } from '@/types/generated/Group'
+import type { Groups } from '@/types/generated/Groups'
 import { useAppStore } from '@/stores/app/AppStore'
 
 export interface ProxyNode {
@@ -34,7 +35,7 @@ export const useProxyStore = defineStore('proxy', () => {
   const loading = ref(false)
   const batchTesting = ref(false)
   /** 原始 gRPC Groups 数据 */
-  const rawGroups = ref<GroupsData>({ group: [] })
+  const rawGroups = ref<Groups>({ group: [] })
   // 节点级测速状态:已删除。sing-box 1.14 gRPC 没有"测单节点" RPC(只有 URLTest 测整组),
   // 官方 sing-box-dashboard 也没有"测单节点"按钮。延迟刷新完全靠 SubscribeGroups 推送。
   const groupTestingMap = ref<Record<string, boolean>>({})
@@ -376,7 +377,7 @@ export const useProxyStore = defineStore('proxy', () => {
           (payload: unknown) => {
             // 后端 emit 的是 gRPC Groups 结构(可能含 group / outboundList 等字段)
             // 直接覆盖 rawGroups 即可,URLTest 完成后的 urlTestDelay 也会在这里更新
-            const data = payload as GroupsData
+            const data = payload as Groups
             if (data && Array.isArray((data as { group?: unknown[] }).group)) {
               // 清理 testedNodes:对 set 中每个 tag,看新 frame 的对应 item:
               // - 新 frame 没该 tag(切订阅/重启内核了)→ 移除

@@ -15,7 +15,7 @@ pub const STORAGE_KEY: &str = "custom_rules";
 
 /// 匹配类型（对应 sing-box route rule 的字段）。新增类型时需同步 `to_route_rule` 实现。
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../src/types/generated/CustomRuleMatchType.ts")]
+#[ts(export, export_to = "../../src/types/generated/CustomRuleMatchType.ts")]
 #[serde(rename_all = "snake_case")]
 pub enum CustomRuleMatchType {
     /// 精确域名（sing-box `domain`）
@@ -42,7 +42,7 @@ impl CustomRuleMatchType {
 
 /// 动作：直连 / 走代理 / 拒绝。代理动作可指定具体出站 tag。
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../src/types/generated/CustomRuleAction.ts")]
+#[ts(export, export_to = "../../src/types/generated/CustomRuleAction.ts")]
 #[serde(rename_all = "snake_case")]
 pub enum CustomRuleAction {
     Direct,
@@ -68,7 +68,7 @@ impl CustomRuleAction {
 
 /// 一条自定义规则。
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../src/types/generated/CustomRule.ts")]
+#[ts(export, export_to = "../../src/types/generated/CustomRule.ts")]
 pub struct CustomRule {
     /// 唯一标识（uuid）。前端编辑/删除按此定位。
     pub id: String,

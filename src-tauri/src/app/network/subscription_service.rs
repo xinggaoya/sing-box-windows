@@ -8,10 +8,11 @@ use crate::app::core::kernel_auto_manage::auto_manage_with_saved_config;
 use crate::app::core::proxy_service::apply_proxy_runtime_state;
 use crate::app::singbox::config_generator;
 use crate::app::singbox::config_validator::{self, ValidationOutcome};
+use crate::app::singbox::ownership::{self, Ownership};
 use crate::app::singbox::settings_patch::apply_port_settings_only;
 use crate::app::storage::enhanced_storage_service::{
     apply_runtime_config_update, db_get_app_config, db_get_subscriptions,
-    db_save_app_config_internal, db_save_subscriptions,
+    db_save_app_config_internal, db_save_subscriptions, get_enhanced_storage,
 };
 use crate::app::storage::state_model::AppConfig;
 use crate::utils::http_client;
@@ -402,6 +403,7 @@ pub async fn add_manual_subscription(
         &app_config,
         &target_path,
     )
+    .await
     .map_err(|e| format!("{}: {}", messages::ERR_PROCESS_SUBSCRIPTION_FAILED, e))?;
 
     if apply_runtime {
@@ -532,7 +534,7 @@ pub async fn get_current_proxy_mode(app_handle: AppHandle) -> Result<String, Str
 async fn download_and_process_subscription(
     url: &str,
     use_original_config: bool,
-    _app_handle: &AppHandle,
+    app_handle: &AppHandle,
     app_config: &AppConfig,
     target_path: &Path,
 ) -> Result<(Option<SubscriptionUserInfo>, ValidationOutcome), Box<dyn Error>> {
@@ -645,14 +647,16 @@ async fn download_and_process_subscription(
         "订阅配置已写入 {:?}（校验结果: {:?}）",
         target_path, outcome
     );
+    // 记录归属：这份配置由本程序生成，后续补丁按归属精确改写
+    persist_ownership(app_handle, target_path, &config).await;
     info!("订阅已更新并应用到模板，配置已保存");
     Ok((userinfo, outcome))
 }
 
-fn process_subscription_content(
+async fn process_subscription_content(
     content: String,
     use_original_config: bool,
-    _app_handle: &AppHandle,
+    app_handle: &AppHandle,
     app_config: &AppConfig,
     target_path: &Path,
 ) -> Result<ValidationOutcome, Box<dyn Error>> {
@@ -696,6 +700,8 @@ fn process_subscription_content(
         "手动配置已写入 {:?}（校验结果: {:?}）",
         target_path, outcome
     );
+    // 记录归属：这份配置由本程序生成，后续补丁按归属精确改写
+    persist_ownership(app_handle, target_path, &config).await;
     Ok(outcome)
 }
 
@@ -734,6 +740,28 @@ fn process_original_config(
 
     info!("原始订阅配置（修改端口后）已成功保存");
     Ok(outcome)
+}
+
+/// 记录"这份配置由本程序生成"的归属信息。
+///
+/// 归属随配置一起落库（`generic_config` 的 `managed_config_tags:<路径>`），
+/// 补丁路径据此判断"能不能按设置改写这份配置"——避免误改用户导入的原始配置。
+///
+/// 原始订阅配置（`use_original_config`）不由本程序生成，**不记录归属**。
+async fn persist_ownership(app_handle: &AppHandle, target_path: &Path, config: &Value) {
+    let storage = match get_enhanced_storage(app_handle).await {
+        Ok(storage) => storage,
+        Err(error) => {
+            warn!("保存配置归属失败（不影响订阅应用）: {}", error);
+            return;
+        }
+    };
+
+    let record = Ownership::claimed(config);
+    let key = ownership::storage_key(&target_path.to_string_lossy());
+    if let Err(error) = storage.save_generic_config(&key, &record).await {
+        warn!("保存配置归属失败（不影响订阅应用）: {}", error);
+    }
 }
 
 #[cfg(test)]

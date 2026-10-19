@@ -2,6 +2,13 @@
 
 ## [未发布]
 
+### ✨ 新功能
+
+- **代理页新增「出站总览」卡片**：展示当前全部出站分组/节点及延迟（按延迟排序，未测速显示 `—`）。此前 `get_outbounds` 后端早已就绪但前端 0 引用，属于"能力已具备、界面没接线"
+- **维护页新增「网络诊断」卡片**：5 项网络质量指标（`network_quality_test`）+ sing-box 1.14 服务状态列表（`get_services`）；并补齐后端 `probe_service_status` 命令用于逐个探测服务可用性
+- **规则页新增「自定义规则」面板**：完整的增 / 删 / 改 / 查 / 启停，走「写配置文件 + 重启内核」路径（与运行时规则语义不同，界面已明确区分）
+- **规则页运行时规则改为只读展示**：改用 sing-box 1.14 官方 gRPC `get_rules`，不再依赖已移除的 Clash API
+
 ### 🐛 问题修复
 
 - 修复后台运行一段时间后代理静默失效（需手动重启内核）：hysteria2 等 QUIC 隧道静默死亡（UDP NAT 超时/服务端断开）后，内核进程存活但所有代理流量黑洞。守护的连通性检测此前不走代理（直连探测永远成功），自愈永不触发；现改为通过内核 mixed 端口探测代理链路，并新增直连对照排除系统断网
@@ -28,6 +35,14 @@
 
 ### ♻️ 重构
 
+- **配置双模型收敛**（阶段 2）：此前 sing-box 配置有两条独立路径——`config_generator` 从零生成、`settings_patch` 在已有配置上打补丁——两者读同一批 `AppConfig` 字段、写同一批语义，**加一个设置项要改两处，漏改不报错**，只会让"生成的配置"与"补丁后的配置"悄悄分叉。
+  - `ConfigIntent`（`app/singbox/config_intent.rs`）：`AppConfig` → 配置语义的**唯一**纯映射
+  - `config_render`（`app/singbox/config_render.rs`）：入口构建、假 DNS server/规则等两条路径**共用**的纯函数
+  - 生成路径**不再回调**补丁路径（`render_skeleton` 不再调用 `apply_app_settings_to_config`）
+  - **配置归属（Ownership）**：补丁前先判定"这份配置是不是本程序的"（依据 `mixed-in` 入口 / 本程序自定义的 DNS server tag，**不靠通用分组名猜测**）。判定为外来配置时只同步端口，**不重建入口、不改写路由终点**——此前靠结构猜测，猜错就会把用户导入的机场原始配置改坏，且不报错、只表现为"能连但走错线路"
+  - 归属随配置落库（`generic_config` 的 `managed_config_tags:<路径>`），老库/手改过的配置回退为按内容推断
+  - 全程不改 Tauri 命令签名，前端零感知
+- **跨语言类型统一到 ts-rs**（阶段 0）：`src/types/generated/` 成为**唯一事实来源**（git 跟踪），删除前端手写的后端结构体 interface（`GroupItem`/`ProxyGroup`/`GroupsData`/`ClashModeStatus` 等）；`src-tauri/src/types/generated/` 是 gitignore 的本地中间产物，勿依赖
 - **TUN 切换状态机收敛**：「置位 → 应用代理配置 → 重启内核 → 失败回滚」此前在首页与托盘各有 3 处变体（回滚顺序、重试次数各不相同），现统一为 `useTunToggle`，平台提权与 sudo 密码交互通过回调注入
 - **内核压缩包解压统一**：下载与导入两条路径各有约 170 行几乎相同的解压代码，且行为已分叉（`.tgz` / `.tar` 只在导入路径可用）。现合并为 `archive.rs`，格式支持取并集，阻塞 IO 全部走 `spawn_blocking`（此前解压大包会阻塞 Tauri 异步运行时）
 - **应用配置改为 schema 驱动**：53 个配置字段此前在 7 处手工枚举（store 声明 / 持久化入参 / store return / 接口 / load / save / watch），加一个设置项要改 7 个地方且漏改无任何报错。现由 `appConfigSchema.ts` 单一声明，load/save/watch 自动生成
@@ -63,6 +78,12 @@
 
 ### 🐛 修复
 
+- **26 个 i18n key 层级错置，界面直接显示裸 key**（如代理页显示 `proxy.tabGroups`、
+  `proxy.badgeFavorites`，通知项显示 `notification.ipv4Preferred`，设置页显示
+  `setting.advanced.clashDirect`）。根因是这些 key 被放在语言包**根层**，而组件用
+  `t('proxy.xxx')` 引用——4 个语言包结构一致，所以"跨语言对齐检查"查不出来。
+  现已按实际引用层级归位（`proxy` / `notification` / `home` / `setting.advanced` /
+  `common` / `rules`），并补齐 4 个语言包均缺失的 `common.minimizedToTray`
 - **i18n 切换不生效、直接显示 key 原文**（用户报告：代理页显示 `proxy.badgeRecommended`、
   `PROXY.TABGROUPS` 而非文案）。根因有两处：
   1. **`LocaleStore` 从未把生效语言写入 vue-i18n 实例**。`createI18n` 建好后
@@ -78,8 +99,12 @@
 
 ### 🧪 测试与门禁
 
-- 前端测试基建（vitest + @vue/test-utils + jsdom）与 **159 项**测试，覆盖 TUN 切换回滚路径、排序分组、内核错误归因、事件精确退订、配置 schema 对称性、国旗码同步、订阅表单三来源、节点名→国旗解析、**locale 同步到 vue-i18n 实例**、**注入文案的语言切换**等此前零覆盖且易回归的逻辑
-- 后端新增 **35 项**测试（163 → 198）：数据库全列往返与迁移幂等、多库各自建表、压缩包四种格式解压、配置内存快照一致性、内核存活判定优先级
+- **配置生成黄金样本**（阶段 2）：把 4 组代表性 `AppConfig`（默认 / TUN / FakeDNS / 局域网）的生成结果固化为 JSON 快照（`app/singbox/testdata/config_golden/`），改配置生成逻辑时必须**逐字段不变**，否则说明配置语义漂移；`SINGBOX_BLESS_GOLDEN=1` 可重新生成
+- **双模型收敛断言**：新增「生成路径的产物再走一遍补丁路径必须逐字段不变」用例——收敛前补丁路径会重排 `dns.servers`、改写假 DNS 规则形态、覆盖 `route.final`，导致"订阅刚刷新的配置"与"改一次设置后的配置"不是一回事
+- **i18n 引用 key 存在性门禁**：`scripts/check-i18n.mjs` 新增扫描 `src/**/*.{ts,vue}` 中静态 `t('a.b')` 调用并校验 key 在基准语言包中存在（当前 532 个引用 key / 0 缺失）——正是这道门禁能提前发现上面那 26 个裸 key
+- **跨语言类型漂移守护**：新增 `src/types/generated/grpc-types.test.ts`，守护 ts-rs 导出路径、serde/ts rename 同步、生成类型不含 `bigint`、前端无手写 interface、barrel 导出齐全
+- 前端测试基建（vitest + @vue/test-utils + jsdom）与 **165 项**测试，覆盖 TUN 切换回滚路径、排序分组、内核错误归因、事件精确退订、配置 schema 对称性、国旗码同步、订阅表单三来源、节点名→国旗解析、**locale 同步到 vue-i18n 实例**、**注入文案的语言切换**等此前零覆盖且易回归的逻辑
+- 后端新增 **34 项**测试（198 → 232）：数据库全列往返与迁移幂等、多库各自建表、压缩包四种格式解压、配置内存快照一致性、内核存活判定优先级、**配置生成黄金样本**、**生成/补丁双模型收敛断言**、**配置归属判定**、**外来配置不被改写**
 - CI 新增 4 道门禁：`cargo fmt --check`、`prettier --check`、前端测试、i18n key 对齐校验；并统一了全库格式（此前 97 个文件未按 prettier 格式化，格式化工具形同虚设）
 - 测试过程中发现并修复 **3 个回归**：TUN 状态机重构时丢失的「索要 sudo 密码后重新执行应用与重启」、配置 schema 中空数组无法清空 `tun_include_macs`、**国旗 URL 大小写回归**（重构时误加 `.toUpperCase()`，而 `flag-icons` 文件名与 `import.meta.glob` 的 key 恒为小写 —— 症状是「节点都识别出来了但一个国旗都不显示」且无任何报错）
 

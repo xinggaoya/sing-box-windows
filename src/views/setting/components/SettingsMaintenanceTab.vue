@@ -194,6 +194,9 @@
     <div v-else class="empty-hint">
       {{ props.t('setting.backup.noPreview') }}
     </div>
+
+    <!-- 网络诊断 / 服务状态（sing-box 1.14 gRPC） -->
+    <SettingsDiagnosticsCard />
   </div>
 </template>
 
@@ -202,6 +205,7 @@ import { DownloadOutline, OpenOutline } from '@vicons/ionicons5'
 import type { UpdateChannel } from '@/stores/app/UpdateStore'
 import type { useUpdateStore } from '@/stores'
 import type { BackupImportResult } from '@/services/system-service'
+import SettingsDiagnosticsCard from './SettingsDiagnosticsCard.vue'
 
 type UpdateStoreLike = ReturnType<typeof useUpdateStore>
 

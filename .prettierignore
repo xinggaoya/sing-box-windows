@@ -1,0 +1,3 @@
+# ts-rs 生成的跨语言类型：机器产物，不参与格式化
+# 生成方式见 docs/development.md「跨语言类型生成」与 src-tauri/src/app/singbox_api/types.rs 顶部说明
+src/types/generated/

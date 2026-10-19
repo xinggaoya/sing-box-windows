@@ -1,8 +1,8 @@
 use super::*;
 use crate::app::core::tun_profile::default_tun_route_exclude_addresses;
+use crate::app::singbox::common::DNS_FAKEIP;
 use crate::app::storage::state_model::AppConfig;
 use serde_json::Value;
-
 fn assert_inbounds_do_not_contain_legacy_fields(config: &Value) {
     let inbounds = config
         .get("inbounds")

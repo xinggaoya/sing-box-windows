@@ -10,7 +10,7 @@ Rust + Tauri 后端根目录，聚合命令注册、插件配置、平台打包�
 src-tauri/
 ├── src/            # 业务代码（app/entity/platform/process/types/utils + lib.rs/main.rs/error.rs）
 │   └── app/singbox_api/  # sing-box 1.14+ 官方 gRPC API 客户端（gRPC-Web over HTTP/1.1）
-├── types/generated/ # ts-rs 生成的 TS 类型镜像（如 CustomRule.ts），勿手改
+├── types/generated/ # ts-rs 本地中间产物（gitignore），勿依赖勿修改
 ├── Cargo.toml      # 依赖、激进 release profile、平台差异依赖
 ├── tauri.conf.json # 应用窗口/打包配置（decorations:false，bundle 全平台目标）
 ├── resources/kernel/ # pnpm kernel:fetch 下载的内核二进制（不入库）
@@ -21,7 +21,7 @@ src-tauri/
 
 | Task           | Location          | Notes                               |
 | -------------- | ----------------- | ----------------------------------- |
-| 命令注册总入口 | `src/lib.rs`      | `invoke_handler`（84 个命令）暴露边界 |
+| 命令注册总入口 | `src/lib.rs`      | `invoke_handler`（87 个命令）暴露边界 |
 | 进程主入口     | `src/main.rs`     | 仅启动入口，逻辑薄                  |
 | 后端分层实现   | `src/app/`        | core/network/singbox/singbox_api/storage/system/tray |
 | gRPC API 客户端 | `src/app/singbox_api/` | 替代 experimental.clash_api    |

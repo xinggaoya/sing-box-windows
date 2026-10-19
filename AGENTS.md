@@ -21,9 +21,11 @@
 │       ├── entity/          # 数据模型（config/github）
 │       ├── platform/        # 平台特定实现（windows/linux/macos）
 │       ├── process/         # 内核进程管理 ProcessManager
-│       ├── types/generated/ # ts-rs 生成的 TS 类型镜像（如 CustomRule.ts）
+│       ├── types/generated/ # ts-rs 本地中间产物（gitignore），勿依赖勿修改
 │       └── utils/           # 通用工具（http/file/log/process 等）
 ├── docs/                # 开发文档（development/i18n/release-playbook/CHANGELOG 等）
+│                       # + gap-analysis-vs-mature-projects（竞品对标与改进批次建议）
+│                       # + implementation-plan-2026-10（存量接线 + 配置双模型收敛实施方案）
 └── .github/workflows/   # ci.yml（质量门禁）+ release.yml / promote-release.yml（两阶段发布）
 ```
 
@@ -59,13 +61,19 @@
 | 路由与托盘空白页     | `src/router/index.ts`, `src/views/BlankView.vue`  | `/blank` 是非标准但关键路径              |
 | 语言切换生效链路     | `src/stores/app/LocaleStore.ts`                    | `currentLocale` 必须同步到 `i18n.global.locale`，否则 store/service 层的 `i18n.global.t` 停在初始语言 |
 | gRPC API 客户端      | `src-tauri/src/app/singbox_api/`                  | 替代 experimental.clash_api              |
-| 后端入口与命令注册   | `src-tauri/src/lib.rs`                            | 86 个命令；setup 同步+异步初始化链       |
+| 后端入口与命令注册   | `src-tauri/src/lib.rs`                            | 87 个命令；setup 同步+异步初始化链       |
 | 内核生命周期         | `src-tauri/src/app/core/kernel_service/`          | orchestrator/runtime/guard/state/event/archive/health |
 | 内核存活判定         | `src-tauri/src/app/core/kernel_service/health.rs` | 唯一判定入口：端口 > 托管句柄 > 平台扫描 |
 | 内核版本管理         | `src-tauri/src/app/core/kernel_service/versioning.rs` | 默认最新版；指定版本下载前前端强制确认兼容风险 |
 | 订阅解析与模式切换   | `src-tauri/src/app/network/subscription_service/` | parser/mode/helpers 分层明显             |
-| sing-box 配置生成    | `src-tauri/src/app/singbox/config_generator.rs`   | 1.14 DNS（mDNS/evaluate）与自定义规则注入 |
-| 自定义规则 CRUD      | `src-tauri/src/app/core/proxy_service.rs` + `app/storage/custom_rule.rs` | 后端就绪，前端暂未接线 |
+| sing-box 配置生成    | `src-tauri/src/app/singbox/config_generator.rs`   | 1.14 DNS（mDNS）与自定义规则注入 |
+| 配置语义唯一来源    | `src-tauri/src/app/singbox/config_intent.rs`     | `AppConfig` → 配置语义的纯映射，生成/补丁共用 |
+| 配置渲染共享层       | `src-tauri/src/app/singbox/config_render.rs`      | 入口/假 DNS 等两条路径共用的纯函数 |
+| 配置补丁与归属       | `src-tauri/src/app/singbox/settings_patch.rs` + `ownership.rs` | 按归属打补丁；外来配置只改端口 |
+| 自定义规则 CRUD      | `src-tauri/src/app/core/proxy_service.rs` + `app/storage/custom_rule.rs` | 5 个命令，存 `generic_config` 表 key=`custom_rules` |
+| 自定义规则 UI        | `src/components/rules/CustomRulePanel.vue` + `src/stores/kernel/CustomRuleStore.ts` | 规则页 CRUD 面板（走文件+重启） |
+| 出站总览             | `src/components/proxy/OutboundOverviewCard.vue`   | 代理页出站与延迟总览 |
+| 网络诊断 / 服务状态  | `src/views/setting/components/SettingsDiagnosticsCard.vue` | 维护页诊断指标 + `probe_service_status` |
 | 内核压缩包解压       | `src-tauri/src/app/core/kernel_service/archive.rs`   | zip/tar.gz/tgz/tar；阻塞 IO 在 spawn_blocking |
 | 国家 / 地区常量     | `src/constants/countries.ts`                       | 国旗码由 scripts/gen-country-codes.mjs 生成 + 测试守护 |
 | 节点名 → 国旗解析   | `src/composables/useNodeFlag.ts`                   | 地名正则 → 本地化国名 → 裸 token 三层兜底；注意 flag-icons 文件名恒为小写 |
@@ -77,6 +85,8 @@
 | 应用内更新           | `src-tauri/src/app/system/update_service.rs`      | 自研 GitHub Release 下载，仅 Windows     |
 | 托盘                 | `src-tauri/src/app/tray/`                         | 启动偏好、状态刷新、动作分发             |
 | 发布流水线           | `.github/workflows/release.yml` + `promote-release.yml` | 两阶段发布，glibc 兼容检查         |
+| 竞品对标与改进清单   | `docs/gap-analysis-vs-mature-projects.md`          | 对标 Clash Verge Rev / v2rayN / FlClash 的差距与 5 批次建议 |
+| 实施方案（存量接线 + 双模型收敛） | `docs/implementation-plan-2026-10.md`      | 阶段 0 类型基线 / 阶段 1 前端接线 / 阶段 2 配置双模型收敛（7 步） |
 
 ## CODE MAP
 
@@ -89,6 +99,9 @@
 | `download_subscription` 等    | Tauri commands     | `src-tauri/src/app/network/subscription_service.rs`     | 订阅下载、切换、回滚                |
 | `EnhancedStorageService`      | Storage service    | `src-tauri/src/app/storage/enhanced_storage_service.rs` | 应用配置与结构化数据持久化          |
 | `config_generator`            | Config builder     | `src-tauri/src/app/singbox/config_generator.rs`         | 规则/outbounds/DNS 组装与 1.14 注入 |
+| `ConfigIntent`                | Config semantics   | `src-tauri/src/app/singbox/config_intent.rs`            | `AppConfig` → 配置语义的唯一映射点    |
+| `config_render`               | Config renderer    | `src-tauri/src/app/singbox/config_render.rs`             | 生成/补丁两条路径共用的纯函数         |
+| `Ownership`                   | Config ownership   | `src-tauri/src/app/singbox/ownership.rs`                 | 本程序创建的 tag 清单，判定配置归属   |
 | `event.rs` 中继               | Event relay        | `src-tauri/src/app/core/kernel_service/event.rs`        | 4 个 gRPC server-streaming → Tauri event |
 
 ## CONVENTIONS
@@ -97,7 +110,7 @@
 - 路径别名：`@/* -> src/*`。
 - TS 禁止：`as any`、`@ts-ignore`、`@ts-nocheck`。
 - Rust 约定：命令返回 `Result<T, String>`，模块/函数 snake_case。
-- 跨语言类型：Rust 结构体经 ts-rs 导出到两侧 `types/generated/`，不要手改生成文件。
+- 跨语言类型：Rust 结构体经 ts-rs 导出到 `src/types/generated/`（唯一事实来源，git 跟踪），不要手改生成文件；`src-tauri/src/types/generated/` 已 gitignore，是本地中间产物。
 - 格式化：2 空格、`singleQuote: true`、`semi: false`、`printWidth: 100`。
 
 ## ANTI-PATTERNS (THIS PROJECT)
@@ -143,7 +156,8 @@ pnpm tauri build:linux:rpm
 
 ## NOTES
 
-- 测试：后端 198 项（`cargo test`），前端 159 项（`vitest`，覆盖 TUN 切换状态机、排序分组、内核错误归因、事件退订、配置 schema、国旗码同步、订阅表单三来源、节点名→国旗解析等易回归逻辑）。CI（`.github/workflows/ci.yml`）在 PR/push 时跑 lint / type-check / prettier / i18n key 校验 / vitest / 内核目标矩阵 / cargo fmt / clippy / cargo test 全部门禁。
+- 测试：后端 232 项（`cargo test`），前端 165 项（`vitest`，覆盖 TUN 切换状态机、排序分组、内核错误归因、事件退订、配置 schema、国旗码同步、订阅表单三来源、节点名→国旗解析、跨语言类型漂移守护等易回归逻辑）。CI（`.github/workflows/ci.yml`）在 PR/push 时跑 lint / type-check / prettier / i18n key 校验 / vitest / 内核目标矩阵 / cargo fmt / clippy / cargo test 全部门禁。
+- **配置生成黄金样本**：`src-tauri/src/app/singbox/testdata/config_golden/*.json` 固化 4 组 `AppConfig` 的生成结果；改配置生成逻辑时必须让快照**逐字段不变**（`SINGBOX_BLESS_GOLDEN=1` 重新生成），否则说明配置语义漂移。
 - i18n：以 `zh-CN` 为基准，`pnpm test:i18n`（`scripts/check-i18n.mjs`）校验 4 个语言包 key 完全对齐；**禁止**在组件里写 `locale.startsWith('zh') ? '中文' : 'English'` 或 `t(key, '中文兜底')`，一律走 locale 语言包。
 - 事件：统一走 `eventService`，并使用 `on*()` 返回的 unlisten 做**精确**退订；「清空某事件全部监听器」是显式的 `removeAllListenersForEvent()`。已移除 `mitt` 事件总线（事件链从 4 跳缩到 2 跳）。
 - 发布为两阶段：tag 触发 `release.yml` 产 Pre-release（多平台矩阵，含 windows-arm64），再手动触发 `promote-release.yml` 转正式；Release Notes 取自 `docs/CHANGELOG.md`。

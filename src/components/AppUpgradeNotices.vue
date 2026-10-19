@@ -8,20 +8,10 @@ import { h, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from 'naive-ui'
 import type { DialogReactive } from 'naive-ui'
+import type { DeprecatedWarnings } from '@/types/generated/DeprecatedWarnings'
 import { useAppStore } from '@/stores/app/AppStore'
 import { useKernelStore } from '@/stores/kernel/KernelStore'
 import { invokeWithAppContext } from '@/services/invoke-client'
-
-interface DeprecatedWarningItem {
-  message?: string
-  description?: string
-  deprecatedVersion?: string
-  scheduledVersion?: string
-}
-
-interface DeprecatedWarningsResult {
-  warnings: DeprecatedWarningItem[]
-}
 
 const DNS_HIJACK_NOTICE_KEY = 'singbox.dnsHijackNoticeAcknowledged.v1'
 const DEPRECATED_NOTICE_KEY = 'singbox.deprecatedNoticeAcknowledged.v1'
@@ -76,7 +66,7 @@ const checkDeprecatedWarnings = async () => {
       deprecatedCheckState = 'done'
       return
     }
-    const result = await invokeWithAppContext<DeprecatedWarningsResult>(
+    const result = await invokeWithAppContext<DeprecatedWarnings>(
       'get_deprecated_warnings',
       undefined,
       { skipDataRestore: true },

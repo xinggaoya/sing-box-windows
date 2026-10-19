@@ -183,6 +183,20 @@ pub async fn get_deprecated_warnings(
         .map_err(|e| format!("获取弃用告警失败: {}", e))
 }
 
+/// 探测 sing-box 服务运行状态（SubscribeServiceStatus 首帧）
+/// 这是 1.14 替代 `experimental.clash_api` HTTP `/version` 的官方方式，
+/// 返回 { status, errorMessage }，status 取值 idle/starting/started/stopping/fatal。
+#[tauri::command]
+pub async fn probe_service_status(
+    app_handle: AppHandle,
+) -> Result<crate::app::singbox_api::ServiceStatusSnapshot, String> {
+    let (handle, _) = make_handle_async(app_handle).await?;
+    handle
+        .probe_service_status()
+        .await
+        .map_err(|e| format!("探测服务状态失败: {}", e))
+}
+
 /// 兼容占位：gRPC API 时代"API token"概念被 `secret` 取代，恒返回空串
 #[tauri::command]
 pub fn get_api_token() -> String {

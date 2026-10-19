@@ -20,7 +20,7 @@ sing-box-windows is a modern cross-platform proxy client for Windows (x64/ARM64)
 - **Backend**: Rust + Tauri 2.0 + tokio + sqlx(SQLite) + reqwest
 - **Architecture**: MVVM + modular design
 - **Persistence**: SQLite (`EnhancedStorageService`) + 前端持久化 composable（`src/stores/app/composables/persistence.ts`）
-- **Cross-language types**: ts-rs 由 Rust 结构体生成，落在 `src/types/generated/` 与 `src-tauri/src/types/generated/`，两侧都不手改
+- **Cross-language types**: ts-rs 由 Rust 结构体生成，落在 `src/types/generated/`（**唯一事实来源**，git 跟踪，两侧都不手改）；`src-tauri/src/types/generated/` 已被 `.gitignore` 忽略，是 ts-rs 本地中间产物，勿依赖勿修改
 - **Build**: Vite (frontend) + `scripts/tauri-wrapper.mjs`（所有 tauri 命令的包装器）
 
 ## Common Commands
@@ -129,7 +129,7 @@ src-tauri/src/
 ├── utils/           # http/file/log/process 等工具
 ├── error.rs         # 统一错误
 ├── main.rs          # 程序入口（薄）
-└── lib.rs           # run()：插件注册、setup（同步+异步初始化链）、86 个命令注册
+└── lib.rs           # run()：插件注册、setup（同步+异步初始化链）、87 个命令注册
 ```
 
 ## Key Features
@@ -167,7 +167,7 @@ src-tauri/src/
 5. Create page views in `views/`
 6. Implement backend commands in `src-tauri/src/app/`
 7. Update routing configuration (if needed)
-8. Register new Tauri commands in `lib.rs`（当前 86 个命令）
+8. Register new Tauri commands in `lib.rs`（当前 87 个命令）
 9. **按 DOC SYNC GATE 更新对应层级文档与 CHANGELOG**
 
 ### Store Development Patterns

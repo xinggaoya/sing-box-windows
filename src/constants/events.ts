@@ -1,5 +1,5 @@
 import type { KernelStatus, KernelDownloadPayload } from '@/services/kernel-service'
-import type { ProxyGroup as GroupsDataProxyGroup } from '@/services/proxy-service'
+import type { Group as GroupsDataProxyGroup } from '@/types/generated/Group'
 import type {
   TrafficDataPayload,
   ConnectionsDataPayload,
