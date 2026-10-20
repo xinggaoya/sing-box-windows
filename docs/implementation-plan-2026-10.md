@@ -9,7 +9,7 @@
 > | 阶段 | 状态 | 落地 |
 > |---|---|---|
 > | 阶段 0 类型基线 | ✅ | `src-tauri/src/app/singbox_api/types.rs` 全量 ts-rs 导出 → 仓库根 `src/types/generated/`；前端手写 interface 删除；`src/types/generated/grpc-types.test.ts` 守护 |
-> | 阶段 1 存量接线 | ✅ | `OutboundOverviewCard.vue` / `SettingsDiagnosticsCard.vue` / `CustomRulePanel.vue` + `custom-rule-service.ts` + `CustomRuleStore.ts` + `probe_service_status` 命令 |
+> | 阶段 1 存量接线 | ✅ | `OutboundsView.vue` / `SettingsDiagnosticsCard.vue` / `CustomRulePanel.vue` + `custom-rule-service.ts` + `CustomRuleStore.ts` + `probe_service_status` 命令 |
 > | 阶段 2 双模型收敛 | ✅ | `config_intent.rs` / `config_render.rs` / `ownership.rs`；生成路径不再回调补丁路径；补丁路径改为按归属打补丁 |
 >
 > 验收：后端 232 项测试 + 黄金样本逐字段 diff 为空 + 「生成/补丁双模型收敛断言」通过；前端 165 项测试；
@@ -164,7 +164,7 @@ import type { ClashModeStatus } from '@/types/generated/ClashModeStatus'
 | 后端 | 无需改动（`lib.rs:258` 已注册） |
 | Service | `src/services/proxy-service.ts` 新增 `getOutbounds(): Promise<OutboundList>` |
 | Store | `src/stores/kernel/ProxyStore.ts` 新增 `outbounds` state + `refreshOutbounds()` |
-| UI | `src/views/ProxyView.vue` 新增"出站总览"折叠面板：tag / type / delay（`urlTestDelay` 毫秒，0 显示"—"） |
+| UI | **独立页面** `src/views/OutboundsView.vue`（路由 `/outbounds`，侧边栏「出站」入口）+ `src/composables/useOutboundList.ts`：tag / type / delay（`urlTestDelay` 毫秒，0 显示"—"），支持名称/类型搜索。**不得**放进代理页（同层元素会压扁代理区） |
 | 价值 | "全节点按延迟排序"的数据源；用户可直观看到所有出站而不只是分组内节点 |
 | 验收 | 面板在无节点/内核未运行时显示空态而非报错；刷新按钮复用现有 `useCleanup` 退订模式 |
 

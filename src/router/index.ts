@@ -35,6 +35,14 @@ const router = createRouter({
           component: () => import('@/views/ProxyView.vue'),
         },
         {
+          // 出站总览：内核里所有出站（含分组）的平铺快照。
+          // 独立成页面而不是代理页里的卡片/抽屉——代理页是定高布局，
+          // 同层挂内容高度不定的面板会把代理组与节点列表挤没。
+          path: '/outbounds',
+          name: 'Outbounds',
+          component: () => import('@/views/OutboundsView.vue'),
+        },
+        {
           path: '/log',
           name: 'Log',
           component: () => import('@/views/LogView.vue'),

@@ -183,8 +183,12 @@
       </div>
     </div>
 
-    <!-- 出站总览：内核中所有出站（含分组）的平铺快照 -->
-    <OutboundOverviewCard class="outbound-overview" />
+    <!--
+      代理页只放「节点 / 分组」这一个主题。
+      「出站总览」已独立成页面（路由 /outbounds，侧边栏「出站」入口）——
+      代理页主体是「定高 + 内部滚动」布局，同层再放有内容高度的卡片/面板
+      会把 .split-view 压扁，代理组与节点列表会直接不可见。
+    -->
   </div>
 </template>
 
@@ -204,7 +208,6 @@ import { getDisplayNodeName, getNodeFlagUrl } from '@/composables/useNodeFlag'
 import { useI18n } from 'vue-i18n'
 import ToolbarBar from '@/components/common/ToolbarBar.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import OutboundOverviewCard from '@/components/proxy/OutboundOverviewCard.vue'
 
 defineOptions({
   name: 'ProxyView',

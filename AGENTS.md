@@ -72,7 +72,7 @@
 | 配置补丁与归属       | `src-tauri/src/app/singbox/settings_patch.rs` + `ownership.rs` | 按归属打补丁；外来配置只改端口 |
 | 自定义规则 CRUD      | `src-tauri/src/app/core/proxy_service.rs` + `app/storage/custom_rule.rs` | 5 个命令，存 `generic_config` 表 key=`custom_rules` |
 | 自定义规则 UI        | `src/components/rules/CustomRulePanel.vue` + `src/stores/kernel/CustomRuleStore.ts` | 规则页 CRUD 面板（走文件+重启） |
-| 出站总览             | `src/components/proxy/OutboundOverviewCard.vue`   | 代理页出站与延迟总览 |
+| 出站总览页面        | `src/views/OutboundsView.vue` + `src/composables/useOutboundList.ts` | 侧边栏「出站」独立页（路由 `/outbounds`），代理页零占用 |
 | 网络诊断 / 服务状态  | `src/views/setting/components/SettingsDiagnosticsCard.vue` | 维护页诊断指标 + `probe_service_status` |
 | 内核压缩包解压       | `src-tauri/src/app/core/kernel_service/archive.rs`   | zip/tar.gz/tgz/tar；阻塞 IO 在 spawn_blocking |
 | 国家 / 地区常量     | `src/constants/countries.ts`                       | 国旗码由 scripts/gen-country-codes.mjs 生成 + 测试守护 |

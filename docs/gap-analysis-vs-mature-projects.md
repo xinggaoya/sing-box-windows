@@ -61,11 +61,12 @@
 
 ### A1. `get_outbounds` 后端就绪，前端零消费
 
-> ✅ **已完成（2026-10-19）**：新增 `src/components/proxy/OutboundOverviewCard.vue`（代理页「出站总览」，按延迟排序），经 `src/services/proxy-service.ts` 的 `getOutbounds()` 消费。
+> ✅ **已完成（2026-10-19）**：新增「出站总览」页（`src/views/OutboundsView.vue` + `src/composables/useOutboundList.ts`，按延迟排序），经 `src/services/proxy-service.ts` 的 `getOutbounds()` 消费。
+> ⚠️ **2026-10-20 修正形态**：最初实现为代理页底部的卡片，与代理区争抢高度导致代理页主体被压扁；中间态改成抽屉仍占用代理页工具栏。现改为**独立页面**（侧边栏「出站」入口，路由 `/outbounds`），代理页零占用。
 
 - 证据：`src-tauri/src/app/singbox_api/client.rs:245` 已实现；`src/` 下 **0 处**引用
 - 价值：`GetOutbounds` 返回全部出站（含延迟），是"全节点按延迟排序"、"出站总览"、"服务列表"的数据源
-- 建议：主页节点选择器支持"全部节点按延迟排序"；代理页增加"出站总览"折叠面板
+- 建议：主页节点选择器支持"全部节点按延迟排序"；出站总览独立成页面（已实现，路由 `/outbounds`）
 
 ### A2. `network_quality_test` 后端就绪，前端零消费
 

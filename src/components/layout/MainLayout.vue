@@ -74,6 +74,7 @@ import {
   DocumentTextOutline,
   SettingsOutline,
   FolderOutline,
+  LayersOutline,
 } from '@vicons/ionicons5'
 import { useMessage } from 'naive-ui'
 import UpdateModal from '@/components/UpdateModal.vue'
@@ -148,6 +149,7 @@ const currentMenu = computed(() => {
     '/setting': 'settings',
     '/connections': 'connections',
     '/proxy': 'proxy',
+    '/outbounds': 'outbounds',
     '/rules': 'rules',
   }
   return pathToMenuMap[path] || path.slice(1)
@@ -157,6 +159,7 @@ const menuItems = computed<NavItem[]>(() => [
   { label: t('nav.home'), key: 'home', icon: HomeOutline },
   { label: t('nav.subscription'), key: 'subscription', icon: FolderOutline },
   { label: t('nav.proxy'), key: 'proxy', icon: SwapHorizontalOutline },
+  { label: t('nav.outbounds'), key: 'outbounds', icon: LayersOutline },
   { label: t('nav.connections'), key: 'connections', icon: LinkOutline },
   { label: t('nav.logs'), key: 'logs', icon: DocumentTextOutline },
   // 规则页隐藏：sing-box 官方 gRPC API 未暴露规则管理接口（see docs/sing-box-api-migration.md）
@@ -175,6 +178,7 @@ const onSelect = (key: string) => {
       settings: '/setting',
       connections: '/connections',
       proxy: '/proxy',
+      outbounds: '/outbounds',
       rules: '/rules',
     }
     router.push(routeMap[key] || `/${key}`)
