@@ -108,17 +108,6 @@ pub fn install_direct_subscriber(sink: Option<&LogSink>) {
     info!("日志写入目录：{}", sink.dir().display());
 }
 
-/// 初始化日志：控制台输出 + 按天轮转的文件输出
-/// 返回日志目录，供后续定时清理使用
-///
-/// 过渡入口：devtools 接线完成后由 `lib.rs` 直接调用 `create_log_sink()` +
-/// `install_direct_subscriber()`。
-pub fn init_logging() -> Option<PathBuf> {
-    let sink = create_log_sink();
-    install_direct_subscriber(sink.as_ref());
-    current_log_dir()
-}
-
 /// 启动定时清理任务，仅保留最新的日志文件
 pub fn spawn_log_cleanup_task(log_dir: PathBuf) -> JoinHandle<()> {
     tauri::async_runtime::spawn(async move {

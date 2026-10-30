@@ -1,4 +1,5 @@
 use super::*;
+use log::Log;
 
 #[test]
 fn unmatched_target_falls_back_to_global_level() {
@@ -100,4 +101,74 @@ fn format_record_line_includes_file_line_and_level() {
     assert!(line.contains(" INFO "));
     assert!(line.contains("core.rs:42"));
     assert!(line.ends_with("内核已启动"));
+}
+
+#[test]
+fn bridge_logger_writes_to_file() {
+    let dir = std::env::temp_dir().join(format!("sbw-bridge-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+
+    let (sink, guard) =
+        crate::utils::log_util::create_log_sink_in(dir.clone()).expect("应创建日志 sink");
+    let logger = FileConsoleLogger::new(
+        sink.writer().clone(),
+        LogDirectiveFilter::parse("info,sing_box_windows=debug"),
+    );
+
+    let args = format_args!("桥接输出");
+    let record = log::Record::builder()
+        .args(args)
+        .level(log::Level::Info)
+        .target("sing_box_windows::app")
+        .file(Some("core.rs"))
+        .line(Some(7))
+        .build();
+    logger.log(&record);
+
+    drop(guard);
+
+    let entries: Vec<_> = std::fs::read_dir(&dir)
+        .expect("日志目录应存在")
+        .filter_map(Result::ok)
+        .collect();
+    assert_eq!(entries.len(), 1);
+
+    let content = std::fs::read_to_string(entries[0].path()).expect("日志文件应可读");
+    assert!(content.contains("桥接输出"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn bridge_logger_respects_filter() {
+    let dir = std::env::temp_dir().join(format!("sbw-bridge-filter-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+
+    let (sink, guard) =
+        crate::utils::log_util::create_log_sink_in(dir.clone()).expect("应创建日志 sink");
+    let logger = FileConsoleLogger::new(sink.writer().clone(), LogDirectiveFilter::parse("warn"));
+
+    let args = format_args!("不该出现");
+    let record = log::Record::builder()
+        .args(args)
+        .level(log::Level::Info)
+        .target("any")
+        .build();
+
+    assert!(!logger.enabled(record.metadata()));
+
+    // 被过滤掉的记录不应落盘
+    logger.log(&record);
+    drop(guard);
+
+    let entries: Vec<_> = std::fs::read_dir(&dir)
+        .expect("日志目录应存在")
+        .filter_map(Result::ok)
+        .collect();
+    assert_eq!(entries.len(), 1);
+
+    let content = std::fs::read_to_string(entries[0].path()).expect("日志文件应可读");
+    assert!(!content.contains("不该出现"));
+
+    let _ = std::fs::remove_dir_all(&dir);
 }

@@ -14,7 +14,9 @@ pub fn recolor_icon_for_mode(base_icon: &Image<'_>, mode: TrayProxyMode) -> Opti
     };
 
     let mut recolored = Vec::with_capacity(base_icon.rgba().len());
-    for pixel in base_icon.rgba().chunks_exact(4) {
+    // `as_chunks` 自 Rust 1.88 稳定（与本 crate 的 MSRV 一致），语义与 `chunks_exact` 相同
+    let (pixels, _remainder) = base_icon.rgba().as_chunks::<4>();
+    for pixel in pixels {
         let alpha = pixel[3];
         if alpha == 0 {
             recolored.extend_from_slice(pixel);

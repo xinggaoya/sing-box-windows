@@ -6,6 +6,8 @@
 //! 「文件 + 控制台」输出，通过官方 `Builder::attach_logger` 挂载回插件。
 
 use chrono::Local;
+use std::io::Write;
+use tracing_appender::non_blocking::NonBlocking;
 
 /// 默认日志指令串，与 `log_util::build_env_filter` 的缺省值保持一致
 pub const DEFAULT_LOG_DIRECTIVES: &str = "debug,sing_box_windows=debug,tauri=info,sqlx=warn";
@@ -157,6 +159,47 @@ pub fn format_record_line(record: &log::Record) -> String {
         record.line(),
         &record.args().to_string(),
     )
+}
+
+/// devtools 模式下的日志写入器
+///
+/// 插件的 `BridgeLayer` 会把 tracing 事件转成 `log::Record` 转发到这里，
+/// 因此文件与控制台输出与 DevTools 面板的数据同源。
+pub struct FileConsoleLogger {
+    writer: NonBlocking,
+    filter: LogDirectiveFilter,
+}
+
+impl FileConsoleLogger {
+    /// 用非阻塞文件 writer + 过滤器构造
+    pub fn new(writer: NonBlocking, filter: LogDirectiveFilter) -> Self {
+        Self { writer, filter }
+    }
+}
+
+impl log::Log for FileConsoleLogger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        self.filter.enabled(metadata.target(), metadata.level())
+    }
+
+    fn log(&self, record: &log::Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+
+        let line = format_record_line(record);
+        // `log::Log::log` 只拿到 `&self`，而 `NonBlocking` 的写接口需要 `&mut`，
+        // 克隆一份写入（克隆共享同一条 channel）
+        let mut writer = self.writer.clone();
+        let _ = writer.write_all(line.as_bytes());
+        let _ = writer.write_all(b"\n");
+        println!("{line}");
+    }
+
+    fn flush(&self) {
+        let mut writer = self.writer.clone();
+        let _ = writer.flush();
+    }
 }
 
 #[cfg(test)]

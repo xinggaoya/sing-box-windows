@@ -1,5 +1,7 @@
 pub mod app_util;
 pub mod config_util;
+#[cfg(feature = "devtools")]
+pub mod devtools_util;
 pub mod file_util;
 pub mod http_client;
 pub mod log_bridge;

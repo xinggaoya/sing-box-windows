@@ -6,7 +6,7 @@ authors = ["XingGao"]
 license = "MIT"
 repository = "https://github.com/xinggaoya/sing-box-windows"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.88"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,6 +16,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.5", features = [] }
+
+[features]
+default = []
+# 开发态调试面板（CrabNebula DevTools）；release 构建不启用，产物不含插件
+devtools = ["dep:tauri-plugin-devtools", "dep:tauri-plugin-devtools-app", "tauri/dynamic-acl"]
 
 [dependencies]
 # 使用最新稳定版本
@@ -34,6 +39,9 @@ serde_yaml = "0.9"
 
 # Tauri 2.0 最新版本
 tauri = { version = "2.10.2", features = ["tray-icon", "unstable", "devtools"] }
+# 开发态调试插件（仅 cargo feature `devtools` 启用时参与编译）
+tauri-plugin-devtools = { version = "2.2.3", optional = true }
+tauri-plugin-devtools-app = { version = "2.1.4", optional = true }
 reqwest = { version = "0.12", features = ["json", "stream", "native-tls-vendored"] }
 dirs = "5.0.1"
 tokio = { version = "1.48", features = ["full"] }

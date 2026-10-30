@@ -39,10 +39,28 @@ fn resolve_startup_launch_context<R: tauri::Runtime>(app: &tauri::App<R>) -> Sta
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 初始化日志，支持文件输出 + 定期清理
-    let log_dir = log_util::init_logging();
+    // 准备日志 sink（日志目录 + 非阻塞文件 writer），devtools 与直连模式共用
+    let log_sink = log_util::create_log_sink();
 
-    tauri::Builder::default()
+    // devtools 模式：插件接管全局 tracing subscriber，日志经 log::Log 桥接输出
+    // （必须早于任何全局 subscriber 安装，否则插件 init 会 panic）
+    #[cfg(all(feature = "devtools", debug_assertions))]
+    let devtools_plugins = crate::utils::devtools_util::init(log_sink);
+
+    // 直连模式：自行安装全局 fmt subscriber（release / 未启用 devtools feature）
+    #[cfg(not(all(feature = "devtools", debug_assertions)))]
+    log_util::install_direct_subscriber(log_sink.as_ref());
+
+    // 日志目录，供后续定时清理使用
+    let log_dir = log_util::current_log_dir();
+
+    let builder = tauri::Builder::default();
+    // devtools 模式：注册调试面板插件
+    #[cfg(all(feature = "devtools", debug_assertions))]
+    let builder = builder
+        .plugin(devtools_plugins.0)
+        .plugin(devtools_plugins.1);
+    builder
         .on_window_event(|window, event| {
             if window.label() != "main" {
                 return;
