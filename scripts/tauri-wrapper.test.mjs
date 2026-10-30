@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import {
   applyAliasArgs,
+  applyDevtoolsFeature,
   getOptionValue,
   hasOption,
   insertBeforeSeparator,
@@ -30,6 +31,24 @@ test('applyAliasArgs 应支持 Linux RPM 构建别名', () => {
     '--bundles',
     'rpm'
   ])
+})
+
+test('applyDevtoolsFeature 只对 dev 命令注入 devtools feature', () => {
+  assert.deepEqual(applyDevtoolsFeature(['dev']), ['dev', '--features', 'devtools'])
+  assert.deepEqual(applyDevtoolsFeature(['build']), ['build'])
+  assert.deepEqual(applyDevtoolsFeature(['build:windows:arm64']), ['build:windows:arm64'])
+})
+
+test('applyDevtoolsFeature 不覆盖用户显式指定的 features', () => {
+  const args = applyDevtoolsFeature(['dev', '--features', 'custom'])
+
+  assert.deepEqual(args, ['dev', '--features', 'custom'])
+})
+
+test('applyDevtoolsFeature 保留 dev 命令的其他参数', () => {
+  const args = applyDevtoolsFeature(['dev', '--no-watch'])
+
+  assert.deepEqual(args, ['dev', '--features', 'devtools', '--no-watch'])
 })
 
 test('hasOption 和 getOptionValue 支持普通与等号参数', () => {

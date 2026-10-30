@@ -55,7 +55,7 @@ export function applyAliasArgs(rawArgs) {
 }
 
 export async function main(rawArgs = process.argv.slice(2)) {
-  let args = applyAliasArgs(rawArgs)
+  let args = applyDevtoolsFeature(applyAliasArgs(rawArgs))
 
   const command = args[0] ?? ''
   const target = resolveTargetFromArgs(args)
@@ -99,6 +99,21 @@ export async function main(rawArgs = process.argv.slice(2)) {
   return runCommand(tauriCommand.command, tauriCommand.args, {
     shell: tauriCommand.shell
   })
+}
+
+/**
+ * dev 命令默认启用 devtools cargo feature（CrabNebula DevTools 调试插件）。
+ * build 系列命令不注入，保证 release 产物不含插件、也不打开 tauri/tracing 埋点。
+ */
+export function applyDevtoolsFeature(args) {
+  const command = args[0] ?? ''
+  if (command !== 'dev') {
+    return args
+  }
+  if (hasOption(args, '--features', '-f')) {
+    return args
+  }
+  return [args[0], '--features', 'devtools', ...args.slice(1)]
 }
 
 export function requireTarget(platform, arch) {
