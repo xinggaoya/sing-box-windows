@@ -918,3 +918,45 @@ Task 4 (wrapper 注入) ─────────────▶ Task 5
 ```
 
 Task 1 与 Task 2 可并行；Task 3 依赖两者；Task 4 与 Task 3 无耦合，可并行。
+
+---
+
+## 执行记录（2026-10-30）
+
+### 提交
+
+| commit | 内容 |
+| --- | --- |
+| `dcaded4` | Task 1：日志桥接模块（RUST_LOG 指令过滤 + 行格式化） |
+| `e0e055c` | Task 2：拆分 log_util，抽出可复用的日志 sink 与直连 subscriber 安装入口 |
+| `7b257e0` | Task 3：接入 devtools 插件（cargo feature 隔离 + 插件装配 + lib.rs 接线） |
+| `ace37ba` | Task 4：dev 命令自动启用 devtools feature |
+| `413e822` | Task 5：CI 门禁与文档同步 |
+| `e2f0503` | e2e 修复：桥接日志行粘连（行内容与换行一次性写入） |
+| `9aaaf33` | 评审修复批：过滤语义对齐 EnvFilter、UTC 时间戳、初始化失败可降级、CI 双路径校验 |
+
+### Rulings（执行中的判断，均已记入提交信息或本表）
+
+- 测试函数命名用**英文 snake_case**（仓库既有约定，如 `parse_uri_list_vless_trojan`），计划草稿里的中文用例名作废
+- 计划里 `longest_prefix_wins` 的期望自相矛盾（spec `sing_box_windows::app=trace` 已允许 Debug），按「最长前缀优先」修正
+- `create_log_sink_in` 返回 `io::Result` 而非 `Option`：保留原「文件日志初始化失败，使用控制台日志: {e}」的错误信息
+- `lib.rs` 用 `let builder = builder.plugin(..)` 遮蔽而非 `let mut builder`：否则非 devtools 构建触发 `unused_mut`（`-D warnings` 直接失败）
+- MSRV 1.77.2 → 1.88 后 clippy 的 `chunks_exact_to_as_chunks` 开始生效 → 连带修 `src/app/tray/icon.rs`（语义等价，模块自带单测覆盖）
+- 滚动日志文件名带日期后缀（`app.log.YYYY-MM-DD`），测试按目录扫描前缀而非写死文件名
+
+### 端到端验证证据
+
+- wrapper 注入生效：`cargo run --no-default-features --features devtools`
+- 插件初始化成功并打印面板地址：`Tauri Devtools v2.2.3` / `Tauri Devtools App v2.1.4` → `https://devtools.crabnebula.dev/dash/127.0.0.1/3033`
+- 桥接生效：终端与文件日志均为桥接格式（UTC 微秒时间戳 + `Z`、级别右对齐 5、`file:line` 齐全）
+- 面板数据通路：`rs.devtools.instrument.Instrument/WatchUpdates` 流 10 秒回传数百 KB，含本项目日志帧与本项目模块 span（`app_lib::app::core::kernel_service::event` / `guard` / `proxy_service::status` / `singbox_api::client`）及 Tauri 内部 span（`app::plugin::register` / `plugin::hooks::initialize`）
+- release 隔离：`cargo tree -e normal` 不带 feature → `tauri-plugin-devtools` 计数 0；带 feature → 3
+
+### 评审结论与处置
+
+fresh reviewer 给出 0 Critical、5 Important、10 Minor。已修：过滤语义与 `EnvFilter` 不一致（含非法/空 `RUST_LOG` 下两种模式相反）、CI 只编译 devtools 路径（release 分支失去编译期护栏）、wrapper 脚本测试从未进 CI、插件 init 失败即 panic 且 sink 失败时零日志、时间戳与直连模式不一致。Minor 中同步处理：终端写失败不再 panic、release+feature 组合给出提示、日志目录提示补齐、guard 重复初始化告警、文档与实现对齐。未处理并记档：`NonBlocking` 每次日志克隆 writer 的热路径开销（M-2）、`log_bridge` 未随 feature 门控以保单测可跑（M-10）。
+
+### 既有失败（非本次引入，未修）
+
+- `pnpm format:check` 报 14 个 `src/` 文件格式漂移（本次未触碰 `src/`）
+- `scripts/fetch-kernel.test.mjs` 期望 `--all` 4 个目标、实际 5 个（目标矩阵已扩到 5 平台）；该文件不在任何 npm script / CI 门禁内
