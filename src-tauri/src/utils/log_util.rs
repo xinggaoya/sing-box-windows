@@ -7,49 +7,116 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::async_runtime::JoinHandle;
 use tracing::{info, warn};
 use tracing_appender::{
-    non_blocking::{self, WorkerGuard},
+    non_blocking::{self, NonBlocking, WorkerGuard},
     rolling,
 };
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 static FILE_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
+static LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 const CLEANUP_INTERVAL_HOURS: u64 = 24;
+
+/// 日志 sink：非阻塞文件 writer + 所属目录
+///
+/// devtools 模式与直连模式共用同一份 sink，区别只在于「谁来写」。
+pub struct LogSink {
+    writer: NonBlocking,
+    dir: PathBuf,
+}
+
+impl LogSink {
+    /// 日志目录
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    /// 非阻塞文件 writer
+    pub fn writer(&self) -> &NonBlocking {
+        &self.writer
+    }
+}
+
+/// 在指定目录创建日志 sink
+///
+/// guard 交调用方持有：只有 drop guard 才会通知后台线程退出并刷盘
+/// （`NonBlocking::flush` 是空操作）。
+pub fn create_log_sink_in(dir: PathBuf) -> io::Result<(LogSink, WorkerGuard)> {
+    let (writer, guard) = create_file_writer(&dir)?;
+    Ok((LogSink { writer, dir }, guard))
+}
+
+/// 在默认工作目录创建日志 sink
+///
+/// guard 存入模块级 OnceLock，保证进程存活期写入线程不被回收。
+pub fn create_log_sink() -> Option<LogSink> {
+    let dir = match prepare_log_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            eprintln!("文件日志初始化失败，使用控制台日志: {e}");
+            return None;
+        }
+    };
+
+    let (sink, guard) = match create_log_sink_in(dir.clone()) {
+        Ok(pair) => pair,
+        Err(e) => {
+            eprintln!("文件日志初始化失败，使用控制台日志: {e}");
+            return None;
+        }
+    };
+
+    // 保存 guard，确保异步写入线程存活
+    let _ = FILE_GUARD.set(guard);
+    let _ = LOG_DIR.set(dir);
+    Some(sink)
+}
+
+/// 当前日志目录（供定时清理任务使用）
+pub fn current_log_dir() -> Option<PathBuf> {
+    LOG_DIR.get().cloned()
+}
+
+/// 直连模式：安装全局 fmt subscriber（文件 + 控制台）
+///
+/// devtools 模式下**不能**调用本函数——全局 subscriber 已被插件占用，
+/// 再次设置会失败（`tracing_subscriber` 的全局默认只能设置一次）。
+pub fn install_direct_subscriber(sink: Option<&LogSink>) {
+    let env_filter = build_env_filter();
+
+    let Some(sink) = sink else {
+        init_console_only(env_filter);
+        return;
+    };
+
+    let combined_writer = sink.writer().clone().and(io::stdout);
+
+    if let Err(e) = fmt()
+        .with_env_filter(env_filter.clone())
+        .with_target(false)
+        .with_thread_ids(true)
+        .with_file(true)
+        .with_line_number(true)
+        .with_writer(combined_writer)
+        .try_init()
+    {
+        eprintln!("初始化日志订阅器失败，回退到控制台日志: {e}");
+        init_console_only(env_filter);
+        return;
+    }
+
+    info!("日志写入目录：{}", sink.dir().display());
+}
 
 /// 初始化日志：控制台输出 + 按天轮转的文件输出
 /// 返回日志目录，供后续定时清理使用
+///
+/// 过渡入口：devtools 接线完成后由 `lib.rs` 直接调用 `create_log_sink()` +
+/// `install_direct_subscriber()`。
 pub fn init_logging() -> Option<PathBuf> {
-    let env_filter = build_env_filter();
-
-    match prepare_log_dir().and_then(|dir| create_file_writer(&dir).map(|writer| (dir, writer))) {
-        Ok((log_dir, (writer, guard))) => {
-            let combined_writer = writer.and(io::stdout);
-
-            if let Err(e) = fmt()
-                .with_env_filter(env_filter.clone())
-                .with_target(false)
-                .with_thread_ids(true)
-                .with_file(true)
-                .with_line_number(true)
-                .with_writer(combined_writer)
-                .try_init()
-            {
-                eprintln!("初始化日志订阅器失败，回退到控制台日志: {e}");
-                init_console_only(env_filter);
-                return None;
-            }
-
-            // 保存 guard，确保异步写入线程存活
-            let _ = FILE_GUARD.set(guard);
-            info!("日志写入目录：{}", log_dir.display());
-            Some(log_dir)
-        }
-        Err(e) => {
-            eprintln!("文件日志初始化失败，使用控制台日志: {e}");
-            init_console_only(env_filter);
-            None
-        }
-    }
+    let sink = create_log_sink();
+    install_direct_subscriber(sink.as_ref());
+    current_log_dir()
 }
 
 /// 启动定时清理任务，仅保留最新的日志文件
@@ -171,3 +238,7 @@ fn perform_cleanup(log_dir: &Path) -> io::Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "log_util.tests.rs"]
+mod tests;
