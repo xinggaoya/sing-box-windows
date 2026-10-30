@@ -23,6 +23,7 @@ serde_json = "1.0.145"
 serde = { version = "1.0.228", features = ["derive"] }
 ts-rs = "11.1"
 # 日志
+log = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "local-time"] }
 tracing-appender = "0.2"
