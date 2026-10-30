@@ -90,7 +90,8 @@ jobs:
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
       - name: Rust clippy
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+        # 带 devtools feature：保证开发态调试插件的代码路径持续可编译
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --features devtools -- -D warnings
 
       - name: Rust test
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml --features devtools

@@ -9,6 +9,14 @@
 - **规则页新增「自定义规则」面板**：完整的增 / 删 / 改 / 查 / 启停，走「写配置文件 + 重启内核」路径（与运行时规则语义不同，界面已明确区分）
 - **规则页运行时规则改为只读展示**：改用 sing-box 1.14 官方 gRPC `get_rules`，不再依赖已移除的 Clash API
 
+### 🛠️ 开发体验
+
+- **开发态接入 CrabNebula DevTools 调试面板**（Tauri 2 官方推荐的调试方案）：可视化查看日志流、Tauri command/event 的 payload 与耗时，方便定位「内核事件没到前端」「command 卡住」这类跨模块链路问题
+  - 通过 cargo feature `devtools` 隔离：release 构建不编译插件、不打开 `tauri/tracing` 埋点，产物零影响；`pnpm tauri dev` 自动启用
+  - 日志不丢：devtools 插件独占全局 tracing subscriber，本进程的文件与终端输出改经官方 `attach_logger` 桥接（`log::Log` 适配器），格式与原先一致
+  - 两种形态：standalone（启动日志里打印 `https://devtools.crabnebula.dev/dash/{ip}/{port}`，浏览器打开即用）、embedded（应用内 `Ctrl+Shift+M` / 右键「Open DevTools」打开抽屉面板）
+  - 顺带把 crate 的 MSRV 从 1.77.2 提到 1.88（插件要求），并把托盘图标取像素的 `chunks_exact` 换成 1.88 稳定的 `as_chunks`
+
 ### 🐛 问题修复
 
 - **修复代理页被「出站总览」挤扁、主体几乎不可见**：代理页主体是「定高 + 内部滚动」布局（`.page-shell` 为 flex 列，`.split-view` 靠 `flex: 1` 吃掉剩余高度），而上一版把有内容高度的「出站总览」作为 `.page-shell` 的**同层子元素**放进了纵向流——flex 分配高度时 `.split-view`（`min-height: 0`）被压到近乎 0 高度，代理组侧栏与节点网格被整块挤出可视区。
