@@ -164,4 +164,4 @@ pnpm tauri build:linux:rpm
 - 应用更新不走 tauri-plugin-updater，由 `system/update_service.rs` 自研（GitHub Releases API，应用内更新仅 Windows）。
 - `tauri-plugin-websocket` 仍在 Rust 侧注册但属遗留；运行态数据链路为：后端 gRPC 订阅 → Tauri event → 前端 `event-service`。
 - 分层 AGENTS 已在 `src/`、`src/stores/`、`src-tauri/`、`src-tauri/src/app/` 细化；改到哪层就核对哪层的文档。
-- **开发调试面板**：`pnpm tauri dev` 会自动注入 `--features devtools`（`src-tauri/Cargo.toml` 的 `devtools` feature），启用 [CrabNebula DevTools](https://v2.tauri.app/zh-cn/develop/debug/crabnebula-devtools/)：日志流、Tauri command/event 的 payload 与耗时可视化。面板地址在启动日志中打印（standalone 网页形态），应用内 `Ctrl+Shift+M` 可开 embedded 形态。release 构建（`pnpm tauri build`）不带该 feature，产物不含插件、也不打开 `tauri/tracing` 埋点。
+- **开发调试面板**：`pnpm tauri dev` 会自动注入 `--features devtools`（`src-tauri/Cargo.toml` 的 `devtools` feature），启用 [CrabNebula DevTools](https://v2.tauri.app/zh-cn/develop/debug/crabnebula-devtools/)：日志流、Tauri command/event 的 payload 与耗时可视化。面板地址在启动时打印到终端（standalone 网页形态），应用内 `Ctrl+Shift+M` 可开 embedded 形态。release 构建（`pnpm tauri build`）不带该 feature，产物不含插件、也不打开 `tauri/tracing` 埋点。

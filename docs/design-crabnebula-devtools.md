@@ -22,7 +22,7 @@
 | F2 | Cargo **不支持**在 `[target.'cfg(debug_assertions)'.dependencies]` 用 `cfg(debug_assertions)`（Cargo 官方明确说明） | release 隔离只能靠 optional dependency + cargo feature |
 | F3 | 最新版 `tauri-plugin-devtools = 2.2.3`（官方文档写的 `2.0.0` 已过时），要求 rustc ≥ **1.88**；`tauri-plugin-devtools-app = 2.1.4` 同 | 项目 `rust-version` 由 `1.77.2` 上调到 `1.88` |
 | F4 | 插件默认监听 `127.0.0.1:3033`，被占用时自动改用 1025–65535 内可用端口（`strict_port=false`） | 与 sing-box `api_port`(28955) / `proxy_port` 不冲突；启动时终端打印 dash 链接 |
-| F5 | 插件的 `BridgeLayer` 把 tracing 事件转成 `log::Record` 转发给 `attach_logger` 注入的 logger，**只带 message 文本**（结构化字段不透传） | 开发态文件日志不含结构化字段；项目 68 处 tracing 调用全部带 message、无具名字段调用 → 实际无损失 |
+| F5 | 插件的 `BridgeLayer` 把 tracing 事件转成 `log::Record` 转发给 `attach_logger` 注入的 logger，**只带 message 文本**（结构化字段不透传） | 开发态文件日志不含结构化字段；项目 68 处 tracing 事件调用全部带 message 字段、无具名字段调用 → 实际无损失 |
 | F6 | Tauri 的 CSP 只作用于本应用协议响应与 `data:` URL（`manager/webview.rs` 的注入点），**外部 URL 不受本应用 CSP 约束** | Embedded 模式（远程加载 devtools UI）**无需改** `tauri.conf.json` 的 CSP |
 | F7 | `tauri-plugin-devtools-app` 要求 tauri 具备 `unstable` + `dynamic-acl`；本项目 tauri 2.11.5 默认特性已含 `dynamic-acl`，`unstable` 已显式开启 | 依赖约束天然满足 |
 | F8 | `tauri dev --features <F>` / `tauri build --features <F>` 均受 CLI 支持 | 用 cargo feature 控制插件是否参与编译 |
@@ -51,8 +51,12 @@ tauri-plugin-devtools-app = { version = "2.1.4", optional = true }
 
 新增 `src-tauri/src/utils/log_bridge.rs`：
 
-- `LogDirectiveFilter`：解析 RUST_LOG 风格指令（默认沿用 `debug,sing_box_windows=debug,tauri=info,sqlx=warn`），按 target 前缀 + 级别判定；**纯函数，可单测**
-- `FileConsoleLogger`：实现 `log::Log`，输出格式对齐现有 fmt 层：`<本地时间> <LEVEL> <ThreadId> <file>:<line> <message>`；写入 `tracing_appender` 非阻塞文件 writer + stdout
+- `LogDirectiveFilter`：解析 RUST_LOG 风格指令，**语义对齐 `tracing_subscriber::EnvFilter`**（否则两种日志模式会“反着来”）：
+  - 支持 `target=level`、全局 `level`、裸 `target`（等价 `target=trace`）
+  - 任一指令非法 → **整串作废**并回退默认指令串（与 `EnvFilter::parse` + `build_env_filter` 的兜底一致）
+  - `RUST_LOG` 未设置 → 默认指令串；`RUST_LOG` 为空 → 不放行任何日志（与 `EnvFilter::parse("")` 一致）
+  - target 前缀最长匹配优先；同一 target 重复时后者覆盖前者
+- `FileConsoleLogger`：实现 `log::Log`，输出格式对齐现有 fmt 层：`<UTC 时间戳> <LEVEL> <ThreadId> <file>:<line> <message>`（时间戳用 `Utc` + 微秒精度 + `Z`，与 fmt 层 `fmt::time::SystemTime` 一致）；写入 `tracing_appender` 非阻塞文件 writer + stdout；文件 sink 不可用时降级为**仅控制台**
 
 `src-tauri/src/utils/log_util.rs` 拆分（保持单一职责）：
 
@@ -81,8 +85,10 @@ pub fn init(logger: Box<dyn log::Log>) -> (TauriPlugin<Wry>, TauriPlugin<Wry>)
 ```
 ① log_util::create_log_sink()                    // 准备日志目录 + 文件 writer（两种模式共用）
 ② devtools 插件初始化（仅 debug_assertions + feature=devtools）
-     └─ attach_logger(桥接 logger) → init()      // ← 全局 subscriber 在此被 devtools 接管
-③ 仅非 devtools 模式：log_util::init_logging()   // release / 未启用 feature 时才设置全局 fmt subscriber
+     └─ attach_logger(桥接 logger) → try_init()   // ← 全局 subscriber 在此被 devtools 接管
+        （用 try_init 而非 init：init 内部 unwrap，抢占失败会 panic；
+          失败时回退到直连日志模式，应用照常启动）
+③ 仅非 devtools 模式：log_util::install_direct_subscriber()  // release / 未启用 feature 时才设置全局 fmt subscriber
 ④ builder.plugin(devtools).plugin(devtools_app)
 ⑤ 其余原有启动流程（托盘 / 存储 / 内核 / 后台任务）完全不动
 ```
@@ -100,6 +106,7 @@ pub fn init(logger: Box<dyn log::Log>) -> (TauriPlugin<Wry>, TauriPlugin<Wry>)
 |---|---|---|
 | 全局 tracing subscriber | devtools registry（`Layer` + `BridgeLayer`） | 我们的 fmt 层 |
 | 终端 / 文件日志 | 经 `BridgeLayer` → `FileConsoleLogger`（含 message，不含结构化字段） | fmt 层（含结构化字段与 span 上下文） |
+| 插件初始化失败 | 回退到直连日志模式（面板不可用，应用照常启动） | 不涉及 |
 | `tauri/tracing` 内部埋点 | 开启 | 关闭 |
 | DevTools 面板 | 可用 | 不可用（插件未编译） |
 

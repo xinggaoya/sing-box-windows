@@ -13,6 +13,7 @@
     "lint:eslint": "eslint . --fix",
     "lint": "run-s lint:*",
     "test:kernel-targets": "node --test scripts/kernel-targets.test.mjs",
+    "test:scripts": "node --test scripts/tauri-wrapper.test.mjs",
     "test:i18n": "node scripts/check-i18n.mjs",
     "format": "prettier --write src/",
     "kernel:fetch": "node scripts/fetch-kernel.mjs",

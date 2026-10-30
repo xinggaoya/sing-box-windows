@@ -67,7 +67,9 @@ pub fn create_log_sink() -> Option<LogSink> {
     };
 
     // 保存 guard，确保异步写入线程存活
-    let _ = FILE_GUARD.set(guard);
+    if FILE_GUARD.set(guard).is_err() {
+        eprintln!("日志写入线程已存在，忽略重复初始化");
+    }
     let _ = LOG_DIR.set(dir);
     Some(sink)
 }
@@ -75,6 +77,15 @@ pub fn create_log_sink() -> Option<LogSink> {
 /// 当前日志目录（供定时清理任务使用）
 pub fn current_log_dir() -> Option<PathBuf> {
     LOG_DIR.get().cloned()
+}
+
+/// 记录日志目录
+///
+/// 需在全局 subscriber 安装完成之后调用，否则该事件会在 subscriber 就绪前被丢弃。
+pub fn announce_log_dir() {
+    if let Some(dir) = current_log_dir() {
+        info!("日志写入目录：{}", dir.display());
+    }
 }
 
 /// 直连模式：安装全局 fmt subscriber（文件 + 控制台）
@@ -102,10 +113,7 @@ pub fn install_direct_subscriber(sink: Option<&LogSink>) {
     {
         eprintln!("初始化日志订阅器失败，回退到控制台日志: {e}");
         init_console_only(env_filter);
-        return;
     }
-
-    info!("日志写入目录：{}", sink.dir().display());
 }
 
 /// 启动定时清理任务，仅保留最新的日志文件

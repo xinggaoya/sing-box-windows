@@ -86,12 +86,23 @@ jobs:
       - name: Kernel targets test
         run: pnpm test:kernel-targets
 
+      - name: Tauri wrapper scripts test
+        # 覆盖 dev 命令注入 devtools feature 的逻辑（release 构建不带该 feature 的护栏）
+        run: pnpm test:scripts
+
       - name: Rust format check
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
-      - name: Rust clippy
+      - name: Rust clippy (devtools feature)
         # 带 devtools feature：保证开发态调试插件的代码路径持续可编译
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --features devtools -- -D warnings
 
-      - name: Rust test
+      - name: Rust clippy (release path)
+        # 不带 feature：直连日志模式的分支只在这种组合下编译，必须单独校验
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Rust test (devtools feature)
         run: cargo test --manifest-path src-tauri/Cargo.toml --features devtools
+
+      - name: Rust test (release path)
+        run: cargo test --manifest-path src-tauri/Cargo.toml

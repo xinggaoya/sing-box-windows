@@ -4,15 +4,35 @@
 //! 调用 `tracing_subscriber::registry().with(...).try_init()`，失败即 panic）。
 //! 因此 devtools 模式下由插件持有全局 subscriber，本模块负责把事件转成
 //! 「文件 + 控制台」输出，通过官方 `Builder::attach_logger` 挂载回插件。
+//!
+//! 过滤语义对齐 `tracing_subscriber::EnvFilter`，避免两种日志模式行为相反：
+//! - 指令串逗号分隔，支持 `target=level`、全局 `level`、裸 `target`（等价 `target=trace`）
+//! - 任一指令非法 → 整个指令串解析失败（`EnvFilter::parse` 同款语义）
+//! - target 前缀最长匹配优先
 
-use chrono::Local;
+use chrono::Utc;
 use std::io::Write;
 use tracing_appender::non_blocking::NonBlocking;
 
 /// 默认日志指令串，与 `log_util::build_env_filter` 的缺省值保持一致
 pub const DEFAULT_LOG_DIRECTIVES: &str = "debug,sing_box_windows=debug,tauri=info,sqlx=warn";
 
-/// 单条日志指令：`target=level` 或仅 `level`
+/// 指令串解析失败
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogDirectiveParseError {
+    /// 出错的指令片段
+    pub directive: String,
+}
+
+impl std::fmt::Display for LogDirectiveParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "非法的日志指令: {}", self.directive)
+    }
+}
+
+impl std::error::Error for LogDirectiveParseError {}
+
+/// 单条日志指令：`target=level`、全局 `level` 或裸 `target`（等价 trace）
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Directive {
     target_prefix: Option<String>,
@@ -20,60 +40,100 @@ struct Directive {
 }
 
 /// RUST_LOG 风格指令过滤器
-///
-/// 匹配规则（简化自 `tracing_subscriber::EnvFilter`）：
-/// - 命中 target 前缀的指令中，**最长前缀**优先
-/// - 没有命中时回落到「无 target 的全局指令」
-/// - 没有任何可用指令时一律不放行
 #[derive(Debug, Clone, Default)]
 pub struct LogDirectiveFilter {
     directives: Vec<Directive>,
 }
 
 impl LogDirectiveFilter {
-    /// 解析逗号分隔的指令串；非法级别指令被忽略
-    pub fn parse(spec: &str) -> Self {
-        let directives = spec
-            .split(',')
-            .filter_map(|item| {
-                let item = item.trim();
-                if item.is_empty() {
-                    return None;
-                }
-                match item.split_once('=') {
-                    Some((target, level)) => {
-                        let level = parse_level_filter(level)?;
-                        let target = target.trim();
-                        if target.is_empty() {
-                            None
-                        } else {
-                            Some(Directive {
-                                target_prefix: Some(target.to_string()),
-                                level,
-                            })
-                        }
-                    }
-                    None => {
-                        let level = parse_level_filter(item)?;
-                        Some(Directive {
-                            target_prefix: None,
-                            level,
-                        })
-                    }
-                }
-            })
-            .collect();
+    /// 解析指令串
+    ///
+    /// 空串得到「不放行任何日志」的过滤器（与 `EnvFilter::parse("")` 一致）；
+    /// 任一指令非法则整体失败（与 `EnvFilter::parse` 一致）。
+    pub fn parse(spec: &str) -> Result<Self, LogDirectiveParseError> {
+        let mut directives: Vec<Directive> = Vec::new();
 
-        Self { directives }
+        for item in spec.split(',') {
+            let item = item.trim();
+            if item.is_empty() {
+                continue;
+            }
+
+            let directive = match item.split_once('=') {
+                Some((target, level)) => {
+                    let target = target.trim();
+                    if target.is_empty() {
+                        return Err(LogDirectiveParseError {
+                            directive: item.to_string(),
+                        });
+                    }
+                    let level =
+                        parse_level_filter(level).ok_or_else(|| LogDirectiveParseError {
+                            directive: item.to_string(),
+                        })?;
+                    Directive {
+                        target_prefix: Some(target.to_string()),
+                        level,
+                    }
+                }
+                None => match parse_level_filter(item) {
+                    Some(level) => Directive {
+                        target_prefix: None,
+                        level,
+                    },
+                    // 裸 token 不是合法级别 → 视为 target（`EnvFilter` 语义：等价 trace）
+                    None => Directive {
+                        target_prefix: Some(item.to_string()),
+                        level: log::LevelFilter::Trace,
+                    },
+                },
+            };
+
+            // 同一 target 重复出现时后者覆盖前者（与 `EnvFilter` 一致）
+            match &directive.target_prefix {
+                Some(prefix) => match directives
+                    .iter_mut()
+                    .find(|existing| existing.target_prefix.as_deref() == Some(prefix.as_str()))
+                {
+                    Some(existing) => *existing = directive,
+                    None => directives.push(directive),
+                },
+                None => match directives
+                    .iter_mut()
+                    .find(|existing| existing.target_prefix.is_none())
+                {
+                    Some(existing) => *existing = directive,
+                    None => directives.push(directive),
+                },
+            }
+        }
+
+        Ok(Self { directives })
     }
 
-    /// 读取 `RUST_LOG`；未设置或为空白时使用默认指令串
+    /// 解析指令串；失败时回退到默认指令串
+    ///
+    /// 避免出现「零指令 → 全静默」的状态（与 `build_env_filter` 的兜底一致）。
+    pub fn parse_or_default(spec: &str) -> Self {
+        match Self::parse(spec) {
+            Ok(filter) => filter,
+            Err(e) => {
+                eprintln!("{e}，回退到默认日志指令: {DEFAULT_LOG_DIRECTIVES}");
+                Self::parse(DEFAULT_LOG_DIRECTIVES).unwrap_or_default()
+            }
+        }
+    }
+
+    /// 从 `RUST_LOG` 读取过滤规则
+    ///
+    /// - 未设置 → 默认指令串（与 `build_env_filter` 一致）
+    /// - 设置为空 → 不放行任何日志（与 `EnvFilter::parse("")` 一致）
+    /// - 含非法指令 → 整串作废，回退默认指令串（与 `build_env_filter` 一致）
     pub fn from_env() -> Self {
-        let spec = std::env::var("RUST_LOG")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| DEFAULT_LOG_DIRECTIVES.to_string());
-        Self::parse(&spec)
+        match std::env::var("RUST_LOG") {
+            Ok(spec) => Self::parse_or_default(&spec),
+            Err(_) => Self::parse_or_default(DEFAULT_LOG_DIRECTIVES),
+        }
     }
 
     /// 判断某条日志是否应当输出
@@ -147,8 +207,10 @@ pub fn format_log_line(
 }
 
 /// 把 `log::Record` 格式化成一行日志
+///
+/// 时间戳与 fmt 层（`fmt::time::SystemTime`）保持一致：UTC RFC3339、微秒精度、带 `Z`。
 pub fn format_record_line(record: &log::Record) -> String {
-    let timestamp = Local::now().format("%Y-%m-%dT%H:%M:%S%.3f").to_string();
+    let timestamp = Utc::now().format("%Y-%m-%dT%H:%M:%S%.6fZ").to_string();
     let thread = format!("{:?}", std::thread::current().id());
 
     format_log_line(
@@ -166,8 +228,9 @@ pub fn format_record_line(record: &log::Record) -> String {
 /// 换行必须与行内容**一次性**写入：`tracing_appender` 的 `NonBlocking` 是 lossy 通道，
 /// 每次 `write_all` 独立投递一条消息，拆开写时换行消息可能被单独丢弃，
 /// 导致日志文件出现行粘连。
-pub fn render_log_payload(record: &log::Record) -> String {
-    let mut payload = format_record_line(record);
+pub fn render_log_payload(line: &str) -> String {
+    let mut payload = String::with_capacity(line.len() + 1);
+    payload.push_str(line);
     payload.push('\n');
     payload
 }
@@ -177,14 +240,26 @@ pub fn render_log_payload(record: &log::Record) -> String {
 /// 插件的 `BridgeLayer` 会把 tracing 事件转成 `log::Record` 转发到这里，
 /// 因此文件与控制台输出与 DevTools 面板的数据同源。
 pub struct FileConsoleLogger {
-    writer: NonBlocking,
+    /// 文件写入器；为 `None` 时只输出到控制台（文件 sink 创建失败时的降级）
+    writer: Option<NonBlocking>,
     filter: LogDirectiveFilter,
 }
 
 impl FileConsoleLogger {
     /// 用非阻塞文件 writer + 过滤器构造
     pub fn new(writer: NonBlocking, filter: LogDirectiveFilter) -> Self {
-        Self { writer, filter }
+        Self {
+            writer: Some(writer),
+            filter,
+        }
+    }
+
+    /// 仅控制台输出（文件 sink 创建失败时的降级）
+    pub fn console_only(filter: LogDirectiveFilter) -> Self {
+        Self {
+            writer: None,
+            filter,
+        }
     }
 }
 
@@ -199,16 +274,24 @@ impl log::Log for FileConsoleLogger {
         }
 
         let line = format_record_line(record);
-        // `log::Log::log` 只拿到 `&self`，而 `NonBlocking` 的写接口需要 `&mut`，
-        // 克隆一份写入（克隆共享同一条 channel）；行内容与换行一次性投递
-        let mut writer = self.writer.clone();
-        let _ = writer.write_all(render_log_payload(record).as_bytes());
-        println!("{line}");
+
+        if let Some(writer) = &self.writer {
+            // `log::Log::log` 只拿到 `&self`，而 `NonBlocking` 的写接口需要 `&mut`，
+            // 克隆一份写入（克隆共享同一条 channel）；行内容与换行一次性投递
+            let mut writer = writer.clone();
+            let _ = writer.write_all(render_log_payload(&line).as_bytes());
+        }
+
+        // 写终端失败不应 panic（日志回调里的 panic 会冒泡进业务代码）
+        let mut stdout = std::io::stdout();
+        let _ = writeln!(stdout, "{line}");
     }
 
     fn flush(&self) {
-        let mut writer = self.writer.clone();
-        let _ = writer.flush();
+        if let Some(writer) = &self.writer {
+            let mut writer = writer.clone();
+            let _ = writer.flush();
+        }
     }
 }
 

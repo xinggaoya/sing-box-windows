@@ -13,7 +13,7 @@
 
 - **开发态接入 CrabNebula DevTools 调试面板**（Tauri 2 官方推荐的调试方案）：可视化查看日志流、Tauri command/event 的 payload 与耗时，方便定位「内核事件没到前端」「command 卡住」这类跨模块链路问题
   - 通过 cargo feature `devtools` 隔离：release 构建不编译插件、不打开 `tauri/tracing` 埋点，产物零影响；`pnpm tauri dev` 自动启用
-  - 日志不丢：devtools 插件独占全局 tracing subscriber，本进程的文件与终端输出改经官方 `attach_logger` 桥接（`log::Log` 适配器），格式与原先一致
+  - 日志不丢：devtools 插件独占全局 tracing subscriber，本进程的文件与终端输出改经官方 `attach_logger` 桥接（`log::Log` 适配器），时间戳与级别格式与原先的 fmt 层一致；过滤规则对齐 `EnvFilter`（非法 `RUST_LOG` 整串回退默认，不会静默失声）
   - 两种形态：standalone（启动日志里打印 `https://devtools.crabnebula.dev/dash/{ip}/{port}`，浏览器打开即用）、embedded（应用内 `Ctrl+Shift+M` / 右键「Open DevTools」打开抽屉面板）
   - 顺带把 crate 的 MSRV 从 1.77.2 提到 1.88（插件要求），并把托盘图标取像素的 `chunks_exact` 换成 1.88 稳定的 `as_chunks`
 

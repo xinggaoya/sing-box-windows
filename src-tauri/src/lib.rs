@@ -45,21 +45,36 @@ pub fn run() {
     // devtools 模式：插件接管全局 tracing subscriber，日志经 log::Log 桥接输出
     // （必须早于任何全局 subscriber 安装，否则插件 init 会 panic）
     #[cfg(all(feature = "devtools", debug_assertions))]
-    let devtools_plugins = crate::utils::devtools_util::init(log_sink);
+    let devtools_plugins = {
+        match crate::utils::devtools_util::init(log_sink) {
+            crate::utils::devtools_util::DevtoolsInit::Ready { probe, app } => Some((probe, app)),
+            // 插件初始化失败 → 回退到直连日志模式，应用照常启动
+            crate::utils::devtools_util::DevtoolsInit::Fallback { sink } => {
+                log_util::install_direct_subscriber(sink.as_ref());
+                None
+            }
+        }
+    };
 
     // 直连模式：自行安装全局 fmt subscriber（release / 未启用 devtools feature）
     #[cfg(not(all(feature = "devtools", debug_assertions)))]
     log_util::install_direct_subscriber(log_sink.as_ref());
 
+    // devtools feature 在 release 构建下不生效（插件只装在 debug 构建）
+    #[cfg(all(feature = "devtools", not(debug_assertions)))]
+    eprintln!("检测到 devtools feature，但当前不是 debug 构建，CrabNebula DevTools 不会启用");
+
     // 日志目录，供后续定时清理使用
     let log_dir = log_util::current_log_dir();
+    log_util::announce_log_dir();
 
     let builder = tauri::Builder::default();
     // devtools 模式：注册调试面板插件
     #[cfg(all(feature = "devtools", debug_assertions))]
-    let builder = builder
-        .plugin(devtools_plugins.0)
-        .plugin(devtools_plugins.1);
+    let builder = match devtools_plugins {
+        Some((probe, app)) => builder.plugin(*probe).plugin(*app),
+        None => builder,
+    };
     builder
         .on_window_event(|window, event| {
             if window.label() != "main" {
