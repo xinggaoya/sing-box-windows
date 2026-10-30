@@ -140,6 +140,60 @@ fn bridge_logger_writes_to_file() {
 }
 
 #[test]
+fn render_log_payload_ends_with_single_newline() {
+    let args = format_args!("载荷换行");
+    let record = log::Record::builder()
+        .args(args)
+        .level(log::Level::Info)
+        .target("sing_box_windows::app")
+        .file(Some("core.rs"))
+        .line(Some(7))
+        .build();
+
+    let payload = render_log_payload(&record);
+
+    assert!(payload.ends_with('\n'));
+    assert_eq!(payload.matches('\n').count(), 1);
+    assert!(payload.contains("载荷换行"));
+}
+
+#[test]
+fn bridge_logger_writes_one_line_per_record() {
+    let dir = std::env::temp_dir().join(format!("sbw-bridge-lines-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+
+    let (sink, guard) =
+        crate::utils::log_util::create_log_sink_in(dir.clone()).expect("应创建日志 sink");
+    let logger = FileConsoleLogger::new(sink.writer().clone(), LogDirectiveFilter::parse("info"));
+
+    for index in 0..50 {
+        let args = format_args!("第 {index} 条");
+        let record = log::Record::builder()
+            .args(args)
+            .level(log::Level::Info)
+            .target("sing_box_windows::app")
+            .build();
+        logger.log(&record);
+    }
+
+    drop(guard);
+
+    let entries: Vec<_> = std::fs::read_dir(&dir)
+        .expect("日志目录应存在")
+        .filter_map(Result::ok)
+        .collect();
+    assert_eq!(entries.len(), 1);
+
+    let content = std::fs::read_to_string(entries[0].path()).expect("日志文件应可读");
+    let lines: Vec<&str> = content.lines().filter(|line| !line.is_empty()).collect();
+    assert_eq!(lines.len(), 50);
+    assert!(lines[0].contains("第 0 条"));
+    assert!(lines[49].contains("第 49 条"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn bridge_logger_respects_filter() {
     let dir = std::env::temp_dir().join(format!("sbw-bridge-filter-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);

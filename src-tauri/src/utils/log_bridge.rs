@@ -161,6 +161,17 @@ pub fn format_record_line(record: &log::Record) -> String {
     )
 }
 
+/// 日志写入载荷：行内容 + 结尾换行
+///
+/// 换行必须与行内容**一次性**写入：`tracing_appender` 的 `NonBlocking` 是 lossy 通道，
+/// 每次 `write_all` 独立投递一条消息，拆开写时换行消息可能被单独丢弃，
+/// 导致日志文件出现行粘连。
+pub fn render_log_payload(record: &log::Record) -> String {
+    let mut payload = format_record_line(record);
+    payload.push('\n');
+    payload
+}
+
 /// devtools 模式下的日志写入器
 ///
 /// 插件的 `BridgeLayer` 会把 tracing 事件转成 `log::Record` 转发到这里，
@@ -189,10 +200,9 @@ impl log::Log for FileConsoleLogger {
 
         let line = format_record_line(record);
         // `log::Log::log` 只拿到 `&self`，而 `NonBlocking` 的写接口需要 `&mut`，
-        // 克隆一份写入（克隆共享同一条 channel）
+        // 克隆一份写入（克隆共享同一条 channel）；行内容与换行一次性投递
         let mut writer = self.writer.clone();
-        let _ = writer.write_all(line.as_bytes());
-        let _ = writer.write_all(b"\n");
+        let _ = writer.write_all(render_log_payload(record).as_bytes());
         println!("{line}");
     }
 
