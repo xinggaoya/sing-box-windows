@@ -44,14 +44,17 @@ tauri-plugin-devtools = { version = "2.2.3", optional = true }
 tauri-plugin-devtools-app = { version = "2.1.4", optional = true }
 reqwest = { version = "0.12", features = ["json", "stream", "native-tls-vendored"] }
 dirs = "5.0.1"
-# ⚠️ tokio 必须锁在 1.53 之前：tauri-plugin-single-instance 依赖的
-# interprocess 2.4.7 仍调用 tokio 1.53 已移除的 `AsyncFd::register_with_interest`，
-# 而该调用位于 interprocess 的 `os/unix/` 模块 —— **只在 Linux 编译**，
-# 因此 Windows / macOS 完全察觉不到，表现为「Linux 构建与 CI 恒定失败」。
-# 等 interprocess 跟进 tokio 1.53 后即可放开此上界。
-tokio = { version = "~1.52", features = ["full"] }
+tokio = { version = "1.48", features = ["full"] }
 futures = "0.3"
 tokio-tungstenite = { version = "0.28", features = ["native-tls"] }
+# ⚠️ interprocess 2.4.6 / 2.4.7 是**坏发布**：其 `os/unix/` 模块调用了 tokio 中
+# 并不存在的 `AsyncFd::register_with_interest`（应为 `with_interest`），
+# 而该模块**只在 Linux 编译** —— Windows / macOS 完全察觉不到，
+# 表现为「本地与 Windows 构建全绿，只有 Linux 构建与 CI 恒定失败」。
+# interprocess 是 tauri-plugin-single-instance 的传递依赖，Cargo 无法直接约束
+# 传递依赖的版本，故在此声明为直接依赖以锁定可用版本；≤2.4.5 均正常。
+# 待上游修复后即可移除本约束。
+interprocess = { version = ">=2.4, <2.4.6", default-features = false }
 url = "2.5"
 urlencoding = "2.1"
 zip = "2.2"

@@ -30,8 +30,8 @@
 - **消除 sing-box 1.14 的 DNS 弃用告警**：DNS 规则移除已废弃的 IP 规则集写法，路由与 DNS 规则统一改用 1.11+ 官方写法
 - **修复「规则集缓存缺失时内核直接起不来」**：直连下载客户端的写法会被内核判定为无意义配置并启动失败，生成与补丁两条路径均已修正，且能自动纠正存量配置
 - **修复 `pnpm kernel:fetch --all` 在 Windows 上拉不到 linux/macOS 内核**：解压改用系统自带 tar，并补齐 `.tar.gz` 的兜底路径
-- **修复 Linux 平台构建失败（master 的 CI 长期红灯、Linux 发布产物缺失）**：根因是**依赖不兼容**而非本仓代码——`tauri-plugin-single-instance` 依赖的 `interprocess 2.4.7` 仍调用 tokio 1.53 已移除的 `AsyncFd::register_with_interest`，而该调用位于 interprocess 的 `os/unix/` 模块，**只在 Linux 编译**，因此 Windows / macOS 完全察觉不到
-  - 将 tokio 锁在 `~1.52`（并在 `Cargo.toml` 写明原因与解除条件），避免后续 `cargo update` 再次引入
+- **修复 Linux 平台构建失败（master 的 CI 长期红灯、Linux 发布产物缺失）**：根因是**传递依赖的坏发布**而非本仓代码——`tauri-plugin-single-instance` 依赖的 `interprocess 2.4.6 / 2.4.7` 在其 `os/unix/` 模块里调用了 tokio 中并不存在的 `AsyncFd::register_with_interest`（应为 `with_interest`），而该模块**只在 Linux 编译**，Windows / macOS 完全察觉不到，表现为「本地与 Windows 构建全绿，只有 Linux 恒定失败」
+  - 将 `interprocess` 锁定在可用区间（`<2.4.6`，≤2.4.5 均正常）；由于它是传递依赖、Cargo 无法直接约束传递依赖版本，故在 `Cargo.toml` 声明为直接依赖以锁定，并在注释中写明原因与解除条件
   - 顺带修掉 `platform/linux.rs` 的 4 处 `clippy::collapsible_if`：clippy 收紧后该 lint 会命中 `if let` 嵌套，而该文件仅在 Linux 编译，本地 Windows 的 clippy 从不检查它
   - 此前 CI 一直红在 clippy 步骤，release workflow 的 Linux job 也因此失败——只有 Windows / macOS 产物
 - **修复代理页被「出站总览」挤扁、主体几乎不可见**：出站总览改为独立页面，代理页布局恢复并加了防回归保底
