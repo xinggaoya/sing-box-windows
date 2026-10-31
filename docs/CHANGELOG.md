@@ -2,161 +2,80 @@
 
 ## [未发布]
 
+## [v2.4.0] - 2026-10-31
+
 ### ✨ 新功能
 
-- **高级设置新增两项 DNS 选项**
-  - **「兜底 DNS 策略」**：决定"未命中任何分流规则的域名"由谁解析。国内 DNS 直连（默认，**不依赖代理**，代理挂掉时国内站点照常解析）/ 境外 DNS 经代理（防污染，但代理不可用时全部解析失败）
-  - **「乐观缓存陈旧窗口上限」**：乐观 DNS 缓存开启时，过期结果最多还能被继续使用多久（默认 30m）。不设置就会落到 sing-box 隐含的 **3 天**——被污染的解析结果会被钉住 3 天，表现为"后台跑久了网络就坏、只能重启内核"
-- **升级 sing-box 内核到 1.14.4**（上游 2026-10-24 发布的最新稳定版）
-  - 逐文件 diff 上游 `v1.14.0...v1.14.4`（174 commits）后确认：**gRPC API 协议层零变更**——`daemon/started_service.proto`、`daemon/managed_service.proto` 与 gRPC-Web 帧格式实现 `service/api/web_bridge.go` 逐字节相同，`APIVersion` 仍为 4。本项目手写的 protobuf 编解码与 gRPC-Web 客户端**零改动**
-  - 配置 schema（`option/`）的变更全是内部 marshal 细节（`omitempty` 化、指针化）；唯一语义变化是 1.14.0 引入的 `direct` rule action 在 1.14.4 被移除（本项目未使用，无影响）
-  - 实机验证：4 份黄金配置在 1.14.0 / 1.14.4 / 1.15.0-alpha.13 三个版本下 `sing-box check` 全部通过；1.14.4 实跑 `api version` / `api status` / `api mode` / `api group list` / `api outbounds` 全部正常
-  - 内核下载兜底版本号从 1.12.10 提到 1.14.4（1.13 及以前不认 `http_clients` 等 1.14 写法，兜底太老会拉回不兼容的内核）
-- **假 DNS 的 IPv6 地址池默认值对齐上游**：`fc00::/18` → `2001:2::/48`。`fc00::/18` 属于 ULA 段，会与企业内网真实 ULA 地址冲突；上游自 1.14.4 的 migration 文档起明确要求改用 `2001:2::/48`（RFC 5180 基准测试段）。存量用户已保存的地址段保持不变（该段在上游并未被移除，只是推荐值变更），仍可在设置页自行覆盖
-
-- **新增「出站」页面（出站总览）**：展示内核里所有出站（含分组）的快照，按延迟排序，未测速显示 `—`，支持按名称/类型搜索。此前 `get_outbounds` 后端早已就绪但前端 0 引用，属于"能力已具备、界面没接线"。**独立成页面（侧边栏「出站」入口，路由 `/outbounds`），完全不占用代理页空间**
-- **维护页新增「网络诊断」卡片**：5 项网络质量指标（`network_quality_test`）+ sing-box 1.14 服务状态列表（`get_services`）；并补齐后端 `probe_service_status` 命令用于逐个探测服务可用性
-- **规则页新增「自定义规则」面板**：完整的增 / 删 / 改 / 查 / 启停，走「写配置文件 + 重启内核」路径（与运行时规则语义不同，界面已明确区分）
-- **规则页运行时规则改为只读展示**：改用 sing-box 1.14 官方 gRPC `get_rules`，不再依赖已移除的 Clash API
+- **升级 sing-box 内核到 1.14.4**（上游最新稳定版）：gRPC API 协议零变更，本项目客户端无需跟版；内核下载兜底版本号同步提高
+- **高级设置新增「兜底 DNS 策略」**：可选择未命中任何分流规则的域名由「国内 DNS 直连」（默认，不依赖代理）还是「境外 DNS 经代理」解析
+- **高级设置新增「乐观缓存陈旧窗口上限」**：控制过期 DNS 结果最多还能被继续使用多久（默认 30m），避免坏结果被长期钉住
+- **假 DNS 的 IPv6 地址池默认值对齐上游**：`fc00::/18` → `2001:2::/48`（RFC 5180 基准测试段），避免与企业内网 ULA 地址冲突；存量用户已保存的值保持不变
+- **新增「出站」页面（出站总览）**：展示内核中所有出站与分组的快照，按延迟排序、支持搜索；独立成页，不占用代理页空间
+- **维护页新增「网络诊断」卡片**：网络质量指标 + sing-box 服务状态列表，可逐项探测服务可用性
+- **规则页新增「自定义规则」面板**：支持自定义规则的增删改查与启停
+- **规则页运行时规则改为只读展示**：改用 sing-box 1.14 官方 gRPC 接口
 
 ### 🛠️ 开发体验
 
-- **修复 `grpc_smoke` 实机联调脚本卡在最后一步退不出来**：`close()` 会等待后台任务结束，而该任务正阻塞在 HTTP 流读取上；内核不会主动结束「日志 / 连接」这类长驻流，于是没有新帧到达时 `close()` 一直挂着。验证脚本现在给 `close()` 加了 2s 超时兜底，连跑 4 次均可正常打印「全部 gRPC API 调用通过」并退出
-- **修复 `pnpm format:check` 失败（CI 当时就是红的）**：两道原因叠加——
-  1. `src/AGENTS.md` 的表格列宽与 prettier 的期望对不上（**与行尾无关，Linux CI 上同样报错**）；
-  2. `.prettierrc.json` 没配 `endOfLine`，prettier 默认要求 LF，而 Windows 上 `git config core.autocrlf=true` 检出的是 CRLF，于是每个被 git 检出的文件都被判为格式不合规（干净 checkout 上 15 个文件报警，实际代码风格并无问题）。
-  现将 `endOfLine` 改为 `"auto"`（prettier 与 git 的检出行为对齐，Windows 本地与 Linux CI 结果一致），并用 prettier 重排 `src/AGENTS.md` 的表格列宽
-
-- **开发态接入 CrabNebula DevTools 调试面板**（Tauri 2 官方推荐的调试方案）：可视化查看日志流、Tauri command/event 的 payload 与耗时，方便定位「内核事件没到前端」「command 卡住」这类跨模块链路问题
-  - 通过 cargo feature `devtools` 隔离：release 构建不编译插件、不打开 `tauri/tracing` 埋点，产物零影响；`pnpm tauri dev` 自动启用
-  - 日志不丢：devtools 插件独占全局 tracing subscriber，本进程的文件与终端输出改经官方 `attach_logger` 桥接（`log::Log` 适配器），时间戳与级别格式与原先的 fmt 层一致；过滤规则对齐 `EnvFilter`（非法 `RUST_LOG` 整串回退默认，不会静默失声）
-  - 两种形态：standalone（启动日志里打印 `https://devtools.crabnebula.dev/dash/{ip}/{port}`，浏览器打开即用）、embedded（应用内 `Ctrl+Shift+M` / 右键「Open DevTools」打开抽屉面板）
-  - 顺带把 crate 的 MSRV 从 1.77.2 提到 1.88（插件要求），并把托盘图标取像素的 `chunks_exact` 换成 1.88 稳定的 `as_chunks`
-  - 配套沉淀：`docs/devtools.md`（本项目调试工具用法 / 日志桥接原理 / 命令行与 CDP 自动化验证 / 已知问题）+ `docs/templates/tauri-devtools/`（可直接复制到**后续 Tauri 项目**的接入模板，含 Cargo feature、桥接模块、接线顺序、CI 双路径门禁与坑位清单）
+- **开发态接入 CrabNebula DevTools 调试面板**：可视化查看日志流、命令与事件的 payload 与耗时；release 构建不含该插件，产物零影响
+- **沉淀调试工具指南与接入模板**：`docs/devtools.md` 与 `docs/templates/tauri-devtools/` 可直接复制到后续 Tauri 项目复用
+- **修复 `pnpm format:check` 在干净 checkout 上失败（CI 当时是红的）**：格式器的行尾策略改为与 git 检出行为对齐
+- **修复 `grpc_smoke` 实机联调脚本卡在最后一步退不出来**：长驻流读取补超时兜底
 
 ### 🐛 问题修复
 
-- **修复「国内网站误走代理 / 无法自动绕过 / 未按规则分流」**：根因是 sing-box 1.11+ 的一条**静默**语义变更——路由规则里的 **IP 匹配**（`ip_cidr` / `geoip-*` 规则集）只在目标**已经是 IP** 时才命中，目标仍是**域名**时**不会隐式解析**。本项目配置里的 `geoip-cn`（按 IP 判定国内直连）因此对域名流量**完全不生效**，而 `geosite-cn` 是域名清单、永远不完整，于是国内站点既不匹配域名规则、也匹配不到 IP 规则，一路落到 `final` 走代理。
-  - 实测证据（用 1.14.4 内核实测）：`rum-openway.guance.com`（121.41.77.126）、`filecdn.minimax.chat`（163.177.155.40）、`ts2.tc.mm.bing.net`（211.97.84.77）**都在 `geoip-cn` 里**，但旧配置下全部走了代理；插入 `{"action":"resolve"}` 后全部改为直连
-  - 路由规则新增 `resolve` 动作（排在 `geosite-cn` / `geosite-geolocation-!cn` 之后、`geoip-cn` 之前），把剩余域名解析成 IP 后再交给 IP 规则判定；`resolve` 是非终结动作，域名规则在其后依然按域名匹配
-  - 规则定义与顺序收敛到新模块 `singbox/config_rules.rs`（`build_route_rules` / `build_dns_rules` / `sync_route_rules` / `sync_dns_rules`），生成路径与补丁路径**共用同一份语义**，杜绝两条路径写歪
-  - 补丁路径会把**存量配置**升级到新形态（拆开旧的 `[geosite-cn, geoip-cn]` 合并规则、补 `resolve`、保留用户自定义规则），外来配置（机场原始配置）不动
-- **修复「代理一挂，全部域名解析失败」**：`dns.final`（未命中任何 DNS 规则时的兜底解析器）此前固定指向**境外解析器且经代理**，代理链路一挂，连国内站点都解析不出来。现默认改为**国内解析器直连**兜底（`dns_cn`），未收录的境外域名照样能拿到真实 IP，且不依赖代理可用性；用户可在高级设置里切回「境外 DNS（经代理）」。
-  - 补丁路径此前**根本没有同步 `dns.final`**（只改端口的最小补丁更不碰），现已补齐
-- **修复「后台长时间运行后网络异常、必须重启内核才能恢复」**：三条独立的诱因一起处理
-  - **乐观 DNS 缓存的陈旧窗口**：sing-box 1.14 的 `optimistic: true` 隐含 **3 天**陈旧窗口——缓存过期后仍先返回陈旧结果再后台刷新，一旦结果被污染或 CDN 换了 IP，客户端会被**钉死 3 天**，表现就是"后台跑久了网络就坏了，只能重启内核"（重启只是清空了内存里的 DNS 缓存）。现默认**关闭**乐观缓存；开启时也始终显式写出较短的陈旧窗口（新增「乐观缓存陈旧窗口上限」设置，默认 30m），不再落到内核隐含的 3 天
-  - **`urltest` 的 `interrupt_exist_connections`**：urltest 每次测速都可能改选节点，该选项开启后会**成批掐断**所有走该分组的长连接（视频 / 远程桌面 / 下载），即"后台跑久了网络就断"。按 sing-box 官方默认值改回 `false`
-  - **国内 DNS 的协议**：默认从 DoH3（`h3://dns.alidns.com`，跑在 QUIC / UDP 443 上）改为 DoH over TCP（`https://dns.alidns.com`）——国内运营商对 QUIC 普遍限速甚至阻断，一旦 UDP 443 不通，**所有**国内域名解析会一起失败。存量配置里仍是旧默认值的会自动迁移（用户自己填过的值不动）
-  - 附带：DNS 超时默认由 5s 调整为官方默认 10s（慢链路下 5s 容易假失败）；「手动切换」分组补上**直连兜底成员**（放在最后、不改变默认选择），代理链路全挂时可一键「全部直连」，不必重启内核
-- **消除 sing-box 1.14 的 DNS 弃用告警**：`dns.rules` 里的 `geoip-cn` 属于 1.14 起废弃的 "Legacy Address Filter Fields"（1.16 移除），且在 DNS 阶段本就无法匹配未解析的域名。现从 DNS 规则里移除，IP 判定统一交给 `route.rules`；路由 / DNS 规则同时改用 1.11+ 官方写法 `action: "route"` + `outbound` / `server`
-- **修复「规则集缓存缺失时内核直接起不来」**：生成的配置里 `http_clients[default].detour` 写的是 `"direct"`，指向一个**空的 direct 出站**。sing-box 1.14+ 的 `common/dialer/detour.go` 对此直接判定为无意义并让内核启动失败：`detour to an empty direct outbound makes no sense`。平时被本地规则集缓存（`initial_path`）拖住，一旦缓存缺失 / 损坏需要联网下载规则集，内核就起不来。
-  - 直连语义改为**不写 `detour`**（`http_client` 不写 detour 时走系统 dialer，语义同样是直连），生成路径与补丁路径共用 `config_render::build_http_clients` 一份实现
-  - 补丁路径会**纠正存量配置**里写错的 `detour: "direct"`，并在下载偏好从「手动」切回「直连」时清掉指向已删除客户端的悬空 `http_client` 引用；顺带把悬空的 `route.default_http_client` 改指回 `default` 客户端（指向不存在的客户端同样会让内核起不来）；外来配置（用户导入的机场原始配置）不受影响
-  - 新增 11 项单测（生成 / 补丁双路径收敛、直连无 detour、存量纠正、用户自建客户端保留、缺失/非法 `http_clients` 兜底、悬空 `default_http_client` 修复、外来配置不动），并重生成 4 份黄金配置快照
-- **修复 `pnpm kernel:fetch --all` 在 Windows 上拉不到 linux/macOS 内核**：脚本用 `tar` 解压 `.tar.gz`，但 Git Bash 自带的 GNU tar 会被 MSYS runtime 做参数转换，`C:/...` 里的冒号被转义成 `C\:/...`，tar 收到一个不存在的路径（`tar (child): Cannot connect to C: resolve failed`）。`.zip` 走 PowerShell 兜底还能成功，`.tar.gz` 没有兜底，直接失败
-  - Windows 优先用系统自带的 bsdtar（原生程序，不经 MSYS 转换）；兜底路径把工作目录设为归档所在目录、只传相对路径，同时绕开 MSYS 转换与 GNU tar 的 `host:path` 判定
-  - 失败时逐条打印真实原因（原来只输出 `Failed: N target(s).`，看不出是下载失败还是解压失败）
-  - 顺带修复 `fetch-kernel.test.mjs` 里一条**陈旧断言**（目标矩阵从 4 个加到 5 个时忘了同步），并把该测试文件接入 `pnpm test:scripts`——此前它**根本没被 CI 跑过**，所以这条断言一直烂着
-- **修复代理页被「出站总览」挤扁、主体几乎不可见**：代理页主体是「定高 + 内部滚动」布局（`.page-shell` 为 flex 列，`.split-view` 靠 `flex: 1` 吃掉剩余高度），而上一版把有内容高度的「出站总览」作为 `.page-shell` 的**同层子元素**放进了纵向流——flex 分配高度时 `.split-view`（`min-height: 0`）被压到近乎 0 高度，代理组侧栏与节点网格被整块挤出可视区。
-  - 「出站总览」改为**独立页面**（`/outbounds`，侧边栏「出站」入口），代理页恢复到本次提交前的样子（零占用）
-  - `.split-view` 加 320px 保底高度，防止同类回归再次压扁代理区
-  - 新增 `src/views/proxy-layout.test.ts` 布局守护（代理页不得出现出站总览 UI / 出站总览必须有独立页面与路由 / `.split-view` 必须有 min-height 保底）与 `src/composables/useOutboundList.test.ts`（排序、过滤、统计）
-- 修复后台运行一段时间后代理静默失效（需手动重启内核）：hysteria2 等 QUIC 隧道静默死亡（UDP NAT 超时/服务端断开）后，内核进程存活但所有代理流量黑洞。守护的连通性检测此前不走代理（直连探测永远成功），自愈永不触发；现改为通过内核 mixed 端口探测代理链路，并新增直连对照排除系统断网
-- 修复自愈机制对"节点本身不可用"场景的处理：原实现一律重启内核，节点坏时会陷入无限重启循环。现改为分级自愈——先关闭全部连接（软恢复，清空黑洞隧道）→ 仍失败且手动选中的是具体节点时自动切换到"自动选择"（发通知告知）→ 最后才重启内核，且连续 2 次重启无效后熔断（暂停重启、提示用户切换节点/检查订阅，轻量自愈保留，链路恢复后自动解除）
+- **修复「国内网站误走代理 / 无法自动绕过 / 未按规则分流」**：sing-box 1.11 起路由规则的 IP 匹配对域名目标不再隐式解析，导致按 IP 判定国内的规则长期失效；补上缺失的解析步骤后，国内站点恢复稳定直连
+- **修复「代理一挂，全部域名解析失败」**：兜底 DNS 改为默认走国内解析器直连，不再依赖代理可用性
+- **修复「后台长时间运行后网络异常、必须重启内核才能恢复」**：乐观 DNS 缓存的陈旧窗口、测速分组掐断长连接、国内 DNS 使用易被限速的 QUIC 三个诱因一并处理
+- **消除 sing-box 1.14 的 DNS 弃用告警**：DNS 规则移除已废弃的 IP 规则集写法，路由与 DNS 规则统一改用 1.11+ 官方写法
+- **修复「规则集缓存缺失时内核直接起不来」**：直连下载客户端的写法会被内核判定为无意义配置并启动失败，生成与补丁两条路径均已修正，且能自动纠正存量配置
+- **修复 `pnpm kernel:fetch --all` 在 Windows 上拉不到 linux/macOS 内核**：解压改用系统自带 tar，并补齐 `.tar.gz` 的兜底路径
+- **修复代理页被「出站总览」挤扁、主体几乎不可见**：出站总览改为独立页面，代理页布局恢复并加了防回归保底
+- **修复后台运行一段时间后代理静默失效（需手动重启内核）**：守护的连通性检测改为经内核代理端口探测，并能区分系统断网
+- **修复自愈机制在「节点本身不可用」时陷入无限重启循环**：改为分级自愈（关连接 → 切自动选择 → 重启内核），连续重启无效后熔断
 
 ### 🐛 稳定性与并发修复
 
-- **修复 SQLite 并发写风险**：连接此前用 `SqlitePool::connect` 裸连（rollback journal + `busy_timeout=0`），而自动保存、内核守护回写自愈策略、订阅切换等多条路径会并发写，存在 `SQLITE_BUSY` 失败。现改为 WAL + `busy_timeout=5s` + 外键约束 + 连接池上限
-- **修复数据库初始化失败后后台任务永久空转**：`background_tasks` 等待存储就绪时是无超时循环，DB 初始化失败后会每秒打一条 warn 且永不停止（日志磁盘无限增长）。现改为 30 秒上限并返回错误
-- **修复「第二个数据库静默不建表」**：建表使用进程级 `OnceCell`，任何非首个数据库路径（测试库、未来多库）都不会建表。现改为按库幂等执行
-- **修复 schema 迁移静默失败不可观测**：60 条 `ALTER TABLE` 的错误被 `.ok()` 直接丢弃，迁移失败在日志里完全无迹可循，线上仅表现为「某项设置不生效」且无法自查。现改为显式查列后补列、失败时携带完整 SQL 上抛，并新增 `PRAGMA user_version` 记录 schema 版本
-- **修复 Tauri 事件监听被误杀**：`eventService.removeEventListener(name)`（不带 id）会清空该事件下**所有**监听器，而三个 kernel store 都是「先用自己的 unlisten 精确移除、再顺手调一次全局清理」，导致同事件的第二个订阅者被无提示误杀。现拆分为按 id 的精确退订与显式的 `removeAllListenersForEvent()`
-- **修复流量监听器泄漏**：`TrafficStore` 丢弃了 `onTrafficData` 返回的 unlisten，只能靠「清空整事件」退订，现已持有引用
-- **修复主进程错误处理器失效**：`main.ts` 的 `errorHandler` 写在 `mount()` 之后，挂载阶段抛出的错误根本捕获不到（白屏时无任何线索）
-- 修复 `kernel-service` 的 `stopKernel({ force })` 为幽灵参数：在前端 3 层透传但被 service 丢弃，后端 `kernel_stop_enhanced` 也不接收，调用方会误以为传参生效
-- 修复 `UpdateModal` 绕过 `eventService` 直接 `listen`，导致监听器无法被统一清理
-- 修复 22 处日志中的 emoji 被替换成字面 `?`（编码损坏）
-- 修复 `update-progress` 事件 `message` 字段缺失时前端会读到 `undefined`
-- **统一内核存活判定**：此前「内核是否在跑」有三套彼此独立的实现且结论会互相矛盾 ——
-  `is_kernel_running` 看进程句柄、`kernel_get_status_enhanced_v2` 看 TCP 端口、
-  `KERNEL_STATE.readiness.process_alive` 谁写谁说了算。表现为「内核明明在跑、流量也正常，
-  前端却显示已停止」。现收敛为 `kernel_service::health` 唯一入口（端口 > 托管句柄 > 平台扫描），
-  端口探测抽象为 trait 后可在无真实内核的环境下完整覆盖优先级规则
+- **修复 SQLite 并发写风险**：改用 WAL + busy_timeout + 连接池，并补充外键约束
+- **修复数据库初始化失败后后台任务永久空转**：等待存储就绪加上超时上限
+- **修复「第二个数据库静默不建表」**：建表改为按库幂等执行
+- **修复 schema 迁移静默失败不可观测**：迁移失败不再被吞掉，失败时携带完整 SQL 上抛，并记录 schema 版本
+- **修复 Tauri 事件监听被误杀**：改为按 id 精确退订，另保留显式的「移除全部监听器」
+- **修复流量监听器泄漏、主进程错误处理器失效、`stopKernel({ force })` 幽灵参数、`UpdateModal` 绕过统一事件清理**
+- **修复 22 处日志 emoji 编码损坏、`update-progress` 事件缺失 message 字段**
+- **统一内核存活判定**：此前三套实现结论可能互相矛盾，表现为「内核在跑、流量正常，界面却显示已停止」；现收敛为唯一判定入口
 
 ### ♻️ 重构
 
-- **配置双模型收敛**（阶段 2）：此前 sing-box 配置有两条独立路径——`config_generator` 从零生成、`settings_patch` 在已有配置上打补丁——两者读同一批 `AppConfig` 字段、写同一批语义，**加一个设置项要改两处，漏改不报错**，只会让"生成的配置"与"补丁后的配置"悄悄分叉。
-  - `ConfigIntent`（`app/singbox/config_intent.rs`）：`AppConfig` → 配置语义的**唯一**纯映射
-  - `config_render`（`app/singbox/config_render.rs`）：入口构建、假 DNS server/规则等两条路径**共用**的纯函数
-  - 生成路径**不再回调**补丁路径（`render_skeleton` 不再调用 `apply_app_settings_to_config`）
-  - **配置归属（Ownership）**：补丁前先判定"这份配置是不是本程序的"（依据 `mixed-in` 入口 / 本程序自定义的 DNS server tag，**不靠通用分组名猜测**）。判定为外来配置时只同步端口，**不重建入口、不改写路由终点**——此前靠结构猜测，猜错就会把用户导入的机场原始配置改坏，且不报错、只表现为"能连但走错线路"
-  - 归属随配置落库（`generic_config` 的 `managed_config_tags:<路径>`），老库/手改过的配置回退为按内容推断
-  - 全程不改 Tauri 命令签名，前端零感知
-- **跨语言类型统一到 ts-rs**（阶段 0）：`src/types/generated/` 成为**唯一事实来源**（git 跟踪），删除前端手写的后端结构体 interface（`GroupItem`/`ProxyGroup`/`GroupsData`/`ClashModeStatus` 等）；`src-tauri/src/types/generated/` 是 gitignore 的本地中间产物，勿依赖
-- **TUN 切换状态机收敛**：「置位 → 应用代理配置 → 重启内核 → 失败回滚」此前在首页与托盘各有 3 处变体（回滚顺序、重试次数各不相同），现统一为 `useTunToggle`，平台提权与 sudo 密码交互通过回调注入
-- **内核压缩包解压统一**：下载与导入两条路径各有约 170 行几乎相同的解压代码，且行为已分叉（`.tgz` / `.tar` 只在导入路径可用）。现合并为 `archive.rs`，格式支持取并集，阻塞 IO 全部走 `spawn_blocking`（此前解压大包会阻塞 Tauri 异步运行时）
-- **应用配置改为 schema 驱动**：53 个配置字段此前在 7 处手工枚举（store 声明 / 持久化入参 / store return / 接口 / load / save / watch），加一个设置项要改 7 个地方且漏改无任何报错。现由 `appConfigSchema.ts` 单一声明，load/save/watch 自动生成
-- **HTTP 客户端按档位复用**：11 处各自 `reqwest::Client::builder()` 收敛为 `ClientProfile`；其中守护循环每 8 秒重建一个含 TLS 根证书的客户端的问题一并修复
-- **应用配置内存快照**：`db_get_app_config` 全仓 58 处调用点每次都是一次 SQLite 往返加全列映射（守护循环每 8 秒至少读 2 次），现改为写时更新快照、读时命中
-- **移除 `mitt` 事件总线**：所有使用点都是把 Tauri 事件再转发一遍的冗余链路（4 跳缩到 2 跳），message 实例改为直连 store
-- **国际化统一**：清除全部 `locale.startsWith('zh') ? '中文' : 'English'` 三元、`t(key, '中文兜底')` inline default 以及 service/store 层硬编码中文消息。语言包从 597 提升到 665 个 key，补齐日/俄语译文（日/俄用户此前在首页会看到裸 key）
-- **日志页与连接页的排序/分组逻辑**合并为 `useSortableGroupedList`
-- 删除后端死代码约 500 行（`src/error.rs`、`process/error.rs`、gRPC 迁移后遗留的 `event_relay.rs`、未注册的 `kernel_get_status_enhanced` / `kernel_get_snapshot`、未使用的 `KERNEL_READY_NOTIFY` / `ProcessStatus` / `ProcessConfig`）
-- 删除前端死代码约 1100 行（5 个 0 引用组件、3 个 0 引用 composable、2 个 0 引用 service、0 引用的类型文件、失效的 `types/index.d.ts` barrel、`page-layout.css` 中 143 行从未生效的 hero/stat 规则）
-- **超大视图拆分**：HomeView / SubView / ProxyView 合计 3059 → 1490 行。
-  - 三个视图的 `<style scoped>`（935 行）迁到 `src/assets/views/*.css`，
-    用 `<style scoped>@import ...</style>` 而非 script import ——
-    这样外部文件里的规则仍经过 SFC 的 scoped 变换，隔离语义与内联完全一致（已验证构建产物）
-  - HomeView：运行环境探测（平台/管理员权限）与节点模式（Clash mode）+ 一键测速
-    → `useHomeDashboard`
-  - SubView：三种来源（URL / 手动 JSON / 手动 URI）的表单状态、校验、提交
-    → `useSubscriptionForm`
-  - ProxyView：节点名 → 国家码 → 国旗的三层解析 → `useNodeFlag`
-- 5 处用 `setTimeout(100ms)` 赌 Vue 调度时机的 store 初始化守卫，改为确定性的 `flushWatchers()`
-- 统一三份重复的时间格式化实现，并修正其隐性问题：原先用 `toLocaleString()` 不传 locale，
-  跟随的是浏览器环境语言而非应用内选定语言
-- **`proxy_service` 按职责拆分**：原单文件 942 行同时承担 inbound 写入 / OS 代理 / gRPC 桥接 /
-  状态查询 / 自定义规则 CRUD，现拆为 `inbound_writer` / `grpc_bridge` / `status` /
-  `custom_rule_crud`，聚合文件保持既有调用路径
-- **`tray/service` 按职责拆分**：原单文件 926 行承担文案 / 菜单 / 窗口 / 动作 / 运行态同步，
-  现拆为 5 个子模块（最大 281 行）
-- 消除 `SettingsAdvancedTab` 的 i18n 双机制（同时 `useI18n()` 与 prop 传 `t`）
-- **国家码改为生成 + 测试守护**：原先 258 行国家码硬编码在 `ProxyView.vue` 且已与 `flag-icons`
-  漂移（包多出 ARAB / ASEAN / GB-ENG 等 16 个码，视图多出包已移除的 AC / EA / TA，导致国旗
-  静默不显示）。现由 `scripts/gen-country-codes.mjs` 生成，`pnpm test:country-codes` 与
-  15 项单元测试双重守护
+- **配置双模型收敛**：配置生成与配置补丁此前各写一份语义，加一个设置项要改两处且漏改不报错；现统一到唯一映射点，生成路径不再回调补丁路径
+- **配置归属判定**：补丁前先判定配置是否属于本程序；判定为外来配置时只同步端口，不重建入口、不改写路由终点，避免改坏用户导入的机场原始配置
+- **跨语言类型统一到 ts-rs**：前端不再手写后端结构体 interface，类型漂移由测试守护
+- **TUN 切换状态机收敛**：首页与托盘的 3 处变体统一为一个状态机
+- **内核压缩包解压统一**：下载与导入两条路径的重复代码合并，支持的格式取并集
+- **应用配置改为 schema 驱动**：配置字段只声明一次，持久化的读/写/监听自动生成
+- **HTTP 客户端按档位复用**：11 处各自建客户端收敛为档位复用，守护循环不再每次重建
+- **应用配置内存快照**：读配置不再每次都走一次数据库往返
+- **移除 `mitt` 事件总线**：事件链路从 4 跳缩到 2 跳
+- **国际化统一**：清除全部语言判断三元与硬编码中文，语言包补齐日/俄语译文
+- **日志页与连接页的排序/分组逻辑合并**
+- **超大视图拆分**：HomeView / SubView / ProxyView 合计 3059 → 1490 行，样式迁到独立 CSS 文件
+- **按职责拆分大文件**：`proxy_service` 拆为 4 个子模块，`tray/service` 拆为 5 个子模块
+- **国家码改为生成 + 测试守护**：消除与 `flag-icons` 的漂移
+- 删除后端死代码约 500 行、前端死代码约 1100 行
 
 ### 🐛 修复
 
-- **26 个 i18n key 层级错置，界面直接显示裸 key**（如代理页显示 `proxy.tabGroups`、
-  `proxy.badgeFavorites`，通知项显示 `notification.ipv4Preferred`，设置页显示
-  `setting.advanced.clashDirect`）。根因是这些 key 被放在语言包**根层**，而组件用
-  `t('proxy.xxx')` 引用——4 个语言包结构一致，所以"跨语言对齐检查"查不出来。
-  现已按实际引用层级归位（`proxy` / `notification` / `home` / `setting.advanced` /
-  `common` / `rules`），并补齐 4 个语言包均缺失的 `common.minimizedToTray`
-- **i18n 切换不生效、直接显示 key 原文**（用户报告：代理页显示 `proxy.badgeRecommended`、
-  `PROXY.TABGROUPS` 而非文案）。根因有两处：
-  1. **`LocaleStore` 从未把生效语言写入 vue-i18n 实例**。`createI18n` 建好后
-     `locale` 停在初始的 `zh-CN`，而 store 与 service 层大量使用 `i18n.global.t(...)`
-     （`kernel-service`、`KernelStore`、`TrayStore` 等），它们只读实例上的 locale。
-     组件内 `useI18n()` 看起来正常，掩盖了实例层从未更新的事实。
-     现由 `LocaleStore` 在 `currentLocale` 上 `watch` 并立即应用到实例，
-     切换语言后 store/service 的提示同步生效，首帧也不会再缓存 key 原文。
-  2. **`useTunToggle` 的 `messages` 固化了 `t()` 结果**。调用方在 setup/store 初始化时
-     把 `t('...')` 求值一次存进普通对象，语言切换后不会被重新求值 —— TUN 切换失败的
-     提示会停留在旧语言。改为支持 getter（字面量仍向后兼容），`HomeView` 与
-     `TrayStore` 改用 `() => t(...)`。
+- **修复 26 个 i18n key 层级错置、界面直接显示裸 key**
+- **修复 i18n 切换不生效、直接显示 key 原文**：生效语言此前从未写入 i18n 实例，且部分提示固化了求值结果
 
 ### 🧪 测试与门禁
 
-- **配置生成黄金样本**（阶段 2）：把 4 组代表性 `AppConfig`（默认 / TUN / FakeDNS / 局域网）的生成结果固化为 JSON 快照（`app/singbox/testdata/config_golden/`），改配置生成逻辑时必须**逐字段不变**，否则说明配置语义漂移；`SINGBOX_BLESS_GOLDEN=1` 可重新生成
-- **双模型收敛断言**：新增「生成路径的产物再走一遍补丁路径必须逐字段不变」用例——收敛前补丁路径会重排 `dns.servers`、改写假 DNS 规则形态、覆盖 `route.final`，导致"订阅刚刷新的配置"与"改一次设置后的配置"不是一回事
-- **i18n 引用 key 存在性门禁**：`scripts/check-i18n.mjs` 新增扫描 `src/**/*.{ts,vue}` 中静态 `t('a.b')` 调用并校验 key 在基准语言包中存在（当前 532 个引用 key / 0 缺失）——正是这道门禁能提前发现上面那 26 个裸 key
-- **跨语言类型漂移守护**：新增 `src/types/generated/grpc-types.test.ts`，守护 ts-rs 导出路径、serde/ts rename 同步、生成类型不含 `bigint`、前端无手写 interface、barrel 导出齐全
-- 前端测试基建（vitest + @vue/test-utils + jsdom）与 **165 项**测试，覆盖 TUN 切换回滚路径、排序分组、内核错误归因、事件精确退订、配置 schema 对称性、国旗码同步、订阅表单三来源、节点名→国旗解析、**locale 同步到 vue-i18n 实例**、**注入文案的语言切换**等此前零覆盖且易回归的逻辑
-- 后端新增 **34 项**测试（198 → 232）：数据库全列往返与迁移幂等、多库各自建表、压缩包四种格式解压、配置内存快照一致性、内核存活判定优先级、**配置生成黄金样本**、**生成/补丁双模型收敛断言**、**配置归属判定**、**外来配置不被改写**
-- CI 新增 4 道门禁：`cargo fmt --check`、`prettier --check`、前端测试、i18n key 对齐校验；并统一了全库格式（此前 97 个文件未按 prettier 格式化，格式化工具形同虚设）
-- 测试过程中发现并修复 **3 个回归**：TUN 状态机重构时丢失的「索要 sudo 密码后重新执行应用与重启」、配置 schema 中空数组无法清空 `tun_include_macs`、**国旗 URL 大小写回归**（重构时误加 `.toUpperCase()`，而 `flag-icons` 文件名与 `import.meta.glob` 的 key 恒为小写 —— 症状是「节点都识别出来了但一个国旗都不显示」且无任何报错）
+- **配置生成黄金样本**：固化 4 组代表性配置，配置语义漂移可被逐字段比对发现
+- **生成 / 补丁双模型收敛断言**：两条路径的产物必须逐字段一致
+- **i18n 引用 key 存在性门禁**：静态引用扫描 + key 校验
+- **跨语言类型漂移守护**：守护 ts-rs 导出路径与前后端类型一致性
+- **CI 新增 4 道门禁**：`cargo fmt --check`、`prettier --check`、前端测试、i18n key 对齐校验
+- 测试规模：后端 289 项、前端 178 项
 
 ## [v2.3.2] - 2026-09-08
 
