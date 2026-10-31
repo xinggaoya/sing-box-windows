@@ -30,10 +30,10 @@
 - **消除 sing-box 1.14 的 DNS 弃用告警**：DNS 规则移除已废弃的 IP 规则集写法，路由与 DNS 规则统一改用 1.11+ 官方写法
 - **修复「规则集缓存缺失时内核直接起不来」**：直连下载客户端的写法会被内核判定为无意义配置并启动失败，生成与补丁两条路径均已修正，且能自动纠正存量配置
 - **修复 `pnpm kernel:fetch --all` 在 Windows 上拉不到 linux/macOS 内核**：解压改用系统自带 tar，并补齐 `.tar.gz` 的兜底路径
-- **修复 Linux 平台编译失败（CI 红灯自 2026-10-11 起持续）**：`platform::list_active_processes_by_name` 的平台分支写成了「`return` + 代码块」，而两个分支互斥——在 Linux 上非 Linux 分支被整段剔除后，函数体**没有尾表达式**，返回类型退化为 `()`，与声明的 `Result` 不匹配，**Linux 直接编译失败**（Windows / macOS 因分支互补而完全察觉不到）
-  - 改为让各平台分支都作为函数的尾表达式；并给这类「函数体仅由互斥 cfg 块构成」的写法加了注释说明，避免再次踩坑
-  - 同时修掉 `platform/linux.rs` 的 4 处 `clippy::collapsible_if`（clippy 1.88 稳定 let-chains 后该 lint 扩展到 `if let` 嵌套；该文件仅在 Linux 编译，本地 Windows 的 clippy 从不检查它）
-  - 这两个问题使 master 的 CI 从 2026-10-11 起持续红灯，也导致 v2.3.2 之后的 Linux 发布产物缺失
+- **修复 Linux 平台构建失败（master 的 CI 长期红灯、Linux 发布产物缺失）**：根因是**依赖不兼容**而非本仓代码——`tauri-plugin-single-instance` 依赖的 `interprocess 2.4.7` 仍调用 tokio 1.53 已移除的 `AsyncFd::register_with_interest`，而该调用位于 interprocess 的 `os/unix/` 模块，**只在 Linux 编译**，因此 Windows / macOS 完全察觉不到
+  - 将 tokio 锁在 `~1.52`（并在 `Cargo.toml` 写明原因与解除条件），避免后续 `cargo update` 再次引入
+  - 顺带修掉 `platform/linux.rs` 的 4 处 `clippy::collapsible_if`：clippy 收紧后该 lint 会命中 `if let` 嵌套，而该文件仅在 Linux 编译，本地 Windows 的 clippy 从不检查它
+  - 此前 CI 一直红在 clippy 步骤，release workflow 的 Linux job 也因此失败——只有 Windows / macOS 产物
 - **修复代理页被「出站总览」挤扁、主体几乎不可见**：出站总览改为独立页面，代理页布局恢复并加了防回归保底
 - **修复后台运行一段时间后代理静默失效（需手动重启内核）**：守护的连通性检测改为经内核代理端口探测，并能区分系统断网
 - **修复自愈机制在「节点本身不可用」时陷入无限重启循环**：改为分级自愈（关连接 → 切自动选择 → 重启内核），连续重启无效后熔断

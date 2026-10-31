@@ -24,16 +24,10 @@ pub async fn is_process_running(process_name: &str) -> Result<bool, String> {
 }
 
 /// 列出指定名称的活跃进程 PID。
-///
-/// ⚠️ 两个平台分支都必须是**函数的尾表达式**（而不是 `return` + 块）：
-/// 在 Linux 上 `#[cfg(not(target_os = "linux"))]` 分支会被整段剔除，
-/// 若 Linux 分支写成 `return ...;`，函数体就没有尾表达式了——
-/// 返回类型变成 `()`，与声明的 `Result<Vec<u32>, String>` 不匹配，
-/// **Linux 编译直接失败**（Windows / macOS 因分支互补而察觉不到）。
 pub async fn list_active_processes_by_name(process_name: &str) -> Result<Vec<u32>, String> {
     #[cfg(target_os = "linux")]
     {
-        platform_list_active_processes_by_name(process_name).await
+        return platform_list_active_processes_by_name(process_name).await;
     }
 
     #[cfg(not(target_os = "linux"))]
