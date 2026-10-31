@@ -34,7 +34,8 @@ tauri-plugin-devtools-app = { version = "2.1.4", optional = true }
 
 ## 2. 日志桥接模块
 
-复制 [`log_bridge.rs`](./log_bridge.rs) 到 `<crate>/src/utils/log_bridge.rs`：
+复制 [`log_bridge.rs`](./log_bridge.rs) 与 [`log_bridge.tests.rs`](./log_bridge.tests.rs)
+到 `<crate>/src/utils/log_bridge.rs` / `log_bridge.tests.rs`（测试文件必须同名同目录）：
 
 - `LogDirectiveFilter`：RUST_LOG 风格过滤，**语义对齐 `tracing_subscriber::EnvFilter`**
   （非法指令整串作废并回退默认、空串不放行、裸 token 视为 `target=trace`、最长前缀优先）
@@ -147,6 +148,7 @@ test('applyDevtoolsFeature 只对 dev 命令注入 devtools feature', () => {
 | 1 | `pnpm tauri dev` | 终端打印 `Tauri Devtools v2.x` + `https://devtools.crabnebula.dev/dash/127.0.0.1/<port>` |
 | 2 | 浏览器打开该地址 | 面板出现，日志流实时滚动 |
 | 3 | 点一次会打后端的按钮 | 面板里能看到对应 command 的 payload 与耗时 |
+| 3.5 | `cargo test log_bridge` | 模板自带的 18 个用例全绿（过滤语义与行格式） |
 | 4 | 看终端与日志文件 | 开发态日志**没有中断**（桥接生效），格式与原 fmt 层一致 |
 | 5 | `cargo tree -e normal`（不带 feature） | 搜不到 `tauri-plugin-devtools` |
 | 6 | `cargo build --release` | 编译通过，产物不含插件 |
