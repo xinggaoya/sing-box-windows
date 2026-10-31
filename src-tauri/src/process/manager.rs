@@ -137,10 +137,11 @@ impl ProcessManager {
         #[cfg(target_os = "linux")]
         {
             let comm_path = format!("/proc/{}/comm", pid);
-            if let Ok(name) = std::fs::read_to_string(&comm_path) {
-                if name.trim() == kernel_name {
-                    return true;
-                }
+            let comm_match = std::fs::read_to_string(comm_path)
+                .ok()
+                .is_some_and(|name| name.trim() == kernel_name);
+            if comm_match {
+                return true;
             }
 
             let exe_path = format!("/proc/{}/exe", pid);
@@ -250,13 +251,15 @@ impl ProcessManager {
     async fn is_managed_kernel_pid_active(&self, pid: u32, kernel_name: &str) -> bool {
         #[cfg(target_os = "linux")]
         {
-            return crate::platform::list_active_processes_by_name(kernel_name)
-                .await
-                .map(|active_pids| active_pids.contains(&pid))
-                .unwrap_or_else(|err| {
+            // ⚠️ 不能用 `unwrap_or_else`：那个闭包不是 async，里面无法 `.await`
+            // （E0728）——而本分支只在 Linux 编译，Windows / macOS 察觉不到。
+            match crate::platform::list_active_processes_by_name(kernel_name).await {
+                Ok(active_pids) => active_pids.contains(&pid),
+                Err(err) => {
                     warn!("读取 Linux 活跃内核 PID 失败: {}", err);
                     self.is_pid_matching_kernel_name(pid, kernel_name).await
-                });
+                }
+            }
         }
 
         #[cfg(not(target_os = "linux"))]
