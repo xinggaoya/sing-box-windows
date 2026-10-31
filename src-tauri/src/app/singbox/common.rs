@@ -29,6 +29,11 @@ pub const DNS_MDNS: &str = "dns_mdns";
 pub const FAKE_DNS_FILTER_PROXY_ONLY: &str = "proxy_only";
 pub const FAKE_DNS_FILTER_GLOBAL_NON_CN: &str = "global_non_cn";
 
+/// `dns.final` 兜底策略：`cn` = 未命中规则的域名用国内解析器（不依赖代理）
+pub const DNS_FINAL_STRATEGY_CN: &str = "cn";
+/// `dns.final` 兜底策略：`proxy` = 未命中规则的域名用境外解析器（经代理）
+pub const DNS_FINAL_STRATEGY_PROXY: &str = "proxy";
+
 // Rule-set tags (官方 SagerNet 规则集)
 pub const RS_GEOSITE_CN: &str = "geosite-cn";
 pub const RS_GEOSITE_GEOLOCATION_NOT_CN: &str = "geosite-geolocation-!cn";
@@ -92,6 +97,17 @@ pub fn normalize_download_detour(app_config: &AppConfig) -> &'static str {
         "manual" => TAG_MANUAL,
         // 默认值调整为直连：gh-proxy 已经加速，避免多余的代理链路
         _ => TAG_DIRECT,
+    }
+}
+
+/// `dns.final` 兜底策略归一化（非法/历史残留值回退默认 `cn`）。
+///
+/// 默认选 `cn`：未命中任何 DNS 规则的域名由**国内解析器直连**解析，
+/// 不依赖代理链路可用性——代理挂掉时国内站点仍能正常解析与访问。
+pub fn normalize_dns_final_strategy(app_config: &AppConfig) -> &'static str {
+    match app_config.singbox_dns_final_strategy.as_str() {
+        DNS_FINAL_STRATEGY_PROXY => DNS_FINAL_STRATEGY_PROXY,
+        _ => DNS_FINAL_STRATEGY_CN,
     }
 }
 

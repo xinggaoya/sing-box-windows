@@ -36,6 +36,7 @@ src/
 | 出站总览 / 网络诊断         | `views/OutboundsView.vue` + `composables/useOutboundList.ts` + `views/setting/components/SettingsDiagnosticsCard.vue` | 「出站」独立页（路由 `/outbounds`）与维护页诊断视图；代理页不得挂出站总览 UI |
 | 设计系统 / 主题             | `assets/tokens.css` + `stores/app/ThemeStore.ts`                                                                      | Indigo 三层 token，主题覆盖 `--primary-*`                                    |
 | 资源清理                    | `composables/useCleanup.ts`                                                                                           | 组件卸载统一清理监听/定时器                                                  |
+| 高级设置表单                | `views/setting/useAdvancedSettingsForm.ts` + `components/SettingsAdvancedTab.vue`                                     | sing-box 高级选项（DNS / 规则 / 实验性）；文案一律走 locale 语言包           |
 
 ## CONVENTIONS (FRONTEND ONLY)
 
@@ -71,3 +72,4 @@ pnpm type-check
 - **运行态数据通道**：后端 gRPC 订阅 → Tauri event → `event-service.ts`；前端无独立 websocket-service，事件名必须用 `constants/events.ts` 常量。
 - **代理页是「定高 + 内部滚动」布局**：`.page-shell`（flex 列）+ `.split-view`（`flex: 1`，节点网格自己内部滚动）构成。**同层不要再放有内容高度的卡片/面板**——flex 分配高度时会把 `.split-view` 压扁（`min-height: 0`），整页主体不可见（2026-10-20 的「出站总览」卡片就是这么把代理页挤废的）。辅助视图一律**独立成页面**（出站总览 → `/outbounds`），并由 `views/proxy-layout.test.ts` 守护这条约定。
 - **UI 设计系统**：Indigo（`assets/tokens.css`），新增组件优先复用 `components/common/` 下的 SectionCard/StatCard/PageHeader 等。
+- **DNS 相关设置项的默认值有稳定性含义**：`appConfigSchema.ts` 里 `singbox_dns_optimistic_cache`（乐观缓存）默认**关闭**、`singbox_dns_optimistic_timeout`（陈旧窗口）默认 30m、`singbox_dns_final_strategy`（兜底 DNS）默认 `cn`。原因见根 AGENTS.md 的「⚠️ dns.optimistic / dns.final」两条：乐观缓存的**隐含 3 天**窗口会把被污染的解析结果钉死（表现为「后台跑久了网络就坏、只能重启内核」），兜底解析器若指向境外解析器则代理一挂全部域名解析失败。改动这些默认值前先读 `src-tauri/src/app/singbox/config_rules.rs` 的模块文档。

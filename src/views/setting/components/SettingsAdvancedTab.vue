@@ -343,7 +343,19 @@
             </div>
           </div>
           <n-form-item :label="extraLabels.dnsTimeout">
-            <n-input v-model:value="singboxExperimentalForm.dnsTimeout" :placeholder="'5s'" />
+            <n-input v-model:value="singboxExperimentalForm.dnsTimeout" :placeholder="'10s'" />
+          </n-form-item>
+          <n-form-item :label="extraLabels.dnsOptimisticTimeout">
+            <n-input
+              v-model:value="singboxExperimentalForm.dnsOptimisticTimeout"
+              :placeholder="'30m'"
+            />
+          </n-form-item>
+          <n-form-item :label="extraLabels.dnsFinalStrategy">
+            <n-select
+              v-model:value="singboxExperimentalForm.dnsFinalStrategy"
+              :options="dnsFinalStrategyOptions"
+            />
           </n-form-item>
 
           <!-- Hysteria2 抗指纹 -->
@@ -473,6 +485,7 @@ const {
   fakeDnsFilterOptions,
   tunDnsModeOptions,
   hysteria2ObfsTypeOptions,
+  dnsFinalStrategyOptions,
   clashModeOptions,
   saveProxyAdvancedSettings,
   saveSingboxProfileSettings,
@@ -525,6 +538,8 @@ const extraLabels = computed(() => ({
   dnsOptimisticCache: t('setting.advanced.dnsOptimisticCache'),
   dnsUseMdns: t('setting.advanced.dnsUseMdns'),
   dnsTimeout: t('setting.advanced.dnsTimeout'),
+  dnsOptimisticTimeout: t('setting.advanced.dnsOptimisticTimeout'),
+  dnsFinalStrategy: t('setting.advanced.dnsFinalStrategy'),
   hysteria2Title: t('setting.advanced.hysteria2Title'),
   hysteria2ObfsType: t('setting.advanced.hysteria2ObfsType'),
   hysteria2DisableChromeParrot: t('setting.advanced.hysteria2DisableChromeParrot'),

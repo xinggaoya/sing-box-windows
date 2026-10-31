@@ -797,9 +797,14 @@ export default {
       deprecatedNotice:
         'sing-box の非推奨計画に従い、clash_api / store_rdrc / independent_cache / download_detour などのフィールドは 1.16 で削除されます。本アプリが生成する設定はすでに移行済みです。カスタム設定テンプレートを使用する場合は、1.16 へ更新する前に自行で調整してください。非推奨フィールドが検出された場合、カーネル起動時に通知が表示されます。',
       dns114Title: 'DNS 1.14 強化',
-      dnsOptimisticCache: '楽観的 DNS キャッシュ（繰り返しクエリの遅延を削減）',
+      dnsOptimisticCache: '楽観的 DNS キャッシュ（繰り返しクエリの遅延を削減、-disable 推奨）',
       dnsUseMdns: 'mDNS を有効化（*.local / link-local）',
-      dnsTimeout: 'DNS タイムアウト（例: 5s）',
+      dnsTimeout: 'DNS タイムアウト（例: 10s）',
+      dnsOptimisticTimeout:
+        '楽観的キャッシュの陳腐ウィンドウ（例: 30m、期限切れの回答を这么久まで 사용할 수 있음）',
+      dnsFinalStrategy: 'フォールバック DNS（どのルールにも一致しないドメインを誰が解決するか）',
+      dnsFinalStrategyCn: '国内 DNS を直接接続（プロキシ非依存、推奨）',
+      dnsFinalStrategyProxy: '海外 DNS をプロキシ経由（汚染防止）',
       hysteria2Title: 'Hysteria2 フィンガープリント対策',
       hysteria2ObfsType: '難読化タイプ',
       hysteria2DisableChromeParrot:

@@ -1,9 +1,9 @@
 {
   "dns": {
-    "final": "dns_proxy",
-    "optimistic": true,
+    "final": "dns_cn",
     "rules": [
       {
+        "action": "route",
         "domain_suffix": [
           "local",
           "254.169.in-addr.arpa",
@@ -15,25 +15,26 @@
         "server": "dns_mdns"
       },
       {
+        "action": "route",
         "clash_mode": "direct",
         "server": "dns_cn"
+      },
+      {
+        "action": "route",
+        "clash_mode": "global",
+        "server": "dns_proxy"
       },
       {
         "action": "reject",
         "rule_set": "geosite-category-ads-all"
       },
       {
-        "clash_mode": "global",
-        "server": "dns_proxy"
-      },
-      {
-        "rule_set": [
-          "geosite-cn",
-          "geoip-cn"
-        ],
+        "action": "route",
+        "rule_set": "geosite-cn",
         "server": "dns_cn"
       },
       {
+        "action": "route",
         "rule_set": "geosite-geolocation-!cn",
         "server": "dns_proxy"
       }
@@ -56,7 +57,7 @@
         "server": "dns.alidns.com",
         "server_port": 443,
         "tag": "dns_cn",
-        "type": "h3"
+        "type": "https"
       },
       {
         "server": "114.114.114.114",
@@ -69,7 +70,7 @@
         "type": "mdns"
       }
     ],
-    "timeout": "5s"
+    "timeout": "10s"
   },
   "experimental": {
     "cache_file": {
@@ -99,7 +100,7 @@
   "outbounds": [
     {
       "idle_timeout": "10m",
-      "interrupt_exist_connections": true,
+      "interrupt_exist_connections": false,
       "interval": "3m",
       "outbounds": [
         "direct"
@@ -111,7 +112,8 @@
     },
     {
       "outbounds": [
-        "自动选择"
+        "自动选择",
+        "direct"
       ],
       "tag": "手动切换",
       "type": "selector"
@@ -254,10 +256,12 @@
         "protocol": "dns"
       },
       {
+        "action": "route",
         "clash_mode": "global",
         "outbound": "手动切换"
       },
       {
+        "action": "route",
         "clash_mode": "direct",
         "outbound": "direct"
       },
@@ -266,30 +270,37 @@
         "rule_set": "geosite-category-ads-all"
       },
       {
+        "action": "route",
         "outbound": "Telegram",
         "rule_set": "geosite-telegram"
       },
       {
+        "action": "route",
         "outbound": "YouTube",
         "rule_set": "geosite-youtube"
       },
       {
+        "action": "route",
         "outbound": "Netflix",
         "rule_set": "geosite-netflix"
       },
       {
+        "action": "route",
         "outbound": "OpenAI",
         "rule_set": "geosite-openai"
       },
       {
+        "action": "route",
         "outbound": "Google",
         "rule_set": "geosite-google"
       },
       {
+        "action": "route",
         "outbound": "direct",
         "rule_set": "geosite-private"
       },
       {
+        "action": "route",
         "ip_cidr": [
           "10.0.0.0/8",
           "100.64.0.0/10",
@@ -304,15 +315,23 @@
         "outbound": "direct"
       },
       {
+        "action": "route",
         "outbound": "direct",
-        "rule_set": [
-          "geosite-cn",
-          "geoip-cn"
-        ]
+        "rule_set": "geosite-cn"
       },
       {
+        "action": "route",
         "outbound": "手动切换",
         "rule_set": "geosite-geolocation-!cn"
+      },
+      {
+        "action": "resolve",
+        "strategy": "ipv4_only"
+      },
+      {
+        "action": "route",
+        "outbound": "direct",
+        "rule_set": "geoip-cn"
       }
     ]
   },

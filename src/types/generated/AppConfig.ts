@@ -52,12 +52,28 @@ tun_self_heal_cooldown_secs: number,
 kernel_update_track: string, 
 /**
  * 1.14 DNS 乐观缓存（optimistic）：重复查询命中过期缓存立即返回 + 后台刷新
+ *
+ * ⚠️ sing-box 的 `optimistic: true` 隐含 **3 天**的陈旧窗口，
+ * 一旦缓存里的结果被污染或 CDN 换了 IP，客户端会被钉死在坏地址上，
+ * 表现就是「后台跑久了网络就坏，只能重启内核」。因此默认关闭；
+ * 开启时也会显式写出较短的陈旧窗口上限（见 `singbox_dns_optimistic_timeout`）。
  */
 singbox_dns_optimistic_cache: boolean, 
 /**
- * 1.14 per-server / per-query DNS 超时（如 "5s"）；空字符串表示用内核默认
+ * 乐观 DNS 缓存的陈旧窗口上限（如 "30m"）；仅在乐观缓存开启时生效
+ */
+singbox_dns_optimistic_timeout: string, 
+/**
+ * 1.14 per-server / per-query DNS 超时（如 "10s"）；空字符串表示用内核默认
  */
 singbox_dns_timeout: string, 
+/**
+ * `dns.final` 兜底解析器策略：`cn`（默认，国内解析器直连）/ `proxy`（境外解析器，经代理）
+ *
+ * 默认 `cn`：未命中任何分流规则的域名由国内解析器解析，**不依赖代理可用性**，
+ * 代理挂掉时国内站点照常解析与直连。
+ */
+singbox_dns_final_strategy: string, 
 /**
  * 1.14 mDNS server（*.local / link-local）；默认开
  */

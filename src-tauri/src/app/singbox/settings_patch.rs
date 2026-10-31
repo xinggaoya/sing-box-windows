@@ -22,8 +22,8 @@
 use super::common::{
     build_dns_server_config, ensure_kernel_log_output, RS_GEOSITE_ADS,
     RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI,
-    RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX,
-    TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
+    RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_MANUAL,
+    TAG_NETFLIX, TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
 };
 use super::config_generator::remote_rule_set_sources;
 use super::config_intent::ConfigIntent;
@@ -33,6 +33,7 @@ use super::config_render::{
     sync_fake_dns_route_rules, sync_fake_dns_rules, sync_fake_dns_server, HTTP_CLIENT_DEFAULT_TAG,
     HTTP_CLIENT_DIRECT_DOWNLOAD_TAG,
 };
+use super::config_rules::{dns_final_server, sync_dns_rules, sync_route_rules};
 use super::ownership::Ownership;
 use crate::app::storage::state_model::AppConfig;
 use serde_json::{json, Map, Value};
@@ -115,9 +116,19 @@ pub fn apply_intent_to_config(config: &mut Value, intent: &ConfigIntent, ownersh
                 } else {
                     dns_obj.remove("reverse_mapping");
                 }
-                // 1.14 新增：乐观 DNS 缓存
+                // 1.14 新增：乐观 DNS 缓存。
+                // ⚠️ 必须显式写出陈旧窗口上限：`optimistic: true` 的隐含默认值是 **3 天**，
+                // 被污染的解析结果会被钉住 3 天，表现为「后台跑久了网络就坏、只能重启内核」。
                 if intent.dns_optimistic {
-                    dns_obj.insert("optimistic".to_string(), json!(true));
+                    let timeout = intent.dns_optimistic_timeout.trim();
+                    dns_obj.insert(
+                        "optimistic".to_string(),
+                        if timeout.is_empty() {
+                            json!({ "enabled": true })
+                        } else {
+                            json!({ "enabled": true, "timeout": timeout })
+                        },
+                    );
                 } else {
                     dns_obj.remove("optimistic");
                 }
@@ -214,9 +225,12 @@ fn apply_owned_profile_settings(
             for outbound in outbounds.iter_mut() {
                 if outbound.get("tag").and_then(|t| t.as_str()) == Some(TAG_AUTO) {
                     if let Some(obj) = outbound.as_object_mut() {
-                        // 强制启用切换时中断旧连接，避免长时间后台运行连接数膨胀
-                        obj.insert("interrupt_exist_connections".to_string(), json!(true));
-                        // 缩短空闲回收时间，防止长尾连接占满列表
+                        // ⚠️ 必须保持 false：urltest 每次测速都可能改选节点，
+                        // 开启后**所有**走这个分组的长连接（视频 / 远程桌面 / 下载）
+                        // 会被成批掐断，表现为「后台跑久了网络就断」。
+                        // sing-box 官方默认同样是 false。
+                        obj.insert("interrupt_exist_connections".to_string(), json!(false));
+                        // 测速连接的空闲超时（sing-box 默认 30m）
                         obj.insert("idle_timeout".to_string(), json!("10m"));
                         obj.insert("url".to_string(), json!(intent.urltest_url));
                     }
@@ -295,32 +309,21 @@ fn apply_owned_profile_settings(
             sync_fake_dns_server(servers, intent);
         }
 
-        // 3) 广告拦截：同步 dns.rules（如果存在/可定位）
+        // 3) DNS 规则：整体对齐到生成路径的形态
+        //    - 旧版的 `[geosite-cn, geoip-cn]` 合并规则拆成 `geosite-cn` 一条
+        //      （`geoip-cn` 属于 1.14 起废弃的 Legacy Address Filter Fields，
+        //       且在 DNS 阶段本就无法匹配未解析的域名）
+        //    - 统一成 `action: "route"` + `server` 的 1.11+ 官方形态
+        //    - 广告拦截规则与模式覆盖规则的相对顺序对齐生成路径
         if let Some(rules) = dns_obj.get_mut("rules").and_then(|v| v.as_array_mut()) {
-            let mut ads_rule_index: Option<usize> = None;
-            for (idx, rule) in rules.iter().enumerate() {
-                if rule.get("rule_set").and_then(|v| v.as_str()) == Some(RS_GEOSITE_ADS) {
-                    ads_rule_index = Some(idx);
-                    break;
-                }
-            }
-
-            if intent.block_ads {
-                if ads_rule_index.is_none() {
-                    // 尽量插入在前面：优先拦截广告域名的解析
-                    rules.insert(0, json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
-                } else if let Some(i) = ads_rule_index {
-                    if let Some(obj) = rules.get_mut(i).and_then(|v| v.as_object_mut()) {
-                        obj.insert("action".to_string(), json!("reject"));
-                        obj.remove("server");
-                    }
-                }
-            } else if let Some(i) = ads_rule_index {
-                rules.remove(i);
-            }
-
+            sync_dns_rules(rules, intent);
             sync_fake_dns_rules(rules, intent);
         }
+
+        // `dns.final`：未命中任何规则的域名的兜底解析器。
+        // 之前补丁路径**没有**同步这个字段，导致订阅配置走补丁路径时
+        // 兜底解析器始终是境外解析器（且经代理）——代理一挂，全部域名解析失败。
+        dns_obj.insert("final".to_string(), json!(dns_final_server(intent)));
     }
 
     // 4) route：同步 final / hijack-dns / ads reject / rule_set download_detour
@@ -453,6 +456,15 @@ fn apply_owned_profile_settings(
             }
 
             sync_fake_dns_route_rules(rules, intent, &fake_dns_route_cleanup_pairs);
+
+            // 国内/境外分流规则：整体对齐到生成路径的形态。
+            //
+            // 关键修正：sing-box 1.11+ 起，路由规则里的 **IP 匹配**只在目标已经是 IP 时才命中，
+            // 域名流量必须先经过 `action: "resolve"` 才能被 `geoip-cn` 这类 IP 规则集匹配。
+            // 没有这一步，`geoip-cn` 对域名流量**完全不生效**——
+            // 于是不在 `geosite-cn` 里的国内站点（域名清单永远不完整）
+            // 既不匹配域名规则、也匹配不到 IP 规则，一路落到 `final` 走代理。
+            sync_route_rules(rules, intent);
         }
     }
 
@@ -469,6 +481,24 @@ fn apply_owned_profile_settings(
                     TAG_TELEGRAM | TAG_YOUTUBE | TAG_NETFLIX | TAG_OPENAI | TAG_GOOGLE
                 )
             });
+        }
+
+        // “手动切换”分组补上直连兜底成员（放最后，不改变默认选择）。
+        // 代理链路全挂时，用户可以一键切到“全部直连”，不必重启内核。
+        if ownership.owns_group(TAG_MANUAL) {
+            for outbound in outbounds.iter_mut() {
+                if outbound.get("tag").and_then(|v| v.as_str()) != Some(TAG_MANUAL) {
+                    continue;
+                }
+                let Some(list) = outbound.get_mut("outbounds").and_then(|v| v.as_array_mut())
+                else {
+                    continue;
+                };
+                let has_direct = list.iter().any(|item| item.as_str() == Some(TAG_DIRECT));
+                if !has_direct {
+                    list.push(json!(TAG_DIRECT));
+                }
+            }
         }
     }
 

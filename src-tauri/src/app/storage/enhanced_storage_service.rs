@@ -507,6 +507,14 @@ pub async fn db_get_app_config_internal<R: tauri::Runtime>(
     #[allow(unused_mut)]
     let mut config = storage.get_app_config().await.map_err(|e| e.to_string())?;
 
+    // 历史遗留默认值迁移：只改应用自己的旧默认值，用户自己填的值不动。
+    if config.apply_legacy_migrations() {
+        tracing::info!("已迁移历史遗留的 sing-box 默认值（国内 DNS 协议 / 乐观缓存窗口）");
+        if let Err(err) = storage.save_app_config(&config).await {
+            tracing::warn!("写回迁移后的应用配置失败: {}", err);
+        }
+    }
+
     // Windows：非管理员启动时自动关闭 TUN，避免因缺少权限导致内核无法拉起
     // Linux/macOS：内核可通过 sudo 提权启动（应用本身无需 root），因此不在这里强制关闭。
     #[cfg(target_os = "windows")]

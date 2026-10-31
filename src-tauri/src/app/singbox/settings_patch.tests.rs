@@ -807,3 +807,216 @@ fn sync_http_clients_should_repair_dangling_default_http_client() {
         "悬空的 route.default_http_client 应被改指到 default 客户端"
     );
 }
+
+/// 一份**旧版本**生成的、归属为本程序的配置：
+/// - `route.rules` 里 `geosite-cn` 与 `geoip-cn` 合并在一条规则；
+/// - 没有 `resolve` 动作（sing-box 1.11+ 的 IP 匹配前提）；
+/// - `dns.rules` 里同样是合并写法；
+/// - `dns.final` 指向境外解析器。
+fn owned_config_with_legacy_cn_rules() -> Value {
+    json!({
+        "inbounds": [
+            { "type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 7890 }
+        ],
+        "dns": {
+            "servers": [
+                { "type": "udp", "tag": "dns_proxy", "server": "1.1.1.1" },
+                { "type": "udp", "tag": "dns_cn", "server": "223.5.5.5" }
+            ],
+            "rules": [
+                { "rule_set": ["geosite-cn", "geoip-cn"], "server": "dns_cn" },
+                { "rule_set": "geosite-geolocation-!cn", "server": "dns_proxy" }
+            ],
+            "final": "dns_proxy"
+        },
+        "outbounds": [
+            { "type": "urltest", "tag": "自动选择", "outbounds": ["节点A"], "interrupt_exist_connections": true },
+            { "type": "selector", "tag": "手动切换", "outbounds": ["自动选择"] },
+            { "type": "direct", "tag": "direct" }
+        ],
+        "route": {
+            "rule_set": [],
+            "rules": [
+                { "action": "sniff" },
+                { "outbound": "direct", "rule_set": ["geosite-cn", "geoip-cn"] },
+                { "outbound": "手动切换", "rule_set": "geosite-geolocation-!cn" }
+            ],
+            "final": "手动切换"
+        }
+    })
+}
+
+/// 补丁路径必须把旧配置升级成"IP 规则可生效"的形态：
+/// 升级前的 `geoip-cn` 对域名流量完全不生效 → 国内站点误走代理。
+#[test]
+fn apply_intent_should_upgrade_legacy_cn_rules_with_resolve_action() {
+    let intent = ConfigIntent::from_app_config(&AppConfig::default());
+    let mut config = owned_config_with_legacy_cn_rules();
+    let ownership = Ownership::inferred(&config);
+    assert!(ownership.managed, "带 mixed-in 入口的配置应被接管");
+
+    apply_intent_to_config(&mut config, &intent, &ownership);
+
+    let rules = config
+        .pointer("/route/rules")
+        .and_then(|v| v.as_array())
+        .expect("route.rules 应存在");
+
+    let resolve_index = rules
+        .iter()
+        .position(|rule| rule.get("action").and_then(|v| v.as_str()) == Some("resolve"))
+        .expect("补丁后必须存在 resolve 动作");
+    let geoip_index = rules
+        .iter()
+        .position(|rule| {
+            rule.get("rule_set")
+                .and_then(|v| v.as_str())
+                .map(|tag| tag == "geoip-cn")
+                .unwrap_or(false)
+        })
+        .expect("补丁后必须存在独立的 geoip-cn 规则");
+
+    assert!(
+        geoip_index > resolve_index,
+        "geoip-cn 必须排在 resolve 之后，否则 IP 规则对域名目标不生效：resolve={} geoip={}",
+        resolve_index,
+        geoip_index
+    );
+}
+
+/// 补丁路径必须把 `dns.final` 从境外解析器改成国内解析器：
+/// 兜底解析器经代理时，代理一挂全部域名解析失败（国内站点也打不开）。
+#[test]
+fn apply_intent_should_switch_dns_final_to_cn_resolver() {
+    let intent = ConfigIntent::from_app_config(&AppConfig::default());
+    let mut config = owned_config_with_legacy_cn_rules();
+    let ownership = Ownership::inferred(&config);
+
+    apply_intent_to_config(&mut config, &intent, &ownership);
+
+    assert_eq!(
+        config.pointer("/dns/final").and_then(|v| v.as_str()),
+        Some("dns_cn"),
+        "兜底解析器应切换为国内解析器（不依赖代理）"
+    );
+}
+
+/// 补丁路径必须清掉 `dns.rules` 里的 `geoip-cn`
+/// （1.14 起废弃的 Legacy Address Filter Fields，且在 DNS 阶段本就无法匹配）。
+#[test]
+fn apply_intent_should_drop_geoip_cn_from_dns_rules() {
+    let intent = ConfigIntent::from_app_config(&AppConfig::default());
+    let mut config = owned_config_with_legacy_cn_rules();
+    let ownership = Ownership::inferred(&config);
+
+    apply_intent_to_config(&mut config, &intent, &ownership);
+
+    let dns_rules = config
+        .pointer("/dns/rules")
+        .and_then(|v| v.as_array())
+        .expect("dns.rules 应存在");
+    for rule in dns_rules {
+        let has_geoip = rule
+            .get("rule_set")
+            .and_then(|v| v.as_str())
+            .map(|tag| tag == "geoip-cn")
+            .unwrap_or(false)
+            || rule
+                .get("rule_set")
+                .and_then(|v| v.as_array())
+                .map(|items| items.iter().any(|item| item.as_str() == Some("geoip-cn")))
+                .unwrap_or(false);
+        assert!(!has_geoip, "dns.rules 不应残留 geoip-cn：{:?}", rule);
+    }
+}
+
+/// 补丁路径必须关闭 urltest 的 `interrupt_exist_connections`：
+/// 否则节点抖动时长连接会被成批掐断（后台跑久了网络就断）。
+#[test]
+fn apply_intent_should_disable_urltest_interrupt_existing_connections() {
+    let intent = ConfigIntent::from_app_config(&AppConfig::default());
+    let mut config = owned_config_with_legacy_cn_rules();
+    let ownership = Ownership::inferred(&config);
+
+    apply_intent_to_config(&mut config, &intent, &ownership);
+
+    let outbounds = config
+        .get("outbounds")
+        .and_then(|v| v.as_array())
+        .expect("outbounds 应存在");
+    let auto = outbounds
+        .iter()
+        .find(|ob| ob.get("tag").and_then(|v| v.as_str()) == Some("自动选择"))
+        .expect("应存在自动选择分组");
+    assert_eq!(
+        auto.get("interrupt_exist_connections")
+            .and_then(|v| v.as_bool()),
+        Some(false),
+        "urltest 不应中断已有连接"
+    );
+}
+
+/// 补丁路径必须给"手动切换"分组补上直连兜底成员（放最后，不改变默认选择）。
+#[test]
+fn apply_intent_should_add_direct_fallback_to_manual_group() {
+    let intent = ConfigIntent::from_app_config(&AppConfig::default());
+    let mut config = owned_config_with_legacy_cn_rules();
+    let ownership = Ownership::inferred(&config);
+
+    apply_intent_to_config(&mut config, &intent, &ownership);
+
+    let outbounds = config
+        .get("outbounds")
+        .and_then(|v| v.as_array())
+        .expect("outbounds 应存在");
+    let manual = outbounds
+        .iter()
+        .find(|ob| ob.get("tag").and_then(|v| v.as_str()) == Some("手动切换"))
+        .expect("应存在手动切换分组");
+    let list = manual
+        .get("outbounds")
+        .and_then(|v| v.as_array())
+        .expect("手动切换分组应有候选列表");
+    assert_eq!(
+        list.first().and_then(|v| v.as_str()),
+        Some("自动选择"),
+        "默认选择仍应是自动选择"
+    );
+    assert!(
+        list.iter().any(|v| v.as_str() == Some("direct")),
+        "手动切换分组应包含直连兜底成员：{:?}",
+        list
+    );
+}
+
+/// 乐观 DNS 缓存开启时必须显式写出陈旧窗口上限：
+/// 裸 `optimistic: true` 意味着内核隐含 3 天陈旧窗口（被污染结果会被钉住 3 天）。
+#[test]
+fn apply_intent_should_bound_optimistic_dns_cache_window() {
+    let app_config = AppConfig {
+        singbox_dns_optimistic_cache: true,
+        singbox_dns_optimistic_timeout: "30m".to_string(),
+        ..AppConfig::default()
+    };
+    let intent = ConfigIntent::from_app_config(&app_config);
+
+    let mut config = owned_config_with_legacy_cn_rules();
+    let ownership = Ownership::inferred(&config);
+    apply_intent_to_config(&mut config, &intent, &ownership);
+
+    let optimistic = config
+        .pointer("/dns/optimistic")
+        .expect("应写入 optimistic");
+    assert_eq!(
+        optimistic.get("enabled").and_then(|v| v.as_bool()),
+        Some(true),
+        "乐观缓存应处于启用状态：{:?}",
+        optimistic
+    );
+    assert_eq!(
+        optimistic.get("timeout").and_then(|v| v.as_str()),
+        Some("30m"),
+        "必须显式写出陈旧窗口上限（内核隐含值是 3 天）：{:?}",
+        optimistic
+    );
+}

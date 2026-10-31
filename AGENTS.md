@@ -54,7 +54,7 @@
 | 前端启动链路         | `src/main.ts`, `src/boot/useAppBootstrap.ts`      | 初始化顺序与事件桥都在这里               |
 | 前端调用后端         | `src/services/invoke-client.ts`                   | 统一入口（端口注入+数据恢复等待）        |
 | 前端事件消费         | `src/services/event-service.ts` + `src/constants/events.ts` | 事件名常量约 27 个；统一精确退订 |
-| 应用配置字段         | `src/stores/app/composables/appConfigSchema.ts`     | 52 个字段的单一事实来源；load/save/watch 全自动生成 |
+| 应用配置字段         | `src/stores/app/composables/appConfigSchema.ts`     | 54 个字段的单一事实来源；load/save/watch 全自动生成 |
 | TUN 切换状态机       | `src/composables/useTunToggle.ts`                    | 置位→应用→重启→失败回滚；含 sudo 重试与提权 |
 | 排序/分组列表        | `src/composables/useSortableGroupedList.ts`          | 日志页与连接页共用 |
 | 内核错误归因         | `src/utils/kernel-errors.ts`                         | sudo 错误码识别 + 失败文案三级回退 |
@@ -70,6 +70,7 @@
 | sing-box 配置生成    | `src-tauri/src/app/singbox/config_generator.rs`   | 1.14 DNS（mDNS）与自定义规则注入 |
 | 配置语义唯一来源    | `src-tauri/src/app/singbox/config_intent.rs`     | `AppConfig` → 配置语义的纯映射，生成/补丁共用 |
 | 配置渲染共享层       | `src-tauri/src/app/singbox/config_render.rs`      | 入口/假 DNS 等两条路径共用的纯函数 |
+| 路由/DNS 规则语义    | `src-tauri/src/app/singbox/config_rules.rs`       | 规则定义与对齐（生成/补丁共用），含 `action: resolve` |
 | 配置补丁与归属       | `src-tauri/src/app/singbox/settings_patch.rs` + `ownership.rs` | 按归属打补丁；外来配置只改端口 |
 | 自定义规则 CRUD      | `src-tauri/src/app/core/proxy_service.rs` + `app/storage/custom_rule.rs` | 5 个命令，存 `generic_config` 表 key=`custom_rules` |
 | 自定义规则 UI        | `src/components/rules/CustomRulePanel.vue` + `src/stores/kernel/CustomRuleStore.ts` | 规则页 CRUD 面板（走文件+重启） |
@@ -104,6 +105,7 @@
 | `config_generator`            | Config builder     | `src-tauri/src/app/singbox/config_generator.rs`         | 规则/outbounds/DNS 组装与 1.14 注入 |
 | `ConfigIntent`                | Config semantics   | `src-tauri/src/app/singbox/config_intent.rs`            | `AppConfig` → 配置语义的唯一映射点    |
 | `config_render`               | Config renderer    | `src-tauri/src/app/singbox/config_render.rs`             | 生成/补丁两条路径共用的纯函数         |
+| `config_rules`                | Rule semantics     | `src-tauri/src/app/singbox/config_rules.rs`              | 路由/DNS 规则的定义与对齐（含 resolve） |
 | `Ownership`                   | Config ownership   | `src-tauri/src/app/singbox/ownership.rs`                 | 本程序创建的 tag 清单，判定配置归属   |
 | `event.rs` 中继               | Event relay        | `src-tauri/src/app/core/kernel_service/event.rs`        | 4 个 gRPC server-streaming → Tauri event |
 
@@ -159,9 +161,14 @@ pnpm tauri build:linux:rpm
 
 ## NOTES
 
-- 测试：后端 263 项（`cargo test`），前端 173 项（`vitest`，覆盖 TUN 切换状态机、排序分组、内核错误归因、事件退订、配置 schema、国旗码同步、订阅表单三来源、节点名→国旗解析、跨语言类型漂移守护等易回归逻辑）。CI（`.github/workflows/ci.yml`）在 PR/push 时跑 lint / type-check / prettier / i18n key 校验 / vitest / 内核目标矩阵 / 脚本单测 / cargo fmt / clippy / cargo test 全部门禁。
+- 测试：后端 289 项（`cargo test`），前端 178 项（`vitest`，覆盖 TUN 切换状态机、排序分组、内核错误归因、事件退订、配置 schema、国旗码同步、订阅表单三来源、节点名→国旗解析、跨语言类型漂移守护等易回归逻辑）。CI（`.github/workflows/ci.yml`）在 PR/push 时跑 lint / type-check / prettier / i18n key 校验 / vitest / 内核目标矩阵 / 脚本单测 / cargo fmt / clippy / cargo test 全部门禁。
 - **配置生成黄金样本**：`src-tauri/src/app/singbox/testdata/config_golden/*.json` 固化 4 组 `AppConfig` 的生成结果；改配置生成逻辑时必须让快照**逐字段不变**（`SINGBOX_BLESS_GOLDEN=1` 重新生成），否则说明配置语义漂移。
 - **内嵌内核版本 1.14.4**（上游 2026-10-24 发布的最新稳定版；仓库内嵌资源在 `src-tauri/resources/kernel/<平台>/<架构>/`，gitignore，构建期由 `pnpm kernel:fetch` 拉取。**下载策略是「默认取最新稳定版」而非钉死版本**——钉版本需改 `scripts/fetch-kernel.mjs` 的默认解析或构建参数）。已逐文件 diff 上游 `v1.14.0...v1.14.4`（174 commits）确认：**gRPC API 协议层零变更**（`daemon/*.proto` 与 `service/api/web_bridge.go` 逐字节相同，`APIVersion` 仍为 4），手写 protobuf 与 gRPC-Web 客户端**不需要跟版**；配置 schema 变更均为内部 marshal 细节。**升级内核前先跑 `sing-box check -c <黄金配置>`**（用真实二进制）而不是只看 changelog。
+- ⚠️ **路由规则的 IP 匹配必须先 `resolve`**：sing-box 1.11+ 起，`route.rules` 里的 `ip_cidr` / `geoip-*` 规则集只在目标已经是 IP 时才命中，**域名目标不会隐式解析**。没有 `{"action":"resolve"}` 规则时 `geoip-cn` 对域名流量完全不生效 → 不在 `geosite-cn` 里的国内站点（域名清单永远不完整）会一路落到 `final` 走代理。规则顺序集中在 `singbox/config_rules.rs::build_route_rules`，**只改那里**。
+- ⚠️ **`dns.rules` 不写 `geoip-cn`**：IP 规则集在 DNS 阶段无法匹配未解析的域名，且属 sing-box 1.14 起废弃的 "Legacy Address Filter Fields"（1.16 移除，内核打印弃用告警）。IP 判定交给 `route.rules`。
+- ⚠️ **`dns.final` 默认国内解析器**（`dns_cn`）：未命中任何 DNS 规则的域名由国内解析器**直连**解析，不依赖代理链路——否则代理一挂，全部域名解析失败（国内站点也打不开）。
+- ⚠️ **`dns.optimistic` 必须带显式陈旧窗口**：裸 `optimistic: true` 隐含**3 天**陈旧窗口，被污染的解析结果会被钉住 3 天（"后台跑久了网络就坏、只能重启内核"）；配置里始终写成 `{"enabled":true,"timeout":"..."}`。
+- ⚠️ **`urltest.interrupt_exist_connections` 保持 `false`**：urltest 改选节点会成批掐断走该分组的长连接（"后台跑久了网络就断"），官方默认同样是 `false`。
 - ⚠️ **`http_clients` 直连客户端不能写 `detour`**：sing-box 1.14+ 对「detour 指向空 direct 出站」直接 `FATAL`（`detour to an empty direct outbound makes no sense`），冷缓存时内核根本起不来。直连要表达成**不写 `detour`**（走系统 dialer）。统一由 `singbox/config_render.rs::build_http_clients` 渲染，生成与补丁两条路径共用。
 - i18n：以 `zh-CN` 为基准，`pnpm test:i18n`（`scripts/check-i18n.mjs`）校验 4 个语言包 key 完全对齐；**禁止**在组件里写 `locale.startsWith('zh') ? '中文' : 'English'` 或 `t(key, '中文兜底')`，一律走 locale 语言包。
 - 事件：统一走 `eventService`，并使用 `on*()` 返回的 unlisten 做**精确**退订；「清空某事件全部监听器」是显式的 `removeAllListenersForEvent()`。已移除 `mitt` 事件总线（事件链从 4 跳缩到 2 跳）。

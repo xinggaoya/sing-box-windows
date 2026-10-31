@@ -29,7 +29,7 @@ void backendKeys
 
 describe('APP_CONFIG_FIELDS 声明完整性', () => {
   it('字段数与实际声明一致', () => {
-    expect(APP_CONFIG_FIELD_NAMES).toHaveLength(52)
+    expect(APP_CONFIG_FIELD_NAMES).toHaveLength(54)
   })
 
   it('字段名无重复', () => {
@@ -58,6 +58,40 @@ describe('APP_CONFIG_FIELDS 声明完整性', () => {
       const field = APP_CONFIG_FIELDS[name] as { key: string }
       expect(field.key, `${name} 的 key 不是 snake_case`).toMatch(/^[a-z0-9_]+$/)
     }
+  })
+})
+
+describe('DNS 相关默认值（稳定性回归守护）', () => {
+  /**
+   * 这些默认值直接对应线上复现过的三个故障：
+   *
+   * 1. `optimistic` 开启时 sing-box 隐含 **3 天**陈旧窗口，被污染的解析结果会被
+   *    钉住 3 天 →「后台跑久了网络就坏，只能重启内核」。默认必须关闭，
+   *    开启时必须同时给出显式的短窗口。
+   * 2. `dns_cn` 用 `h3`（DoH3 / QUIC over UDP 443）时，国内运营商对 QUIC 限速或
+   *    阻断会让**所有**国内域名解析一起失败。默认必须是 DoH over TCP。
+   * 3. `dns.final` 兜底到境外解析器（且经代理）时，代理一挂全部域名解析失败。
+   *    默认必须是国内解析器。
+   */
+  it('乐观 DNS 缓存默认关闭', () => {
+    expect(APP_CONFIG_FIELDS.singboxDnsOptimisticCache.ref.value).toBe(false)
+  })
+
+  it('乐观缓存默认带显式的陈旧窗口上限（不落到内核隐含的 3 天）', () => {
+    expect(APP_CONFIG_FIELDS.singboxDnsOptimisticTimeout.ref.value).toBe('30m')
+  })
+
+  it('DNS 超时默认采用官方 10s', () => {
+    expect(APP_CONFIG_FIELDS.singboxDnsTimeout.ref.value).toBe('10s')
+  })
+
+  it('兜底 DNS 默认走国内解析器（不依赖代理）', () => {
+    expect(APP_CONFIG_FIELDS.singboxDnsFinalStrategy.ref.value).toBe('cn')
+  })
+
+  it('国内 DNS 默认使用 DoH over TCP 而不是 DoH3', () => {
+    expect(APP_CONFIG_FIELDS.singboxDnsCn.ref.value).toBe('https://dns.alidns.com/dns-query')
+    expect(APP_CONFIG_FIELDS.singboxDnsCn.ref.value).not.toMatch(/^h3:/)
   })
 })
 

@@ -70,8 +70,13 @@ pub(crate) struct DnsConfig {
     pub servers: Vec<DnsServerConfig>,
     pub rules: Vec<Value>,
     /// 1.14 默认按 transport 隔离 DNS 缓存，`independent_cache` 已被移除
+    ///
+    /// 取值是对象形式 `{"enabled": true, "timeout": "30m"}`：
+    /// 裸 `true` 会启用 sing-box **隐含的 3 天**陈旧窗口（被污染的解析结果会被
+    /// 钉住 3 天，表现为“后台跑久了网络就坏、只能重启内核”），
+    /// 因此这里总是显式写出用户配置的陈旧窗口上限。
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub optimistic: Option<bool>,
+    pub optimistic: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reverse_mapping: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]

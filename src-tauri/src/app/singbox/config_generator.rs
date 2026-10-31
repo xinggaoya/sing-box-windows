@@ -1,14 +1,15 @@
 use super::common::{
     build_dns_server_config, kernel_log_output_path, DNS_CN, DNS_MDNS, DNS_PROXY, DNS_RESOLVER,
-    PRIVATE_IP_CIDRS, RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN,
-    RS_GEOSITE_GOOGLE, RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE,
-    RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE,
+    RS_GEOIP_CN, RS_GEOSITE_ADS, RS_GEOSITE_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, RS_GEOSITE_GOOGLE,
+    RS_GEOSITE_NETFLIX, RS_GEOSITE_OPENAI, RS_GEOSITE_PRIVATE, RS_GEOSITE_TELEGRAM,
+    RS_GEOSITE_YOUTUBE,
 };
 use super::config_intent::ConfigIntent;
 use super::config_render::{
     build_fakeip_dns_server, build_http_clients, build_inbounds, sync_fake_dns_route_rules,
     sync_fake_dns_rules, HTTP_CLIENT_DIRECT_DOWNLOAD_TAG,
 };
+use super::config_rules::{build_dns_rules, build_route_rules, dns_final_server};
 use super::config_schema::{
     CacheFileConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, LogConfig,
     RemoteRuleSetConfig, RouteConfig, SingBoxConfig,
@@ -51,9 +52,13 @@ fn render_skeleton(intent: &ConfigIntent) -> Value {
             "tag": TAG_AUTO,
             "outbounds": [TAG_DIRECT],
             "url": intent.urltest_url,
-            // 保障切换节点时主动中断旧连接，避免连接数长期堆积
-            "interrupt_exist_connections": true,
-            // 缩短空闲回收时间，配合上面的中断行为防止连接滞留
+            // ⚠️ 不要开 `interrupt_exist_connections`：urltest 每次测速都可能改选节点，
+            // 一旦开启，**所有**走这个分组的长连接（视频 / 远程桌面 / 下载）会被成批掐断，
+            // 表现为「后台跑久了网络就断」。sing-box 官方默认就是 false。
+            // 连接堆积由内核自身的超时回收处理，不需要靠杀掉连接来清理。
+            "interrupt_exist_connections": false,
+            // 测速连接的空闲超时（sing-box 默认 30m）；调小只是让测速连接更早释放，
+            // 与用户长连接无关。
             "idle_timeout": "10m",
             "interval": "3m",
             "tolerance": 50
@@ -61,8 +66,10 @@ fn render_skeleton(intent: &ConfigIntent) -> Value {
         json!({
             "type": "selector",
             "tag": TAG_MANUAL,
-            // 手动切换分组只暴露“自动选择 + 订阅节点”，不暴露 direct，避免 UI 优选/自动选择误选到直连。
-            "outbounds": [TAG_AUTO]
+            // 手动切换分组暴露“自动选择 + 订阅节点”，并把 direct 放在**最后**：
+            // direct 只是“代理全挂时的逃生通道”（全部直连），
+            // 放最后可确保默认选择仍是“自动选择”，不会误选成直连。
+            "outbounds": [TAG_AUTO, TAG_DIRECT]
         }),
     ];
 
@@ -102,37 +109,9 @@ fn render_skeleton(intent: &ConfigIntent) -> Value {
         json!({ "type": "block", "tag": TAG_BLOCK }),
     ]);
 
-    let mut dns_rules: Vec<Value> = vec![
-        json!({ "clash_mode": "direct", "server": DNS_CN }),
-        json!({ "clash_mode": "global", "server": DNS_PROXY }),
-        json!({ "rule_set": [RS_GEOSITE_CN, RS_GEOIP_CN], "server": DNS_CN }),
-        json!({ "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN, "server": DNS_PROXY }),
-    ];
-
-    // mDNS 规则必须排在所有其他 DNS 规则之前：*.local / link-local 反查只应答于
-    // 本地多播,落到 CN/代理解析都会失败。域名列表与 sing-box v1.14.0
-    // dns/transport/mdns 的 mdnsLocalZones 一一对应（不用 geosite-private,
-    // 那里面还混着 *.lan 等非 mDNS 名称,发去多播组不会有应答）。
-    if intent.dns_use_mdns {
-        dns_rules.insert(
-            0,
-            json!({
-                "domain_suffix": [
-                    "local",
-                    "254.169.in-addr.arpa",
-                    "8.e.f.ip6.arpa",
-                    "9.e.f.ip6.arpa",
-                    "a.e.f.ip6.arpa",
-                    "b.e.f.ip6.arpa"
-                ],
-                "server": DNS_MDNS
-            }),
-        );
-    }
-
-    if intent.block_ads {
-        dns_rules.insert(2, json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
-    }
+    // DNS / 路由规则的定义集中在 `config_rules` 模块：生成路径与补丁路径共用同一份语义，
+    // 避免两条路径写歪（详见该模块的文档注释）。
+    let mut dns_rules: Vec<Value> = build_dns_rules(intent);
 
     sync_fake_dns_rules(&mut dns_rules, intent);
 
@@ -158,39 +137,7 @@ fn render_skeleton(intent: &ConfigIntent) -> Value {
         })
         .collect::<Vec<Value>>();
 
-    let mut route_rules: Vec<Value> = vec![json!({ "action": "sniff" })];
-
-    if intent.dns_hijack {
-        route_rules.push(json!({ "protocol": "dns", "action": "hijack-dns" }));
-    }
-
-    route_rules.extend([
-        json!({ "clash_mode": "global", "outbound": default_outbound }),
-        json!({ "clash_mode": "direct", "outbound": TAG_DIRECT }),
-    ]);
-
-    if intent.block_ads {
-        route_rules.push(json!({ "rule_set": RS_GEOSITE_ADS, "action": "reject" }));
-    }
-
-    if intent.enable_app_groups {
-        route_rules.extend([
-            json!({ "rule_set": RS_GEOSITE_TELEGRAM, "outbound": TAG_TELEGRAM }),
-            json!({ "rule_set": RS_GEOSITE_YOUTUBE, "outbound": TAG_YOUTUBE }),
-            json!({ "rule_set": RS_GEOSITE_NETFLIX, "outbound": TAG_NETFLIX }),
-            json!({ "rule_set": RS_GEOSITE_OPENAI, "outbound": TAG_OPENAI }),
-            // Google 服务分流（包含 Gemini、DeepMind、搜索、云服务等所有 Google 相关域名）
-            json!({ "rule_set": RS_GEOSITE_GOOGLE, "outbound": TAG_GOOGLE }),
-        ]);
-    }
-
-    // 直接内置私网段，避免依赖不存在的 geoip-private 规则集导致启动 404 退出
-    route_rules.extend([
-        json!({ "rule_set": RS_GEOSITE_PRIVATE, "outbound": TAG_DIRECT }),
-        json!({ "ip_cidr": PRIVATE_IP_CIDRS, "outbound": TAG_DIRECT }),
-        json!({ "rule_set": [RS_GEOSITE_CN, RS_GEOIP_CN], "outbound": TAG_DIRECT }),
-        json!({ "rule_set": RS_GEOSITE_GEOLOCATION_NOT_CN, "outbound": default_outbound }),
-    ]);
+    let mut route_rules: Vec<Value> = build_route_rules(intent);
 
     // fakeip 生成的地址段需要显式直连，确保连接能够回到内核并完成域名逆向映射。
     // 与补丁路径共用 `config_render::sync_fake_dns_route_rules`，保证两条路径的规则形态一致。
@@ -227,12 +174,25 @@ fn render_skeleton(intent: &ConfigIntent) -> Value {
         dns: DnsConfig {
             servers: build_dns_servers(intent, default_outbound),
             rules: dns_rules,
-            // 1.14 启用乐观 DNS 缓存：重复查询命中过期缓存立即返回 + 后台刷新，降低尾延迟
-            optimistic: intent.dns_optimistic.then_some(true),
+            // 1.14 乐观 DNS 缓存：重复查询命中过期缓存立即返回 + 后台刷新，降低尾延迟。
+            // ⚠️ 必须显式写出**陈旧窗口上限**：`optimistic: true` 的隐含默认值是 **3 天**，
+            // 一旦缓存里的结果被污染或 CDN 换了 IP，客户端会被钉死在坏地址上长达 3 天，
+            // 表现为「后台跑久了网络就坏，只能重启内核」（重启只是清空了内存缓存）。
+            optimistic: intent.dns_optimistic.then(|| {
+                if intent.dns_optimistic_timeout.trim().is_empty() {
+                    json!({ "enabled": true })
+                } else {
+                    json!({
+                        "enabled": true,
+                        "timeout": intent.dns_optimistic_timeout.trim()
+                    })
+                }
+            }),
             // per-query / per-server DNS 超时（1.14 新增）；为空时不写入
             timeout: (!intent.dns_timeout.is_empty()).then(|| intent.dns_timeout.clone()),
             reverse_mapping: intent.fake_dns_enabled().then_some(true),
-            final_server: DNS_PROXY.to_string(),
+            // 兜底解析器：默认国内解析器（不依赖代理），见 `ConfigIntent::dns_final`
+            final_server: dns_final_server(intent).to_string(),
         },
         inbounds: build_inbounds(intent, None),
         outbounds,
@@ -647,7 +607,9 @@ fn ensure_urltest_and_selector(
             "type": "urltest",
             "tag": TAG_AUTO,
             "outbounds": [],
-            "interrupt_exist_connections": true,
+            // ⚠️ 保持 false：urltest 改选节点时会把走这个分组的长连接成批掐断，
+            // 表现为「后台跑久了网络就断」。官方默认同样是 false。
+            "interrupt_exist_connections": false,
             "idle_timeout": "10m",
             "url": "http://cp.cloudflare.com/generate_204",
             "interval": "3m",
@@ -675,14 +637,17 @@ fn ensure_urltest_and_selector(
             .and_then(|v| v.as_object_mut())
             .ok_or_else(|| format!("outbound(tag={}) 不是对象", TAG_AUTO))?;
         auto.insert("outbounds".to_string(), Value::Array(auto_list));
+        // 补丁路径可能残留旧值（true），这里强制对齐
+        auto.insert("interrupt_exist_connections".to_string(), json!(false));
     }
 
-    // 手动切换候选列表：自动选择 + 每个节点
-    let mut manual_list = Vec::<Value>::with_capacity(1 + node_tags.len());
+    // 手动切换候选列表：自动选择 + 每个节点 + 直连（放最后，仅作为逃生通道）
+    let mut manual_list = Vec::<Value>::with_capacity(2 + node_tags.len());
     manual_list.push(Value::String(TAG_AUTO.to_string()));
     for tag in node_tags {
         manual_list.push(Value::String(tag.clone()));
     }
+    manual_list.push(Value::String(TAG_DIRECT.to_string()));
     {
         let manual = outbounds
             .get_mut(manual_idx)

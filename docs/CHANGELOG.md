@@ -4,6 +4,9 @@
 
 ### ✨ 新功能
 
+- **高级设置新增两项 DNS 选项**
+  - **「兜底 DNS 策略」**：决定"未命中任何分流规则的域名"由谁解析。国内 DNS 直连（默认，**不依赖代理**，代理挂掉时国内站点照常解析）/ 境外 DNS 经代理（防污染，但代理不可用时全部解析失败）
+  - **「乐观缓存陈旧窗口上限」**：乐观 DNS 缓存开启时，过期结果最多还能被继续使用多久（默认 30m）。不设置就会落到 sing-box 隐含的 **3 天**——被污染的解析结果会被钉住 3 天，表现为"后台跑久了网络就坏、只能重启内核"
 - **升级 sing-box 内核到 1.14.4**（上游 2026-10-24 发布的最新稳定版）
   - 逐文件 diff 上游 `v1.14.0...v1.14.4`（174 commits）后确认：**gRPC API 协议层零变更**——`daemon/started_service.proto`、`daemon/managed_service.proto` 与 gRPC-Web 帧格式实现 `service/api/web_bridge.go` 逐字节相同，`APIVersion` 仍为 4。本项目手写的 protobuf 编解码与 gRPC-Web 客户端**零改动**
   - 配置 schema（`option/`）的变更全是内部 marshal 细节（`omitempty` 化、指针化）；唯一语义变化是 1.14.0 引入的 `direct` rule action 在 1.14.4 被移除（本项目未使用，无影响）
@@ -33,6 +36,19 @@
 
 ### 🐛 问题修复
 
+- **修复「国内网站误走代理 / 无法自动绕过 / 未按规则分流」**：根因是 sing-box 1.11+ 的一条**静默**语义变更——路由规则里的 **IP 匹配**（`ip_cidr` / `geoip-*` 规则集）只在目标**已经是 IP** 时才命中，目标仍是**域名**时**不会隐式解析**。本项目配置里的 `geoip-cn`（按 IP 判定国内直连）因此对域名流量**完全不生效**，而 `geosite-cn` 是域名清单、永远不完整，于是国内站点既不匹配域名规则、也匹配不到 IP 规则，一路落到 `final` 走代理。
+  - 实测证据（用 1.14.4 内核实测）：`rum-openway.guance.com`（121.41.77.126）、`filecdn.minimax.chat`（163.177.155.40）、`ts2.tc.mm.bing.net`（211.97.84.77）**都在 `geoip-cn` 里**，但旧配置下全部走了代理；插入 `{"action":"resolve"}` 后全部改为直连
+  - 路由规则新增 `resolve` 动作（排在 `geosite-cn` / `geosite-geolocation-!cn` 之后、`geoip-cn` 之前），把剩余域名解析成 IP 后再交给 IP 规则判定；`resolve` 是非终结动作，域名规则在其后依然按域名匹配
+  - 规则定义与顺序收敛到新模块 `singbox/config_rules.rs`（`build_route_rules` / `build_dns_rules` / `sync_route_rules` / `sync_dns_rules`），生成路径与补丁路径**共用同一份语义**，杜绝两条路径写歪
+  - 补丁路径会把**存量配置**升级到新形态（拆开旧的 `[geosite-cn, geoip-cn]` 合并规则、补 `resolve`、保留用户自定义规则），外来配置（机场原始配置）不动
+- **修复「代理一挂，全部域名解析失败」**：`dns.final`（未命中任何 DNS 规则时的兜底解析器）此前固定指向**境外解析器且经代理**，代理链路一挂，连国内站点都解析不出来。现默认改为**国内解析器直连**兜底（`dns_cn`），未收录的境外域名照样能拿到真实 IP，且不依赖代理可用性；用户可在高级设置里切回「境外 DNS（经代理）」。
+  - 补丁路径此前**根本没有同步 `dns.final`**（只改端口的最小补丁更不碰），现已补齐
+- **修复「后台长时间运行后网络异常、必须重启内核才能恢复」**：三条独立的诱因一起处理
+  - **乐观 DNS 缓存的陈旧窗口**：sing-box 1.14 的 `optimistic: true` 隐含 **3 天**陈旧窗口——缓存过期后仍先返回陈旧结果再后台刷新，一旦结果被污染或 CDN 换了 IP，客户端会被**钉死 3 天**，表现就是"后台跑久了网络就坏了，只能重启内核"（重启只是清空了内存里的 DNS 缓存）。现默认**关闭**乐观缓存；开启时也始终显式写出较短的陈旧窗口（新增「乐观缓存陈旧窗口上限」设置，默认 30m），不再落到内核隐含的 3 天
+  - **`urltest` 的 `interrupt_exist_connections`**：urltest 每次测速都可能改选节点，该选项开启后会**成批掐断**所有走该分组的长连接（视频 / 远程桌面 / 下载），即"后台跑久了网络就断"。按 sing-box 官方默认值改回 `false`
+  - **国内 DNS 的协议**：默认从 DoH3（`h3://dns.alidns.com`，跑在 QUIC / UDP 443 上）改为 DoH over TCP（`https://dns.alidns.com`）——国内运营商对 QUIC 普遍限速甚至阻断，一旦 UDP 443 不通，**所有**国内域名解析会一起失败。存量配置里仍是旧默认值的会自动迁移（用户自己填过的值不动）
+  - 附带：DNS 超时默认由 5s 调整为官方默认 10s（慢链路下 5s 容易假失败）；「手动切换」分组补上**直连兜底成员**（放在最后、不改变默认选择），代理链路全挂时可一键「全部直连」，不必重启内核
+- **消除 sing-box 1.14 的 DNS 弃用告警**：`dns.rules` 里的 `geoip-cn` 属于 1.14 起废弃的 "Legacy Address Filter Fields"（1.16 移除），且在 DNS 阶段本就无法匹配未解析的域名。现从 DNS 规则里移除，IP 判定统一交给 `route.rules`；路由 / DNS 规则同时改用 1.11+ 官方写法 `action: "route"` + `outbound` / `server`
 - **修复「规则集缓存缺失时内核直接起不来」**：生成的配置里 `http_clients[default].detour` 写的是 `"direct"`，指向一个**空的 direct 出站**。sing-box 1.14+ 的 `common/dialer/detour.go` 对此直接判定为无意义并让内核启动失败：`detour to an empty direct outbound makes no sense`。平时被本地规则集缓存（`initial_path`）拖住，一旦缓存缺失 / 损坏需要联网下载规则集，内核就起不来。
   - 直连语义改为**不写 `detour`**（`http_client` 不写 detour 时走系统 dialer，语义同样是直连），生成路径与补丁路径共用 `config_render::build_http_clients` 一份实现
   - 补丁路径会**纠正存量配置**里写错的 `detour: "direct"`，并在下载偏好从「手动」切回「直连」时清掉指向已删除客户端的悬空 `http_client` 引用；顺带把悬空的 `route.default_http_client` 改指回 `default` 客户端（指向不存在的客户端同样会让内核起不来）；外来配置（用户导入的机场原始配置）不受影响

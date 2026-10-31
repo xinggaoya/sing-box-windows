@@ -172,7 +172,7 @@ export const APP_CONFIG_FIELDS = {
   singboxDnsProxy: defineField('singbox_dns_proxy', 'https://1.1.1.1/dns-query', {
     read: keepCurrentIfBlank,
   }),
-  singboxDnsCn: defineField('singbox_dns_cn', 'h3://dns.alidns.com/dns-query', {
+  singboxDnsCn: defineField('singbox_dns_cn', 'https://dns.alidns.com/dns-query', {
     read: keepCurrentIfBlank,
   }),
   singboxDnsResolver: defineField('singbox_dns_resolver', '114.114.114.114', {
@@ -209,8 +209,19 @@ export const APP_CONFIG_FIELDS = {
   kernelUpdateTrack: defineField('kernel_update_track', 'stable', {
     read: keepCurrentIfBlank,
   }),
-  singboxDnsOptimisticCache: defineField('singbox_dns_optimistic_cache', true),
-  singboxDnsTimeout: defineField('singbox_dns_timeout', '5s', { read: keepCurrentIfBlank }),
+  // 乐观 DNS 缓存默认关闭：sing-box 的 `optimistic: true` 隐含 **3 天**陈旧窗口，
+  // 被污染的解析结果会被钉住 3 天，表现为「后台跑久了网络就坏、只能重启内核」。
+  singboxDnsOptimisticCache: defineField('singbox_dns_optimistic_cache', false),
+  // 开启乐观缓存时的陈旧窗口上限（显式写出，避免落到内核隐含的 3 天）
+  singboxDnsOptimisticTimeout: defineField('singbox_dns_optimistic_timeout', '30m', {
+    read: keepCurrentIfBlank,
+  }),
+  singboxDnsTimeout: defineField('singbox_dns_timeout', '10s', { read: keepCurrentIfBlank }),
+  // 未命中任何分流规则的域名用哪个解析器兜底：
+  // 'cn' = 国内解析器（直连，不依赖代理）/ 'proxy' = 境外解析器（经代理）
+  singboxDnsFinalStrategy: defineField('singbox_dns_final_strategy', 'cn', {
+    read: keepCurrentIfBlank,
+  }),
   singboxDnsUseMdns: defineField('singbox_dns_use_mdns', true),
   singboxEnableTlsSpoof: defineField('singbox_enable_tls_spoof', false),
   tunDnsMode: defineField('tun_dns_mode', 'hijack', { read: keepCurrentIfBlank }),

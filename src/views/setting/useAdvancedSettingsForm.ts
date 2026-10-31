@@ -32,7 +32,9 @@ interface AppStoreLike {
   singboxUrltestUrl: string
   // === sing-box 1.14 新增字段（实验性） ===
   singboxDnsOptimisticCache: boolean
+  singboxDnsOptimisticTimeout: string
   singboxDnsTimeout: string
+  singboxDnsFinalStrategy: string
   singboxDnsUseMdns: boolean
   singboxEnableTlsSpoof: boolean
   hysteria2DisableChromeParrot: boolean
@@ -114,8 +116,10 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
   // === sing-box 1.14 实验性 / 高级选项 ===
   const savingSingboxExperimental = ref(false)
   const singboxExperimentalForm = reactive({
-    dnsOptimisticCache: true,
-    dnsTimeout: '5s',
+    dnsOptimisticCache: false,
+    dnsOptimisticTimeout: '30m',
+    dnsTimeout: '10s',
+    dnsFinalStrategy: 'cn' as 'cn' | 'proxy',
     dnsUseMdns: true,
     enableTlsSpoof: false,
     hysteria2DisableChromeParrot: false,
@@ -132,6 +136,12 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
   const hysteria2ObfsTypeOptions = computed(() => [
     { label: options.t('setting.advanced.obfsSalamander'), value: 'salamander' },
     { label: options.t('setting.advanced.obfsGecko'), value: 'gecko' },
+  ])
+
+  // DNS 兜底解析器策略：决定“未命中任何分流规则的域名”由哪个解析器解析。
+  const dnsFinalStrategyOptions = computed(() => [
+    { label: options.t('setting.advanced.dnsFinalStrategyCn'), value: 'cn' },
+    { label: options.t('setting.advanced.dnsFinalStrategyProxy'), value: 'proxy' },
   ])
 
   const clashModeOptions = computed(() => [
@@ -198,7 +208,10 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
 
       // 1.14 实验性字段
       singboxExperimentalForm.dnsOptimisticCache = options.appStore.singboxDnsOptimisticCache
+      singboxExperimentalForm.dnsOptimisticTimeout = options.appStore.singboxDnsOptimisticTimeout
       singboxExperimentalForm.dnsTimeout = options.appStore.singboxDnsTimeout
+      singboxExperimentalForm.dnsFinalStrategy = options.appStore.singboxDnsFinalStrategy as
+        'cn' | 'proxy'
       singboxExperimentalForm.dnsUseMdns = options.appStore.singboxDnsUseMdns
       singboxExperimentalForm.enableTlsSpoof = options.appStore.singboxEnableTlsSpoof
       singboxExperimentalForm.hysteria2DisableChromeParrot =
@@ -313,7 +326,10 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
     savingSingboxExperimental.value = true
     try {
       options.appStore.singboxDnsOptimisticCache = singboxExperimentalForm.dnsOptimisticCache
-      options.appStore.singboxDnsTimeout = singboxExperimentalForm.dnsTimeout.trim() || '5s'
+      options.appStore.singboxDnsOptimisticTimeout =
+        singboxExperimentalForm.dnsOptimisticTimeout.trim() || '30m'
+      options.appStore.singboxDnsTimeout = singboxExperimentalForm.dnsTimeout.trim() || '10s'
+      options.appStore.singboxDnsFinalStrategy = singboxExperimentalForm.dnsFinalStrategy
       options.appStore.singboxDnsUseMdns = singboxExperimentalForm.dnsUseMdns
       options.appStore.singboxEnableTlsSpoof = singboxExperimentalForm.enableTlsSpoof
       options.appStore.hysteria2DisableChromeParrot =
@@ -348,6 +364,7 @@ export const useAdvancedSettingsForm = (options: UseAdvancedSettingsFormOptions)
     fakeDnsFilterOptions,
     tunDnsModeOptions,
     hysteria2ObfsTypeOptions,
+    dnsFinalStrategyOptions,
     clashModeOptions,
     saveProxyAdvancedSettings,
     saveSingboxProfileSettings,

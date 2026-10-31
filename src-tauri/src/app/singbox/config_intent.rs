@@ -24,8 +24,9 @@
 
 use super::common::{
     dns_bootstrap_strategy, dns_strategy, node_domain_resolver_strategy,
-    normalize_default_outbound, normalize_dns_mode, normalize_download_detour,
-    normalize_fake_dns_filter_mode, FAKE_DNS_FILTER_GLOBAL_NON_CN, TAG_MANUAL,
+    normalize_default_outbound, normalize_dns_final_strategy, normalize_dns_mode,
+    normalize_download_detour, normalize_fake_dns_filter_mode, FAKE_DNS_FILTER_GLOBAL_NON_CN,
+    TAG_MANUAL,
 };
 use crate::app::storage::state_model::AppConfig;
 
@@ -125,8 +126,18 @@ pub struct ConfigIntent {
     pub node_resolver_strategy: &'static str,
     pub dns_hijack: bool,
     pub dns_optimistic: bool,
+    /// 乐观 DNS 缓存的**陈旧窗口上限**。
+    ///
+    /// sing-box 1.14 的 `optimistic: true` 隐含 **3 天**的默认窗口：
+    /// 缓存过期后仍会先返回陈旧结果再后台刷新。一旦某个结果被污染
+    /// （或 CDN 换 IP），客户端会被钉死在坏地址上长达 3 天，
+    /// 表现就是"后台跑久了网络就坏了，只能重启内核"——
+    /// 重启只是清空了内存里的 DNS 缓存。显式给出较短的上限即可根治。
+    pub dns_optimistic_timeout: String,
     pub dns_timeout: String,
     pub dns_use_mdns: bool,
+    /// `dns.final` 兜底解析器策略（`cn` / `proxy`）。
+    pub dns_final: &'static str,
     /// 假 DNS 语义（地址段与过滤模式始终存在，`enabled` 决定是否真正启用）
     pub fake_dns: FakeDnsIntent,
 
@@ -204,8 +215,10 @@ impl ConfigIntent {
             node_resolver_strategy: node_domain_resolver_strategy(app_config),
             dns_hijack: app_config.singbox_dns_hijack,
             dns_optimistic: app_config.singbox_dns_optimistic_cache,
+            dns_optimistic_timeout: app_config.singbox_dns_optimistic_timeout.clone(),
             dns_timeout: app_config.singbox_dns_timeout.clone(),
             dns_use_mdns: app_config.singbox_dns_use_mdns,
+            dns_final: normalize_dns_final_strategy(app_config),
             fake_dns,
 
             block_ads: app_config.singbox_block_ads,

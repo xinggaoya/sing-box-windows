@@ -25,6 +25,8 @@ src-tauri/
 | 进程主入口     | `src/main.rs`     | 仅启动入口，逻辑薄                  |
 | 后端分层实现   | `src/app/`        | core/network/singbox/singbox_api/storage/system/tray |
 | gRPC API 客户端 | `src/app/singbox_api/` | 替代 experimental.clash_api    |
+| 路由 / DNS 规则语义 | `src/app/singbox/config_rules.rs` | 生成路径与补丁路径共用的规则定义与对齐（含 `action: resolve`） |
+| 配置生成 / 补丁 | `src/app/singbox/config_generator.rs` / `settings_patch.rs` | 两条路径共享 `config_intent` 语义 |
 | 应用内更新     | `src/app/system/update_service.rs` | 自研 GitHub Release 更新，非 tauri-plugin-updater |
 | 平台差异实现   | `src/platform/` + `Cargo.toml` | cfg(windows/unix/macos)        |
 | 打包行为       | `tauri.conf.json` | 窗口与 bundle 相关                  |
@@ -63,3 +65,7 @@ cd src-tauri && cargo test
 - 单实例由 `tauri_plugin_single_instance` 插件实现（tauri.conf.json 无配置段）；窗口 `decorations: false` 自绘。
 - 新增/修改命令后必须同步：`lib.rs` 注册、前端 service、对应层级 AGENTS.md（见根 AGENTS.md 的 DOC SYNC GATE）。
 - **全局 tracing subscriber 只能设置一次**：`tauri-plugin-devtools` 的 `Builder::try_init` 会抢占全局 subscriber（已被占用时 `init()` 直接 panic）。`lib.rs::run()` 中 devtools 插件先于 fmt 层初始化；`log_util::install_direct_subscriber` 仅在非 devtools 模式（release / 未启用 `devtools` feature）调用。devtools 模式下日志经 `log_bridge::FileConsoleLogger` 桥接输出。用法与排障见根目录 `docs/devtools.md`，接入其它项目见 `docs/templates/tauri-devtools/`。
+- ⚠️ **路由规则里的 IP 匹配需要 `action: "resolve"`**：sing-box 1.11+ 起，`route.rules` 里的 `ip_cidr` / `geoip-*` 规则集**只在目标已经是 IP 时才命中**，目标仍是域名时**不会隐式解析**。因此 `geoip-cn`（按 IP 判定国内）必须排在一条 `{"action":"resolve"}` 规则之后，否则它对域名流量**完全不生效**——国内站点会一路落到 `final` 走代理。规则定义与顺序集中在 `src/app/singbox/config_rules.rs`（`build_route_rules` / `sync_route_rules`），**新增/调整规则只能改那里**，不要在两条路径里各写一份。
+- ⚠️ **`dns.rules` 里不要写 `geoip-cn`**：IP 规则集在 DNS 阶段无法匹配"尚未解析的域名"（先有鸡还是先有蛋），且属于 sing-box 1.14 起废弃的 "Legacy Address Filter Fields"（1.16 移除，内核会打印弃用告警）。IP 判定一律交给 `route.rules`。
+- ⚠️ **`dns.optimistic` 必须显式写出陈旧窗口**：裸 `optimistic: true` 隐含**3 天**的陈旧窗口，被污染的解析结果会被钉住 3 天，表现为"后台跑久了网络就坏，只能重启内核"（重启只是清空了内存缓存）。配置里始终写成 `{"enabled": true, "timeout": "<用户配置>"}`。
+- ⚠️ **`urltest.interrupt_exist_connections` 保持 `false`**：urltest 每次测速都可能改选节点，开启后**所有**走该分组的长连接（视频 / 远程桌面 / 下载）会被成批掐断。sing-box 官方默认同样是 `false`。

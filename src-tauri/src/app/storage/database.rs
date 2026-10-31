@@ -195,7 +195,7 @@ impl DatabaseService {
                 active_config_path TEXT,
                 installed_kernel_version TEXT,
                 singbox_dns_proxy TEXT DEFAULT 'https://1.1.1.1/dns-query',
-                singbox_dns_cn TEXT DEFAULT 'h3://dns.alidns.com/dns-query',
+                singbox_dns_cn TEXT DEFAULT 'https://dns.alidns.com/dns-query',
                 singbox_dns_resolver TEXT DEFAULT '114.114.114.114',
                 singbox_urltest_url TEXT DEFAULT 'http://cp.cloudflare.com/generate_204',
                 singbox_default_proxy_outbound TEXT DEFAULT 'manual',
@@ -240,7 +240,7 @@ impl DatabaseService {
                 ("active_config_path", "TEXT"),
                 ("installed_kernel_version", "TEXT"),
                 ("singbox_dns_proxy", "TEXT DEFAULT 'https://1.1.1.1/dns-query'"),
-                ("singbox_dns_cn", "TEXT DEFAULT 'h3://dns.alidns.com/dns-query'"),
+                ("singbox_dns_cn", "TEXT DEFAULT 'https://dns.alidns.com/dns-query'"),
                 ("singbox_dns_resolver", "TEXT DEFAULT '114.114.114.114'"),
                 ("singbox_urltest_url", "TEXT DEFAULT 'http://cp.cloudflare.com/generate_204'"),
                 ("singbox_default_proxy_outbound", "TEXT DEFAULT 'manual'"),
@@ -256,8 +256,10 @@ impl DatabaseService {
                 ("tun_self_heal_cooldown_secs", "INTEGER DEFAULT 90"),
                 // === sing-box 1.14 升级新增字段 ===
                 ("kernel_update_track", "TEXT DEFAULT 'stable'"),
-                ("singbox_dns_optimistic_cache", "BOOLEAN DEFAULT TRUE"),
-                ("singbox_dns_timeout", "TEXT DEFAULT '5s'"),
+                ("singbox_dns_optimistic_cache", "BOOLEAN DEFAULT FALSE"),
+                ("singbox_dns_optimistic_timeout", "TEXT DEFAULT '30m'"),
+                ("singbox_dns_timeout", "TEXT DEFAULT '10s'"),
+                ("singbox_dns_final_strategy", "TEXT DEFAULT 'cn'"),
                 ("singbox_dns_use_mdns", "BOOLEAN DEFAULT TRUE"),
                 ("singbox_enable_tls_spoof", "BOOLEAN DEFAULT FALSE"),
                 ("tun_dns_mode", "TEXT DEFAULT 'hijack'"),
@@ -494,9 +496,15 @@ impl DatabaseService {
                 singbox_dns_optimistic_cache: row
                     .try_get("singbox_dns_optimistic_cache")
                     .unwrap_or(default_config.singbox_dns_optimistic_cache),
+                singbox_dns_optimistic_timeout: row
+                    .try_get("singbox_dns_optimistic_timeout")
+                    .unwrap_or_else(|_| default_config.singbox_dns_optimistic_timeout.clone()),
                 singbox_dns_timeout: row
                     .try_get("singbox_dns_timeout")
                     .unwrap_or_else(|_| default_config.singbox_dns_timeout.clone()),
+                singbox_dns_final_strategy: row
+                    .try_get("singbox_dns_final_strategy")
+                    .unwrap_or_else(|_| default_config.singbox_dns_final_strategy.clone()),
                 singbox_dns_use_mdns: row
                     .try_get("singbox_dns_use_mdns")
                     .unwrap_or(default_config.singbox_dns_use_mdns),
@@ -548,8 +556,8 @@ impl DatabaseService {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO app_config
-            (id, auto_start_kernel, auto_start_app, auto_hide_to_tray_on_autostart, tray_close_behavior, prefer_ipv6, allow_lan_access, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, active_config_path, installed_kernel_version, singbox_dns_proxy, singbox_dns_cn, singbox_dns_resolver, singbox_urltest_url, singbox_default_proxy_outbound, singbox_block_ads, singbox_download_detour, singbox_dns_hijack, singbox_fake_dns_enabled, singbox_fake_dns_ipv4_range, singbox_fake_dns_ipv6_range, singbox_fake_dns_filter_mode, singbox_enable_app_groups, tun_self_heal_enabled, tun_self_heal_cooldown_secs, created_at, updated_at, tun_route_exclude_address, kernel_update_track, singbox_dns_optimistic_cache, singbox_dns_timeout, singbox_dns_use_mdns, singbox_enable_tls_spoof, tun_dns_mode, tun_include_macs, tun_exclude_macs, hysteria2_disable_chrome_parrot, hysteria2_obfs_type, clash_mode, enable_web_dashboard, enable_tailscale_endpoint, tailscale_run_ssh_server, tailscale_taildrop_directory)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, auto_start_kernel, auto_start_app, auto_hide_to_tray_on_autostart, tray_close_behavior, prefer_ipv6, allow_lan_access, proxy_port, api_port, proxy_mode, system_proxy_enabled, tun_enabled, tray_instance_id, system_proxy_bypass, tun_auto_route, tun_strict_route, tun_mtu, tun_ipv4, tun_ipv6, tun_stack, tun_enable_ipv6, active_config_path, installed_kernel_version, singbox_dns_proxy, singbox_dns_cn, singbox_dns_resolver, singbox_urltest_url, singbox_default_proxy_outbound, singbox_block_ads, singbox_download_detour, singbox_dns_hijack, singbox_fake_dns_enabled, singbox_fake_dns_ipv4_range, singbox_fake_dns_ipv6_range, singbox_fake_dns_filter_mode, singbox_enable_app_groups, tun_self_heal_enabled, tun_self_heal_cooldown_secs, created_at, updated_at, tun_route_exclude_address, kernel_update_track, singbox_dns_optimistic_cache, singbox_dns_optimistic_timeout, singbox_dns_timeout, singbox_dns_final_strategy, singbox_dns_use_mdns, singbox_enable_tls_spoof, tun_dns_mode, tun_include_macs, tun_exclude_macs, hysteria2_disable_chrome_parrot, hysteria2_obfs_type, clash_mode, enable_web_dashboard, enable_tailscale_endpoint, tailscale_run_ssh_server, tailscale_taildrop_directory)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(config.auto_start_kernel)
@@ -597,7 +605,9 @@ impl DatabaseService {
         // === sing-box 1.14 升级新增字段（与 PRAGMA 顺序一致） ===
         .bind(&config.kernel_update_track)
         .bind(config.singbox_dns_optimistic_cache)
+        .bind(&config.singbox_dns_optimistic_timeout)
         .bind(&config.singbox_dns_timeout)
+        .bind(&config.singbox_dns_final_strategy)
         .bind(config.singbox_dns_use_mdns)
         .bind(config.singbox_enable_tls_spoof)
         .bind(&config.tun_dns_mode)
