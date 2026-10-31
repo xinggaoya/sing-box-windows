@@ -25,10 +25,9 @@ fn parse_proc_stat_state(content: &str) -> Option<char> {
 
 fn read_process_state(proc_root: &Path, pid: u32) -> Option<char> {
     let status_path = proc_root.join(pid.to_string()).join("status");
-    if let Ok(status) = std::fs::read_to_string(status_path) {
-        if let Some(state) = parse_proc_status_state(&status) {
-            return Some(state);
-        }
+    let status = std::fs::read_to_string(status_path).ok();
+    if let Some(state) = status.as_deref().and_then(parse_proc_status_state) {
+        return Some(state);
     }
 
     let stat_path = proc_root.join(pid.to_string()).join("stat");
@@ -51,22 +50,23 @@ fn pid_matches_process_name(proc_root: &Path, pid: u32, process_name: &str) -> b
     let proc_path = proc_root.join(pid.to_string());
 
     let comm_path = proc_path.join("comm");
-    if let Ok(name) = std::fs::read_to_string(comm_path) {
-        if name.trim() == process_name {
-            return true;
-        }
+    let comm_match = std::fs::read_to_string(comm_path)
+        .ok()
+        .is_some_and(|name| name.trim() == process_name);
+    if comm_match {
+        return true;
     }
 
     let exe_path = proc_path.join("exe");
-    if let Ok(target) = std::fs::read_link(exe_path) {
-        return target
-            .file_name()
-            .and_then(|file| file.to_str())
-            .map(|file| file == process_name)
-            .unwrap_or(false);
-    }
-
-    false
+    std::fs::read_link(exe_path)
+        .ok()
+        .and_then(|target| {
+            target
+                .file_name()
+                .and_then(|file| file.to_str())
+                .map(|file| file == process_name)
+        })
+        .unwrap_or(false)
 }
 
 fn filter_active_pids(
@@ -137,41 +137,43 @@ fn read_active_pids_from_proc(proc_root: &Path, process_name: &str, self_pid: u3
 fn collect_active_processes(proc_root: &Path, process_name: &str) -> Vec<u32> {
     let self_pid = std::process::id();
 
-    if let Ok(output) = std::process::Command::new("pidof")
+    let active = std::process::Command::new("pidof")
         .arg("-x")
         .arg(process_name)
         .output()
-    {
-        if output.status.success() {
-            let active = filter_active_pids(
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| {
+            filter_active_pids(
                 proc_root,
                 process_name,
                 parse_pid_list(&String::from_utf8_lossy(&output.stdout)),
                 self_pid,
-            );
-            if !active.is_empty() {
-                info!("通过pidof检测到活跃进程: {:?}", active);
-                return active;
-            }
-        }
+            )
+        })
+        .unwrap_or_default();
+    if !active.is_empty() {
+        info!("通过pidof检测到活跃进程: {:?}", active);
+        return active;
     }
 
-    if let Ok(output) = std::process::Command::new("pgrep")
+    let active = std::process::Command::new("pgrep")
         .args(["-x", process_name])
         .output()
-    {
-        if output.status.success() {
-            let active = filter_active_pids(
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| {
+            filter_active_pids(
                 proc_root,
                 process_name,
                 parse_pid_list(&String::from_utf8_lossy(&output.stdout)),
                 self_pid,
-            );
-            if !active.is_empty() {
-                info!("通过pgrep检测到活跃进程: {:?}", active);
-                return active;
-            }
-        }
+            )
+        })
+        .unwrap_or_default();
+    if !active.is_empty() {
+        info!("通过pgrep检测到活跃进程: {:?}", active);
+        return active;
     }
 
     read_active_pids_from_proc(proc_root, process_name, self_pid)
