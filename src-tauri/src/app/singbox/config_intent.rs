@@ -25,7 +25,7 @@
 use super::common::{
     dns_bootstrap_strategy, dns_strategy, node_domain_resolver_strategy,
     normalize_default_outbound, normalize_dns_mode, normalize_download_detour,
-    normalize_fake_dns_filter_mode, FAKE_DNS_FILTER_GLOBAL_NON_CN,
+    normalize_fake_dns_filter_mode, FAKE_DNS_FILTER_GLOBAL_NON_CN, TAG_MANUAL,
 };
 use crate::app::storage::state_model::AppConfig;
 
@@ -153,7 +153,7 @@ impl ConfigIntent {
             ),
             ipv6_range: normalize_fakeip_range(
                 &app_config.singbox_fake_dns_ipv6_range,
-                "fc00::/18",
+                "2001:2::/48",
             ),
             filter_mode: normalize_fake_dns_filter_mode(app_config),
         };
@@ -222,6 +222,14 @@ impl ConfigIntent {
     /// 假 DNS 的过滤模式
     pub fn fake_dns_filter_mode(&self) -> &'static str {
         self.fake_dns.filter_mode
+    }
+
+    /// 规则集下载是否走「手动选择」出站（而非直连）。
+    ///
+    /// 为 true 时，本机专用规则集（geosite-private）需要单独一个直连客户端，
+    /// 避免它跟着其它规则集一起走代理链路。
+    pub fn download_via_manual(&self) -> bool {
+        self.download_detour == TAG_MANUAL
     }
 }
 

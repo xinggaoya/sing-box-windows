@@ -31,6 +31,37 @@
 > sing-box 1.14.0 gRPC API 实际只支持 HTTP/1.1 gRPC-Web（POST + chunked），**不支持 WebSocket**。
 > 关键修复：reqwest 客户端必须 `.no_proxy()` 禁用 Windows 系统代理（残留 127.0.0.1:12080）。
 
+## 1.14.0 → 1.14.4 协议层复核（2026-10-31）
+
+升级到上游最新稳定版 **1.14.4** 时，逐文件 diff 上游 `v1.14.0...v1.14.4`（174 commits）后确认：
+
+| 关键文件 | 差异 | 结论 |
+|---|---|---|
+| `daemon/started_service.proto` | **逐字节相同** | 手写 protobuf 无需改动 |
+| `daemon/managed_service.proto` | **逐字节相同** | 同上 |
+| `service/api/web_bridge.go`（gRPC-Web 帧格式实现） | **逐字节相同** | 手写 gRPC-Web 客户端无需改动 |
+| `daemon/started_service.go` | 内部重构：`clashServer`→`clashMode` 改名、日志缓冲 `list.List`→`logRing`、`iGroup.Now()`→`iGroup.Selected(NetworkTCP)` | proto 字段未变，**无影响** |
+| `constant/rule.go` | 1.14.0 引入的 `direct` rule action 被移除 | 本项目未使用该 action，**无影响** |
+| `option/*` | 全是内部 marshal 细节（`omitempty` 化、指针化） | 本项目生成的配置字段**不受影响** |
+
+- `APIVersion` 仍为 **4**（`daemon/started_service.go` 的 `const APIVersion = 4`）。
+- **实机验证**：1.14.4 上跑通 `api version` / `api status` / `api mode` / `api group list` / `api outbounds`，
+  返回值与 1.14.0 完全一致；4 份黄金配置在 1.14.0 / 1.14.4 / 1.15.0-alpha.13 三个版本下
+  `sing-box check` 全部通过。
+- **结论**：1.14.x 补丁版本**不需要跟版** `singbox_api/`。升级内核前先 diff
+  `daemon/*.proto` 与 `service/api/web_bridge.go`——这两处不变即可确认协议兼容。
+
+### 1.14.4 带来的配置层语义变化（需跟进）
+
+- **fakeip 的 IPv6 默认段**：`fc00::/18` → `2001:2::/48`（上游 migration 文档明确要求迁移）。
+  `fc00::/18` 属于 ULA，会与企业内网真实 ULA 地址冲突；本项目默认值已同步。
+- **`independent_cache` DNS 选项**等 deprecated 字段标注 **1.16.0** 移除；
+  本项目配置已全部迁移到 1.14 写法（`http_clients` + `route.default_http_client`），无 deprecated 字段。
+- **DNS 规则引用纯 ip_cidr 规则集**（如 `geoip-cn`）会触发
+  `Legacy Address Filter Fields in DNS rules` 弃用警告，**1.16.0 将变为硬错误**。
+  彻底迁移需改用 `evaluate` + `match_response`，与本项目「假 DNS 不用 evaluate」的既定约定冲突，
+  需单独设计（暂列待办）。
+
 **本工程为一次性全面替换**：
 
 - 关闭 `experimental.clash_api`，所有依赖该接口的 Rust 命令、Tauri command、Vue 组件同步移除。

@@ -78,7 +78,6 @@
   },
   "http_clients": [
     {
-      "detour": "direct",
       "tag": "default"
     }
   ],

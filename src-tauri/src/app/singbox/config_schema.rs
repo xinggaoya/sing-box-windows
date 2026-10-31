@@ -27,7 +27,12 @@ pub(crate) struct SingBoxConfig {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct HttpClientConfig {
     pub tag: String,
-    /// Dial Field：经由哪个出站下载（如 manual / direct）；None 表示直连
+    /// Dial Field：经由哪个出站下载。
+    ///
+    /// ⚠️ **不能写 `"direct"`**：sing-box 1.14+ 会把“detour 指向空 direct 出站”
+    /// 判定为无意义并让内核启动失败（`detour to an empty direct outbound makes no sense`）。
+    /// **直连＝不写本字段**（`http_client` 不写 detour 时走系统 dialer，语义同样是直连）。
+    /// 需要经由某个出站下载时，写那个出站的 tag（如手动分组 tag）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detour: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

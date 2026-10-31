@@ -193,7 +193,9 @@ export const APP_CONFIG_FIELDS = {
   singboxFakeDnsIpv4Range: defineField('singbox_fake_dns_ipv4_range', '198.18.0.0/15', {
     read: keepCurrentIfBlank,
   }),
-  singboxFakeDnsIpv6Range: defineField('singbox_fake_dns_ipv6_range', 'fc00::/18', {
+  // 上游 sing-box 1.14.4 起推荐 2001:2::/48（RFC 5180 基准测试段）；
+  // fc00::/18 属于 ULA，会与企业内网真实 ULA 地址冲突。
+  singboxFakeDnsIpv6Range: defineField('singbox_fake_dns_ipv6_range', '2001:2::/48', {
     read: keepCurrentIfBlank,
   }),
   singboxFakeDnsFilterMode: defineField('singbox_fake_dns_filter_mode', 'proxy_only', {

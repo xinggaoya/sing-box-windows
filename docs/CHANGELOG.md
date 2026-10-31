@@ -4,12 +4,25 @@
 
 ### ✨ 新功能
 
+- **升级 sing-box 内核到 1.14.4**（上游 2026-10-24 发布的最新稳定版）
+  - 逐文件 diff 上游 `v1.14.0...v1.14.4`（174 commits）后确认：**gRPC API 协议层零变更**——`daemon/started_service.proto`、`daemon/managed_service.proto` 与 gRPC-Web 帧格式实现 `service/api/web_bridge.go` 逐字节相同，`APIVersion` 仍为 4。本项目手写的 protobuf 编解码与 gRPC-Web 客户端**零改动**
+  - 配置 schema（`option/`）的变更全是内部 marshal 细节（`omitempty` 化、指针化）；唯一语义变化是 1.14.0 引入的 `direct` rule action 在 1.14.4 被移除（本项目未使用，无影响）
+  - 实机验证：4 份黄金配置在 1.14.0 / 1.14.4 / 1.15.0-alpha.13 三个版本下 `sing-box check` 全部通过；1.14.4 实跑 `api version` / `api status` / `api mode` / `api group list` / `api outbounds` 全部正常
+  - 内核下载兜底版本号从 1.12.10 提到 1.14.4（1.13 及以前不认 `http_clients` 等 1.14 写法，兜底太老会拉回不兼容的内核）
+- **假 DNS 的 IPv6 地址池默认值对齐上游**：`fc00::/18` → `2001:2::/48`。`fc00::/18` 属于 ULA 段，会与企业内网真实 ULA 地址冲突；上游自 1.14.4 的 migration 文档起明确要求改用 `2001:2::/48`（RFC 5180 基准测试段）。存量用户已保存的地址段保持不变（该段在上游并未被移除，只是推荐值变更），仍可在设置页自行覆盖
+
 - **新增「出站」页面（出站总览）**：展示内核里所有出站（含分组）的快照，按延迟排序，未测速显示 `—`，支持按名称/类型搜索。此前 `get_outbounds` 后端早已就绪但前端 0 引用，属于"能力已具备、界面没接线"。**独立成页面（侧边栏「出站」入口，路由 `/outbounds`），完全不占用代理页空间**
 - **维护页新增「网络诊断」卡片**：5 项网络质量指标（`network_quality_test`）+ sing-box 1.14 服务状态列表（`get_services`）；并补齐后端 `probe_service_status` 命令用于逐个探测服务可用性
 - **规则页新增「自定义规则」面板**：完整的增 / 删 / 改 / 查 / 启停，走「写配置文件 + 重启内核」路径（与运行时规则语义不同，界面已明确区分）
 - **规则页运行时规则改为只读展示**：改用 sing-box 1.14 官方 gRPC `get_rules`，不再依赖已移除的 Clash API
 
 ### 🛠️ 开发体验
+
+- **修复 `grpc_smoke` 实机联调脚本卡在最后一步退不出来**：`close()` 会等待后台任务结束，而该任务正阻塞在 HTTP 流读取上；内核不会主动结束「日志 / 连接」这类长驻流，于是没有新帧到达时 `close()` 一直挂着。验证脚本现在给 `close()` 加了 2s 超时兜底，连跑 4 次均可正常打印「全部 gRPC API 调用通过」并退出
+- **修复 `pnpm format:check` 失败（CI 当时就是红的）**：两道原因叠加——
+  1. `src/AGENTS.md` 的表格列宽与 prettier 的期望对不上（**与行尾无关，Linux CI 上同样报错**）；
+  2. `.prettierrc.json` 没配 `endOfLine`，prettier 默认要求 LF，而 Windows 上 `git config core.autocrlf=true` 检出的是 CRLF，于是每个被 git 检出的文件都被判为格式不合规（干净 checkout 上 15 个文件报警，实际代码风格并无问题）。
+  现将 `endOfLine` 改为 `"auto"`（prettier 与 git 的检出行为对齐，Windows 本地与 Linux CI 结果一致），并用 prettier 重排 `src/AGENTS.md` 的表格列宽
 
 - **开发态接入 CrabNebula DevTools 调试面板**（Tauri 2 官方推荐的调试方案）：可视化查看日志流、Tauri command/event 的 payload 与耗时，方便定位「内核事件没到前端」「command 卡住」这类跨模块链路问题
   - 通过 cargo feature `devtools` 隔离：release 构建不编译插件、不打开 `tauri/tracing` 埋点，产物零影响；`pnpm tauri dev` 自动启用
@@ -20,6 +33,14 @@
 
 ### 🐛 问题修复
 
+- **修复「规则集缓存缺失时内核直接起不来」**：生成的配置里 `http_clients[default].detour` 写的是 `"direct"`，指向一个**空的 direct 出站**。sing-box 1.14+ 的 `common/dialer/detour.go` 对此直接判定为无意义并让内核启动失败：`detour to an empty direct outbound makes no sense`。平时被本地规则集缓存（`initial_path`）拖住，一旦缓存缺失 / 损坏需要联网下载规则集，内核就起不来。
+  - 直连语义改为**不写 `detour`**（`http_client` 不写 detour 时走系统 dialer，语义同样是直连），生成路径与补丁路径共用 `config_render::build_http_clients` 一份实现
+  - 补丁路径会**纠正存量配置**里写错的 `detour: "direct"`，并在下载偏好从「手动」切回「直连」时清掉指向已删除客户端的悬空 `http_client` 引用；顺带把悬空的 `route.default_http_client` 改指回 `default` 客户端（指向不存在的客户端同样会让内核起不来）；外来配置（用户导入的机场原始配置）不受影响
+  - 新增 11 项单测（生成 / 补丁双路径收敛、直连无 detour、存量纠正、用户自建客户端保留、缺失/非法 `http_clients` 兜底、悬空 `default_http_client` 修复、外来配置不动），并重生成 4 份黄金配置快照
+- **修复 `pnpm kernel:fetch --all` 在 Windows 上拉不到 linux/macOS 内核**：脚本用 `tar` 解压 `.tar.gz`，但 Git Bash 自带的 GNU tar 会被 MSYS runtime 做参数转换，`C:/...` 里的冒号被转义成 `C\:/...`，tar 收到一个不存在的路径（`tar (child): Cannot connect to C: resolve failed`）。`.zip` 走 PowerShell 兜底还能成功，`.tar.gz` 没有兜底，直接失败
+  - Windows 优先用系统自带的 bsdtar（原生程序，不经 MSYS 转换）；兜底路径把工作目录设为归档所在目录、只传相对路径，同时绕开 MSYS 转换与 GNU tar 的 `host:path` 判定
+  - 失败时逐条打印真实原因（原来只输出 `Failed: N target(s).`，看不出是下载失败还是解压失败）
+  - 顺带修复 `fetch-kernel.test.mjs` 里一条**陈旧断言**（目标矩阵从 4 个加到 5 个时忘了同步），并把该测试文件接入 `pnpm test:scripts`——此前它**根本没被 CI 跑过**，所以这条断言一直烂着
 - **修复代理页被「出站总览」挤扁、主体几乎不可见**：代理页主体是「定高 + 内部滚动」布局（`.page-shell` 为 flex 列，`.split-view` 靠 `flex: 1` 吃掉剩余高度），而上一版把有内容高度的「出站总览」作为 `.page-shell` 的**同层子元素**放进了纵向流——flex 分配高度时 `.split-view`（`min-height: 0`）被压到近乎 0 高度，代理组侧栏与节点网格被整块挤出可视区。
   - 「出站总览」改为**独立页面**（`/outbounds`，侧边栏「出站」入口），代理页恢复到本次提交前的样子（零占用）
   - `.split-view` 加 320px 保底高度，防止同类回归再次压扁代理区

@@ -6,10 +6,11 @@ use super::common::{
 };
 use super::config_intent::ConfigIntent;
 use super::config_render::{
-    build_fakeip_dns_server, build_inbounds, sync_fake_dns_route_rules, sync_fake_dns_rules,
+    build_fakeip_dns_server, build_http_clients, build_inbounds, sync_fake_dns_route_rules,
+    sync_fake_dns_rules, HTTP_CLIENT_DIRECT_DOWNLOAD_TAG,
 };
 use super::config_schema::{
-    CacheFileConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, HttpClientConfig, LogConfig,
+    CacheFileConfig, DnsConfig, DnsServerConfig, ExperimentalConfig, LogConfig,
     RemoteRuleSetConfig, RouteConfig, SingBoxConfig,
 };
 use crate::app::storage::state_model::AppConfig;
@@ -43,7 +44,6 @@ fn render_skeleton(intent: &ConfigIntent) -> Value {
     let dns_strategy = intent.dns_strategy;
 
     let default_outbound = intent.default_outbound;
-    let download_detour = intent.download_detour;
 
     let mut outbounds: Vec<Value> = vec![
         json!({
@@ -142,7 +142,7 @@ fn render_skeleton(intent: &ConfigIntent) -> Value {
     // 下载出站（1.14 原生写法）：所有 rule-set 经 `http_clients["default"]` 下载，
     // detour 跟随用户的下载出站偏好；仅当偏好为 manual 时，private 这类本机规则集
     // 单独走 `http_clients["direct-download"]`（直连），保持 1.13 时代 `download_detour` 的语义。
-    let download_via_manual = download_detour == TAG_MANUAL;
+    let download_via_manual = intent.download_via_manual();
     let rule_set_cache_dir = crate::app::system::rule_set_cache_service::cache_dir().cloned();
     let rule_sets = remote_rule_set_sources(intent)
         .iter()
@@ -153,7 +153,7 @@ fn render_skeleton(intent: &ConfigIntent) -> Value {
                     .to_string()
             });
             let http_client = (download_via_manual && source.direct_detour)
-                .then(|| "direct-download".to_string());
+                .then(|| HTTP_CLIENT_DIRECT_DOWNLOAD_TAG.to_string());
             remote_rule_set_value(source, initial_path, http_client)
         })
         .collect::<Vec<Value>>();
@@ -251,25 +251,9 @@ fn render_skeleton(intent: &ConfigIntent) -> Value {
         // 1.14 顶层 HTTP 客户端（替代 rule_set.download_detour）：
         // "default" 供所有 rule-set 下载使用，detour 跟随下载出站偏好；
         // 偏好为 manual 时额外提供 "direct-download"，供 private 等本机规则集固定直连。
-        http_clients: Some({
-            let mut clients = vec![HttpClientConfig {
-                tag: "default".to_string(),
-                detour: Some(download_detour.to_string()),
-                server: None,
-                server_port: None,
-                tls: None,
-            }];
-            if download_via_manual {
-                clients.push(HttpClientConfig {
-                    tag: "direct-download".to_string(),
-                    detour: Some(TAG_DIRECT.to_string()),
-                    server: None,
-                    server_port: None,
-                    tls: None,
-                });
-            }
-            clients
-        }),
+        // ⚠️ 直连客户端**不能写 detour**：detour 指向空 direct 出站会让内核启动失败，
+        // 详见 `config_render::build_http_clients` 的说明。
+        http_clients: Some(build_http_clients(intent)),
         // services 由下方二次注入（要追加 services 字段）
         services: None,
     };

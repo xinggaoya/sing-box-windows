@@ -23,19 +23,19 @@ src/
 
 ## WHERE TO LOOK
 
-| Task                        | Location                                                                                             | Notes                                                    |
-| --------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| 应用启动初始化顺序          | `boot/useAppBootstrap.ts`                                                                            | store 初始化、事件桥、清理函数                           |
-| 后端命令调用封装            | `services/invoke-client.ts`                                                                          | 自动上下文注入（端口等）                                 |
-| 后端事件监听                | `services/event-service.ts`                                                                          | traffic/log/connection 入口                              |
-| 内核业务前端编排            | `services/kernel-service.ts`                                                                         | 命令调用最集中                                           |
-| 路由行为（含托盘）          | `router/index.ts`                                                                                    | `/blank` 逻辑关键                                        |
-| 节点选择 / 测速             | `services/proxy-service.ts` + `stores/kernel/ProxyStore.ts`                                          | gRPC API（sing-box 1.14+）                               |
-| 规则页（只读 + 自定义规则） | `views/RulesView.vue`                                                                                | 运行时规则只读（gRPC `get_rules`）+ 自定义规则 CRUD 面板 |
-| 自定义规则前端接线          | `services/custom-rule-service.ts` + `stores/kernel/CustomRuleStore.ts`                               | 走文件+重启路径，与运行时规则语义不同，UI 需区分         |
+| Task                        | Location                                                                                                              | Notes                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 应用启动初始化顺序          | `boot/useAppBootstrap.ts`                                                                                             | store 初始化、事件桥、清理函数                                               |
+| 后端命令调用封装            | `services/invoke-client.ts`                                                                                           | 自动上下文注入（端口等）                                                     |
+| 后端事件监听                | `services/event-service.ts`                                                                                           | traffic/log/connection 入口                                                  |
+| 内核业务前端编排            | `services/kernel-service.ts`                                                                                          | 命令调用最集中                                                               |
+| 路由行为（含托盘）          | `router/index.ts`                                                                                                     | `/blank` 逻辑关键                                                            |
+| 节点选择 / 测速             | `services/proxy-service.ts` + `stores/kernel/ProxyStore.ts`                                                           | gRPC API（sing-box 1.14+）                                                   |
+| 规则页（只读 + 自定义规则） | `views/RulesView.vue`                                                                                                 | 运行时规则只读（gRPC `get_rules`）+ 自定义规则 CRUD 面板                     |
+| 自定义规则前端接线          | `services/custom-rule-service.ts` + `stores/kernel/CustomRuleStore.ts`                                                | 走文件+重启路径，与运行时规则语义不同，UI 需区分                             |
 | 出站总览 / 网络诊断         | `views/OutboundsView.vue` + `composables/useOutboundList.ts` + `views/setting/components/SettingsDiagnosticsCard.vue` | 「出站」独立页（路由 `/outbounds`）与维护页诊断视图；代理页不得挂出站总览 UI |
-| 设计系统 / 主题             | `assets/tokens.css` + `stores/app/ThemeStore.ts`                                                     | Indigo 三层 token，主题覆盖 `--primary-*`                |
-| 资源清理                    | `composables/useCleanup.ts`                                                                          | 组件卸载统一清理监听/定时器                              |
+| 设计系统 / 主题             | `assets/tokens.css` + `stores/app/ThemeStore.ts`                                                                      | Indigo 三层 token，主题覆盖 `--primary-*`                                    |
+| 资源清理                    | `composables/useCleanup.ts`                                                                                           | 组件卸载统一清理监听/定时器                                                  |
 
 ## CONVENTIONS (FRONTEND ONLY)
 

@@ -57,6 +57,7 @@ cd src-tauri && cargo test
 - `tauri_plugin_websocket` 仅在 `lib.rs` 注册一次，无重复注册；但运行态数据已改走 gRPC 订阅 → Tauri event，该插件属遗留。
 - `Cargo.toml` 配置了激进的 release profile（LTO/codegen-units=1/strip/panic=abort），排障时注意 release 与 dev 行为差异（panic 直接 abort，不可恢复）。
 - **API 协议**：内核交互使用 sing-box 1.14+ 官方 `type: "api"`（gRPC-Web over HTTP/1.1），由 `src/app/singbox_api/` 客户端实现；metacubexd 兼容层（`experimental.clash_api`）已彻底移除。
+- **内嵌内核 1.14.4**：`src-tauri/resources/kernel/<平台>/<架构>/`（gitignore，构建期 `pnpm kernel:fetch` 拉取，覆盖 windows/amd64+arm64、linux/amd64、macos/arm64+amd64 共 5 个目标）。升级内核时先 diff 上游 proto 与 `service/api/web_bridge.go`——1.14.0→1.14.4 这段**逐字节未变**，所以 `singbox_api/` 无需跟版。内核版本号的兜底值在 `core/kernel_service/download.rs`（现为 1.14.4）。
 - **规则与代理提供者管理**未实现：官方 gRPC API 未暴露对应管理接口，规则页仅只读展示（`get_rules`），等待上游 API 扩展。
 - **应用更新**不走 tauri-plugin-updater，由 `system/update_service.rs` 自研（GitHub Releases API，应用内更新仅 Windows）。
 - 单实例由 `tauri_plugin_single_instance` 插件实现（tauri.conf.json 无配置段）；窗口 `decorations: false` 自绘。

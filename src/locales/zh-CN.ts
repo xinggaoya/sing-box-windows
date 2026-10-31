@@ -781,7 +781,7 @@ export default {
       fakeDnsIpv4Range: 'Fake DNS IPv4 地址池',
       fakeDnsIpv6Range: 'Fake DNS IPv6 地址池',
       fakeDnsIpv4Invalid: 'Fake DNS IPv4 地址池格式无效（示例：198.18.0.0/15）',
-      fakeDnsIpv6Invalid: 'Fake DNS IPv6 地址池格式无效（示例：fc00::/18）',
+      fakeDnsIpv6Invalid: 'Fake DNS IPv6 地址池格式无效（示例：2001:2::/48）',
       dnsProxy: '代理 DNS（非国内）',
       dnsCn: '国内 DNS',
       dnsResolver: '解析器 DNS（用于解析 DoH 域名）',

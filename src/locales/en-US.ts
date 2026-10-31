@@ -794,7 +794,7 @@ export default {
       fakeDnsIpv4Range: 'Fake DNS IPv4 range',
       fakeDnsIpv6Range: 'Fake DNS IPv6 range',
       fakeDnsIpv4Invalid: 'Invalid Fake DNS IPv4 range format (e.g. 198.18.0.0/15)',
-      fakeDnsIpv6Invalid: 'Invalid Fake DNS IPv6 range format (e.g. fc00::/18)',
+      fakeDnsIpv6Invalid: 'Invalid Fake DNS IPv6 range format (e.g. 2001:2::/48)',
       dnsProxy: 'Proxy DNS (non-CN)',
       dnsCn: 'CN DNS',
       dnsResolver: 'Resolver DNS (for DoH hostname resolving)',

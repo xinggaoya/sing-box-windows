@@ -54,6 +54,11 @@ export async function main(rawArgs = process.argv.slice(2)) {
   }
 
   if (errors.length > 0) {
+    // 逐条打印失败原因：只报"Failed: N target(s)"的话，调用方根本看不出是下载失败
+    // 还是解压失败（尤其是解压失败时 tar 的报错被吞掉了）。
+    errors.forEach((error) => {
+      console.error(`[error] ${error?.message ?? error}`)
+    })
     console.error(`Failed: ${errors.length} target(s).`)
     return 1
   }
@@ -103,7 +108,7 @@ export function printHelp() {
 Examples:
   node scripts/fetch-kernel.mjs --platform windows --arch amd64
   node scripts/fetch-kernel.mjs --all
-  node scripts/fetch-kernel.mjs --platform macos --arch arm64 --version 1.12.10
+  node scripts/fetch-kernel.mjs --platform macos --arch arm64 --version 1.14.4
   node scripts/fetch-kernel.mjs --all --skip-existing
   node scripts/fetch-kernel.mjs --all --track oldstable   # 上一稳定版（适合兼容性回退）
   node scripts/fetch-kernel.mjs --all --track beta        # 预发版
@@ -488,43 +493,151 @@ export async function downloadFile(url, destination) {
 
 export async function extractArchive(archivePath, outputDir) {
   if (archivePath.endsWith('.zip')) {
+    let tarError = null
     try {
-      await runCommand('tar', ['-xf', archivePath, '-C', outputDir])
+      await runTar(['-xf'], archivePath, outputDir)
       return
-    } catch {
+    } catch (error) {
+      tarError = error
       // Fall back for environments without tar/unzip.
     }
 
-    if (process.platform === 'win32') {
-      await runCommand('powershell', [
-        '-NoProfile',
-        '-Command',
-        `Expand-Archive -LiteralPath "${archivePath}" -DestinationPath "${outputDir}" -Force`
-      ])
+    try {
+      if (process.platform === 'win32') {
+        await runCommand('powershell', [
+          '-NoProfile',
+          '-Command',
+          `Expand-Archive -LiteralPath "${archivePath}" -DestinationPath "${outputDir}" -Force`
+        ])
+      } else {
+        await runCommand('unzip', ['-q', archivePath, '-d', outputDir])
+      }
       return
+    } catch (fallbackError) {
+      // 两条路都挂了时，把**两边**的原因都带出来：只报兜底那条会让人误以为是 unzip 的问题，
+      // 而实际更常见的是 tar 解压失败（路径/格式不对）。
+      throw new Error(
+        `解压 ${archivePath} 失败：tar → ${tarError?.message ?? tarError}；兜底 → ${fallbackError?.message ?? fallbackError}`
+      )
     }
-
-    await runCommand('unzip', ['-q', archivePath, '-d', outputDir])
-    return
   }
 
-  if (archivePath.endsWith('.tar.gz')) {
-    await runCommand('tar', ['-xzf', archivePath, '-C', outputDir])
+  if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
+    await runTar(['-xzf'], archivePath, outputDir)
     return
   }
 
   throw new Error(`Unsupported archive: ${archivePath}`)
 }
 
-export async function runCommand(command, commandArgs) {
+/**
+ * 用 tar 解压归档。
+ *
+ * ## ⚠️ Windows 上 tar 的三个坑
+ *
+ * 1. **MSYS 路径转换**：Git Bash 自带的 GNU tar 会被 MSYS runtime 做参数转换，
+ *    `C:/...` 里的冒号可能被转义成 `C\:/...`，tar 收到一个不存在的路径；
+ *    不加 `--force-local` 时还会被当成 `host:path`，报
+ *    `tar (child): Cannot connect to C: resolve failed`。
+ * 2. **Windows 自带的 bsdtar**（`System32\tar.exe`）是原生 Windows 程序，
+ *    不做 MSYS 转换，原生吃盘符路径，但**不认** `--force-local`。
+ * 3. **GNU tar 认** `--force-local`，但对盘符路径的处理与 bsdtar 相反。
+ *
+ * 因此策略是：
+ * - Windows 优先用系统自带的 bsdtar（原生、无路径转换）；
+ * - 兜底用 PATH 上的 `tar`，并把**工作目录**设成归档所在目录、只传**相对路径**，
+ *   相对路径不含盘符冒号，同时绕开 MSYS 转换与 GNU tar 的 `host:path` 判定
+ *   （GNU tar / bsdtar / macOS 自带 tar 都能处理）。
+ */
+export async function runTar(tarArgs, archivePath, outputDir) {
+  const attempts = buildTarAttempts(tarArgs, archivePath, outputDir)
+
+  let lastError = null
+  for (const attempt of attempts) {
+    try {
+      await runCommand(attempt.command, attempt.args, {
+        cwd: attempt.cwd,
+        quiet: true
+      })
+      return
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError
+}
+
+/**
+ * 构造 tar 调用候选：按可靠程度从高到低排列。
+ *
+ * 导出是为了单测能直接断言「Windows 优先用系统 bsdtar」与「兜底走相对路径」。
+ */
+export function buildTarAttempts(tarArgs, archivePath, outputDir) {
+  const attempts = []
+
+  // 1) Windows 自带 bsdtar：原生 Windows 程序，完全不经过 MSYS 路径转换
+  if (process.platform === 'win32') {
+    const systemTar = windowsSystemTar()
+    if (systemTar) {
+      attempts.push({
+        command: systemTar,
+        args: [...tarArgs, archivePath, '-C', outputDir]
+      })
+    }
+  }
+
+  // 2) 通用兜底：工作目录 = 归档所在目录，只传相对路径（不含盘符冒号）
+  const workDir = path.dirname(archivePath)
+  const relativeArchive = toPosixPath(path.basename(archivePath))
+  // `path.relative` 在**跨盘符**时会直接返回绝对路径（此时仍然无法避开冒号，
+  // 但归档与输出目录本就在同一个临时目录里，实际不会走到这个分支）。
+  const relativeOutput = toPosixPath(path.relative(workDir, outputDir)) || '.'
+  attempts.push({
+    command: 'tar',
+    args: [...tarArgs, relativeArchive, '-C', relativeOutput],
+    cwd: workDir
+  })
+
+  return attempts
+}
+
+/** Windows 自带 tar（bsdtar）的绝对路径；不存在时返回 null */
+export function windowsSystemTar() {
+  const systemRoot = process.env.SystemRoot || process.env.windir || 'C:\\Windows'
+  const candidate = path.join(systemRoot, 'System32', 'tar.exe')
+  return fs.existsSync(candidate) ? candidate : null
+}
+
+/** 把 Windows 的反斜杠路径转成正斜杠（tar / MSYS 通用） */
+function toPosixPath(targetPath) {
+  return targetPath.split(path.sep).join('/')
+}
+
+export async function runCommand(command, commandArgs, options = {}) {
+  const quiet = options.quiet === true
   await new Promise((resolve, reject) => {
-    const child = spawn(command, commandArgs, { stdio: 'inherit' })
+    const child = spawn(command, commandArgs, {
+      stdio: quiet ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+      ...(options.cwd ? { cwd: options.cwd } : {})
+    })
+
+    let stderr = ''
+    if (quiet) {
+      child.stderr?.on('data', (chunk) => {
+        stderr += chunk
+      })
+      // stdout 也必须消费掉：管道缓冲区写满时子进程会阻塞住（tar 的详细输出可能很大）。
+      child.stdout?.resume()
+    }
+
     child.on('error', reject)
     child.on('close', (code) => {
       if (code === 0) {
         resolve()
       } else {
-        reject(new Error(`${command} exited with code ${code}`))
+        const detail = stderr.trim()
+        reject(new Error(`${command} exited with code ${code}${detail ? `: ${detail}` : ''}`))
       }
     })
   })

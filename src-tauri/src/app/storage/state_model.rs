@@ -136,7 +136,9 @@ impl Default for AppConfig {
             singbox_dns_hijack: true,
             singbox_fake_dns_enabled: false,
             singbox_fake_dns_ipv4_range: "198.18.0.0/15".to_string(),
-            singbox_fake_dns_ipv6_range: "fc00::/18".to_string(),
+            // 上游 sing-box 1.14.4 起推荐 2001:2::/48（RFC 5180 基准测试段）；
+            // fc00::/18 属于 ULA，会与企业内网真实 ULA 地址冲突。
+            singbox_fake_dns_ipv6_range: "2001:2::/48".to_string(),
             singbox_fake_dns_filter_mode: "proxy_only".to_string(),
             singbox_enable_app_groups: true,
             tun_self_heal_enabled: true,

@@ -159,8 +159,10 @@ pnpm tauri build:linux:rpm
 
 ## NOTES
 
-- 测试：后端 232 项（`cargo test`），前端 165 项（`vitest`，覆盖 TUN 切换状态机、排序分组、内核错误归因、事件退订、配置 schema、国旗码同步、订阅表单三来源、节点名→国旗解析、跨语言类型漂移守护等易回归逻辑）。CI（`.github/workflows/ci.yml`）在 PR/push 时跑 lint / type-check / prettier / i18n key 校验 / vitest / 内核目标矩阵 / cargo fmt / clippy / cargo test 全部门禁。
+- 测试：后端 263 项（`cargo test`），前端 173 项（`vitest`，覆盖 TUN 切换状态机、排序分组、内核错误归因、事件退订、配置 schema、国旗码同步、订阅表单三来源、节点名→国旗解析、跨语言类型漂移守护等易回归逻辑）。CI（`.github/workflows/ci.yml`）在 PR/push 时跑 lint / type-check / prettier / i18n key 校验 / vitest / 内核目标矩阵 / 脚本单测 / cargo fmt / clippy / cargo test 全部门禁。
 - **配置生成黄金样本**：`src-tauri/src/app/singbox/testdata/config_golden/*.json` 固化 4 组 `AppConfig` 的生成结果；改配置生成逻辑时必须让快照**逐字段不变**（`SINGBOX_BLESS_GOLDEN=1` 重新生成），否则说明配置语义漂移。
+- **内嵌内核版本 1.14.4**（上游 2026-10-24 发布的最新稳定版；仓库内嵌资源在 `src-tauri/resources/kernel/<平台>/<架构>/`，gitignore，构建期由 `pnpm kernel:fetch` 拉取。**下载策略是「默认取最新稳定版」而非钉死版本**——钉版本需改 `scripts/fetch-kernel.mjs` 的默认解析或构建参数）。已逐文件 diff 上游 `v1.14.0...v1.14.4`（174 commits）确认：**gRPC API 协议层零变更**（`daemon/*.proto` 与 `service/api/web_bridge.go` 逐字节相同，`APIVersion` 仍为 4），手写 protobuf 与 gRPC-Web 客户端**不需要跟版**；配置 schema 变更均为内部 marshal 细节。**升级内核前先跑 `sing-box check -c <黄金配置>`**（用真实二进制）而不是只看 changelog。
+- ⚠️ **`http_clients` 直连客户端不能写 `detour`**：sing-box 1.14+ 对「detour 指向空 direct 出站」直接 `FATAL`（`detour to an empty direct outbound makes no sense`），冷缓存时内核根本起不来。直连要表达成**不写 `detour`**（走系统 dialer）。统一由 `singbox/config_render.rs::build_http_clients` 渲染，生成与补丁两条路径共用。
 - i18n：以 `zh-CN` 为基准，`pnpm test:i18n`（`scripts/check-i18n.mjs`）校验 4 个语言包 key 完全对齐；**禁止**在组件里写 `locale.startsWith('zh') ? '中文' : 'English'` 或 `t(key, '中文兜底')`，一律走 locale 语言包。
 - 事件：统一走 `eventService`，并使用 `on*()` 返回的 unlisten 做**精确**退订；「清空某事件全部监听器」是显式的 `removeAllListenersForEvent()`。已移除 `mitt` 事件总线（事件链从 4 跳缩到 2 跳）。
 - 发布为两阶段：tag 触发 `release.yml` 产 Pre-release（多平台矩阵，含 windows-arm64），再手动触发 `promote-release.yml` 转正式；Release Notes 取自 `docs/CHANGELOG.md`。

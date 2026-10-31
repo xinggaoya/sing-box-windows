@@ -175,7 +175,7 @@ fn fake_dns_should_append_fakeip_server_and_enable_reverse_mapping() {
     );
     assert_eq!(
         fakeip_server.get("inet6_range").and_then(|v| v.as_str()),
-        Some("fc00::/18")
+        Some("2001:2::/48")
     );
 
     assert_eq!(
@@ -339,5 +339,65 @@ fn prefer_ipv6_should_not_leak_into_dns_bootstrap_strategy() {
             .get("strategy")
             .and_then(|v| v.as_str()),
         Some("prefer_ipv6")
+    );
+}
+
+#[test]
+fn generated_http_clients_should_not_detour_to_empty_direct_outbound() {
+    // 回归守护：直连下载的 http_client **不能**写 detour。
+    //
+    // sing-box 1.14+ 的 common/dialer/detour.go 会对"detour 指向空 direct 出站"
+    // 直接让内核启动失败：
+    //   "detour to an empty direct outbound makes no sense"
+    // 冷缓存（规则集需要联网下载）时这条配置会让内核根本起不来。
+    // 不写 detour 时 http_client 走系统 dialer，语义同样是直连。
+    let config = generate_base_config(&AppConfig::default());
+
+    let clients = config
+        .get("http_clients")
+        .and_then(|v| v.as_array())
+        .expect("1.14 配置应包含顶层 http_clients");
+    assert!(!clients.is_empty(), "http_clients 不应为空");
+
+    for client in clients {
+        let tag = client.get("tag").and_then(|v| v.as_str()).unwrap_or("");
+        assert!(
+            client.get("detour").is_none(),
+            "直连下载的 http_client({tag}) 不应写 detour，实际: {client:?}"
+        );
+    }
+}
+
+#[test]
+fn generated_http_clients_should_follow_manual_download_preference() {
+    // 偏好「走手动选择出站」时：default 客户端 detour 到手动分组，
+    // 另有一个**直连**客户端（同样不写 detour）供本机专用规则集使用。
+    let app_config = AppConfig {
+        singbox_download_detour: "manual".to_string(),
+        ..AppConfig::default()
+    };
+    let config = generate_base_config(&app_config);
+
+    let clients = config
+        .get("http_clients")
+        .and_then(|v| v.as_array())
+        .expect("1.14 配置应包含顶层 http_clients");
+
+    let default_client = clients
+        .iter()
+        .find(|c| c.get("tag").and_then(|v| v.as_str()) == Some("default"))
+        .expect("default 客户端应存在");
+    assert_eq!(
+        default_client.get("detour").and_then(|v| v.as_str()),
+        Some(crate::app::singbox::common::TAG_MANUAL)
+    );
+
+    let direct_client = clients
+        .iter()
+        .find(|c| c.get("tag").and_then(|v| v.as_str()) == Some("direct-download"))
+        .expect("直连下载客户端应存在");
+    assert!(
+        direct_client.get("detour").is_none(),
+        "直连客户端不应写 detour，实际: {direct_client:?}"
     );
 }

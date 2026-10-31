@@ -51,8 +51,10 @@ pub async fn download_kernel(app_handle: AppHandle, version: Option<String>) -> 
                 v
             }
             Err(e) => {
-                warn!("获取最新版本失败: {}, 使用默认版本 1.12.10", e);
-                "1.12.10".to_string()
+                // 兜底版本必须是与本项目配置语义兼容的 1.14+（1.13 及以前不认
+                // `http_clients` / `route.default_http_client` 等写法，1.12 更早）。
+                warn!("获取最新版本失败: {}, 使用默认版本 1.14.4", e);
+                "1.14.4".to_string()
             }
         },
     };

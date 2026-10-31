@@ -1,6 +1,6 @@
 # 竞品对标与改进建议（2026-10）
 
-**结论先行**：本项目的**技术底座已达一线水平**（sing-box 1.14.0 原生 gRPC API、事件驱动运行态、schema 驱动配置、CI 全门禁），**不缺架构，缺产品面**。
+**结论先行**：本项目的**技术底座已达一线水平**（sing-box 1.14.4 原生 gRPC API、事件驱动运行态、schema 驱动配置、CI 全门禁），**不缺架构，缺产品面**。
 
 对照 4 个成熟开源项目 + sing-box 官方桌面客户端后，差距集中在三类：
 
@@ -29,7 +29,7 @@
 
 | 维度 | 本项目 | 对比 |
 |---|---|---|
-| 内核交互 | sing-box 1.14.0 官方 gRPC API（`type: "api"`），手写 protobuf 无 prost 依赖 | 官方桌面客户端同为 1.14 gRPC；CVR/Mihomo 仍走 Clash RESTful |
+| 内核交互 | sing-box 1.14.4 官方 gRPC API（`type: "api"`），手写 protobuf 无 prost 依赖 | 官方桌面客户端同为 1.14 gRPC；CVR/Mihomo 仍走 Clash RESTful |
 | 1.14 特性接入 | `optimistic` 缓存、mDNS、`http_clients`+`default_http_client` 替代 `download_detour`、`services:[api]`、Tailscale endpoint、SSH server、TLS spoof | 与官方客户端 1.14 能力面基本对齐 |
 | deprecated 清理 | `experimental.clash_api` / `store_rdrc` / `independent_cache` / `download_detour` 全部迁移并有 `settings_patch` 兜底清残留 | 多数竞品未做 1.16 提前适配 |
 | 配置一致性 | `appConfigSchema.ts` schema 驱动，加字段只改 1 处（原为 7 处） | 竞品普遍手写重复枚举 |
@@ -261,6 +261,18 @@
   ⚠️ 风险点：Tailscale endpoint 写入后若缺 auth key 会**导致内核启动失败**，
   因此需要"用户显式开启且已配置 auth key 才写入"的额外判定，不能无条件跟随设置开关。
 
+#### ✅ 已部分修复：`singbox_download_detour`（内核 1.14.4 适配时）
+
+- 补丁路径新增 `sync_http_clients` + `sync_rule_set_http_client_refs`
+  （`src-tauri/src/app/singbox/settings_patch.rs`），渲染逻辑提到
+  `config_render::build_http_clients` 由两条路径共用：
+  - 改下载偏好后，**已有配置**的 `http_clients` 会被重写
+  - 偏好从「手动」切回「直连」时，指向已删除客户端的悬空 `route.rule_set[].http_client` 引用一并清掉
+  - 外来配置（`Ownership.managed == false`）完全不动
+- 顺带修掉一个会让**内核启动失败**的缺陷：直连客户端曾写成 `detour: "direct"`，
+  指向空 direct 出站 → sing-box 1.14+ 直接 `FATAL`（详见 `singbox/config_render.rs::build_http_clients` 注释）
+- ⚠️ 剩余缺口：`enable_tailscale_endpoint` / `singbox_dns_use_mdns` 两项**仍未落地**，待后续批次处理
+
 ---
 
 ## 七、建议执行顺序
@@ -296,7 +308,7 @@
 
 | 结论 | 证据位置 |
 |---|---|
-| 内核 1.14.0 | `src-tauri/resources/kernel/windows/amd64/version.txt` |
+| 内核 1.14.4 | `src-tauri/resources/kernel/windows/amd64/version.txt` |
 | 1.14 特性已接入 | `src-tauri/src/app/singbox/config_generator.rs:217,241,285,289` |
 | deprecated 清理 | `src-tauri/src/app/singbox/settings_patch.rs:39,62,75,291` |
 | `get_outbounds` 未接线 | `src-tauri/src/app/singbox_api/client.rs:245`；`src/` 0 引用 |

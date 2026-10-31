@@ -859,7 +859,7 @@ export default {
       fakeDnsIpv4Range: 'Диапазон Fake DNS IPv4',
       fakeDnsIpv6Range: 'Диапазон Fake DNS IPv6',
       fakeDnsIpv4Invalid: 'Неверный формат диапазона Fake DNS IPv4 (пример: 198.18.0.0/15)',
-      fakeDnsIpv6Invalid: 'Неверный формат диапазона Fake DNS IPv6 (пример: fc00::/18)',
+      fakeDnsIpv6Invalid: 'Неверный формат диапазона Fake DNS IPv6 (пример: 2001:2::/48)',
       dnsProxy: 'Прокси DNS (не-CN)',
       dnsCn: 'CN DNS',
       dnsResolver: 'Резолвер DNS (для разрешения DoH-хостов)',

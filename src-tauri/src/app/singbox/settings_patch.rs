@@ -25,11 +25,13 @@ use super::common::{
     RS_GEOSITE_TELEGRAM, RS_GEOSITE_YOUTUBE, TAG_AUTO, TAG_DIRECT, TAG_GOOGLE, TAG_NETFLIX,
     TAG_OPENAI, TAG_TELEGRAM, TAG_YOUTUBE,
 };
+use super::config_generator::remote_rule_set_sources;
 use super::config_intent::ConfigIntent;
 use super::config_render::{
-    build_inbounds, ensure_sniff_route_rule, extract_existing_tun_route_exclude_address,
-    extract_fake_dns_server_range_pair, sync_fake_dns_route_rules, sync_fake_dns_rules,
-    sync_fake_dns_server,
+    build_http_clients, build_inbounds, ensure_sniff_route_rule,
+    extract_existing_tun_route_exclude_address, extract_fake_dns_server_range_pair,
+    sync_fake_dns_route_rules, sync_fake_dns_rules, sync_fake_dns_server, HTTP_CLIENT_DEFAULT_TAG,
+    HTTP_CLIENT_DIRECT_DOWNLOAD_TAG,
 };
 use super::ownership::Ownership;
 use crate::app::storage::state_model::AppConfig;
@@ -364,11 +366,17 @@ fn apply_owned_profile_settings(
                     )
                 });
             }
+
+            // 同步规则集上的 `http_client` 引用（与顶层 `http_clients` 保持一致）
+            sync_rule_set_http_client_refs(rule_sets, intent);
         }
 
         // 1.14 新增：默认 HTTP 客户端（替代 download_detour）—— 必须在 rule_set 借用结束后
         if !route_obj.contains_key("default_http_client") {
-            route_obj.insert("default_http_client".to_string(), json!("default"));
+            route_obj.insert(
+                "default_http_client".to_string(),
+                json!(HTTP_CLIENT_DEFAULT_TAG),
+            );
         }
 
         if let Some(rules) = route_obj.get_mut("rules").and_then(|v| v.as_array_mut()) {
@@ -461,6 +469,129 @@ fn apply_owned_profile_settings(
                     TAG_TELEGRAM | TAG_YOUTUBE | TAG_NETFLIX | TAG_OPENAI | TAG_GOOGLE
                 )
             });
+        }
+    }
+
+    // 6) 顶层 `http_clients`：与生成路径共用同一份渲染逻辑（必须在 route 借用结束后）
+    sync_http_clients(config_obj, intent, ownership);
+}
+
+/// 同步顶层 `http_clients`（sing-box 1.14 替代 `rule_set.download_detour` 的原生写法）。
+///
+/// 只动本程序创建的两个客户端（`default` / `direct-download`），用户自己加的其它
+/// `http_client` 原样保留；外来配置（`ownership.managed == false`）一个字节都不动。
+///
+/// ## ⚠️ 直连客户端不能写 `detour`
+///
+/// sing-box 1.14+ 的 `common/dialer/detour.go` 会对"detour 指向空 direct 出站"
+/// 直接判定为无意义，并让内核**启动失败**：
+///
+/// ```text
+/// start service: initialize rule-set[0]: initial rule-set: geosite-cn:
+///   Get "https://.../geosite-cn.srs": detour to an empty direct outbound makes no sense
+/// ```
+///
+/// 不写 `detour` 时 `http_client` 走系统 dialer，语义同样是直连——所以直连必须表达成
+/// "没有 `detour` 字段"。存量配置里写的是 `detour: "direct"`，本函数负责纠正回来。
+fn sync_http_clients(
+    config_obj: &mut Map<String, Value>,
+    intent: &ConfigIntent,
+    ownership: &Ownership,
+) {
+    if !ownership.managed {
+        // 外来配置：用户自己的 http_client 绝不改写
+        return;
+    }
+
+    let desired = build_http_clients(intent);
+    // 用**自有类型**的 tag 列表（而不是借用 `desired`），后面 `desired` 会被 move 掉。
+    let desired_tags: Vec<String> = desired.iter().map(|client| client.tag.clone()).collect();
+
+    let clients = config_obj
+        .entry("http_clients".to_string())
+        .or_insert_with(|| json!([]));
+    if !clients.is_array() {
+        *clients = json!([]);
+    }
+    let Some(arr) = clients.as_array_mut() else {
+        return;
+    };
+
+    // 先清掉本程序的历史客户端（直连偏好下不再需要 `direct-download`），
+    // 避免留下指向不存在客户端的悬空配置。
+    // ⚠️ 只清 tag 为 `default` / `direct-download` 的——这两个是本程序创建的；
+    // 用户自己加的其它 http_client 原样保留。
+    arr.retain(|client| {
+        let tag = client.get("tag").and_then(|v| v.as_str()).unwrap_or("");
+        let owned = tag == HTTP_CLIENT_DEFAULT_TAG || tag == HTTP_CLIENT_DIRECT_DOWNLOAD_TAG;
+        !owned || desired_tags.iter().any(|wanted| wanted == tag)
+    });
+
+    // 再按当前偏好写入本程序的客户端（已存在则原地替换，保持顺序不变）
+    for client in desired {
+        let tag = client.tag.clone();
+        let value = serde_json::to_value(&client).expect("http client 序列化失败");
+        match arr
+            .iter_mut()
+            .find(|item| item.get("tag").and_then(|v| v.as_str()) == Some(tag.as_str()))
+        {
+            Some(slot) => *slot = value,
+            None => arr.push(value),
+        }
+    }
+
+    // `route.default_http_client` 也不能指向已被删除的客户端：
+    // 内核对不存在的 http_client 会直接启动失败。
+    // 典型触发：配置被手工改过，或经其它工具往返处理过。
+    if let Some(route) = config_obj.get_mut("route").and_then(|v| v.as_object_mut()) {
+        let current = route
+            .get("default_http_client")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let points_at_removed_client = (current == HTTP_CLIENT_DEFAULT_TAG
+            || current == HTTP_CLIENT_DIRECT_DOWNLOAD_TAG)
+            && !desired_tags.iter().any(|wanted| wanted == current);
+        if points_at_removed_client {
+            route.insert(
+                "default_http_client".to_string(),
+                json!(HTTP_CLIENT_DEFAULT_TAG),
+            );
+        }
+    }
+}
+
+/// 同步远程 rule-set 上的 `http_client` 引用。
+///
+/// - 偏好为直连：本程序不再创建 `direct-download` 客户端，残留引用必须清掉
+///   （引用不存在的 client 会让内核启动失败）。
+/// - 偏好为走手动选择出站：本机专用规则集（geosite-private）固定走直连客户端。
+fn sync_rule_set_http_client_refs(rule_sets: &mut [Value], intent: &ConfigIntent) {
+    let direct_tags: Vec<&str> = remote_rule_set_sources(intent)
+        .iter()
+        .filter(|source| source.direct_detour)
+        .map(|source| source.tag)
+        .collect();
+
+    for rs in rule_sets.iter_mut() {
+        let Some(obj) = rs.as_object_mut() else {
+            continue;
+        };
+        if obj.get("type").and_then(|v| v.as_str()) != Some("remote") {
+            continue;
+        }
+
+        let tag = obj.get("tag").and_then(|v| v.as_str()).unwrap_or("");
+        if intent.download_via_manual() {
+            if direct_tags.contains(&tag) {
+                obj.insert(
+                    "http_client".to_string(),
+                    json!(HTTP_CLIENT_DIRECT_DOWNLOAD_TAG),
+                );
+            }
+        } else if obj.get("http_client").and_then(|v| v.as_str())
+            == Some(HTTP_CLIENT_DIRECT_DOWNLOAD_TAG)
+        {
+            obj.remove("http_client");
         }
     }
 }

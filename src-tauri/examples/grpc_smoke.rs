@@ -99,7 +99,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             println!("⚠️  SubscribeStatus: 流空");
         }
-        sub.close().await;
+        // ⚠️ close() 会等待后台任务结束，而该任务正阻塞在 HTTP 流读取上：
+        // 内核不会主动结束「日志 / 连接」这类长驻流，于是没有新帧到达时
+        // close() 会一直挂着（验证脚本会卡在最后一步退不出来）。
+        // 这里加超时兜底：验证脚本不需要等流彻底收干净。
+        let _ = tokio::time::timeout(Duration::from_secs(2), sub.close()).await;
     }
 
     // 10) SubscribeLog（取 1 条消息后立即关闭）
@@ -130,7 +134,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(Err(e)) => println!("❌ SubscribeLog 错误: {e}"),
             Err(_) => println!("⚠️  SubscribeLog: 2s 超时无消息"),
         }
-        sub.close().await;
+        // ⚠️ close() 会等待后台任务结束，而该任务正阻塞在 HTTP 流读取上：
+        // 内核不会主动结束「日志 / 连接」这类长驻流，于是没有新帧到达时
+        // close() 会一直挂着（验证脚本会卡在最后一步退不出来）。
+        // 这里加超时兜底：验证脚本不需要等流彻底收干净。
+        let _ = tokio::time::timeout(Duration::from_secs(2), sub.close()).await;
     }
 
     // 11) SubscribeConnections（取 1 条消息后立即关闭）
@@ -149,7 +157,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(Err(e)) => println!("❌ SubscribeConnections 错误: {e}"),
             Err(_) => println!("⚠️  SubscribeConnections: 2s 超时"),
         }
-        sub.close().await;
+        // ⚠️ close() 会等待后台任务结束，而该任务正阻塞在 HTTP 流读取上：
+        // 内核不会主动结束「日志 / 连接」这类长驻流，于是没有新帧到达时
+        // close() 会一直挂着（验证脚本会卡在最后一步退不出来）。
+        // 这里加超时兜底：验证脚本不需要等流彻底收干净。
+        let _ = tokio::time::timeout(Duration::from_secs(2), sub.close()).await;
     }
 
     println!("\n🎉 全部 gRPC API 调用通过！");

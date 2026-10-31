@@ -17,9 +17,10 @@
 
 use super::common::{
     DNS_FAKEIP, FAKE_DNS_FILTER_GLOBAL_NON_CN, RS_GEOSITE_GEOLOCATION_NOT_CN, TAG_DIRECT,
+    TAG_MANUAL,
 };
 use super::config_intent::ConfigIntent;
-use super::config_schema::DnsServerConfig;
+use super::config_schema::{DnsServerConfig, HttpClientConfig};
 use crate::app::core::tun_profile::normalize_persisted_tun_route_exclude_address;
 use serde_json::{json, Map, Value};
 
@@ -243,4 +244,69 @@ fn is_fake_dns_route_rule(rule: &Value, cleanup_pairs: &[(String, String)]) -> b
             .iter()
             .all(|cidr| ip_cidr.iter().any(|v| v.as_str() == Some(*cidr)))
     })
+}
+
+/// 顶层 `http_clients` 里本程序创建的默认客户端 tag
+pub const HTTP_CLIENT_DEFAULT_TAG: &str = "default";
+
+/// 顶层 `http_clients` 里本程序创建的直连下载客户端 tag
+pub const HTTP_CLIENT_DIRECT_DOWNLOAD_TAG: &str = "direct-download";
+
+/// 构建顶层 `http_clients`（sing-box 1.14 替代 `rule_set.download_detour` 的原生写法）。
+///
+/// ## ⚠️ 直连语义必须表达成「没有 detour 字段」
+///
+/// sing-box 1.14+ 的 `common/dialer/detour.go` 会对"detour 指向空 direct 出站"
+/// 直接判定为无意义，并让内核**启动失败**：
+///
+/// ```text
+/// start service: initialize rule-set[0]: initial rule-set: geosite-cn:
+///   Get "https://.../geosite-cn.srs": detour to an empty direct outbound makes no sense
+/// ```
+///
+/// 而 `http_client` **不写 detour 时走系统 dialer**（`common/httpclient/client.go`
+/// → `dialer.New` → `NewDefault`），语义同样是直连。
+/// 所以直连必须表达成"没有 `detour` 字段"，而不是 `detour: "direct"`。
+///
+/// 历史实现写的是 `detour: "direct"`，平时被本地规则集缓存（`initial_path`）掩盖，
+/// 一旦缓存缺失、需要联网下载规则集，内核就起不来。
+pub(crate) fn build_http_clients(intent: &ConfigIntent) -> Vec<HttpClientConfig> {
+    let mut clients = vec![HttpClientConfig {
+        tag: HTTP_CLIENT_DEFAULT_TAG.to_string(),
+        detour: download_http_client_detour(intent),
+        server: None,
+        server_port: None,
+        tls: None,
+    }];
+
+    // 偏好为「走手动选择出站」时，本机专用规则集（geosite-private）固定直连下载，
+    // 单独给它一个直连客户端；直连客户端同样不能写 detour（见上）。
+    if intent.download_via_manual() {
+        clients.push(HttpClientConfig {
+            tag: HTTP_CLIENT_DIRECT_DOWNLOAD_TAG.to_string(),
+            detour: None,
+            server: None,
+            server_port: None,
+            tls: None,
+        });
+    }
+
+    clients
+}
+
+/// 下载出站偏好 → `http_client` 的 `detour` 字段。
+///
+/// - 直连（默认）→ `None`：不写 detour，走系统 dialer，即直连
+/// - 走「手动选择」出站 → `Some(TAG_MANUAL)`
+///
+/// ⚠️ 判定条件统一走 [`ConfigIntent::download_via_manual`]，不直接比较
+/// `download_detour` 的字面值：万一将来新增第三种偏好，直接比字面值会让本函数
+/// 把一个**不存在的出站 tag** 当作 detour 写出去，而 `download_via_manual()`
+/// 仍然是 false → 内核启动时找不到该出站。
+fn download_http_client_detour(intent: &ConfigIntent) -> Option<String> {
+    if intent.download_via_manual() {
+        Some(TAG_MANUAL.to_string())
+    } else {
+        None
+    }
 }

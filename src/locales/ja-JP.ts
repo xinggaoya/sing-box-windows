@@ -848,7 +848,7 @@ export default {
       fakeDnsIpv4Range: 'Fake DNS IPv4 範囲',
       fakeDnsIpv6Range: 'Fake DNS IPv6 範囲',
       fakeDnsIpv4Invalid: 'Fake DNS IPv4 範囲の形式が不正です（例: 198.18.0.0/15）',
-      fakeDnsIpv6Invalid: 'Fake DNS IPv6 範囲の形式が不正です（例: fc00::/18）',
+      fakeDnsIpv6Invalid: 'Fake DNS IPv6 範囲の形式が不正です（例: 2001:2::/48）',
       dnsProxy: 'プロキシ DNS（非中国）',
       dnsCn: '中国 DNS',
       dnsResolver: 'リゾルバ DNS（DoH の名前解決用）',

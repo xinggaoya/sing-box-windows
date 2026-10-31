@@ -79,7 +79,7 @@
       },
       {
         "inet4_range": "198.18.0.0/15",
-        "inet6_range": "fc00::/18",
+        "inet6_range": "2001:2::/48",
         "tag": "dns_fakeip",
         "type": "fakeip"
       }
@@ -94,7 +94,6 @@
   },
   "http_clients": [
     {
-      "detour": "direct",
       "tag": "default"
     }
   ],
@@ -334,7 +333,7 @@
       {
         "ip_cidr": [
           "198.18.0.0/15",
-          "fc00::/18"
+          "2001:2::/48"
         ],
         "outbound": "direct"
       }

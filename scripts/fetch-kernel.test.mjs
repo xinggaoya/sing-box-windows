@@ -1,14 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import os from 'node:os'
+import path from 'node:path'
 import {
   buildDownloadUrls,
   buildFilename,
   buildGithubHeaders,
+  buildTarAttempts,
   normalizeVersionTag,
   parseArgs,
   parseVersionFromReleaseHtml,
   parseVersionFromReleaseUrl,
-  resolveRequestedTargets
+  resolveRequestedTargets,
+  windowsSystemTar
 } from './fetch-kernel.mjs'
 
 test('parseArgs 支持等号和值分离两种形式', () => {
@@ -36,7 +40,9 @@ test('resolveRequestedTargets 支持主机目标和全量目标', () => {
   assert.equal(hostTargets[0].arch, 'amd64')
 
   const allTargets = resolveRequestedTargets({ all: true }, { platform: 'linux', arch: 'x64' })
-  assert.equal(allTargets.length, 4)
+  // 目标矩阵共 5 个：windows/amd64、windows/arm64、linux/amd64、macos/arm64、macos/amd64
+  // （新增 windows/arm64 时忘了同步这条断言，且该文件此前没接入 CI，故一直没人发现）
+  assert.equal(allTargets.length, 5)
 })
 
 test('buildFilename 根据平台生成正确文件名', () => {
@@ -90,4 +96,50 @@ test('buildGithubHeaders 在存在 token 时附带认证头', () => {
       process.env.SING_BOX_GITHUB_TOKEN = original
     }
   }
+})
+
+test('buildTarAttempts 兜底走相对路径，绕开 MSYS 盘符冒号转换', () => {
+  // Windows 上 Git Bash 自带的 GNU tar 会被 MSYS runtime 做参数转换：
+  // "C:/..." 的冒号被转义成 "C\:/..."，tar 收到一个不存在的路径。
+  // 兜底方案把工作目录设成归档所在目录、只传相对路径，天然不含盘符冒号。
+  const workDir = path.join(os.tmpdir(), 'sing-box-abc')
+  const archivePath = path.join(workDir, 'sing-box-1.14.4-linux-amd64.tar.gz')
+  const outputDir = path.join(workDir, 'extract')
+
+  const attempts = buildTarAttempts(['-xzf'], archivePath, outputDir)
+  const fallback = attempts[attempts.length - 1]
+
+  assert.equal(fallback.command, 'tar')
+  assert.equal(fallback.cwd, workDir, '兜底调用应把工作目录设为归档所在目录')
+  assert.ok(
+    !fallback.args.some((arg) => path.isAbsolute(arg)),
+    `兜底调用的参数不应含绝对路径: ${fallback.args.join(' ')}`
+  )
+  assert.ok(
+    fallback.args.includes('sing-box-1.14.4-linux-amd64.tar.gz'),
+    `兜底调用应传归档文件名: ${fallback.args.join(' ')}`
+  )
+  assert.equal(fallback.args[fallback.args.length - 1], 'extract')
+})
+
+test('buildTarAttempts 在 Windows 上优先使用系统自带 bsdtar', () => {
+  // 系统自带的 tar.exe 是原生 Windows 程序，不经过 MSYS 路径转换，
+  // 原生吃盘符路径（虽然不认 --force-local，但根本不需要）。
+  const archivePath = path.join(os.tmpdir(), 'sb.tar.gz')
+  const outputDir = path.join(os.tmpdir(), 'out')
+
+  const attempts = buildTarAttempts(['-xzf'], archivePath, outputDir)
+
+  // Windows 自带 bsdtar 不一定存在（Windows 10 1803 之前没有 tar.exe），
+  // 没有时直接走通用兜底候选。
+  if (process.platform !== 'win32' || windowsSystemTar() === null) {
+    assert.equal(attempts[0].command, 'tar')
+    return
+  }
+
+  assert.match(attempts[0].command, /tar\.exe$/i)
+  assert.ok(
+    attempts[0].args.includes(archivePath),
+    `bsdtar 候选应直接使用原生归档路径: ${attempts[0].args.join(' ')}`
+  )
 })
