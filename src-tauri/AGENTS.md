@@ -61,4 +61,4 @@ cd src-tauri && cargo test
 - **应用更新**不走 tauri-plugin-updater，由 `system/update_service.rs` 自研（GitHub Releases API，应用内更新仅 Windows）。
 - 单实例由 `tauri_plugin_single_instance` 插件实现（tauri.conf.json 无配置段）；窗口 `decorations: false` 自绘。
 - 新增/修改命令后必须同步：`lib.rs` 注册、前端 service、对应层级 AGENTS.md（见根 AGENTS.md 的 DOC SYNC GATE）。
-- **全局 tracing subscriber 只能设置一次**：`tauri-plugin-devtools` 的 `Builder::try_init` 会抢占全局 subscriber（已被占用时 `init()` 直接 panic）。`lib.rs::run()` 中 devtools 插件先于 fmt 层初始化；`log_util::install_direct_subscriber` 仅在非 devtools 模式（release / 未启用 `devtools` feature）调用。devtools 模式下日志经 `log_bridge::FileConsoleLogger` 桥接输出。
+- **全局 tracing subscriber 只能设置一次**：`tauri-plugin-devtools` 的 `Builder::try_init` 会抢占全局 subscriber（已被占用时 `init()` 直接 panic）。`lib.rs::run()` 中 devtools 插件先于 fmt 层初始化；`log_util::install_direct_subscriber` 仅在非 devtools 模式（release / 未启用 `devtools` feature）调用。devtools 模式下日志经 `log_bridge::FileConsoleLogger` 桥接输出。用法与排障见根目录 `docs/devtools.md`，接入其它项目见 `docs/templates/tauri-devtools/`。

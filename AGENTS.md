@@ -23,7 +23,8 @@
 │       ├── process/         # 内核进程管理 ProcessManager
 │       ├── types/generated/ # ts-rs 本地中间产物（gitignore），勿依赖勿修改
 │       └── utils/           # 通用工具（http/file/log/process 等）
-├── docs/                # 开发文档（development/i18n/release-playbook/CHANGELOG 等）
+├── docs/                # 开发文档（development/i18n/release-playbook/devtools/CHANGELOG 等）
+│   └── templates/       # 可复制到其它项目的接入模板（tauri-devtools 等）
 │                       # + gap-analysis-vs-mature-projects（竞品对标与改进批次建议）
 │                       # + implementation-plan-2026-10（存量接线 + 配置双模型收敛实施方案）
 └── .github/workflows/   # ci.yml（质量门禁）+ release.yml / promote-release.yml（两阶段发布）
@@ -87,6 +88,8 @@
 | 发布流水线           | `.github/workflows/release.yml` + `promote-release.yml` | 两阶段发布，glibc 兼容检查         |
 | 竞品对标与改进清单   | `docs/gap-analysis-vs-mature-projects.md`          | 对标 Clash Verge Rev / v2rayN / FlClash 的差距与 5 批次建议 |
 | 实施方案（存量接线 + 双模型收敛） | `docs/implementation-plan-2026-10.md`      | 阶段 0 类型基线 / 阶段 1 前端接线 / 阶段 2 配置双模型收敛（7 步） |
+| 调试工具指南（DevTools） | `docs/devtools.md`                     | 开发态面板用法 / 日志桥接原理 / 命令行验证 / 已知问题 |
+| 调试工具接入模板（给后续项目） | `docs/templates/tauri-devtools/README.md` | 任意 Tauri 2 项目接入同一套调试工具的步骤与坑位清单 |
 
 ## CODE MAP
 
@@ -164,4 +167,4 @@ pnpm tauri build:linux:rpm
 - 应用更新不走 tauri-plugin-updater，由 `system/update_service.rs` 自研（GitHub Releases API，应用内更新仅 Windows）。
 - `tauri-plugin-websocket` 仍在 Rust 侧注册但属遗留；运行态数据链路为：后端 gRPC 订阅 → Tauri event → 前端 `event-service`。
 - 分层 AGENTS 已在 `src/`、`src/stores/`、`src-tauri/`、`src-tauri/src/app/` 细化；改到哪层就核对哪层的文档。
-- **开发调试面板**：`pnpm tauri dev` 会自动注入 `--features devtools`（`src-tauri/Cargo.toml` 的 `devtools` feature），启用 [CrabNebula DevTools](https://v2.tauri.app/zh-cn/develop/debug/crabnebula-devtools/)：日志流、Tauri command/event 的 payload 与耗时可视化。面板地址在启动时打印到终端（standalone 网页形态），应用内 `Ctrl+Shift+M` 可开 embedded 形态。release 构建（`pnpm tauri build`）不带该 feature，产物不含插件、也不打开 `tauri/tracing` 埋点。
+- **开发调试面板**：`pnpm tauri dev` 会自动注入 `--features devtools`（`src-tauri/Cargo.toml` 的 `devtools` feature），启用 [CrabNebula DevTools](https://v2.tauri.app/zh-cn/develop/debug/crabnebula-devtools/)：日志流、Tauri command/event 的 payload 与耗时可视化。面板地址在启动时打印到终端（standalone 网页形态），应用内 `Ctrl+Shift+M` 可开 embedded 形态。release 构建（`pnpm tauri build`）不带该 feature，产物不含插件、也不打开 `tauri/tracing` 埋点。**用法见 `docs/devtools.md`**；**后续 Tauri 项目接入同一套工具直接抄 `docs/templates/tauri-devtools/`**（含坑位清单）。

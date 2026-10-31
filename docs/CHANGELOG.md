@@ -16,6 +16,7 @@
   - 日志不丢：devtools 插件独占全局 tracing subscriber，本进程的文件与终端输出改经官方 `attach_logger` 桥接（`log::Log` 适配器），时间戳与级别格式与原先的 fmt 层一致；过滤规则对齐 `EnvFilter`（非法 `RUST_LOG` 整串回退默认，不会静默失声）
   - 两种形态：standalone（启动日志里打印 `https://devtools.crabnebula.dev/dash/{ip}/{port}`，浏览器打开即用）、embedded（应用内 `Ctrl+Shift+M` / 右键「Open DevTools」打开抽屉面板）
   - 顺带把 crate 的 MSRV 从 1.77.2 提到 1.88（插件要求），并把托盘图标取像素的 `chunks_exact` 换成 1.88 稳定的 `as_chunks`
+  - 配套沉淀：`docs/devtools.md`（本项目调试工具用法 / 日志桥接原理 / 命令行与 CDP 自动化验证 / 已知问题）+ `docs/templates/tauri-devtools/`（可直接复制到**后续 Tauri 项目**的接入模板，含 Cargo feature、桥接模块、接线顺序、CI 双路径门禁与坑位清单）
 
 ### 🐛 问题修复
 
