@@ -44,6 +44,18 @@ fn normalize_for_snapshot(mut config: Value) -> Value {
             log.insert("output".to_string(), json!("<LOG_PATH>"));
         }
     }
+    // TUN 适配器名是平台相关的：Windows / Linux 固定为 `singbox_tun`，
+    // macOS 由系统分配 utun 设备名（不写该字段）。
+    // 快照保留字段本身（断言它存在），但把取值归一化，保证跨平台可复现。
+    if let Some(inbounds) = config.get_mut("inbounds").and_then(|v| v.as_array_mut()) {
+        for inbound in inbounds.iter_mut() {
+            if let Some(obj) = inbound.as_object_mut() {
+                if obj.contains_key("interface_name") {
+                    obj.insert("interface_name".to_string(), json!("<INTERFACE_NAME>"));
+                }
+            }
+        }
+    }
     config
 }
 

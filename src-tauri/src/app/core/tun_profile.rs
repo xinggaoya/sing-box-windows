@@ -102,7 +102,7 @@ pub struct TunProfile {
     pub strict_route: bool,
     pub stack: String,
     pub mtu: u16,
-    pub interface_name: String,
+    pub interface_name: Option<String>,
     pub route_exclude_address: Vec<String>,
     pub dns_mode: String,
 }
@@ -116,7 +116,7 @@ impl TunProfile {
             .interface_name
             .clone()
             .filter(|name| !name.trim().is_empty())
-            .unwrap_or_else(default_interface_name);
+            .or_else(default_interface_name);
 
         let ipv6_address = if options.enable_ipv6 && !options.ipv6_address.trim().is_empty() {
             Some(options.ipv6_address.clone())
@@ -170,23 +170,32 @@ impl TunProfile {
                 set_system_proxy: None,
                 dns_mode: None,
             },
-            config_model::Inbound {
-                r#type: "tun".to_string(),
-                tag: "tun-in".to_string(),
-                listen: None,
-                interface_name: Some(self.interface_name.clone()),
-                listen_port: None,
-                address: Some(self.address_list()),
-                auto_route: Some(self.auto_route),
-                strict_route: Some(self.strict_route),
-                stack: Some(self.stack.clone()),
-                mtu: Some(self.mtu),
-                route_address: None,
-                route_exclude_address: Some(self.route_exclude_address.clone()),
-                set_system_proxy: None,
-                dns_mode: Some(self.dns_mode.clone()),
-            },
+            self.to_tun_inbound(),
         ]
+    }
+
+    /// 渲染 TUN inbound —— **TUN inbound 的唯一实现**。
+    ///
+    /// TUN-12：此前生成路径（`config_render::build_inbounds`）与运行时切换路径
+    /// （`to_inbounds`）各写一份，字段不一致（生成路径缺 `interface_name`）。
+    /// 现在两条路径都经由本方法，产出**逐字段一致**的 inbound。
+    pub fn to_tun_inbound(&self) -> config_model::Inbound {
+        config_model::Inbound {
+            r#type: "tun".to_string(),
+            tag: "tun-in".to_string(),
+            listen: None,
+            interface_name: self.interface_name.clone(),
+            listen_port: None,
+            address: Some(self.address_list()),
+            auto_route: Some(self.auto_route),
+            strict_route: Some(self.strict_route),
+            stack: Some(self.stack.clone()),
+            mtu: Some(self.mtu),
+            route_address: None,
+            route_exclude_address: Some(self.route_exclude_address.clone()),
+            set_system_proxy: None,
+            dns_mode: Some(self.dns_mode.clone()),
+        }
     }
 }
 
@@ -220,19 +229,22 @@ fn normalize_stack(stack: &str) -> String {
     }
 }
 
-fn default_interface_name() -> String {
+/// TUN 适配器默认名称。
+///
+/// - **Windows / Linux**：固定为 `singbox_tun`。
+///   名称固定才能保证「订阅更新生成的配置」与「切换 TUN 写入的配置」
+///   使用**同一个** Wintun 适配器，不会因为配置更新而多出一个网卡。
+/// - **macOS**：`None` —— 由系统分配 `utun` 设备名。
+///   macOS 的 `utunN` 由内核统一分配且与系统 VPN 共用，
+///   程序侧固定名称既可能撞名，也会让每次配置更新都换一个设备。
+fn default_interface_name() -> Option<String> {
     #[cfg(target_os = "macos")]
     {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        if let Ok(duration) = SystemTime::now().duration_since(UNIX_EPOCH) {
-            let idx = (duration.subsec_millis() % 90) + 5;
-            return format!("utun{}", idx);
-        }
-        "utun5".to_string()
+        None
     }
     #[cfg(not(target_os = "macos"))]
     {
-        "singbox_tun".to_string()
+        Some("singbox_tun".to_string())
     }
 }
 

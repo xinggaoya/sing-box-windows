@@ -27,6 +27,7 @@
 │   └── templates/       # 可复制到其它项目的接入模板（tauri-devtools 等）
 │                       # + gap-analysis-vs-mature-projects（竞品对标与改进批次建议）
 │                       # + implementation-plan-2026-10（存量接线 + 配置双模型收敛实施方案）
+│                       # + tun-privilege-restart-issues（TUN 提权/重启问题清单，12 条待修）
 └── .github/workflows/   # ci.yml（质量门禁）+ release.yml / promote-release.yml（两阶段发布）
 ```
 
@@ -55,9 +56,10 @@
 | 前端调用后端         | `src/services/invoke-client.ts`                   | 统一入口（端口注入+数据恢复等待）        |
 | 前端事件消费         | `src/services/event-service.ts` + `src/constants/events.ts` | 事件名常量约 27 个；统一精确退订 |
 | 应用配置字段         | `src/stores/app/composables/appConfigSchema.ts`     | 54 个字段的单一事实来源；load/save/watch 全自动生成 |
-| TUN 切换状态机       | `src/composables/useTunToggle.ts`                    | 置位→应用→重启→失败回滚；含 sudo 重试与提权 |
+| TUN 切换状态机       | `src/composables/useTunToggle.ts`                    | 置位→应用→重启→失败回滚（含运行态恢复）；含 sudo 重试与提权 |
+| 提权状态判定（后端） | `src-tauri/src/app/system/elevation/`                | Windows 读进程 token 判定提权；Unix 查 UID |
 | 排序/分组列表        | `src/composables/useSortableGroupedList.ts`          | 日志页与连接页共用 |
-| 内核错误归因         | `src/utils/kernel-errors.ts`                         | sudo 错误码识别 + 失败文案三级回退 |
+| 内核错误归因         | `src/utils/kernel-errors.ts`                         | sudo 错误码识别 + 权限不足识别 + 失败文案三级回退 |
 | store 初始化守卫     | `src/utils/store-init.ts`                             | `flushWatchers()` 取代 setTimeout 赌调度 |
 | 路由与托盘空白页     | `src/router/index.ts`, `src/views/BlankView.vue`  | `/blank` 是非标准但关键路径              |
 | 语言切换生效链路     | `src/stores/app/LocaleStore.ts`                    | `currentLocale` 必须同步到 `i18n.global.locale`，否则 store/service 层的 `i18n.global.t` 停在初始语言 |
@@ -91,6 +93,7 @@
 | 实施方案（存量接线 + 双模型收敛） | `docs/implementation-plan-2026-10.md`      | 阶段 0 类型基线 / 阶段 1 前端接线 / 阶段 2 配置双模型收敛（7 步） |
 | 调试工具指南（DevTools） | `docs/devtools.md`                     | 开发态面板用法 / 日志桥接原理 / 命令行验证 / 已知问题 |
 | 调试工具接入模板（给后续项目） | `docs/templates/tauri-devtools/README.md` | 任意 Tauri 2 项目接入同一套调试工具的步骤与坑位清单 |
+| TUN 提权/重启问题清单 | `docs/tun-privilege-restart-issues.md`             | 12 条问题的定位与修复状态；TUN 相关改动先看这里 |
 
 ## CODE MAP
 

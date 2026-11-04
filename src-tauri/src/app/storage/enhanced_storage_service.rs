@@ -515,28 +515,12 @@ pub async fn db_get_app_config_internal<R: tauri::Runtime>(
         }
     }
 
-    // Windows：非管理员启动时自动关闭 TUN，避免因缺少权限导致内核无法拉起
-    // Linux/macOS：内核可通过 sudo 提权启动（应用本身无需 root），因此不在这里强制关闭。
-    #[cfg(target_os = "windows")]
-    if config.tun_enabled && !crate::app::system::system_service::check_admin() {
-        let previous_mode = config.proxy_mode.clone();
-        config.tun_enabled = false;
-        config.proxy_mode = if config.system_proxy_enabled {
-            "system".to_string()
-        } else {
-            "manual".to_string()
-        };
-
-        if let Err(err) = storage.save_app_config(&config).await {
-            tracing::warn!("在非管理员模式下写入关闭 TUN 设置失败: {}", err);
-        } else {
-            tracing::info!(
-                "检测到当前未获得管理员权限，已自动关闭 TUN 模式（原模式: {}）",
-                previous_mode
-            );
-        }
-    }
-
+    // TUN-02：此处曾是「非管理员 → 关闭 TUN 并落库」的副作用点。
+    // 它把用户显式开启的 TUN 悄悄抹掉并写回数据库，导致开关反复弹回、
+    // 每次都要重新走一遍提权重启。现在**读配置不再改写用户意图、不再写库**：
+    // 「当前环境能否真的跑起 TUN」改由运行态判定
+    // （`proxy_service::platform_policy`），无法满足时上报 `elevation_required`，
+    // 由前端引导一次性授权。
     Ok(config)
 }
 

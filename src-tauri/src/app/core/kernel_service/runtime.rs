@@ -6,12 +6,12 @@ use crate::app::core::kernel_service::state::{KernelState, KERNEL_STATE};
 use crate::app::core::kernel_service::status::is_kernel_running_ref;
 use crate::app::core::kernel_service::utils::{
     emit_kernel_error_with_context, emit_kernel_started, emit_kernel_starting, emit_kernel_status,
-    emit_kernel_stopped, resolve_config_path, KernelStatusPayload,
+    emit_kernel_stopped, is_permission_failure_detail, resolve_config_path, KernelStatusPayload,
 };
 use crate::app::core::kernel_service::PROCESS_MANAGER;
 use crate::app::core::proxy_service::{
-    apply_os_proxy, apply_proxy_runtime_state, update_dns_strategy, write_inbounds_to_config,
-    ProxyRuntimeState,
+    apply_os_proxy, apply_proxy_runtime_state, platform_policy, update_dns_strategy,
+    write_inbounds_to_config, ProxyRuntimeState,
 };
 use crate::app::core::tun_profile::TunProxyOptions;
 use crate::app::storage::enhanced_storage_service::db_get_app_config;
@@ -39,6 +39,10 @@ pub struct ResolvedProxyState {
     pub proxy: ProxyRuntimeState,
     pub api_port: u16,
     pub prefer_ipv6: bool,
+    /// 当前环境无法以所需权限运行 TUN，需要用户一次性授权。
+    ///
+    /// TUN-02：不再静默降级，而是显式上报给前端。
+    pub elevation_required: bool,
 }
 
 impl ResolvedProxyState {
@@ -47,26 +51,45 @@ impl ResolvedProxyState {
     }
 }
 
-fn classify_startup_stability_failure(detail: &str) -> (&'static str, &'static str) {
+fn classify_startup_stability_failure(
+    detail: &str,
+    stderr: Option<&str>,
+) -> (&'static str, &'static str) {
+    // TUN-05：权限类失败优先判定。内核因无权创建 TUN 设备而“秒退”时，
+    // 表面症状是「进程立即退出」，但真实原因是权限不足 —— 不区分开的话，
+    // 用户只会看到「内核启动失败」，不知道该提权。
+    let permission_denied =
+        stderr.is_some_and(is_permission_failure_detail) || is_permission_failure_detail(detail);
+    if permission_denied {
+        return (
+            "KERNEL_PERMISSION_DENIED",
+            "内核启动失败：权限不足，TUN 模式需要以管理员权限运行内核",
+        );
+    }
+
     if detail.contains("API status") {
         (
             "KERNEL_API_HTTP_ERROR",
-            "kernel API returned error status code",
+            "内核启动失败：内核 API 返回了错误状态码",
         )
     } else if detail.contains("exited immediately") {
         (
             "KERNEL_PROCESS_EXITED_EARLY",
-            "kernel process exited shortly after startup",
+            "内核启动失败：内核进程启动后立即退出",
         )
     } else {
         (
             "KERNEL_API_TIMEOUT",
-            "kernel API not ready within stability window",
+            "内核启动失败：内核 API 在稳定窗口内未就绪",
         )
     }
 }
 
 fn classify_runtime_start_failure(detail: &str) -> &'static str {
+    // TUN-05：权限类失败单独归类，前端才能提示「需要管理员权限」
+    if is_permission_failure_detail(detail) {
+        return "KERNEL_PERMISSION_DENIED";
+    }
     if detail.contains("内核文件不存在") {
         "KERNEL_BINARY_MISSING"
     } else if detail.contains("配置文件不存在") {
@@ -225,6 +248,13 @@ pub async fn resolve_proxy_runtime_state(
         app_config.tun_enabled = enabled;
     }
 
+    // TUN-02：用户意图保留在 `app_config.tun_enabled`；运行态是否真的启用 TUN
+    // 由平台策略判定。无法满足权限时不再静默降级，而是上报 `elevation_required`。
+    let policy = platform_policy::apply_tun_policy(
+        app_config.clone(),
+        crate::app::system::elevation::can_run_tun_kernel(),
+    );
+
     let tun_options = overrides.tun_options.unwrap_or_else(|| TunProxyOptions {
         ipv4_address: app_config.tun_ipv4.clone(),
         ipv6_address: app_config.tun_ipv6.clone(),
@@ -242,7 +272,7 @@ pub async fn resolve_proxy_runtime_state(
         proxy_port: app_config.proxy_port,
         allow_lan_access: app_config.allow_lan_access,
         system_proxy_enabled: app_config.system_proxy_enabled,
-        tun_enabled: app_config.tun_enabled,
+        tun_enabled: policy.runtime_tun_enabled,
         system_proxy_bypass: overrides
             .system_proxy_bypass
             .unwrap_or_else(|| app_config.system_proxy_bypass.clone()),
@@ -253,6 +283,7 @@ pub async fn resolve_proxy_runtime_state(
         proxy: proxy_state,
         api_port: app_config.api_port,
         prefer_ipv6: app_config.prefer_ipv6,
+        elevation_required: policy.elevation_required,
     })
 }
 
@@ -458,7 +489,9 @@ pub(super) async fn start_kernel_impl(
                 error!("❌ 内核稳定性校验失败: {}", e);
 
                 // 读取内核 stderr 输出辅助诊断
-                if let Some(stderr_output) = PROCESS_MANAGER.read_stderr_output().await {
+                // TUN-05：stderr 里的权限报错是区分「权限不足」与「内核秒退」的关键线索
+                let stderr_output = PROCESS_MANAGER.read_stderr_output().await;
+                if let Some(stderr_output) = &stderr_output {
                     let trimmed = stderr_output.trim();
                     if !trimmed.is_empty() {
                         warn!("内核 stderr 输出:\n{}", trimmed);
@@ -466,7 +499,8 @@ pub(super) async fn start_kernel_impl(
                 }
 
                 KERNEL_STATE.mark_failed();
-                let (code, message) = classify_startup_stability_failure(&e);
+                let (code, message) =
+                    classify_startup_stability_failure(&e, stderr_output.as_deref());
                 if let Err(stop_err) = PROCESS_MANAGER.stop(Some(&app_handle)).await {
                     warn!("稳定性校验失败后的进程清理失败: {}", stop_err);
                 }
@@ -792,7 +826,10 @@ pub async fn apply_proxy_settings(
         "success": true,
         "mode": resolved.derived_mode(),
         "system_proxy_enabled": resolved.proxy.system_proxy_enabled,
-        "tun_enabled": resolved.proxy.tun_enabled
+        "tun_enabled": resolved.proxy.tun_enabled,
+        // TUN-02：用户开启了 TUN 但当前环境无法以所需权限运行时，显式上报，
+        // 由前端引导一次性授权，而不是静默降级成普通模式。
+        "elevation_required": resolved.elevation_required
     }))
 }
 

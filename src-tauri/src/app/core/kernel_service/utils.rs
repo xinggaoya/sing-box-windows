@@ -252,6 +252,45 @@ fn infer_stage_from_source(source: &str) -> StartupStage {
     }
 }
 
+/// 判断一段内核启动 / 停止错误详情是否属于「权限不足」。
+///
+/// TUN-05：权限类失败此前一律归类为 `KERNEL_START_FAILED` /
+/// `KERNEL_PROCESS_EXITED_EARLY`，用户看不到「需要管理员权限」的提示，
+/// 只知道「内核启动失败」，无从下手。
+///
+/// 覆盖三类来源：
+/// - 操作系统层拒绝访问（`Access is denied` / `拒绝访问` / `0x80070005`）；
+/// - 显式权限要求（`requires elevation` / `administrator privileges are required`）；
+/// - 本项目自身的权限错误文案（`权限错误: ...`）。
+pub fn is_permission_failure_detail(detail: &str) -> bool {
+    let lower = detail.to_ascii_lowercase();
+
+    const OS_DENIAL_MARKERS: &[&str] = &[
+        "access is denied",
+        "permission denied",
+        "operation not permitted",
+        "0x80070005",
+        "拒绝访问",
+        "权限不足",
+    ];
+
+    const PRIVILEGE_REQUIREMENT_MARKERS: &[&str] = &[
+        "requires elevation",
+        "requires administrator",
+        "administrator privileges",
+        "must be run as administrator",
+        "需要管理员权限",
+    ];
+
+    const PROJECT_MARKERS: &[&str] = &["权限错误"];
+
+    OS_DENIAL_MARKERS
+        .iter()
+        .chain(PRIVILEGE_REQUIREMENT_MARKERS.iter())
+        .chain(PROJECT_MARKERS.iter())
+        .any(|marker| lower.contains(marker))
+}
+
 fn infer_kind_from_code(code: &str, details: &str) -> StartupDiagnosisKind {
     match code {
         "KERNEL_CONFIG_INVALID" => StartupDiagnosisKind::ConfigInvalid,

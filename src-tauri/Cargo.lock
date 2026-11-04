@@ -4654,6 +4654,7 @@ dependencies = [
  "urlencoding",
  "walkdir",
  "which",
+ "windows",
  "winreg 0.52.0",
  "zip",
 ]

@@ -72,6 +72,13 @@ rand = "0.8"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52.0"
+# 提权状态探测：读取进程 token 的 TokenElevation，避免用 `net session` 这类
+# 依赖系统服务的外部命令做判定（会假阴性）。版本与 Cargo.lock 中既有传递依赖一致。
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading",
+] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2.3"

@@ -11,7 +11,7 @@ import { sudoService } from '@/services/sudo-service'
 import type { TrayNavigatePayload, TrayToggleProxyFeaturePayload } from '@/types/events'
 import { useAppStore, useKernelStore, useLocaleStore, useSubStore, useSudoStore } from '@/stores'
 import { useWindowStore } from '@/stores/app/WindowStore'
-import { prepareTunAndRestartAsAdmin, useTunToggle } from '@/composables/useTunToggle'
+import { ensureWindowsTunPrivilege, useTunToggle } from '@/composables/useTunToggle'
 
 const TRAY_SYNC_DEBOUNCE_MS = 150
 
@@ -202,18 +202,16 @@ export const useTrayStore = defineStore('tray', () => {
       restartFailed: () => i18n.global.t('notification.kernelRestartFailed'),
     },
     ensurePrivilege: async (target) => {
-      if (!target) return 'proceed'
       const platform = await systemService.getPlatformInfo().catch(() => 'unknown')
 
       if (platform === 'windows') {
-        const isAdmin = await systemService.checkAdmin()
-        if (isAdmin) return 'proceed'
-        // 无管理员权限：保存配置并以管理员身份重启，由重启接手
-        const escalated = await prepareTunAndRestartAsAdmin()
-        if (!escalated) {
-          console.error('以管理员身份重启以启用TUN失败')
-        }
-        return 'escalated'
+        // 与首页共用同一条 Windows 提权路径（TUN-03）：
+        // 开启与关闭对称；提权失败由 onFailure 提示，不再退回本地状态机
+        // （否则会出现二次报错）。
+        return ensureWindowsTunPrivilege(target, {
+          onFailure: () =>
+            appStore.showErrorMessage?.(i18n.global.t('notification.proxyModeChangeFailed')),
+        })
       }
 
       if (platform === 'linux' || platform === 'macos') {
@@ -247,7 +245,6 @@ export const useTrayStore = defineStore('tray', () => {
       await router.push('/').catch(() => {})
       return useSudoStore().requestPassword()
     },
-    applyOverrides: (target) => ({ tun_enabled: target }),
   })
 
   const applyTunToggleFromTray = async (enabled: boolean) => {

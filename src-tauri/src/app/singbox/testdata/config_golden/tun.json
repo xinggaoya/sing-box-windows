@@ -96,6 +96,7 @@
       ],
       "auto_route": true,
       "dns_mode": "disabled",
+      "interface_name": "<INTERFACE_NAME>",
       "mtu": 9000,
       "route_exclude_address": [
         "10.0.0.0/8",

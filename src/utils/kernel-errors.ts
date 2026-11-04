@@ -15,6 +15,9 @@
 const SUDO_PASSWORD_REQUIRED = 'SUDO_PASSWORD_REQUIRED'
 const SUDO_PASSWORD_INVALID = 'SUDO_PASSWORD_INVALID'
 
+/** 后端权限不足错误码（与 `kernel_service/utils.rs` 保持一致） */
+const KERNEL_PERMISSION_DENIED = 'KERNEL_PERMISSION_DENIED'
+
 /**
  * sudo 密码错误类型。
  * - `required`：需要用户输入密码
@@ -55,6 +58,23 @@ export function parseSudoCode(raw: unknown): SudoFailureCode | null {
 }
 
 /**
+ * 判断失败是否源于「权限不足」。
+ *
+ * TUN-05：内核因无权创建 TUN 设备 / 无权改路由表而启动失败时，
+ * 需要引导用户以管理员身份运行，而不是只显示「内核启动失败」。
+ */
+export function requiresElevation(raw: unknown): boolean {
+  const message = extractKernelErrorMessage(raw)
+  if (!message) return false
+  return (
+    message.includes(KERNEL_PERMISSION_DENIED) ||
+    message.includes('权限不足') ||
+    message.includes('权限错误') ||
+    message.includes('administrator privileges')
+  )
+}
+
+/**
  * 内核失败文案的三级回退：启动诊断摘要 > 最后一次错误 > 调用方给的兜底文案。
  *
  * 诊断摘要优先是因为它比 `lastError` 更具体（含阶段、端口、stderr 片段）。
@@ -89,6 +109,8 @@ export interface KernelFailure {
   sudoCode: SudoFailureCode | null
   /** 是否应当引导用户输入 sudo 密码并重试 */
   needsSudoRetry: boolean
+  /** 是否因权限不足而失败（需要引导用户以管理员身份运行） */
+  requiresElevation: boolean
 }
 
 export function describeKernelFailure(
@@ -111,5 +133,6 @@ export function describeKernelFailure(
     text,
     sudoCode,
     needsSudoRetry: sudoCode === 'required' || sudoCode === 'invalid',
+    requiresElevation: requiresElevation(text),
   }
 }

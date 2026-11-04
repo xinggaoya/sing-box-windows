@@ -80,6 +80,25 @@ impl TunIntent {
         }
         addresses
     }
+
+    /// 转换为运行时 TUN 选项。
+    ///
+    /// TUN-12：生成路径与运行时切换路径必须基于**同一份**「意图 → 运行时选项」映射，
+    /// 否则两条路径产出的 TUN inbound 会不一致。
+    pub fn to_proxy_options(&self) -> crate::app::core::tun_profile::TunProxyOptions {
+        crate::app::core::tun_profile::TunProxyOptions {
+            ipv4_address: self.ipv4.clone(),
+            ipv6_address: self.ipv6.clone(),
+            mtu: self.mtu,
+            auto_route: self.auto_route,
+            strict_route: self.strict_route,
+            stack: self.stack.clone(),
+            enable_ipv6: self.enable_ipv6,
+            route_exclude_address: self.route_exclude_address.clone(),
+            interface_name: None,
+            dns_mode: self.dns_mode.to_string(),
+        }
+    }
 }
 
 /// Tailscale endpoint（1.14）语义

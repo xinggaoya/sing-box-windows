@@ -273,14 +273,14 @@ impl ProcessManager {
         app_handle: Option<&AppHandle>,
         pid: u32,
         kernel_name: &str,
-    ) {
+    ) -> Result<()> {
         if let Err(err) = kill_process_by_pid(pid) {
             warn!("终止托管内核进程失败 (pid={}): {}", pid, err);
         }
 
         sleep(Duration::from_millis(250)).await;
         if !self.is_managed_kernel_pid_active(pid, kernel_name).await {
-            return;
+            return Ok(());
         }
 
         #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -301,7 +301,7 @@ impl ProcessManager {
                     sleep(Duration::from_millis(250)).await;
                     if !self.is_managed_kernel_pid_active(pid, kernel_name).await {
                         info!("已通过 sudo 终止内核进程 PID: {}", pid);
-                        return;
+                        return Ok(());
                     }
                 }
                 Err(err) => {
@@ -310,7 +310,14 @@ impl ProcessManager {
             }
         }
 
+        // TUN-07：进程终止不掉。在 Windows 上最常见的原因是该内核进程以更高权限
+        // （管理员）启动，而当前进程不是管理员 —— 这种情况必须**明确报出来**，
+        // 否则用户只会看到「内核停止失败」，不知道该以管理员身份重启应用。
         warn!("PID {} 在终止后仍处于活跃状态", pid);
+        Err(ProcessError::PermissionError(format!(
+            "内核进程 PID {} 仍在运行（可能以管理员权限启动，当前进程无权限结束它）；请以管理员身份重启应用后再试",
+            pid
+        )))
     }
 
     async fn has_active_managed_kernel_pid(&self) -> bool {
@@ -510,13 +517,35 @@ impl ProcessManager {
                         KERNEL_STATE.update_readiness(|readiness| {
                             readiness.process_alive = false;
                         });
-                        last_error =
-                            ProcessError::StartFailed("内核进程启动后验证失败".to_string());
+
+                        // TUN-05/TUN-06：内核“秒退”最常见的原因就是权限不足
+                        // （无法创建 TUN 设备 / 无权改路由表）。
+                        // 先读 stderr 再清理，避免丢掉诊断线索。
+                        let stderr_tail = self.read_stderr_output().await;
+                        let permission_denied = stderr_tail
+                            .as_deref()
+                            .map(crate::app::core::kernel_service::utils::is_permission_failure_detail)
+                            .unwrap_or(false);
+
+                        last_error = if permission_denied {
+                            ProcessError::PermissionError(
+                                "内核启动后立即退出，stderr 显示权限不足（创建 TUN 设备或修改路由表需要管理员权限）"
+                                    .to_string(),
+                            )
+                        } else {
+                            ProcessError::StartFailed("内核进程启动后验证失败".to_string())
+                        };
                         warn!("❌ 第{}次启动后验证失败", attempt);
 
                         // 清理失败的进程
                         if let Err(e) = self.cleanup_failed_process().await {
                             error!("清理失败进程时出错: {}", e);
+                        }
+
+                        // TUN-06：权限类失败重试多少次都一样，直接失败返回
+                        if permission_denied {
+                            error!("❌ 权限不足，停止重试并以权限错误返回");
+                            return Err(last_error);
                         }
                     }
                 }
@@ -769,12 +798,21 @@ impl ProcessManager {
         }
 
         info!("发现托管内核进程 PID: {}，开始清理", pid);
-        self.try_kill_pid_with_optional_privilege(app_handle, pid, kernel_name)
+        let kill_result = self
+            .try_kill_pid_with_optional_privilege(app_handle, pid, kernel_name)
             .await;
         self.clear_managed_pid();
         sleep(Duration::from_millis(300)).await;
 
-        Ok(())
+        match kill_result {
+            Ok(()) => Ok(()),
+            // TUN-07：保留错误类型，让上层能区分「权限不足」与「其他失败」
+            Err(ProcessError::PermissionError(msg)) => Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                msg,
+            )),
+            Err(err) => Err(std::io::Error::other(err.to_string())),
+        }
     }
 
     // 按进程名强制清理所有内核进程。
@@ -933,7 +971,13 @@ impl ProcessManager {
         }
 
         // 兜底：尝试清理托管 PID 记录对应的进程
+        // TUN-07：权限不足必须上报 —— 内核以管理员身份启动时，普通权限杀不掉，
+        // 用户需要知道「要以管理员身份重启应用」，而不是只看到「停止失败」。
         if let Err(e) = self.kill_existing_processes(app_handle).await {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                error!("❌ 清理托管内核进程失败（权限不足）: {}", e);
+                return Err(ProcessError::PermissionError(e.to_string()));
+            }
             warn!("清理托管内核进程失败: {}", e);
         }
 

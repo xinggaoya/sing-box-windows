@@ -45,6 +45,11 @@ pub fn build_inbounds(
     }));
 
     // TUN 模式依赖 sing-box 配置里显式存在 tun inbound，所以这里根据设置开关动态添加/移除。
+    //
+    // TUN-12：TUN inbound 由 `TunProfile` 渲染（唯一实现），
+    // 与运行时切换路径（`proxy_service::inbound_writer`）产出**逐字段一致**的 inbound。
+    // 此前两条路径各写一份且字段不一致（生成路径缺 `interface_name`），
+    // 会让「订阅更新后的配置」与「切换 TUN 后的配置」使用不同的 Wintun 适配器名。
     if intent.tun.enabled {
         let route_exclude_address = intent
             .tun
@@ -53,18 +58,15 @@ pub fn build_inbounds(
             .or(existing_route_exclude)
             .unwrap_or_else(crate::app::core::tun_profile::default_tun_route_exclude_addresses);
 
-        inbounds.push(json!({
-            "type": "tun",
-            "tag": "tun-in",
-            "address": intent.tun.addresses(),
-            "auto_route": intent.tun.auto_route,
-            "strict_route": intent.tun.strict_route,
-            "stack": intent.tun.stack,
-            "mtu": intent.tun.mtu,
-            // 1.14 新增：对系统 DNS 的接管方式（hijack 默认改写系统 DNS，disabled 保持不接管）
-            "dns_mode": intent.tun.dns_mode,
-            "route_exclude_address": route_exclude_address
-        }));
+        let tun_profile = crate::app::core::tun_profile::TunProfile::from_options(
+            &intent.tun.to_proxy_options(),
+            Some(&route_exclude_address),
+        );
+
+        inbounds.push(
+            serde_json::to_value(tun_profile.to_tun_inbound())
+                .unwrap_or_else(|_| json!({ "type": "tun", "tag": "tun-in" })),
+        );
     }
 
     inbounds
@@ -310,3 +312,7 @@ fn download_http_client_detour(intent: &ConfigIntent) -> Option<String> {
         None
     }
 }
+
+#[cfg(test)]
+#[path = "config_render.tests.rs"]
+mod tests;

@@ -75,3 +75,49 @@ fn test_build_kernel_error_payload_should_include_structured_api_http_error_diag
     assert_eq!(payload["startup_diagnosis"]["stage"], "readiness");
     assert_eq!(payload["startup_diagnosis"]["http_status"], 400);
 }
+
+// ── TUN-05：权限类失败的识别 ───────────────────────────────────────────────
+
+#[test]
+fn permission_failure_is_detected_from_os_level_denial() {
+    // Windows 上 taskkill / OpenProcess 失败时的典型文案
+    assert!(is_permission_failure_detail("终止进程失败: 拒绝访问。\r\n"));
+    assert!(is_permission_failure_detail("Access is denied."));
+    assert!(is_permission_failure_detail(
+        "error: operation not permitted"
+    ));
+}
+
+#[test]
+fn permission_failure_is_detected_from_privilege_requirement() {
+    assert!(is_permission_failure_detail(
+        "The requested operation requires elevation."
+    ));
+    assert!(is_permission_failure_detail(
+        "create tun device: administrator privileges are required"
+    ));
+    assert!(is_permission_failure_detail("需要管理员权限"));
+}
+
+#[test]
+fn permission_failure_is_detected_from_windows_error_code() {
+    // ERROR_ACCESS_DENIED
+    assert!(is_permission_failure_detail("failed: 0x80070005"));
+}
+
+#[test]
+fn unrelated_failures_are_not_treated_as_permission_issues() {
+    assert!(!is_permission_failure_detail("配置文件不存在"));
+    assert!(!is_permission_failure_detail("内核文件不存在"));
+    assert!(!is_permission_failure_detail("配置校验失败"));
+    assert!(!is_permission_failure_detail(
+        "kernel API not ready within stability window"
+    ));
+    assert!(!is_permission_failure_detail("API status 500"));
+}
+
+#[test]
+fn permission_detection_is_case_insensitive() {
+    assert!(is_permission_failure_detail("ACCESS IS DENIED"));
+    assert!(is_permission_failure_detail("access is denied"));
+}

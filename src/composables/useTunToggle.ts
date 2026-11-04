@@ -43,7 +43,7 @@ export interface TunToggleOptions {
   messages: TunToggleMessageSource
   /** 提权前置；省略则直接执行核心流程 */
   ensurePrivilege?: (target: boolean) => Promise<PrivilegeOutcome>
-  /** sudo 密码相关失败的处理；返回 true 表示重试成功 */
+  /** sudo 密码相关失败的处理；返回 true 表示原地重试成功 */
   handleSudoFailure?: (code: 'required' | 'invalid') => Promise<boolean>
   /** 传给 `applyProxySettings` 的额外覆盖（如 `{ tun_enabled: true }`） */
   applyOverrides?: (target: boolean) => Record<string, unknown> | undefined
@@ -80,6 +80,26 @@ export function useTunToggle(options: TunToggleOptions) {
       lastError: kernelStore.lastError,
       fallback,
     })
+
+  /**
+   * 按目标状态重新应用配置并重启内核。
+   *
+   * 用于两处「需要把运行态拉回某个模式」的场景：
+   * - 切换失败后的回滚（TUN-09）；
+   * - 提权重启失败后恢复网络出口（TUN-10）。
+   *
+   * 尽力而为：失败时不抛错，由调用方决定如何汇报。
+   */
+  const restoreRuntime = async (target: boolean): Promise<void> => {
+    try {
+      const applied = await kernelStore.applyProxySettings(options.applyOverrides?.(target))
+      if (applied) {
+        await kernelStore.restartKernel()
+      }
+    } catch {
+      // 恢复失败不能掩盖原始错误：调用方会把原始 failure 一并返回
+    }
+  }
 
   /**
    * 核心流程（不含回滚）。返回 `null` 表示成功，否则返回失败归因。
@@ -127,14 +147,18 @@ export function useTunToggle(options: TunToggleOptions) {
    * @param target 目标开关状态
    */
   const applyTunSwitch = async (target: boolean): Promise<TunSwitchOutcome> => {
+    const previous = appStore.tunEnabled
+
+    // TUN-04：状态未变时**先短路**，再考虑提权。
+    // 提权前置在 Windows 上会弹 UAC 并以管理员身份重启整个应用 ——
+    // 什么都没改的切换不该触发它，否则用户会看到「没动却弹 UAC 重启」。
+    if (previous === target) return { status: 'skipped' }
+
     // 提权前置由调用方处理（可能直接转入「保存 + 管理员重启」，无需本地回滚）
     if (options.ensurePrivilege) {
       const outcome = await options.ensurePrivilege(target)
       if (outcome === 'escalated') return { status: 'escalated' }
     }
-
-    const previous = appStore.tunEnabled
-    if (previous === target) return { status: 'skipped' }
 
     pending.value = true
     try {
@@ -144,9 +168,13 @@ export function useTunToggle(options: TunToggleOptions) {
       // 回滚开关：TUN 是全量接管，回滚失败会让用户失去网络出口，
       // 因此这里的错误不能吞掉。
       await appStore.toggleTun(previous)
+      // TUN-09：只还原 DB 布尔值会让「界面状态」与「内核实际模式」脱节 ——
+      // 内核可能已被停掉、或仍跑着新模式（残留 TUN 网卡与路由）。
+      await restoreRuntime(previous)
       return { status: 'failed', failure }
     } catch (error) {
       await appStore.toggleTun(previous)
+      await restoreRuntime(previous)
       return { status: 'failed', failure: describe(error, text('restartFailed')) }
     } finally {
       pending.value = false
@@ -155,6 +183,7 @@ export function useTunToggle(options: TunToggleOptions) {
 
   return { pending, applyTunSwitch }
 }
+
 /**
  * 「保存 TUN 配置 → 以管理员身份重启」流程。
  *
@@ -166,15 +195,20 @@ export function useTunToggle(options: TunToggleOptions) {
  * 杀掉的进程做运行时配置应用，既无必要又会在失败时提前中断流程），TrayStore 则没有。
  * 这里统一为「置位 → 落库 → 停内核 → 请求重启」，任何一步失败都回滚开关。
  *
+ * @param target 目标开关状态。开启传 `true`，关闭传 `false`（关闭同样需要结束
+ *               一个高权限内核进程，普通权限杀不掉 —— TUN-08）。
  * @returns 是否成功走到「请求重启」这一步
  */
-export async function prepareTunAndRestartAsAdmin(): Promise<boolean> {
+export async function prepareTunAndRestartAsAdmin(target = true): Promise<boolean> {
   const appStore = useAppStore()
   const kernelStore = useKernelStore()
 
   const previous = appStore.tunEnabled
+  // 目标与当前一致时无需变更，更不该触发「停内核 + 重启应用」
+  if (previous === target) return true
+
   try {
-    await appStore.toggleTun(true)
+    await appStore.toggleTun(target)
     // 必须落库：新进程启动时从 DB 读取配置，不落库则重启后 TUN 不会生效
     await appStore.saveToBackend()
 
@@ -188,6 +222,55 @@ export async function prepareTunAndRestartAsAdmin(): Promise<boolean> {
   } catch {
     // 回滚开关，避免用户下次启动直接进入未验证的 TUN 状态
     await appStore.toggleTun(previous)
+    // TUN-10：内核已经被停掉，而 TUN 是全量接管 —— 若不把内核拉回来，
+    // 用户会直接失去网络出口。这里按旧模式恢复运行态。
+    try {
+      const applied = await kernelStore.applyProxySettings({ tun_enabled: previous })
+      if (applied) {
+        await kernelStore.restartKernel()
+      }
+    } catch {
+      // 尽力而为：恢复失败也不能掩盖原始错误
+    }
     return false
   }
+}
+
+/**
+ * Windows 提权前置：首页与托盘共用。
+ *
+ * 当前进程没有管理员权限时，转入「落库 + 以管理员身份重启应用」。
+ *
+ * 开启与关闭**对称**（TUN-08）：关闭 TUN 同样要结束一个高权限内核进程，
+ * 普通权限杀不掉，因此也必须走管理员重启。
+ *
+ * 返回值语义：
+ * - `'proceed'`：**已经具备管理员权限**（或本次根本不需要提权），
+ *   调用方应继续走本地状态机；
+ * - `'escalated'`：本次切换已由提权流程接手（成功重启 / 用户取消 / 提权失败）。
+ *   提权失败时**不会**退回本地状态机 —— 否则会出现「二次报错 + 二次弹窗」。
+ */
+export async function ensureWindowsTunPrivilege(
+  target: boolean,
+  options: {
+    /** 确认回调（首页有确认弹窗，托盘没有）。返回 `false` 表示用户取消。 */
+    confirm?: (target: boolean) => Promise<boolean>
+    /** 提权失败时的回调（用于提示用户） */
+    onFailure?: () => void
+  } = {},
+): Promise<PrivilegeOutcome> {
+  const { systemService } = await import('@/services/system-service')
+  const isAdmin = await systemService.checkAdmin()
+  if (isAdmin) return 'proceed'
+
+  if (options.confirm) {
+    const confirmed = await options.confirm(target)
+    if (!confirmed) return 'escalated'
+  }
+
+  const escalated = await prepareTunAndRestartAsAdmin(target)
+  if (!escalated) {
+    options.onFailure?.()
+  }
+  return 'escalated'
 }

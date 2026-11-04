@@ -223,7 +223,11 @@ import PortSettingsDialog from '@/components/common/PortSettingsDialog.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import SectionCard from '@/components/common/SectionCard.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'
-import { prepareTunAndRestartAsAdmin, useTunToggle } from '@/composables/useTunToggle'
+import {
+  ensureWindowsTunPrivilege,
+  prepareTunAndRestartAsAdmin,
+  useTunToggle,
+} from '@/composables/useTunToggle'
 import { useSudoStore } from '@/stores'
 import { formatBytes, formatSpeed } from '@/utils'
 import { extractKernelErrorMessage, resolveKernelFailureText } from '@/utils/kernel-errors'
@@ -280,6 +284,14 @@ const { pending: tunTogglePending, applyTunSwitch } = useTunToggle({
   },
   // Unix 下内核启动前需要 sudo 密码；缺失时先索要再继续
   ensurePrivilege: async (target) => {
+    // Windows：开启与关闭**都需要**管理员权限。
+    // 关闭同样要结束一个高权限内核进程，普通权限杀不掉（TUN-08），
+    // 因此关闭方向也走「确认 + 保存配置 + 管理员重启」。
+    if (isWindowsPlatform.value) {
+      // 确认弹窗与失败提示都在 confirmTunSwitch 内部处理，
+      // 因此这里不传 onFailure（避免双重报错）。
+      return ensureWindowsTunPrivilege(target, { confirm: confirmTunSwitch })
+    }
     if (!target || !isUnixPlatform.value) return 'proceed'
 
     const status = await sudoService.getStatus()
@@ -371,7 +383,7 @@ const toggleSystemProxy = async (value: boolean) => {
   }
 }
 
-const confirmTunSwitch = () => {
+const confirmTunSwitch = (target: boolean) => {
   let dialogReactive: DialogReactive | null = null
   let resolved = false
 
@@ -387,7 +399,7 @@ const confirmTunSwitch = () => {
       if (dialogReactive) dialogReactive.loading = true
 
       try {
-        const success = await prepareTunModeWithAdminRestart()
+        const success = await prepareTunModeWithAdminRestart(target)
         finish(success)
         return success
       } finally {
@@ -398,7 +410,7 @@ const confirmTunSwitch = () => {
 
     dialogReactive = dialog.warning({
       title: t('home.tunConfirm.title'),
-      content: t('home.tunConfirm.description'),
+      content: target ? t('home.tunConfirm.description') : t('home.tunConfirm.disableDescription'),
       positiveText: t('home.tunConfirm.confirm'),
       negativeText: t('common.cancel'),
       maskClosable: false,
@@ -412,16 +424,6 @@ const confirmTunSwitch = () => {
 const toggleTunProxy = async (value: boolean) => {
   if (modeSwitchPending.value) return
 
-  if (value && isWindowsPlatform.value) {
-    // Windows 需要管理员权限才能创建 TUN 网卡
-    await checkAdmin()
-    if (!isAdmin.value) {
-      // 无权限：走「确认 + 保存配置 + 管理员重启」流程
-      await confirmTunSwitch()
-      return
-    }
-  }
-
   const outcome = await applyTunSwitch(value)
   switch (outcome.status) {
     case 'success':
@@ -429,6 +431,11 @@ const toggleTunProxy = async (value: boolean) => {
       break
     case 'failed':
       message.error(outcome.failure.text)
+      // TUN-05：权限不足时给出「以管理员身份重启」的入口 ——
+      // 内核因无权创建 TUN 设备而失败时，这是唯一能真正跑起来的办法。
+      if (outcome.failure.requiresElevation && isWindowsPlatform.value) {
+        await confirmTunSwitch(value)
+      }
       break
     default:
       // 'skipped'（状态未变）/ 'escalated'（已转交管理员重启）无需提示
@@ -464,8 +471,8 @@ const requestRestartAsAdmin = async () => {
   await systemService.restartAsAdmin()
 }
 
-const prepareTunModeWithAdminRestart = async () => {
-  const success = await prepareTunAndRestartAsAdmin()
+const prepareTunModeWithAdminRestart = async (target: boolean) => {
+  const success = await prepareTunAndRestartAsAdmin(target)
   if (!success) {
     message.error(t('notification.proxyModeChangeFailed'))
   }

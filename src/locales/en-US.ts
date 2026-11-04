@@ -122,6 +122,8 @@ export default {
       title: 'Administrator permission required',
       description:
         'TUN mode needs the app to restart with administrator privileges. Restart as admin now?',
+      disableDescription:
+        'Turning off TUN mode needs the app to restart with administrator privileges (a kernel started as admin cannot be stopped without them). Restart as admin now?',
       confirm: 'Restart as admin',
     },
     sudoPassword: {

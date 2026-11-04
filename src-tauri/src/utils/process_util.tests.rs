@@ -25,7 +25,8 @@ fn test_create_hidden_async_command() {
 #[cfg(target_os = "windows")]
 #[test]
 fn test_windows_commands() {
-    use windows::*;
+    // 显式指向本模块内的 `windows` 辅助模块，避免与同名外部 crate 冲突
+    use super::windows::*;
 
     let _tasklist = create_tasklist_command();
     let _taskkill = create_taskkill_command();

@@ -17,6 +17,7 @@
 pub mod custom_rule_crud;
 pub mod grpc_bridge;
 pub mod inbound_writer;
+pub mod platform_policy;
 pub mod status;
 
 // 供内部跨模块调用（非命令）再导出

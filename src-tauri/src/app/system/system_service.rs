@@ -294,56 +294,15 @@ fn restart_as_admin_macos(app_handle: tauri::AppHandle) -> Result<(), String> {
 }
 
 // 检查是否有管理员权限 - 跨平台实现
+//
+// 实现委托给 `app::system::elevation`：Windows 上读取进程 token 的
+// `TokenElevation`（权威、无外部依赖），Unix 上检查 UID
+// （Linux 用真实 UID、macOS 用有效 UID —— 在 admin 组中不代表进程有 root 权限）。
+// 早期实现用 `net session` 判定，该命令依赖 Server 服务可用性，
+// 服务被禁用时会假阴性，进而触发多余的提权重启与「静默关闭 TUN」副作用。
 #[tauri::command]
 pub fn check_admin() -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        check_admin_windows()
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        check_admin_linux()
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        check_admin_macos()
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-    {
-        false // 其他平台默认返回false
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn check_admin_windows() -> bool {
-    // 尝试执行一个需要管理员权限的操作，例如查询系统会话
-    let result = std::process::Command::new("net")
-        .arg("session")
-        .creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW)
-        .output();
-
-    match result {
-        Ok(output) => output.status.success(),
-        Err(_) => false,
-    }
-}
-
-#[cfg(target_os = "linux")]
-fn check_admin_linux() -> bool {
-    // 直接使用 getuid() 检查是否为 root 用户
-    // 这是最可靠的方式，不依赖可被伪造的环境变量
-    nix::unistd::getuid().is_root()
-}
-
-#[cfg(target_os = "macos")]
-fn check_admin_macos() -> bool {
-    // TUN 需要 root 权限运行，检查当前进程的 effective UID
-    // 注意：在 admin 组中不代表当前进程有 root 权限
-    // 我们需要检查的是进程是否以 root 身份运行
-    nix::unistd::geteuid().is_root()
+    crate::app::system::elevation::is_elevated()
 }
 
 // 打开开发者工具

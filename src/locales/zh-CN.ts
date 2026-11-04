@@ -120,6 +120,8 @@ export default {
     tunConfirm: {
       title: '需要管理员权限',
       description: '切换到 TUN 模式需要以管理员权限重启应用，是否立即以管理员身份重启？',
+      disableDescription:
+        '关闭 TUN 模式需要以管理员权限重启应用（普通权限无法结束以管理员身份启动的内核进程），是否立即以管理员身份重启？',
       confirm: '以管理员身份重启',
     },
     sudoPassword: {

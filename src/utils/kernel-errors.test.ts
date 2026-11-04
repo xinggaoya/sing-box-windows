@@ -3,6 +3,7 @@ import {
   describeKernelFailure,
   extractKernelErrorMessage,
   parseSudoCode,
+  requiresElevation,
   resolveKernelFailureText,
 } from '@/utils/kernel-errors'
 
@@ -139,5 +140,33 @@ describe('错误消息不依赖 console 输出', () => {
     const spy = vi.spyOn(console, 'error')
     parseSudoCode('SUDO_PASSWORD_REQUIRED')
     expect(spy).not.toHaveBeenCalled()
+  })
+})
+
+// ── TUN-05：权限不足的识别 ─────────────────────────────────────────────────
+
+describe('requiresElevation', () => {
+  it('识别后端的权限不足错误码', () => {
+    expect(requiresElevation('KERNEL_PERMISSION_DENIED')).toBe(true)
+    expect(requiresElevation('内核启动失败：权限不足，TUN 模式需要以管理员权限运行内核')).toBe(true)
+    expect(requiresElevation('权限错误: 内核进程 PID 123 仍在运行')).toBe(true)
+  })
+
+  it('普通内核错误不被误判为权限问题', () => {
+    expect(requiresElevation('KERNEL_START_FAILED')).toBe(false)
+    expect(requiresElevation('内核启动失败：配置校验未通过')).toBe(false)
+    expect(requiresElevation('KERNEL_API_TIMEOUT')).toBe(false)
+    expect(requiresElevation('')).toBe(false)
+  })
+
+  it('describeKernelFailure 会带上权限标记', () => {
+    const failure = describeKernelFailure('KERNEL_PERMISSION_DENIED', { fallback: '兜底' })
+    expect(failure.requiresElevation).toBe(true)
+    expect(failure.needsSudoRetry).toBe(false)
+  })
+
+  it('普通失败不带权限标记', () => {
+    const failure = describeKernelFailure('KERNEL_START_FAILED', { fallback: '兜底' })
+    expect(failure.requiresElevation).toBe(false)
   })
 })

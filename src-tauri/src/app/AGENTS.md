@@ -33,6 +33,9 @@ src-tauri/src/app/
 | 配置归属判定       | `singbox/ownership.rs`                  | 记录本程序创建的 tag；落库 `managed_config_tags:<路径>` |
 | gRPC API 交互     | `singbox_api/` + `core/proxy_service.rs` | 替代 experimental.clash_api |
 | 自定义规则 CRUD   | `core/proxy_service.rs` + `storage/custom_rule.rs` | 5 个命令，存 `generic_config` 表 key=`custom_rules` |
+| 提权状态判定      | `system/elevation/`                     | `state.rs` 为平台无关合并规则（可跨平台单测），`windows.rs` 读进程 token |
+| TUN 运行态策略    | `core/proxy_service/platform_policy.rs` | 区分「用户意图」与「运行态」，不改写用户设置 |
+| TUN inbound 渲染  | `core/tun_profile.rs`                   | **唯一实现**；生成路径与运行时切换路径共用 |
 | 事件中继          | `core/kernel_service/event.rs`           | 4 个 gRPC server-streaming（Status/Log/Connections/Groups），指数退避+清理纪元 |
 | 托盘              | `tray/`                                  | 启动偏好、关窗后状态刷新、动作分发 |
 
@@ -42,6 +45,7 @@ src-tauri/src/app/
 - 复杂领域通过子模块拆分（如 kernel_service, subscription_service）。
 - 错误信息优先携带上下文，便于前端展示与日志定位。
 - 业务分层保持单向：command -> domain service -> utility。
+- **平台差异要下沉到可单测的纯函数**：`system/elevation/state.rs` 与 `core/proxy_service/platform_policy.rs` 承载判定逻辑，平台相关的 FFI 只做取值。
 
 ## ANTI-PATTERNS
 

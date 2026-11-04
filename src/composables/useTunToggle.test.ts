@@ -289,7 +289,9 @@ describe('useTunToggle - 提权前置', () => {
     expect(state.privilegeCalls).toBe(1)
   })
 
-  it('提权检查在「状态未变」的短路之前执行（提权本身可能有副作用）', async () => {
+  it('提权检查在「状态未变」的短路之后执行（TUN-04）', async () => {
+    // 提权前置会弹 UAC 并以管理员身份重启整个应用 ——
+    // 状态没变的切换不该触发它，否则用户会看到「什么都没改却弹 UAC 重启」。
     state.tunEnabled = true
     const { applyTunSwitch } = await makeComposable({
       ensurePrivilege: async () => {
@@ -298,8 +300,58 @@ describe('useTunToggle - 提权前置', () => {
       },
     })
 
-    await applyTunSwitch(true)
-    expect(state.privilegeCalls).toBe(1)
+    const outcome = await applyTunSwitch(true)
+    expect(outcome).toEqual({ status: 'skipped' })
+    expect(state.privilegeCalls).toBe(0)
+  })
+})
+
+describe('useTunToggle - 回滚时恢复运行态（TUN-09）', () => {
+  it('重启失败后回滚开关并按旧模式恢复运行态', async () => {
+    state.tunEnabled = false
+    state.restartResult = false
+    const { applyTunSwitch } = await makeComposable()
+
+    const outcome = await applyTunSwitch(true)
+
+    expect(outcome.status).toBe('failed')
+    expect(state.tunEnabled).toBe(false)
+    // 回滚不能只还原 DB 布尔值：内核可能已被停掉或仍跑着新模式，
+    // 必须重新应用旧配置并重启，界面状态与内核实际模式才能对齐。
+    expect(state.applyCalls.length).toBe(2)
+    expect(state.restartCalls).toBe(2)
+  })
+
+  it('应用配置失败时回滚也尝试恢复运行态（尽力而为，不抛错）', async () => {
+    state.tunEnabled = false
+    state.applyResult = false
+    const { applyTunSwitch } = await makeComposable()
+
+    const outcome = await applyTunSwitch(true)
+
+    expect(outcome.status).toBe('failed')
+    expect(state.tunEnabled).toBe(false)
+    expect(state.applyCalls.length).toBe(2)
+    // 应用失败 → 不应再重启内核（内核仍跑着旧配置）
+    expect(state.restartCalls).toBe(0)
+  })
+
+  it('回滚自身抛错时不掩盖原始失败', async () => {
+    state.tunEnabled = false
+    state.restartResult = false
+    const { __kernelStore } = (await import('@/stores/kernel/KernelStore')) as unknown as {
+      __kernelStore: { applyProxySettings: () => Promise<boolean> }
+    }
+    const spy = vi.spyOn(__kernelStore, 'applyProxySettings').mockImplementation(async () => {
+      state.applyCalls.push(undefined)
+      throw new Error('回滚时也炸了')
+    })
+
+    const { applyTunSwitch } = await makeComposable()
+    const outcome = await applyTunSwitch(true)
+
+    expect(outcome.status).toBe('failed')
+    expect(spy).toHaveBeenCalled()
   })
 })
 
@@ -312,7 +364,7 @@ describe('prepareTunAndRestartAsAdmin', () => {
       .mockResolvedValue()
 
     state.tunEnabled = false
-    const ok = await module.prepareTunAndRestartAsAdmin()
+    const ok = await module.prepareTunAndRestartAsAdmin(true)
 
     expect(ok).toBe(true)
     expect(state.tunEnabled).toBe(true)
@@ -326,10 +378,54 @@ describe('prepareTunAndRestartAsAdmin', () => {
     vi.spyOn(systemService.systemService, 'restartAsAdmin').mockRejectedValue(new Error('denied'))
 
     state.tunEnabled = false
-    const ok = await module.prepareTunAndRestartAsAdmin()
+    const ok = await module.prepareTunAndRestartAsAdmin(true)
 
     expect(ok).toBe(false)
     expect(state.tunEnabled).toBe(false)
+  })
+
+  it('关闭方向：不得把 TUN 反向置为开启（TUN-03/TUN-08）', async () => {
+    // 旧实现无条件 `toggleTun(true)`，导致「关闭 TUN」在非提权环境下
+    // 反而把 TUN 打开并触发管理员重启。
+    const module = await import('@/composables/useTunToggle')
+    const systemService = await import('@/services/system-service')
+    vi.spyOn(systemService.systemService, 'restartAsAdmin').mockResolvedValue()
+
+    state.tunEnabled = true
+    const ok = await module.prepareTunAndRestartAsAdmin(false)
+
+    expect(ok).toBe(true)
+    expect(state.tunEnabled).toBe(false)
+  })
+
+  it('管理员重启失败后按旧模式恢复内核（TUN-10）', async () => {
+    // 流程是「落库 -> 停内核 -> 请求管理员重启」。最后一步失败时内核已被停掉，
+    // 而 TUN 是全量接管 —— 用户会直接失去网络出口，必须把内核拉回来。
+    const module = await import('@/composables/useTunToggle')
+    const systemService = await import('@/services/system-service')
+    vi.spyOn(systemService.systemService, 'restartAsAdmin').mockRejectedValue(new Error('denied'))
+
+    state.tunEnabled = false
+    const ok = await module.prepareTunAndRestartAsAdmin(true)
+
+    expect(ok).toBe(false)
+    expect(state.tunEnabled).toBe(false)
+    expect(state.applyCalls.length).toBeGreaterThan(0)
+    expect(state.restartCalls).toBeGreaterThan(0)
+  })
+
+  it('目标状态与当前一致时不请求重启', async () => {
+    const module = await import('@/composables/useTunToggle')
+    const systemService = await import('@/services/system-service')
+    const restartAsAdmin = vi
+      .spyOn(systemService.systemService, 'restartAsAdmin')
+      .mockResolvedValue()
+
+    state.tunEnabled = true
+    const ok = await module.prepareTunAndRestartAsAdmin(true)
+
+    expect(ok).toBe(true)
+    expect(restartAsAdmin).not.toHaveBeenCalled()
   })
 })
 
@@ -386,3 +482,68 @@ describe('useTunToggle 的 i18n 文案注入', () => {
 // 避免 unused 导入告警
 void ref
 void nextTick
+
+// ── Windows 提权前置（首页与托盘共用）──────────────────────────────────────
+
+describe('ensureWindowsTunPrivilege', () => {
+  async function mockAdmin(isAdmin: boolean, restartFails = false) {
+    const mod = await import('@/services/system-service')
+    vi.spyOn(mod.systemService, 'checkAdmin').mockResolvedValue(isAdmin)
+    vi.spyOn(mod.systemService, 'restartAsAdmin').mockImplementation(async () => {
+      if (restartFails) throw new Error('denied')
+    })
+    return mod.systemService
+  }
+
+  it('已是管理员时直接放行，不触发提权流程', async () => {
+    const { ensureWindowsTunPrivilege } = await import('@/composables/useTunToggle')
+    const svc = await mockAdmin(true)
+
+    const outcome = await ensureWindowsTunPrivilege(true)
+
+    expect(outcome).toBe('proceed')
+    expect(svc.restartAsAdmin).not.toHaveBeenCalled()
+  })
+
+  it('非管理员时转入管理员重启', async () => {
+    const { ensureWindowsTunPrivilege } = await import('@/composables/useTunToggle')
+    const svc = await mockAdmin(false)
+
+    const outcome = await ensureWindowsTunPrivilege(true)
+
+    expect(outcome).toBe('escalated')
+    expect(svc.restartAsAdmin).toHaveBeenCalled()
+  })
+
+  it('用户取消确认时不重启', async () => {
+    const { ensureWindowsTunPrivilege } = await import('@/composables/useTunToggle')
+    const svc = await mockAdmin(false)
+
+    const outcome = await ensureWindowsTunPrivilege(true, { confirm: async () => false })
+
+    expect(outcome).toBe('escalated')
+    expect(svc.restartAsAdmin).not.toHaveBeenCalled()
+  })
+
+  it('提权失败时触发 onFailure 并交由提权流程收尾', async () => {
+    // 关键：失败必须与「已是管理员」的 proceed 区分开，
+    // 否则调用方会在正常路径上误报错误。
+    const { ensureWindowsTunPrivilege } = await import('@/composables/useTunToggle')
+    await mockAdmin(false, true)
+    const onFailure = vi.fn()
+
+    const outcome = await ensureWindowsTunPrivilege(true, { onFailure })
+
+    expect(outcome).toBe('escalated')
+    expect(onFailure).toHaveBeenCalledTimes(1)
+  })
+
+  it('提权失败时不会退回本地状态机（避免二次报错与二次弹窗）', async () => {
+    const { ensureWindowsTunPrivilege } = await import('@/composables/useTunToggle')
+    await mockAdmin(false, true)
+
+    const outcome = await ensureWindowsTunPrivilege(true)
+
+    expect(outcome).not.toBe('proceed')
+  })
+})
