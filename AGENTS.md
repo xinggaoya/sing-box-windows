@@ -23,11 +23,11 @@
 │       ├── process/         # 内核进程管理 ProcessManager
 │       ├── types/generated/ # ts-rs 本地中间产物（gitignore），勿依赖勿修改
 │       └── utils/           # 通用工具（http/file/log/process 等）
-├── docs/                # 开发文档（development/i18n/release-playbook/devtools/CHANGELOG 等）
-│   └── templates/       # 可复制到其它项目的接入模板（tauri-devtools 等）
+├── docs/                # 开发文档（development/i18n/release-playbook/automation/CHANGELOG 等）
 │                       # + gap-analysis-vs-mature-projects（竞品对标与改进批次建议）
 │                       # + implementation-plan-2026-10（存量接线 + 配置双模型收敛实施方案）
 │                       # + tun-privilege-restart-issues（TUN 提权/重启问题清单，12 条待修）
+├── plugins/             # 独立仓库的插件源码占位（gitignore），如浏览器调试桥
 └── .github/workflows/   # ci.yml（质量门禁）+ release.yml / promote-release.yml（两阶段发布）
 ```
 
@@ -91,8 +91,8 @@
 | 发布流水线           | `.github/workflows/release.yml` + `promote-release.yml` | 两阶段发布，glibc 兼容检查         |
 | 竞品对标与改进清单   | `docs/gap-analysis-vs-mature-projects.md`          | 对标 Clash Verge Rev / v2rayN / FlClash 的差距与 5 批次建议 |
 | 实施方案（存量接线 + 双模型收敛） | `docs/implementation-plan-2026-10.md`      | 阶段 0 类型基线 / 阶段 1 前端接线 / 阶段 2 配置双模型收敛（7 步） |
-| 调试工具指南（DevTools） | `docs/devtools.md`                     | 开发态面板用法 / 日志桥接原理 / 命令行验证 / 已知问题 |
-| 调试工具接入模板（给后续项目） | `docs/templates/tauri-devtools/README.md` | 任意 Tauri 2 项目接入同一套调试工具的步骤与坑位清单 |
+| 浏览器调试桥         | 外部插件 `xinggaoya/tauri-plugin-web-dev-bridge` | 让普通浏览器直连**运行中**的真实后端（真实数据，非 mock）；Rust 侧 git 依赖 + 前端 npm git 依赖，详见 `docs/development.md` |
+| 浏览器自动化测试     | `docs/automation.md`                              | AI/脚本驱动浏览器做端到端调试与回归；基于浏览器调试桥，含 agent-browser 命令清单与常见坑 |
 | TUN 提权/重启问题清单 | `docs/tun-privilege-restart-issues.md`             | 12 条问题的定位与修复状态；TUN 相关改动先看这里 |
 
 ## CODE MAP
@@ -133,7 +133,7 @@
 ## COMMANDS
 
 ```bash
-# 开发（dev 会自动加 --features devtools，启用 CrabNebula DevTools 调试面板）
+# 开发（桌面应用 + vite dev server；浏览器可直接调试，见 docs/development.md）
 pnpm install            # 首次
 pnpm kernel:fetch       # 首次构建前必须；--all 为全平台（stable/oldstable/beta/testing 轨道）
 pnpm tauri dev
@@ -146,8 +146,8 @@ pnpm test:i18n
 pnpm test
 pnpm test:kernel-targets
 cd src-tauri && cargo fmt --all -- --check
-cd src-tauri && cargo clippy --all-targets --features devtools -- -D warnings
-cd src-tauri && cargo test --features devtools
+cd src-tauri && cargo clippy --all-targets -- -D warnings
+cd src-tauri && cargo test
 
 # 构建（全部经 scripts/tauri-wrapper.mjs 包装）
 pnpm tauri build
@@ -179,4 +179,4 @@ pnpm tauri build:linux:rpm
 - 应用更新不走 tauri-plugin-updater，由 `system/update_service.rs` 自研（GitHub Releases API，应用内更新仅 Windows）。
 - `tauri-plugin-websocket` 仍在 Rust 侧注册但属遗留；运行态数据链路为：后端 gRPC 订阅 → Tauri event → 前端 `event-service`。
 - 分层 AGENTS 已在 `src/`、`src/stores/`、`src-tauri/`、`src-tauri/src/app/` 细化；改到哪层就核对哪层的文档。
-- **开发调试面板**：`pnpm tauri dev` 会自动注入 `--features devtools`（`src-tauri/Cargo.toml` 的 `devtools` feature），启用 [CrabNebula DevTools](https://v2.tauri.app/zh-cn/develop/debug/crabnebula-devtools/)：日志流、Tauri command/event 的 payload 与耗时可视化。面板地址在启动时打印到终端（standalone 网页形态），应用内 `Ctrl+Shift+M` 可开 embedded 形态。release 构建（`pnpm tauri build`）不带该 feature，产物不含插件、也不打开 `tauri/tracing` 埋点。**用法见 `docs/devtools.md`**；**后续 Tauri 项目接入同一套工具直接抄 `docs/templates/tauri-devtools/`**（含坑位清单）。
+- **浏览器直连真实后端（调试与自动化测试的主入口）**：本项目集成外部插件 [tauri-plugin-web-dev-bridge](https://github.com/xinggaoya/tauri-plugin-web-dev-bridge)，让普通浏览器能驱动**运行中**的应用并拿到**真实**数据（真实数据库 / 真实内核 gRPC 查询 / 真实事件流），而不是任何形式的前端 mock。机制是桥在应用进程内合成一条真正的 Tauri IPC 消息（携带 `invoke_key`）投递给应用自身的命令处理器。**用法见 `docs/development.md` 的「浏览器调试桥」**；**AI/脚本化端到端测试见 `docs/automation.md`**。release 构建自动跳过，桌面端行为完全不变。

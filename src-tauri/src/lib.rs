@@ -39,42 +39,17 @@ fn resolve_startup_launch_context<R: tauri::Runtime>(app: &tauri::App<R>) -> Sta
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 准备日志 sink（日志目录 + 非阻塞文件 writer），devtools 与直连模式共用
+    // 准备日志 sink（日志目录 + 非阻塞文件 writer）
     let log_sink = log_util::create_log_sink();
 
-    // devtools 模式：插件接管全局 tracing subscriber，日志经 log::Log 桥接输出
-    // （必须早于任何全局 subscriber 安装，否则插件 init 会 panic）
-    #[cfg(all(feature = "devtools", debug_assertions))]
-    let devtools_plugins = {
-        match crate::utils::devtools_util::init(log_sink) {
-            crate::utils::devtools_util::DevtoolsInit::Ready { probe, app } => Some((probe, app)),
-            // 插件初始化失败 → 回退到直连日志模式，应用照常启动
-            crate::utils::devtools_util::DevtoolsInit::Fallback { sink } => {
-                log_util::install_direct_subscriber(sink.as_ref());
-                None
-            }
-        }
-    };
-
-    // 直连模式：自行安装全局 fmt subscriber（release / 未启用 devtools feature）
-    #[cfg(not(all(feature = "devtools", debug_assertions)))]
+    // 安装全局 fmt subscriber（文件 + 控制台）
     log_util::install_direct_subscriber(log_sink.as_ref());
-
-    // devtools feature 在 release 构建下不生效（插件只装在 debug 构建）
-    #[cfg(all(feature = "devtools", not(debug_assertions)))]
-    eprintln!("检测到 devtools feature，但当前不是 debug 构建，CrabNebula DevTools 不会启用");
 
     // 日志目录，供后续定时清理使用
     let log_dir = log_util::current_log_dir();
     log_util::announce_log_dir();
 
     let builder = tauri::Builder::default();
-    // devtools 模式：注册调试面板插件
-    #[cfg(all(feature = "devtools", debug_assertions))]
-    let builder = match devtools_plugins {
-        Some((probe, app)) => builder.plugin(*probe).plugin(*app),
-        None => builder,
-    };
     builder
         .on_window_event(|window, event| {
             if window.label() != "main" {
@@ -102,7 +77,13 @@ pub fn run() {
             show_window(app);
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        // 浏览器调试桥：让普通浏览器直连运行中的真实后端（release 构建自动跳过）
+        .plugin(tauri_plugin_web_dev_bridge::Builder::new().build())
         .setup(move |app| {
+            // 调试桥必须在 setup 钩子里启动：`App<Wry>::invoke_key()`（合成 IPC 消息的必备
+            // 参数）只在桌面运行时的 `App` 上公开，且此时窗口/webview 已创建完毕。
+            tauri_plugin_web_dev_bridge::start(app)?;
+
             // if cfg!(debug_assertions) {
             //     app.handle().plugin(
             //         tauri_plugin_log::Builder::default()

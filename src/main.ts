@@ -6,6 +6,15 @@ import App from './App.vue'
 import router from './router'
 import { usePinia } from '@/stores'
 import i18n from './locales'
+import { installWebDevBridge } from 'tauri-plugin-web-dev-bridge'
+
+// 浏览器调试桥：仅开发构建生效。
+// 在 Tauri 环境下这是空操作；在普通浏览器里，它把后端调用转发给本地调试桥，
+// 从而让页面拿到**真实**数据（真实数据库 / 真实内核查询 / 真实事件流）。
+// 必须在 createApp 之前安装——首屏的第一个 invoke 就需要它。
+if (import.meta.env.DEV) {
+  installWebDevBridge()
+}
 
 const app = createApp(App)
 

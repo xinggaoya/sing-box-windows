@@ -18,8 +18,6 @@ static LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 const CLEANUP_INTERVAL_HOURS: u64 = 24;
 
 /// 日志 sink：非阻塞文件 writer + 所属目录
-///
-/// devtools 模式与直连模式共用同一份 sink，区别只在于「谁来写」。
 pub struct LogSink {
     writer: NonBlocking,
     dir: PathBuf,
@@ -88,10 +86,7 @@ pub fn announce_log_dir() {
     }
 }
 
-/// 直连模式：安装全局 fmt subscriber（文件 + 控制台）
-///
-/// devtools 模式下**不能**调用本函数——全局 subscriber 已被插件占用，
-/// 再次设置会失败（`tracing_subscriber` 的全局默认只能设置一次）。
+/// 安装全局 fmt subscriber（文件 + 控制台）
 pub fn install_direct_subscriber(sink: Option<&LogSink>) {
     let env_filter = build_env_filter();
 

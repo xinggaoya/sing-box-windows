@@ -2,6 +2,20 @@
 
 ## [未发布]
 
+### 🛠️ 开发体验
+
+- **浏览器可直接调试前端，并拿到真实后端数据**：新增 [tauri-plugin-web-dev-bridge](https://github.com/xinggaoya/tauri-plugin-web-dev-bridge) 集成。
+  此前把前端页面丢进浏览器时，页面能打开但每一个后端调用都会炸（`Cannot read properties of undefined (reading 'invoke' / 'transformCallback')`），只能反复「改代码 → 重新打包桌面端 → 点一下」地调试。
+  该插件在应用进程内开一个只监听 `127.0.0.1` 的 HTTP 桥，把浏览器的请求**还原成一条真正的 Tauri IPC 消息**投递给应用**自身**的命令处理器——
+  因此浏览器里看到的是真实数据库、真实内核 gRPC 查询与真实事件流，切换节点会真的切换内核。
+  - 事件通道采用**短轮询**而非 SSE / WebSocket：长连接会让浏览器自动化工具的 *networkidle* 判定永远无法达成（实测 `agent-browser open` 挂起 > 300s），改为轮询后降至约 1.1s
+  - 事件按**标签页**隔离，多标签页与自动化多上下文互不串扰
+  - release 构建自动跳过；桌面端行为完全不变（`installWebDevBridge()` 是空操作）
+- **新增 `docs/automation.md`：浏览器自动化测试指南**。后续 AI / 脚本化的端到端调试与回归测试统一走上述调试桥，文档内含 agent-browser 命令清单、curl 级断言方式、事件轮询协议与常见坑清单。
+- **移除 CrabNebula DevTools 集成**（`v2.4.0` 引入）：该方案需要额外的第三方桌面应用、独立端口与日志桥接，与本项目的浏览器直连方案功能重叠且维护成本更高。
+  已移除 `devtools` cargo feature、`tauri-plugin-devtools(-app)` 依赖、日志桥接模块与 `pnpm tauri dev` 的 `--features devtools` 自动注入，CI 也不再跑 feature 双份构建。
+  **WebView 原生开发者工具（应用内 `open_devtools`）保留**，与浏览器调试桥是两套独立能力。
+
 ## [v2.4.0] - 2026-10-31
 
 ### ✨ 新功能

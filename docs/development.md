@@ -26,6 +26,8 @@ Sing-Box Windows 是一个跨平台桌面客户端，前端使用 Vue 3 + TypeSc
 - 后端托盘能力：`src-tauri/src/app/tray/`
 - 内核拉取与打包包装：`scripts/fetch-kernel.mjs`、`scripts/tauri-wrapper.mjs`
 - 发布流程：`.github/workflows/release.yml`、`.github/workflows/promote-release.yml`
+- 浏览器调试桥（外部插件）：[xinggaoya/tauri-plugin-web-dev-bridge](https://github.com/xinggaoya/tauri-plugin-web-dev-bridge)
+- 浏览器自动化测试：`docs/automation.md`
 
 ## 技术栈
 
@@ -161,6 +163,7 @@ sing-box-windows/
 │   └── Cargo.toml          # Rust 依赖与版本
 ├── scripts/                # 内核拉取与 tauri wrapper
 ├── docs/                   # 项目文档
+├── plugins/                # 独立仓库的插件源码占位（gitignore），如浏览器调试桥
 └── .github/workflows/      # 发布工作流
 ```
 
@@ -282,6 +285,59 @@ $env:SING_BOX_KERNEL_FETCH_MODE='force'; pnpm tauri build
   - 强制重新下载内核，而不是跳过已有资源
 - `SING_BOX_GITHUB_TOKEN`
   - 给 GitHub API 请求加认证，降低 latest 拉取时被限流的概率
+
+## 浏览器调试桥
+
+调试前端时，除了在桌面窗口里点，还可以**用普通浏览器打开 vite dev server**，
+并拿到**真实的后端数据**（真实数据库、真实内核 gRPC 查询、真实事件流）。
+
+> 能力由外部插件 [tauri-plugin-web-dev-bridge](https://github.com/xinggaoya/tauri-plugin-web-dev-bridge) 提供，
+> 本仓库以 git 依赖引入（Rust 侧 `Cargo.toml`、前端侧 `package.json`），
+> 因此仓库内不跟踪其副本。
+
+### 用法
+
+```bash
+pnpm tauri dev      # 桌面应用与 vite dev server 一同启动
+```
+
+然后用**普通浏览器**打开 `http://localhost:6221`，页面与桌面窗口行为一致。
+
+> **后续 AI / 脚本化的端到端调试与回归测试，统一使用本调试桥**，
+> 具体命令与断言方式见 [`docs/automation.md`](./automation.md)。
+
+### 原理
+
+插件在应用进程内开一个只监听 `127.0.0.1` 的 HTTP 桥，
+把浏览器的请求**还原成一条真正的 Tauri IPC 消息**（携带 `invoke_key`），
+投递给应用**自身**的命令处理器——因此走的是同一套命令分发、ACL 校验与错误处理，
+新业务命令零改动。
+
+| 路由 | 用途 |
+| --- | --- |
+| `POST /invoke` | 调用一个真实后端命令（body：`{ cmd, args, clientId }`） |
+| `GET /events` | 拉取自游标之后的事件（短轮询，与浏览器侧同款） |
+| `GET /events/stream` | SSE 辅助通道，供命令行调试 |
+| `GET /health` | 健康检查 |
+
+### 调试要点
+
+- **必须先启动桌面应用**：桥活在应用进程里；应用未启动时前端会给出明确提示，
+  而不是一堆 `undefined` 报错
+- **事件用短轮询**：长连接（SSE / WebSocket）会让自动化工具的 *networkidle* 判定
+  永远无法达成，`agent-browser open` 之类的命令会一直挂起
+- **桥的接口可直接用 curl 调试**：
+
+  ```bash
+  curl http://127.0.0.1:6222/health
+  curl -X POST http://127.0.0.1:6222/invoke \
+    -H 'Content-Type: application/json' \
+    -d '{"cmd":"db_get_app_config","args":{}}'
+  ```
+
+- **WebView 原生开发者工具**：应用内的 `open_devtools` 命令（前端 `system-service.ts` 的
+  `openDevtools()`）仍保留，它开的是桌面窗口内嵌的 WebView DevTools；
+  它与本调试桥是**两套东西**，自动化测试请用后者。
 
 ## 前端开发约定
 
@@ -541,4 +597,5 @@ lint → type-check → prettier → i18n key 校验 → 前端测试 → 内核
 - `README.md`
 - `README.zh.md`
 - `docs/i18n.md`
+- `docs/automation.md`
 - `docs/CHANGELOG.md`

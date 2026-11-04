@@ -19,10 +19,10 @@ tauri-build = { version = "2.5", features = [] }
 
 [features]
 default = []
-# 开发态调试面板（CrabNebula DevTools）；release 构建不启用，产物不含插件
-devtools = ["dep:tauri-plugin-devtools", "dep:tauri-plugin-devtools-app", "tauri/dynamic-acl"]
 
 [dependencies]
+# 浏览器调试桥：让普通浏览器直连运行中的真实后端（dev-only，release 自动跳过）
+tauri-plugin-web-dev-bridge = { git = "https://github.com/xinggaoya/tauri-plugin-web-dev-bridge", tag = "v0.1.0" }
 # 使用最新稳定版本
 serde_json = "1.0.145"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -39,9 +39,6 @@ serde_yaml = "0.9"
 
 # Tauri 2.0 最新版本
 tauri = { version = "2.10.2", features = ["tray-icon", "unstable", "devtools"] }
-# 开发态调试插件（仅 cargo feature `devtools` 启用时参与编译）
-tauri-plugin-devtools = { version = "2.2.3", optional = true }
-tauri-plugin-devtools-app = { version = "2.1.4", optional = true }
 reqwest = { version = "0.12", features = ["json", "stream", "native-tls-vendored"] }
 dirs = "5.0.1"
 tokio = { version = "1.48", features = ["full"] }

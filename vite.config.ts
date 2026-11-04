@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
+import { webDevBridgeVitePlugin } from 'tauri-plugin-web-dev-bridge/vite'
 
 const vendorChunkGroups: Array<[string, string[]]> = [
   [
@@ -56,6 +57,9 @@ export default defineConfig(({ mode: _mode }) => ({
     Components({
       resolvers: [NaiveUiResolver()],
     }),
+    // 浏览器调试桥的端口发现：把 Rust 侧写的描述文件以同源 JSON 暴露给浏览器，
+    // 使得 Rust 监听随机端口时前端也能零配置找到它。
+    webDevBridgeVitePlugin(),
   ],
   resolve: {
     alias: {

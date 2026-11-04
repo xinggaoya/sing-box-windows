@@ -41,6 +41,10 @@ target
 # ZCode 工具临时产物
 .zcode/
 
+# 本仓库内引用的独立插件仓库（源码在其各自的 GitHub 仓库中）
+# 通过 Cargo git 依赖 + npm git 依赖引入，不在本仓库跟踪副本。
+/plugins/
+
 # 调研时克隆的外部仓库（sing-box-dashboard 等）
 .tmp_sbd/
 
