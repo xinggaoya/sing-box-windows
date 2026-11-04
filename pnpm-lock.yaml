@@ -47,8 +47,8 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.40(typescript@6.0.3))
       tauri-plugin-web-dev-bridge:
-        specifier: github:xinggaoya/tauri-plugin-web-dev-bridge#v0.1.0
-        version: git+ssh://git@github.com/xinggaoya/tauri-plugin-web-dev-bridge.git#ddc4bf38e2c13c1d5506fc14d385fa48dfed78cf(vite@8.2.0(@types/node@24.13.3)(esbuild@0.27.2)(yaml@2.9.0))
+        specifier: git+https://github.com/xinggaoya/tauri-plugin-web-dev-bridge.git#v0.1.0
+        version: https://codeload.github.com/xinggaoya/tauri-plugin-web-dev-bridge/tar.gz/13d894827b14b9e7c510535b8a957383a4972dcd(vite@8.2.0(@types/node@24.13.3)(esbuild@0.27.2)(yaml@2.9.0))
       vue:
         specifier: ^3.5.40
         version: 3.5.40(typescript@6.0.3)
@@ -1942,8 +1942,8 @@ packages:
     resolution: {integrity: sha512-MeQTA1r0litLUf0Rp/iisCaL8761lKAZHaimlbGK4j0HysC4PLfqygQj9srcs0m2RdtDYnF8UuYyKpbjHYp7Jw==}
     engines: {node: ^14.18.0 || >=16.0.0}
 
-  tauri-plugin-web-dev-bridge@git+ssh://git@github.com/xinggaoya/tauri-plugin-web-dev-bridge.git#ddc4bf38e2c13c1d5506fc14d385fa48dfed78cf:
-    resolution: {commit: ddc4bf38e2c13c1d5506fc14d385fa48dfed78cf, repo: git@github.com:xinggaoya/tauri-plugin-web-dev-bridge.git, type: git}
+  tauri-plugin-web-dev-bridge@https://codeload.github.com/xinggaoya/tauri-plugin-web-dev-bridge/tar.gz/13d894827b14b9e7c510535b8a957383a4972dcd:
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/xinggaoya/tauri-plugin-web-dev-bridge/tar.gz/13d894827b14b9e7c510535b8a957383a4972dcd}
     version: 0.1.0
     peerDependencies:
       vite: ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
@@ -3945,7 +3945,7 @@ snapshots:
     dependencies:
       '@pkgr/core': 0.2.9
 
-  tauri-plugin-web-dev-bridge@git+ssh://git@github.com/xinggaoya/tauri-plugin-web-dev-bridge.git#ddc4bf38e2c13c1d5506fc14d385fa48dfed78cf(vite@8.2.0(@types/node@24.13.3)(esbuild@0.27.2)(yaml@2.9.0)):
+  tauri-plugin-web-dev-bridge@https://codeload.github.com/xinggaoya/tauri-plugin-web-dev-bridge/tar.gz/13d894827b14b9e7c510535b8a957383a4972dcd(vite@8.2.0(@types/node@24.13.3)(esbuild@0.27.2)(yaml@2.9.0)):
     optionalDependencies:
       vite: 8.2.0(@types/node@24.13.3)(esbuild@0.27.2)(yaml@2.9.0)
 
