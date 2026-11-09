@@ -67,6 +67,7 @@
 | 后端入口与命令注册   | `src-tauri/src/lib.rs`                            | 87 个命令；setup 同步+异步初始化链       |
 | 内核生命周期         | `src-tauri/src/app/core/kernel_service/`          | orchestrator/runtime/guard/state/event/archive/health |
 | 内核存活判定         | `src-tauri/src/app/core/kernel_service/health.rs` | 唯一判定入口：端口 > 托管句柄 > 平台扫描 |
+| 内核安装态判定       | `src-tauri/src/app/core/kernel_service/installation.rs` | 文件层事实（已安装/文件丢失疑似被隔离/未安装/不可读）；与运行态 `version` 分开，勿混用 |
 | 内核版本管理         | `src-tauri/src/app/core/kernel_service/versioning.rs` | 默认最新版；指定版本下载前前端强制确认兼容风险 |
 | 订阅解析与模式切换   | `src-tauri/src/app/network/subscription_service/` | parser/mode/helpers 分层明显             |
 | sing-box 配置生成    | `src-tauri/src/app/singbox/config_generator.rs`   | 1.14 DNS（mDNS）与自定义规则注入 |
@@ -76,6 +77,7 @@
 | 配置补丁与归属       | `src-tauri/src/app/singbox/settings_patch.rs` + `ownership.rs` | 按归属打补丁；外来配置只改端口 |
 | 自定义规则 CRUD      | `src-tauri/src/app/core/proxy_service.rs` + `app/storage/custom_rule.rs` | 5 个命令，存 `generic_config` 表 key=`custom_rules` |
 | 自定义规则 UI        | `src/components/rules/CustomRulePanel.vue` + `src/stores/kernel/CustomRuleStore.ts` | 规则页 CRUD 面板（走文件+重启） |
+| 内核安装/启动失败归因 | `src/composables/useKernelDiagnosis.ts` + `src/components/kernel/KernelDiagnosisCard.vue` | 诊断 kind → 本地化文案（配置非法/被隔离/权限/端口占用）；首页与设置页共用同一组件 |
 | 出站总览页面        | `src/views/OutboundsView.vue` + `src/composables/useOutboundList.ts` | 侧边栏「出站」独立页（路由 `/outbounds`），代理页零占用 |
 | 网络诊断 / 服务状态  | `src/views/setting/components/SettingsDiagnosticsCard.vue` | 维护页诊断指标 + `probe_service_status` |
 | 内核压缩包解压       | `src-tauri/src/app/core/kernel_service/archive.rs`   | zip/tar.gz/tgz/tar；阻塞 IO 在 spawn_blocking |

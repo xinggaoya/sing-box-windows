@@ -2,6 +2,16 @@
 
 ## [未发布]
 
+### 🐛 问题修复
+
+- **修复「内核一直提示未安装」（issue #70）**：设置页此前用**运行中**内核的版本号（gRPC `GetVersion`）判断「内核是否已安装」——内核一停这个值就是空，界面随即从「已安装 v1.14.4」跳回「未安装」，哪怕内核文件好好地躺在磁盘上；用户「更新内核成功了也还是未安装」正是这个原因（状态轮询每 3 秒把版本号抹掉一次）。
+  - **「已安装」与「运行中」彻底分层**：新增文件层事实 `installed` / `installed_version` / `install_state`（后端 `kernel_service/installation.rs`），运行态 `version` 不再兼任「是否已安装」的判据
+  - **版本号不再被 `null` 覆盖**：状态合并此前是整体展开（`{...status, ...next}`），后端回传的 `version: null` 会把**已经知道**的版本号一起抹掉；版本类字段改为单独赋值
+  - **不再一律报「未安装」，改为报真实原因**：新增 `file_lost`（文件曾经存在、现在没了——典型是杀毒软件隔离）与 `unreadable`（文件在但执行不了——常见于被安全软件拦截）两种状态；设置页会明确提示「内核文件缺失（可能被杀毒软件隔离）」并给出处置建议
+  - **启动失败原因不再被藏起来**：状态接口此前只在事件路径带 `startup_diagnosis`，轮询路径丢了这个字段（页面一刷新就看不到失败原因）；现已补齐，设置页直接展示归因——配置非法 / 配置文件缺失 / 内核文件缺失 / 权限不足 / 需要系统密码 / 端口占用 / 启动后立即退出 / API 错误与超时
+  - 新增诊断归因组件 `components/kernel/KernelDiagnosisCard.vue`，首页与设置页共用同一份（此前首页一套、设置页没有，两边容易漂移）
+  - i18n：新增 `setting.kernel.installState.*` 与 `setting.kernel.diagnosis.*`（4 语言对齐）
+
 ### 🛠️ 开发体验
 
 - **浏览器可直接调试前端，并拿到真实后端数据**：新增 [tauri-plugin-web-dev-bridge](https://github.com/xinggaoya/tauri-plugin-web-dev-bridge) 集成。

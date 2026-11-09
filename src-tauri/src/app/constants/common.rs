@@ -6,6 +6,7 @@
 pub mod messages {
     // 错误消息
     pub const ERR_KERNEL_NOT_FOUND: &str = "内核文件不存在";
+    pub const ERR_KERNEL_FILE_LOST: &str = "内核文件缺失（可能被杀毒软件隔离或被清理）";
     pub const ERR_VERSION_CHECK_FAILED: &str = "执行版本检查失败";
     pub const ERR_GET_VERSION_FAILED: &str = "获取版本信息失败";
     pub const ERR_CONFIG_READ_FAILED: &str = "读取配置文件失败";

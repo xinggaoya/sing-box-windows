@@ -29,6 +29,7 @@ src/
 | 后端命令调用封装            | `services/invoke-client.ts`                                                                                           | 自动上下文注入（端口等）                                                                  |
 | 后端事件监听                | `services/event-service.ts`                                                                                           | traffic/log/connection 入口                                                               |
 | 内核业务前端编排            | `services/kernel-service.ts`                                                                                          | 命令调用最集中                                                                            |
+| 内核安装态 / 启动失败归因   | `stores/kernel/KernelStore.ts` + `composables/useKernelDiagnosis.ts` + `components/kernel/KernelDiagnosisCard.vue`    | 「已安装」看文件层（`installState`），「运行中」看 `version`；两者不得混用                |
 | 路由行为（含托盘）          | `router/index.ts`                                                                                                     | `/blank` 逻辑关键                                                                         |
 | 节点选择 / 测速             | `services/proxy-service.ts` + `stores/kernel/ProxyStore.ts`                                                           | gRPC API（sing-box 1.14+）                                                                |
 | 规则页（只读 + 自定义规则） | `views/RulesView.vue`                                                                                                 | 运行时规则只读（gRPC `get_rules`）+ 自定义规则 CRUD 面板                                  |
@@ -53,6 +54,8 @@ src/
 - ❌ 绕过 `invoke-client` 造成上下文参数不一致。
 - ❌ 新增事件不写到 `constants/events.ts`。
 - ❌ 用 `as any` 临时压类型通过检查。
+- ❌ 用**运行中**内核的 `version` 判断「内核是否已安装」——内核一停它就是 `null`，会把「已装未运行」误报成「未安装」（issue #70）。已安装态一律看 `installState` / `installedVersion`。
+- ❌ 用 `{...state, ...next}` 整体展开合并后端状态：后端回传的 `version: null` 会把**已知**的版本号抹掉（issue #70）。版本类字段必须单独赋值。
 
 ## TESTING / VERIFY
 

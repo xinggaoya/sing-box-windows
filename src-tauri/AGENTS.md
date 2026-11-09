@@ -21,10 +21,11 @@ src-tauri/
 
 | Task           | Location          | Notes                               |
 | -------------- | ----------------- | ----------------------------------- |
-| 命令注册总入口 | `src/lib.rs`      | `invoke_handler`（87 个命令）暴露边界 |
+| 命令注册总入口 | `src/lib.rs`      | `invoke_handler`（88 个命令）暴露边界 |
 | 进程主入口     | `src/main.rs`     | 仅启动入口，逻辑薄                  |
 | 后端分层实现   | `src/app/`        | core/network/singbox/singbox_api/storage/system/tray |
 | gRPC API 客户端 | `src/app/singbox_api/` | 替代 experimental.clash_api    |
+| 内核安装态判定 | `src/app/core/kernel_service/installation.rs` | 文件层事实：已安装 / 文件丢失（疑似被杀软隔离）/ 未安装 / 文件存在但不可读；`check_kernel_version` 与 `get_kernel_installation` 共用同一判定 |
 | 路由 / DNS 规则语义 | `src/app/singbox/config_rules.rs` | 生成路径与补丁路径共用的规则定义与对齐（含 `action: resolve`） |
 | 配置生成 / 补丁 | `src/app/singbox/config_generator.rs` / `settings_patch.rs` | 两条路径共享 `config_intent` 语义 |
 | 应用内更新     | `src/app/system/update_service.rs` | 自研 GitHub Release 更新，非 tauri-plugin-updater |
@@ -57,6 +58,7 @@ cd src-tauri && cargo test
 - `tauri_plugin_websocket` 仅在 `lib.rs` 注册一次，无重复注册；但运行态数据已改走 gRPC 订阅 → Tauri event，该插件属遗留。
 - `Cargo.toml` 配置了激进的 release profile（LTO/codegen-units=1/strip/panic=abort），排障时注意 release 与 dev 行为差异（panic 直接 abort，不可恢复）。
 - **API 协议**：内核交互使用 sing-box 1.14+ 官方 `type: "api"`（gRPC-Web over HTTP/1.1），由 `src/app/singbox_api/` 客户端实现；metacubexd 兼容层（`experimental.clash_api`）已彻底移除。
+- **「已安装」与「运行中」是两件事**：状态接口 `kernel_get_status_enhanced_v2` 里的 `version` 取自**运行中**内核的 gRPC `GetVersion`，内核一停就是 `null`；文件层事实走 `installed` / `installed_version` / `install_state`（由 `installation.rs` 给出）。前端**不得**用 `version` 判断「内核是否已安装」——那会把「内核没在跑」误报成「未安装」。
 - **内嵌内核 1.14.4**：`src-tauri/resources/kernel/<平台>/<架构>/`（gitignore，构建期 `pnpm kernel:fetch` 拉取，覆盖 windows/amd64+arm64、linux/amd64、macos/arm64+amd64 共 5 个目标）。升级内核时先 diff 上游 proto 与 `service/api/web_bridge.go`——1.14.0→1.14.4 这段**逐字节未变**，所以 `singbox_api/` 无需跟版。内核版本号的兜底值在 `core/kernel_service/download.rs`（现为 1.14.4）。
 - **规则与代理提供者管理**未实现：官方 gRPC API 未暴露对应管理接口，规则页仅只读展示（`get_rules`），等待上游 API 扩展。
 - **应用更新**不走 tauri-plugin-updater，由 `system/update_service.rs` 自研（GitHub Releases API，应用内更新仅 Windows）。

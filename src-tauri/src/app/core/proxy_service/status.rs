@@ -44,17 +44,22 @@ pub async fn kernel_get_status_enhanced_v2(
     // 1) 从 db 读 api_port / proxy_port
     //    端口配置工作流:UI 改端口 → invoke `update_singbox_ports` 写 db + `kernel_restart_*` 触发重启,
     //    内核用 db 新端口启动。所以 db 永远是权威源,不需要前端注入端口参数。
-    let (api_port, proxy_port) = match db_get_app_config(app_handle.clone()).await {
-        Ok(c) => (c.api_port, c.proxy_port),
-        Err(e) => {
-            tracing::warn!("status_v2: db_get_app_config failed: {}", e);
-            return Ok(serde_json::json!({
-                "process_running": false, "api_ready": false, "websocket_ready": false,
-                "kernel_state": "stopped",
-                "error": format!("获取 app config 失败: {}", e),
-            }));
-        }
-    };
+    let (api_port, proxy_port, recorded_kernel_version) =
+        match db_get_app_config(app_handle.clone()).await {
+            Ok(c) => (
+                c.api_port,
+                c.proxy_port,
+                c.installed_kernel_version.filter(|v| !v.is_empty()),
+            ),
+            Err(e) => {
+                tracing::warn!("status_v2: db_get_app_config failed: {}", e);
+                return Ok(serde_json::json!({
+                    "process_running": false, "api_ready": false, "websocket_ready": false,
+                    "kernel_state": "stopped",
+                    "error": format!("获取 app config 失败: {}", e),
+                }));
+            }
+        };
 
     // 2) 统一健康探测（端口 > 托管句柄 > 平台扫描）
     //    见 kernel_service::health：此前本命令用「纯 TCP 端口」而托盘/守护用
@@ -143,11 +148,28 @@ pub async fn kernel_get_status_enhanced_v2(
     readiness.process_alive = process_running;
     readiness.api_ready = api_ready;
 
+    // 5) 安装态（文件层）与启动失败诊断
+    //    `version` 只在**内核正在运行**时才有值（gRPC GetVersion），内核一停就是 null。
+    //    前端此前把「未运行」当成「未安装」，于是界面一律显示「未安装」，
+    //    内核启动失败（配置非法 / 被杀毒软件隔离 / 端口占用）时更是把真实原因藏了起来。
+    //    这里补齐两层事实：
+    //    - `installed` / `installed_version`：内核文件在不在、已安装版本是多少；
+    //    - `startup_diagnosis`：上次启动失败的具体归因（此前只有事件路径带，
+    //      轮询路径丢了这个字段，页面一刷新就看不到失败原因了）。
+    let installation =
+        crate::app::core::kernel_service::installation::probe_installation_light_with(
+            recorded_kernel_version,
+        );
+
     Ok(serde_json::json!({
         "process_running": process_running,
         "api_ready": api_ready,
         "websocket_ready": api_ready,
         "version": version,
+        "installed": installation.state.is_installed(),
+        "installed_version": installation.version,
+        "install_state": installation.state,
+        "startup_diagnosis": KERNEL_STATE.get_startup_diagnosis(),
         "error": error_msg,
         "kernel_state": kernel_state_str,
         "readiness": {

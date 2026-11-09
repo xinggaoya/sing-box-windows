@@ -185,61 +185,30 @@ pub(crate) fn extract_clean_version(output: &str) -> String {
 
 #[tauri::command]
 pub async fn check_kernel_version(app_handle: AppHandle) -> Result<String, String> {
-    // 1. 尝试从数据库读取缓存的版本号
-    use crate::app::storage::enhanced_storage_service::db_get_app_config;
-    if let Ok(config) = db_get_app_config(app_handle.clone()).await {
-        if let Some(ver) = config.installed_kernel_version {
-            if !ver.is_empty() {
-                // optional: 验证一下文件是否存在，避免只是数据库有记录但文件没了
-                let kernel_path = paths::get_kernel_path();
-                if kernel_path.exists() {
-                    info!("从数据库读取缓存的内核版本: {}", ver);
-                    return Ok(ver);
-                }
-            }
-        }
-    }
-
-    // 2. 如果数据库没有或文件不存在，回退到执行命令检查
+    // 1) 文件不在时先尝试装内嵌内核 —— 这是「检查安装」按钮的**修复**语义：
+    //    首次运行（或内核文件被清理后）应当能自愈，而不是只回一句「不存在」。
     let kernel_path = paths::get_kernel_path();
-
     if !kernel_path.exists() {
         let _ =
             crate::app::core::kernel_service::embedded::ensure_embedded_kernel(&app_handle).await;
     }
 
-    if !kernel_path.exists() {
-        return Err(messages::ERR_KERNEL_NOT_FOUND.to_string());
+    // 2) 统一走安装态探测：文件在不在、版本读不读得到、历史上装过没有。
+    //    与 `get_kernel_installation` 共用同一套判定，避免「两处结论互相矛盾」。
+    let installation =
+        crate::app::core::kernel_service::installation::probe_installation(&app_handle).await;
+
+    use crate::app::core::kernel_service::installation::InstallState;
+    match installation.state {
+        InstallState::Installed => Ok(installation.version.unwrap_or_default()),
+        // 文件在但跑不起来：把 stderr 带出去（多半是被安全软件拦截或文件损坏）
+        InstallState::Unreadable => Err(installation
+            .detail
+            .unwrap_or_else(|| messages::ERR_GET_VERSION_FAILED.to_string())),
+        // 曾经装过、现在文件没了：多半被杀毒软件隔离了
+        InstallState::FileLost => Err(messages::ERR_KERNEL_FILE_LOST.to_string()),
+        InstallState::Missing => Err(messages::ERR_KERNEL_NOT_FOUND.to_string()),
     }
-
-    let mut cmd = tokio::process::Command::new(kernel_path);
-    cmd.arg("version");
-
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(crate::app::constants::core::process::CREATE_NO_WINDOW);
-
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| format!("{}: {}", messages::ERR_VERSION_CHECK_FAILED, e))?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("{}: {}", messages::ERR_GET_VERSION_FAILED, error));
-    }
-
-    let version_info = String::from_utf8_lossy(&output.stdout);
-    let version = extract_clean_version(&version_info);
-
-    // 3. 将查到的版本回写到数据库，下次就不用查了
-    use crate::app::storage::enhanced_storage_service::db_save_app_config_internal;
-    if let Ok(mut config) = db_get_app_config(app_handle.clone()).await {
-        // 只有当如果不一致时才保存? 或者总是保存确保最新
-        config.installed_kernel_version = Some(version.clone());
-        let _ = db_save_app_config_internal(config, &app_handle).await;
-    }
-
-    Ok(version)
 }
 
 /// 调用内核二进制执行 `sing-box check`，校验指定配置的语法与可加载性。

@@ -13,6 +13,7 @@ pub mod event;
 pub mod guard;
 pub mod health;
 pub mod import;
+pub mod installation;
 pub mod log_rotation;
 pub mod orchestrator;
 pub mod runtime;

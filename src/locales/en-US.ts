@@ -681,6 +681,73 @@ export default {
       versionConfirmContent:
         'This app is built on the sing-box 1.14+ gRPC API. Manually downloading or switching kernel versions may cause compatibility issues (e.g., failure to connect to the kernel or abnormal behavior). Download v{version} anyway?',
       versionConfirmAction: 'Download Anyway',
+      installState: {
+        running: 'Kernel running',
+        installedNotRunning: 'Kernel installed, not running',
+        missing: 'No kernel detected',
+        missingHint: 'Download or import a kernel first, then start the proxy.',
+        fileLost: 'Kernel file is missing (possibly quarantined by antivirus)',
+        fileLostHint:
+          'The kernel file existed before but is gone now — most likely your antivirus quarantined it. Add this app directory to the security software allowlist, then download the kernel again.',
+        unreadable: 'Kernel file exists but cannot be executed',
+        unreadableHint:
+          'The kernel file is in place but its version cannot be read. Security software may be blocking execution, or the file is corrupted. Please download the kernel again.',
+      },
+      diagnosis: {
+        technicalDetail: 'Technical details',
+        config_invalid: {
+          title: 'Invalid configuration, the kernel cannot start',
+          hint: 'The active sing-box configuration did not pass the kernel check. Refresh the subscription to regenerate it, or review the config file and retry.',
+        },
+        config_missing: {
+          title: 'Configuration file not found',
+          hint: 'The active configuration file does not exist. Pick or download a configuration again on the Subscription page.',
+        },
+        binary_missing: {
+          title: 'Kernel binary missing',
+          hint: 'The sing-box executable was not found — antivirus may have quarantined it, or the install directory was cleaned. Allowlist this app directory, then download the kernel again.',
+        },
+        permission_denied: {
+          title: 'Permission denied, the kernel cannot start',
+          hint: 'The kernel lacks permission to create the TUN device or modify routing tables. Restart the app as administrator.',
+        },
+        sudo_required: {
+          title: 'System password required',
+          hint: 'This operation needs system privileges. Enter the system password and retry.',
+        },
+        sudo_invalid: {
+          title: 'Incorrect system password',
+          hint: 'Enter the correct system password and retry.',
+        },
+        port_conflict: {
+          title: 'Port already in use',
+          hint: 'The proxy port or API port is taken by another process. Change the port, or stop the process holding it, then retry.',
+        },
+        process_exited_early: {
+          title: 'The kernel exited right after starting',
+          hint: 'The kernel process quit immediately after launch. If security software blocked it, allowlist the kernel file and retry.',
+        },
+        api_http_error: {
+          title: 'The kernel API returned an error',
+          hint: 'The kernel is running but API calls fail. Expand the technical details to see the status code.',
+        },
+        api_timeout: {
+          title: 'The kernel API is unresponsive',
+          hint: 'The kernel process is running but the API does not answer. Try restarting the kernel.',
+        },
+        conflict_cleanup_failed: {
+          title: 'Could not stop the process holding the port',
+          hint: 'The process holding the port cannot be terminated (it may need administrator rights). Restart the app as administrator and retry.',
+        },
+        guard_restart_failed: {
+          title: 'The kernel watchdog failed to restart it',
+          hint: 'The automatic restart after a crash failed. Expand the technical details or restart the kernel manually.',
+        },
+        unknown: {
+          title: 'The kernel failed to start',
+          hint: 'Expand the technical details to locate the cause.',
+        },
+      },
     },
     proxyAdvanced: {
       title: 'Advanced Proxy Settings',

@@ -245,6 +245,7 @@ pub fn run() {
             crate::app::core::kernel_service::versioning::get_latest_kernel_version_cmd,
             crate::app::core::kernel_service::versioning::get_kernel_releases_cmd,
             crate::app::core::kernel_service::versioning::check_kernel_version,
+            crate::app::core::kernel_service::installation::get_kernel_installation,
             crate::app::core::kernel_service::status::is_kernel_running,
             crate::app::core::kernel_service::status::get_system_uptime,
             // Core - Kernel service commands (enhanced)

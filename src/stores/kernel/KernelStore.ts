@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { APP_EVENTS } from '@/constants/events'
-import { kernelService, type KernelStatus } from '@/services/kernel-service'
+import {
+  kernelService,
+  type KernelInstallState,
+  type KernelInstallation,
+  type KernelStatus,
+} from '@/services/kernel-service'
 import { useAppStore, type ProxyMode } from '../app/AppStore'
 import i18n from '@/locales'
 import { eventService } from '@/services/event-service'
@@ -34,6 +39,8 @@ export const useKernelStore = defineStore('kernel', () => {
   const lastError = ref('')
   const isLoading = ref(false)
   const isKernelInstalled = ref(false)
+  /** 内核安装态（文件层）：从未安装 / 文件丢失（疑似被隔离）/ 已安装 / 文件存在但不可读 */
+  const installation = ref<KernelInstallation | null>(null)
   const stateVersion = ref(0)
   const lastOperationId = ref('')
   const healthStatus = ref<{ healthy: boolean; issues: string[]; lastChecked?: number }>({
@@ -68,7 +75,27 @@ export const useKernelStore = defineStore('kernel', () => {
       lastOperationId.value = next.op_id
     }
 
-    status.value = { ...status.value, ...next }
+    // 版本相关字段**不能**走整体展开：
+    //   - `version` 是**运行中**内核的版本（gRPC GetVersion），内核一停后端就回 null；
+    //   - `installed_version` 是已安装版本（文件层）。
+    // 展开语义是「键存在就覆盖」，null 会把已知的版本号抹掉——界面随之从
+    // 「已安装 v1.14.4」跳回「未安装」（用户反馈 issue #70 的直接成因）。
+    const { version, installed_version: installedVersion, ...rest } = next
+    status.value = { ...status.value, ...rest }
+    if (typeof version === 'string' && version) {
+      status.value.version = version
+    }
+    if (typeof next.installed === 'boolean') {
+      isKernelInstalled.value = next.installed
+      // 文件层：文件已经不在了，之前记着的已安装版本一并作废
+      // （否则杀软隔离内核后，界面仍会拿着旧版本号显示「已安装」）。
+      if (!next.installed) {
+        status.value.installed_version = null
+      }
+    }
+    if (typeof installedVersion === 'string' && installedVersion) {
+      status.value.installed_version = installedVersion
+    }
     if (next.readiness) {
       readiness.value = { ...readiness.value, ...next.readiness }
     }
@@ -147,6 +174,12 @@ export const useKernelStore = defineStore('kernel', () => {
     // 2. 先走"快照"初始化，再通过事件增量更新
     const snapshot = await kernelService.getKernelSnapshot()
     applyStatus(snapshot)
+
+    // 2.1 探测内核安装态（文件层）。
+    //     内核「已安装」与「正在运行」是两件事：内核没跑时状态里的 version 是 null，
+    //     若界面拿它当「已安装」就会一律显示未安装（issue #70）。
+    //     这里在启动时探一次，让设置页一打开就能给出真实的安装状态。
+    await refreshInstallation()
 
     // 3. 定时轮询 status:之前完全依赖后端 kernel-status-changed 事件推送,
     //    但该事件只在 kernel_start/stop/restart 状态点 emit,内核运行期间不 emit,
@@ -256,24 +289,68 @@ export const useKernelStore = defineStore('kernel', () => {
     }
   }
 
+  /**
+   * 刷新内核安装态（文件层）。
+   *
+   * 完整探测会执行一次 `sing-box version` 子进程，因此只在启动、下载完成后、
+   * 以及用户手动点「检查安装」时调用，不进 3 秒轮询。
+   */
+  const refreshInstallation = async () => {
+    const result = await kernelService.getKernelInstallation()
+    if (!result) return null
+    installation.value = result
+    isKernelInstalled.value = result.state === 'installed' || result.state === 'unreadable'
+    // 完整探测对已安装版本是权威的：读到就写，读不到就清空
+    // （文件被杀软隔离后，不能还拿着旧版本号显示「已安装」）。
+    status.value.installed_version = result.version
+    status.value.installed = isKernelInstalled.value
+    status.value.install_state = result.state
+    return result
+  }
+
+  /**
+   * 检查内核安装情况。
+   *
+   * 走 `check_kernel_version`（带修复语义：文件不在时先尝试装内嵌内核），
+   * 拿到版本后再刷新一次安装态，让界面能区分「已安装 / 文件丢失 / 未安装」。
+   */
   const checkKernelInstallation = async () => {
     try {
       const version = await kernelService.getKernelVersion()
       const cleaned = normalizeKernelVersion(version)
-      isKernelInstalled.value = Boolean(cleaned)
       if (cleaned) {
-        status.value.version = cleaned
+        // 已安装版本（内核未运行也有值），不要写进 `version`——那是运行态字段
+        status.value.installed_version = cleaned
       }
+      await refreshInstallation()
       return isKernelInstalled.value
     } catch (error) {
       lastError.value =
         error instanceof Error ? error.message : i18n.global.t('home.kernelInstallCheckFailed')
+      await refreshInstallation()
       return false
     }
   }
 
-  const hasVersionInfo = () => Boolean(status.value.version)
-  const getVersionString = () => normalizeKernelVersion(status.value.version || '')
+  /**
+   * 内核安装态（文件层）。优先取状态接口轮询回来的值，其次取主动探测结果。
+   *
+   * 两者都还没有时返回 `null`（**未知**）——不能默认成 `missing`，
+   * 否则探测还没回来就会先闪一句「未检测到内核」。
+   */
+  const installState = computed<KernelInstallState | null>(
+    () => status.value.install_state || installation.value?.state || null,
+  )
+
+  /** 已安装版本号（内核未运行也有值）；拿不到时退回运行中内核的版本 */
+  const installedVersion = computed(
+    () =>
+      status.value.installed_version || installation.value?.version || status.value.version || '',
+  )
+
+  /** 是否知道内核版本（用于界面区分「已安装」与「未安装」） */
+  const hasVersionInfo = () => Boolean(installedVersion.value)
+  const getVersionString = () => normalizeKernelVersion(installedVersion.value)
 
   const fetchLatestKernelVersion = async () => {
     try {
@@ -303,8 +380,9 @@ export const useKernelStore = defineStore('kernel', () => {
 
   const hasKernelUpdate = computed(() => {
     if (!latestAvailableVersion.value) return false
-    if (!status.value.version) return true
-    return compareVersion(latestAvailableVersion.value, status.value.version) > 0
+    const current = installedVersion.value
+    if (!current) return true
+    return compareVersion(latestAvailableVersion.value, current) > 0
   })
 
   const isRunning = computed(() => status.value.process_running)
@@ -357,6 +435,9 @@ export const useKernelStore = defineStore('kernel', () => {
     isLoading,
     lastError,
     isKernelInstalled,
+    installation,
+    installState,
+    installedVersion,
     isRunning,
     isReady,
     startupDiagnosisSummary,
@@ -374,6 +455,7 @@ export const useKernelStore = defineStore('kernel', () => {
     applyProxySettings,
     toggleIpVersion,
     checkKernelInstallation,
+    refreshInstallation,
     hasVersionInfo,
     getVersionString,
     fetchLatestKernelVersion,

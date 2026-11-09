@@ -59,26 +59,8 @@
       </div>
     </section>
 
-    <!-- 启动诊断告警 -->
-    <n-alert
-      v-if="kernelStore.startupDiagnosis"
-      type="error"
-      class="diagnosis-alert"
-      :title="kernelStore.startupDiagnosis.message"
-    >
-      <div class="diagnosis-body">
-        <div class="diagnosis-meta">
-          <n-tag size="small" type="error">{{ kernelStore.startupDiagnosis.stage }}</n-tag>
-          <n-tag size="small">{{ kernelStore.startupDiagnosis.kind }}</n-tag>
-        </div>
-        <div class="diagnosis-detail">{{ kernelStore.startupDiagnosis.detail }}</div>
-        <ul v-if="kernelStore.startupDiagnosis.suggested_actions?.length" class="diagnosis-actions">
-          <li v-for="action in kernelStore.startupDiagnosis.suggested_actions" :key="action">
-            {{ action }}
-          </li>
-        </ul>
-      </div>
-    </n-alert>
+    <!-- 启动诊断告警（与设置页共用同一组件，避免两处各写一遍归因） -->
+    <KernelDiagnosisCard />
 
     <!-- 控制台：一键测速 / 系统代理 / TUN / 节点模式 -->
     <div class="control-grid">
@@ -220,6 +202,7 @@ import { useProxyStore } from '@/stores/kernel/ProxyStore'
 import { sudoService } from '@/services/sudo-service'
 import { systemService } from '@/services/system-service'
 import PortSettingsDialog from '@/components/common/PortSettingsDialog.vue'
+import KernelDiagnosisCard from '@/components/kernel/KernelDiagnosisCard.vue'
 import TrafficChart from '@/components/layout/TrafficChart.vue'
 import SectionCard from '@/components/common/SectionCard.vue'
 import { useKernelStatus } from '@/composables/useKernelStatus'

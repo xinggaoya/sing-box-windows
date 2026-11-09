@@ -672,6 +672,73 @@ export default {
       versionConfirmContent:
         '本应用基于 sing-box 1.14+ 的 gRPC API 开发，自行下载切换旧版内核可能出现兼容性问题（如无法连接内核、功能异常等）。仍要下载 v{version} 吗？',
       versionConfirmAction: '仍要下载',
+      installState: {
+        running: '内核运行中',
+        installedNotRunning: '内核已安装，当前未运行',
+        missing: '未检测到内核',
+        missingHint: '请先下载或手动导入内核，再启动代理。',
+        fileLost: '内核文件缺失（可能被杀毒软件隔离）',
+        fileLostHint:
+          '内核文件曾经存在、现在找不到了，最常见的原因是杀毒软件把它隔离了。请把本应用的目录加入安全软件白名单，然后重新下载内核。',
+        unreadable: '内核文件存在但无法执行',
+        unreadableHint:
+          '内核文件已就位，但读不出版本号。可能是安全软件拦截了执行，或文件已损坏，请重新下载内核。',
+      },
+      diagnosis: {
+        technicalDetail: '技术细节',
+        config_invalid: {
+          title: '配置文件有误，内核无法启动',
+          hint: '当前生效的 sing-box 配置未通过内核校验。可在「订阅」页刷新订阅重新生成配置，或在维护页检查配置文件后重试。',
+        },
+        config_missing: {
+          title: '找不到配置文件',
+          hint: '当前生效的配置文件不存在。请在「订阅」页重新选择或下载一份配置。',
+        },
+        binary_missing: {
+          title: '内核文件缺失',
+          hint: '找不到 sing-box 可执行文件，可能是杀毒软件把它隔离了，或安装目录被清理。请把本应用目录加入安全软件白名单后重新下载内核。',
+        },
+        permission_denied: {
+          title: '权限不足，内核无法启动',
+          hint: '内核没有权限创建 TUN 设备或修改路由表。请以管理员身份重启应用。',
+        },
+        sudo_required: {
+          title: '需要系统密码',
+          hint: '该操作需要系统权限，请输入系统密码后重试。',
+        },
+        sudo_invalid: {
+          title: '系统密码不正确',
+          hint: '请重新输入正确的系统密码后重试。',
+        },
+        port_conflict: {
+          title: '端口被占用',
+          hint: '代理端口或 API 端口已被其他进程占用。请修改端口，或结束占用端口的进程后重试。',
+        },
+        process_exited_early: {
+          title: '内核启动后立即退出',
+          hint: '内核进程刚启动就退出了。若是被安全软件拦截，请把内核文件加入白名单后重试。',
+        },
+        api_http_error: {
+          title: '内核 API 返回错误',
+          hint: '内核已启动但 API 调用失败。请展开技术细节查看状态码。',
+        },
+        api_timeout: {
+          title: '内核 API 无响应',
+          hint: '内核进程在运行但 API 没有响应。请尝试重启内核。',
+        },
+        conflict_cleanup_failed: {
+          title: '无法结束占用端口的进程',
+          hint: '占用端口的进程无法结束（可能需要管理员权限）。请以管理员身份重启应用后重试。',
+        },
+        guard_restart_failed: {
+          title: '内核守护重启失败',
+          hint: '内核异常退出后自动重启失败。请展开技术细节查看原因，或手动重启内核。',
+        },
+        unknown: {
+          title: '内核启动失败',
+          hint: '请展开技术细节定位具体原因。',
+        },
+      },
     },
     proxyAdvanced: {
       title: '代理高级设置',

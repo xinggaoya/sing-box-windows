@@ -22,12 +22,33 @@ export interface KernelStatus {
   readiness?: KernelReadinessSnapshot
   startup_diagnosis?: StartupDiagnosis | null
   uptime_ms?: number
-  version?: string
+  /**
+   * **运行中**内核的版本号，取自 gRPC GetVersion。
+   * 内核未运行时为 null —— 它不代表「内核没装」。
+   */
+  version?: string | null
+  /** 内核文件是否存在（文件层事实，与运行态无关） */
+  installed?: boolean
+  /** 已安装版本号（内核未运行也有值） */
+  installed_version?: string | null
+  /** 内核安装态（文件层）：从未安装 / 文件丢失（疑似被隔离）/ 已安装 / 文件存在但不可读 */
+  install_state?: KernelInstallState
   error?: string
   kernel_state?: 'stopped' | 'starting' | 'running' | 'stopping' | 'failed' | 'crashed'
   state_version?: number
   op_id?: string
   operation?: string
+}
+
+/** 内核安装态（文件层） */
+export type KernelInstallState = 'missing' | 'file_lost' | 'installed' | 'unreadable'
+
+/** 内核安装态探测结果 */
+export interface KernelInstallation {
+  state: KernelInstallState
+  version: string | null
+  detail: string | null
+  kernel_path: string
 }
 
 export interface KernelCommandResult {
@@ -223,6 +244,23 @@ class KernelService {
     } catch (error) {
       console.error('获取内核版本失败:', error)
       return ''
+    }
+  }
+
+  /**
+   * 查询内核安装态（文件层事实）。
+   *
+   * 与 `getKernelVersion()` 的区别：后者读的是**运行中**内核的版本（内核没跑就拿不到），
+   * 这里回答的是「内核装没装、文件还在不在、曾经装过现在是不是被隔离了」。
+   */
+  async getKernelInstallation(): Promise<KernelInstallation | null> {
+    try {
+      return await invokeWithAppContext<KernelInstallation>('get_kernel_installation', undefined, {
+        skipDataRestore: true,
+      })
+    } catch (error) {
+      console.error('查询内核安装态失败:', error)
+      return null
     }
   }
 
