@@ -75,6 +75,7 @@ import {
   SettingsOutline,
   FolderOutline,
   LayersOutline,
+  AnalyticsOutline,
 } from '@vicons/ionicons5'
 import { useMessage } from 'naive-ui'
 import UpdateModal from '@/components/UpdateModal.vue'
@@ -162,8 +163,11 @@ const menuItems = computed<NavItem[]>(() => [
   { label: t('nav.outbounds'), key: 'outbounds', icon: LayersOutline },
   { label: t('nav.connections'), key: 'connections', icon: LinkOutline },
   { label: t('nav.logs'), key: 'logs', icon: DocumentTextOutline },
-  // 规则页隐藏：sing-box 官方 gRPC API 未暴露规则管理接口（see docs/sing-box-api-migration.md）
-  // 等待上游 API 扩展或自建后端命令后恢复：{ label: t('nav.rules'), key: 'rules', icon: AnalyticsOutline },
+  // 规则页：sing-box 1.14 官方 gRPC 已提供 GetRules，运行时规则表可只读展示；
+  // 自定义规则走「写配置文件 + 重启内核」路径（issue #62），不依赖 API。
+  // 曾因「官方 API 未暴露规则管理接口」被注释掉，实际同一次迁移就已接好 get_rules，
+  // 入口一直没恢复（issue #69）—— 现恢复，并由 vitest 守护入口不得再消失。
+  { label: t('nav.rules'), key: 'rules', icon: AnalyticsOutline },
   { label: t('nav.settings'), key: 'settings', icon: SettingsOutline },
 ])
 

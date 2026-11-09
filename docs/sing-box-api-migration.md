@@ -66,8 +66,21 @@
 
 - 关闭 `experimental.clash_api`，所有依赖该接口的 Rust 命令、Tauri command、Vue 组件同步移除。
 - 移除 metacubexd 预下载与"打开内置 web dashboard"入口（metacubexd 是 Clash 客户端，依赖 Clash API）。
-- 规则页与代理提供者页在官方 API 未暴露对应接口前隐藏（占位 UI），路由保留 meta 但 disabled。
+- 规则页在官方 API 暴露 `GetRules` 后**已恢复**（见下方「规则页恢复」）；代理提供者页至今未恢复（官方 API 仍未暴露对应接口）。
 - 自定义规则 CRUD（issue #62）走"写文件 + 重启内核"路径，不依赖 API，与现状一致。
+
+## 规则页恢复（2026-11-09）
+
+迁移阶段曾以「官方 API 未暴露规则管理接口」为由隐藏规则页入口，但**同一次迁移就已经接好了
+`GetRules`**（`proxy_service/grpc_bridge.rs::get_rules`），v2.4.0 又补上了规则页的
+「自定义规则」面板——功能、路由、页面全部齐备，唯独侧边栏入口没跟着恢复，
+用户反馈「2.4.0 主界面看不到规则页」（issue #69）。
+
+现恢复侧边栏「规则」入口，并新增 `src/components/layout/nav-entries.test.ts` 守护：
+该测试**只认去掉注释后以 `{ label:` 开头的菜单项行**，因此入口再次被注释掉时会立刻变红
+（早期用 `toContain("t('nav.rules')")` 的写法会被注释里的同名字符串骗过，守护形同虚设）。
+
+代理提供者页（`ProxyProvidersView`）仍未恢复——官方 API 至今没有对应接口。
 
 ## 接口映射（Clash API → gRPC API）
 
@@ -140,7 +153,7 @@
 
 - 更新 `AGENTS.md`（根 + `src-tauri/AGENTS.md` + `src-tauri/src/app/AGENTS.md` + `src/AGENTS.md`）：
   - "WHERE TO LOOK" 表更新：`core/proxy_service/` 改用 gRPC；`core/event_relay.rs` 改流式订阅；删除 `core/kernel_service/embedded.rs::ensure_external_ui` 描述；前端 `services/proxy-service.ts` 改 gRPC 调用。
-  - "NOTES" 注明：协议从 Clash API 迁移到官方 gRPC API；metacubexd 不再使用；规则与代理提供者 UI 待官方 API 暴露后启用。
+  - "NOTES" 注明：协议从 Clash API 迁移到官方 gRPC API；metacubexd 不再使用；规则 UI 已随 `GetRules` 恢复，代理提供者 UI 待官方 API 暴露后启用。
 - 更新 `docs/CHANGELOG.md`：加 `Unreleased` 条目记录本迁移。
 - 全门禁：`cargo clippy` + `cargo test` + `pnpm lint` + `pnpm type-check`。
 

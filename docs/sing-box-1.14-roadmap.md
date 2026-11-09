@@ -314,8 +314,8 @@ v1.14 desktop 客户端核心新增 Tailscale 模式。本项目作为 Tauri 客
 
 `docs/sing-box-api-migration.md` 记录规则/代理提供者 UI 在迁移阶段被隐藏。1.14 gRPC 支持 `GetRules` / `GetOutbounds` 后可逐步恢复：
 
-- [ ] `RulesView.vue` 恢复：调 `GetRules` 展示路由规则表，支持禁用/启用
-- [ ] `ProxyProvidersView` 恢复：调 `GetOutbounds` 展示所有 outbounds
+- [x] `RulesView.vue` 恢复：调 `GetRules` 展示路由规则表（**2026-11-09 已恢复**，含侧边栏入口与守护测试，见 issue #69）
+- [ ] `ProxyProvidersView` 恢复：调 `GetOutbounds` 展示所有 outbounds（官方 API 仍未暴露对应接口；出站总览已另做独立页 `/outbounds`）
 
 ---
 
