@@ -4,6 +4,13 @@
 
 ### 🐛 问题修复
 
+- **修复订阅节点识别不完整（`hysteria` v1 与 `anytls` 丢失）**：解析器的协议白名单
+  与 Clash 转换缺少 hysteria v1；同时订阅默认以 sing-box UA 请求，而机场面板的
+  sing-box 目标会直接丢弃 only-Clash 协议（本订阅的 6 个 anytls 节点完全没有下发）。
+  - 解析器新增 hysteria v1：sing-box JSON 白名单、Clash YAML 转换（`auth_str` /
+    `up` / `down` / `obfs` / `ports`）、`hysteria://` URI 解析
+  - 生成自有配置时改用 Clash/Mihomo 兼容 UA 拉取订阅（节点集合最完整），解析不到
+    节点时自动回退默认 UA；「使用原始配置」模式仍保持 sing-box UA 以拿到原始 JSON
 - **修复「内核一直提示未安装」（issue #70）**：设置页此前用**运行中**内核的版本号（gRPC `GetVersion`）判断「内核是否已安装」——内核一停这个值就是空，界面随即从「已安装 v1.14.4」跳回「未安装」，哪怕内核文件好好地躺在磁盘上；用户「更新内核成功了也还是未安装」正是这个原因（状态轮询每 3 秒把版本号抹掉一次）。
   - **「已安装」与「运行中」彻底分层**：新增文件层事实 `installed` / `installed_version` / `install_state`（后端 `kernel_service/installation.rs`），运行态 `version` 不再兼任「是否已安装」的判据
   - **版本号不再被 `null` 覆盖**：状态合并此前是整体展开（`{...status, ...next}`），后端回传的 `version: null` 会把**已经知道**的版本号一起抹掉；版本类字段改为单独赋值
