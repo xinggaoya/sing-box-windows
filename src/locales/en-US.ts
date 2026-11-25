@@ -432,13 +432,13 @@ export default {
     uriList: 'Node Links / YAML',
     uriContent: 'Node Content',
     uriContentPlaceholder:
-      'Supports vmess://, vless://, trojan://, ss://, hysteria2://, tuic://, anytls:// (one per line) or Clash/Mihomo YAML',
+      'Supports vmess://, vless://, trojan://, ss://, hysteria://, hysteria2://, tuic://, anytls:// (one per line) or Clash/Mihomo YAML',
     uriContentRequired: 'Please enter node links or Clash YAML',
     manualContent: 'Manual Configuration Content',
     urlHint: 'Supports sing-box JSON, Clash(Mihomo) YAML, and URI lists (Base64 supported)',
     manualHint: 'sing-box JSON only. Defaults to original config and only replaces ports',
     uriHint:
-      'Supports vmess/vless/trojan/ss/hysteria2/tuic/anytls (one per line) or Clash/Mihomo YAML',
+      'Supports vmess/vless/trojan/ss/hysteria/hysteria2/tuic/anytls (one per line) or Clash/Mihomo YAML',
     autoUpdate: 'Auto Update',
     autoUpdateManualHint: 'Manual content does not support auto update',
     autoUpdateOff: 'Disable auto update',

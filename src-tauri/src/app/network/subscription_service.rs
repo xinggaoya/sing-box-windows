@@ -49,6 +49,47 @@ fn try_decode_base64_to_text(raw: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
+/// 依次尝试：直接解析 → Base64 解码 → 去掉 URI 前缀后再 Base64 解码。
+///
+/// 抽成独立函数是为了在“兼容 UA 抓到的内容解析不到节点”时，
+/// 用默认 UA 重试时复用同一套解析降级逻辑。
+fn extract_nodes_with_fallbacks(content: &str) -> Result<Vec<Value>, Box<dyn Error>> {
+    let mut nodes = extract_nodes_from_subscription(content)?;
+    info!("从原始内容提取到 {} 个节点", nodes.len());
+
+    if nodes.is_empty() {
+        info!("未从原始内容提取到节点，尝试base64解码...");
+
+        if let Some(decoded_text) = try_decode_base64_to_text(content) {
+            info!("base64 解码成功，重新从解码内容提取节点...");
+            nodes = extract_nodes_from_subscription(&decoded_text)?;
+            info!("从 base64 解码内容提取到 {} 个节点", nodes.len());
+        }
+    }
+
+    if nodes.is_empty() {
+        info!("标准解码方法均未提取到节点，尝试移除前缀后再解码...");
+
+        let stripped_text = content
+            .trim()
+            .replace("vmess://", "")
+            .replace("ss://", "")
+            .replace("trojan://", "")
+            .replace("vless://", "")
+            .replace("hysteria2://", "")
+            .replace("hysteria://", "");
+
+        if let Ok(decoded) = general_purpose::STANDARD.decode(&stripped_text) {
+            if let Ok(decoded_text) = String::from_utf8(decoded) {
+                nodes = extract_nodes_from_subscription(&decoded_text)?;
+                info!("从移除前缀后解码内容提取到 {} 个节点", nodes.len());
+            }
+        }
+    }
+
+    Ok(nodes)
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct SubscriptionPersistResult {
     pub config_path: String,
@@ -98,6 +139,16 @@ struct SubscriptionFetchResult {
 }
 
 const SUBSCRIPTION_USERINFO_COMPAT_UAS: [&str; 2] = ["clash.meta", "clash-verge/1.7.7"];
+
+/// 节点导入优先使用的 Clash(Mihomo) 兼容 UA。
+///
+/// 很多机场面板的 sing-box 目标会丢弃 Clash-only 协议（典型如 anytls），
+/// 返回的 sing-box JSON 看起来正常、但节点集合并不完整；同一订阅用
+/// Clash UA 请求则能拿到全部节点（本项目的 Clash YAML 转换已支持
+/// vmess/vless/trojan/ss/tuic/hysteria/hysteria2/anytls）。
+/// 仅用于“生成我们自己的配置”模式；`use_original_config` 必须保持
+/// 默认 UA，因为该模式直接消费服务端下发的 sing-box JSON。
+const NODE_IMPORT_COMPAT_USER_AGENT: &str = "clash-verge/1.7.7";
 
 fn normalized_active_config_path(path: &Option<String>) -> Option<&str> {
     path.as_deref()
@@ -198,8 +249,9 @@ async fn fetch_subscription_content_with_user_agent(
 
 async fn fetch_subscription_content(
     url: &str,
+    preferred_user_agent: Option<&str>,
 ) -> Result<(String, Option<SubscriptionUserInfo>), Box<dyn Error>> {
-    let primary = fetch_subscription_content_with_user_agent(url, None).await?;
+    let primary = fetch_subscription_content_with_user_agent(url, preferred_user_agent).await?;
 
     if !should_retry_subscription_userinfo(&primary) {
         return Ok((primary.body, primary.userinfo));
@@ -212,6 +264,11 @@ async fn fetch_subscription_content(
 
     let mut fallback_userinfo = None;
     for compat_user_agent in SUBSCRIPTION_USERINFO_COMPAT_UAS {
+        // 首选 UA 本身就是兼容 UA 时不必再重复请求一次
+        if Some(compat_user_agent) == preferred_user_agent {
+            continue;
+        }
+
         match fetch_subscription_content_with_user_agent(url, Some(compat_user_agent)).await {
             Ok(result) => {
                 if let Some(userinfo) = result.userinfo {
@@ -552,9 +609,33 @@ async fn download_and_process_subscription(
 
     info!("开始下载订阅: {}", url);
 
-    let (response_text, userinfo) = fetch_subscription_content(url)
+    // 生成自有配置时优先请求 Clash 格式（节点集合最完整，含 anytls 等
+    // sing-box 目标不支持的协议）；“原始配置”模式保持默认 UA 以拿到 sing-box JSON。
+    let preferred_user_agent = if use_original_config {
+        None
+    } else {
+        Some(NODE_IMPORT_COMPAT_USER_AGENT)
+    };
+
+    let fetched = fetch_subscription_content(url, preferred_user_agent)
         .await
-        .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?;
+        .map_err(|error| error.to_string());
+    let (response_text, userinfo) = match fetched {
+        Ok(result) => result,
+        Err(error_message) => {
+            if preferred_user_agent.is_some() {
+                // 少数机场对不认识的 UA 直接返回 4xx；回退默认 UA，避免换 UA 引入新故障。
+                info!("兼容 UA 下载失败，回退到默认 UA 重试: {}", error_message);
+                fetch_subscription_content(url, None)
+                    .await
+                    .map_err(|e| format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, e))?
+            } else {
+                return Err(
+                    format!("{}: {}", messages::ERR_SUBSCRIPTION_FAILED, error_message).into(),
+                );
+            }
+        }
+    };
 
     info!("订阅下载成功，内容长度: {} 字节", response_text.len());
 
@@ -564,38 +645,22 @@ async fn download_and_process_subscription(
         return Ok((userinfo, outcome));
     }
 
-    let mut extracted_nodes = extract_nodes_from_subscription(&response_text)?;
-    info!("从原始内容提取到 {} 个节点", extracted_nodes.len());
+    let mut extracted_nodes = extract_nodes_with_fallbacks(&response_text)?;
 
-    if extracted_nodes.is_empty() {
-        info!("未从原始内容提取到节点，尝试base64解码...");
-
-        if let Some(decoded_text) = try_decode_base64_to_text(&response_text) {
-            info!("base64 解码成功，重新从解码内容提取节点...");
-            extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
-            info!("从 base64 解码内容提取到 {} 个节点", extracted_nodes.len());
-        }
-    }
-
-    if extracted_nodes.is_empty() {
-        info!("标准解码方法均未提取到节点，尝试移除前缀后再解码...");
-
-        let stripped_text = response_text
-            .trim()
-            .replace("vmess://", "")
-            .replace("ss://", "")
-            .replace("trojan://", "")
-            .replace("vless://", "")
-            .replace("hysteria2://", "");
-
-        if let Ok(decoded) = general_purpose::STANDARD.decode(&stripped_text) {
-            if let Ok(decoded_text) = String::from_utf8(decoded) {
-                extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
-                info!(
-                    "从移除前缀后解码内容提取到 {} 个节点",
-                    extracted_nodes.len()
-                );
+    // 兼容 UA 可能让部分只认 sing-box 的机场返回错误页/空内容；
+    // 此时回退到默认 UA 再试一次，避免“换个 UA 把原本能用的订阅弄挂”。
+    let mut userinfo = userinfo;
+    if extracted_nodes.is_empty() && preferred_user_agent.is_some() {
+        info!("兼容 UA 未提取到节点，回退到默认 UA 重试...");
+        match fetch_subscription_content(url, None).await {
+            Ok((fallback_text, fallback_userinfo)) => {
+                let fallback_nodes = extract_nodes_with_fallbacks(&fallback_text)?;
+                if !fallback_nodes.is_empty() {
+                    extracted_nodes = fallback_nodes;
+                    userinfo = userinfo.or(fallback_userinfo);
+                }
             }
+            Err(e) => info!("默认 UA 重试失败: {}", e),
         }
     }
 
@@ -665,16 +730,8 @@ async fn process_subscription_content(
         return process_original_config(&content, app_config, target_path);
     }
 
-    let mut extracted_nodes = extract_nodes_from_subscription(&content)?;
+    let extracted_nodes = extract_nodes_with_fallbacks(&content)?;
     info!("从手动内容提取到 {} 个节点", extracted_nodes.len());
-
-    if extracted_nodes.is_empty() {
-        if let Some(decoded_text) = try_decode_base64_to_text(&content) {
-            info!("手动内容 base64 解码成功，重新提取节点");
-            extracted_nodes = extract_nodes_from_subscription(&decoded_text)?;
-            info!("从解码内容提取到 {} 个节点", extracted_nodes.len());
-        }
-    }
 
     if extracted_nodes.is_empty() {
         return Err("无法从配置内容提取节点，请检查格式".into());

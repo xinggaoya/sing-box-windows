@@ -468,13 +468,13 @@ export default {
     uriList: 'ノードリンク / YAML',
     uriContent: 'ノード内容',
     uriContentPlaceholder:
-      'vmess://、vless://、trojan://、ss://、hysteria2://、tuic://、anytls://（1 行 1 件）または Clash/Mihomo YAML に対応',
+      'vmess://、vless://、trojan://、ss://、hysteria://、hysteria2://、tuic://、anytls://（1 行 1 件）または Clash/Mihomo YAML に対応',
     uriContentRequired: 'ノードリンクまたは Clash YAML を入力してください',
     manualContent: '手動設定コンテンツ',
     urlHint: 'sing-box JSON / Clash(Mihomo) YAML / URI リストに対応（Base64 可能）',
     manualHint: 'sing-box JSON のみ対応。デフォルトは元の設定で実行（ポートのみ置換）',
     uriHint:
-      'vmess/vless/trojan/ss/hysteria2/tuic/anytls（1 行 1 件）または Clash/Mihomo YAML に対応',
+      'vmess/vless/trojan/ss/hysteria/hysteria2/tuic/anytls（1 行 1 件）または Clash/Mihomo YAML に対応',
     autoUpdate: '自動更新',
     autoUpdateManualHint: '手動入力の内容は自動更新に対応していません',
     autoUpdateOff: '自動更新を無効化',

@@ -471,14 +471,14 @@ export default {
     uriList: 'Ссылки / YAML',
     uriContent: 'Содержимое узлов',
     uriContentPlaceholder:
-      'Поддерживаются vmess://, vless://, trojan://, ss://, hysteria2://, tuic://, anytls:// (по одному в строке) или Clash/Mihomo YAML',
+      'Поддерживаются vmess://, vless://, trojan://, ss://, hysteria://, hysteria2://, tuic://, anytls:// (по одному в строке) или Clash/Mihomo YAML',
     uriContentRequired: 'Введите ссылки узлов или Clash YAML',
     manualContent: 'Содержимое ручной конфигурации',
     urlHint: 'Поддерживаются sing-box JSON, Clash(Mihomo) YAML и списки URI (Base64 возможно)',
     manualHint:
       'Только sing-box JSON. По умолчанию используется исходная конфигурация с заменой портов',
     uriHint:
-      'Поддерживаются vmess/vless/trojan/ss/hysteria2/tuic/anytls (по одному в строке) или Clash/Mihomo YAML',
+      'Поддерживаются vmess/vless/trojan/ss/hysteria/hysteria2/tuic/anytls (по одному в строке) или Clash/Mihomo YAML',
     autoUpdate: 'Автообновление',
     autoUpdateManualHint: 'Для ручного ввода автообновление не поддерживается',
     autoUpdateOff: 'Отключить автообновление',
