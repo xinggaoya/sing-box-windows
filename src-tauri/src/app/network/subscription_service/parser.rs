@@ -160,6 +160,8 @@ pub fn extract_nodes_from_subscription(
                     || normalized_text.contains("ss://")
                     || normalized_text.contains("trojan://")
                     || normalized_text.contains("vless://")
+                    // hysteria v1 与 hysteria2 是两个不同的 URI 前缀，需分别判断
+                    || normalized_text.contains("hysteria://")
                     || normalized_text.contains("hysteria2://")
                     || normalized_text.contains("tuic://")
                     || normalized_text.contains("anytls://"))
@@ -315,6 +317,7 @@ fn is_supported_outbound_type(node_type: &str) -> bool {
             | "shadowsocksr"
             | "socks"
             | "http"
+            | "hysteria" // hysteria v1（面板的 sing-box 目标仍会下发）
             | "hysteria2"
             | "tuic"
             | "anytls"
@@ -539,6 +542,68 @@ fn convert_clash_node_to_singbox(clash_node: &Value) -> Option<Value> {
                 "password": password
             }))
         }
+        "hysteria" => {
+            // Clash(Mihomo) hysteria v1：认证串在不同实现中写作 auth_str / auth-str / auth。
+            let auth = clash_node
+                .get("auth_str")
+                .or_else(|| clash_node.get("auth-str"))
+                .or_else(|| clash_node.get("auth"))
+                .or_else(|| clash_node.get("password"))
+                .and_then(|p| p.as_str())?;
+
+            let mut node = json!({
+                "tag": name,
+                "type": "hysteria",
+                "server": server,
+                "server_port": port,
+                "auth_str": auth,
+                "tls": build_tls_from_clash(clash_node, server)
+            });
+
+            // Clash 的 up/down 单位是 Mbps，与 sing-box 的 up_mbps/down_mbps 一致。
+            // 注意：Clash 的 protocol 是 hysteria 的传输模式（udp/wechat-video/faketcp），
+            // 不是 sing-box 的 network，不能直接映射，否则会让出站只支持 UDP。
+            for (clash_key, field) in [("up", "up_mbps"), ("down", "down_mbps")] {
+                if let Some(value) = clash_node.get(clash_key).and_then(|v| {
+                    v.as_u64()
+                        .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+                }) {
+                    node[field] = json!(value);
+                }
+            }
+
+            // sing-box 的 hysteria.obfs 是 XPlus 密码（不是类型名）。
+            if let Some(obfs_password) = clash_node
+                .get("obfs-password")
+                .or_else(|| clash_node.get("obfs_param"))
+                .and_then(|p| p.as_str())
+                .filter(|s| !s.is_empty())
+            {
+                node["obfs"] = json!(obfs_password);
+            } else if let Some(obfs) = clash_node
+                .get("obfs")
+                .and_then(|p| p.as_str())
+                .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("xplus"))
+            {
+                node["obfs"] = json!(obfs);
+            }
+
+            // Clash 的 ports 是端口跳跃列表（"443,8443" / "1000-2000"），
+            // sing-box 需要 ":" 区间写法。
+            if let Some(ports) = clash_node.get("ports").and_then(|v| v.as_str()) {
+                let server_ports: Vec<Value> = ports
+                    .split(',')
+                    .map(|p| p.trim())
+                    .filter(|p| !p.is_empty())
+                    .map(|p| Value::String(p.replace('-', ":")))
+                    .collect();
+                if !server_ports.is_empty() {
+                    node["server_ports"] = json!(server_ports);
+                }
+            }
+
+            Some(node)
+        }
         "hysteria2" => {
             // sing-box hysteria2 用 password 字段；up/down 在 Clash 是 up/down（MBps），sing-box 用 up_mbps/down_mbps。
             let password = clash_node.get("password").and_then(|p| p.as_str())?;
@@ -724,6 +789,10 @@ fn convert_uri_node_to_singbox(uri: &str) -> Option<Value> {
     }
     if uri.starts_with("ss://") {
         return parse_ss_uri(uri);
+    }
+    if uri.starts_with("hysteria://") {
+        // hysteria v1（注意：hysteria2:// 不匹配该前缀）
+        return parse_hysteria_uri(uri);
     }
     if uri.starts_with("hysteria2://") {
         return parse_hysteria2_uri(uri);
@@ -1016,6 +1085,111 @@ fn parse_trojan_uri(uri: &str) -> Option<Value> {
             transport["headers"] = json!({ "Host": host });
         }
         node["transport"] = transport;
+    }
+
+    Some(node)
+}
+
+/// 解析 hysteria v1 URI：
+///   hysteria://host:port?auth=xxx&peer=sni&insecure=1&upmbps=100&downmbps=100&alpn=h3#tag
+/// 也兼容把认证串放在 userinfo 的写法：hysteria://auth@host:port?...
+fn parse_hysteria_uri(uri: &str) -> Option<Value> {
+    let url = Url::parse(uri).ok()?;
+    let query = parse_query_map(&url);
+
+    // query_pairs() 返回的已经是 percent-decode 后的值，不能再解码一次
+    // （否则密码里字面的 `%40` 会被误当作编码）；userinfo 才是原始编码值。
+    let auth = query
+        .get("auth")
+        .or_else(|| query.get("auth_str"))
+        .or_else(|| query.get("auth-str"))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            let password = decode_userinfo(url.username().trim());
+            (!password.is_empty()).then_some(password)
+        })?;
+
+    let server = url.host_str()?.to_string();
+    let server_port = url.port().unwrap_or(443) as u64;
+    let tag = {
+        let decoded = decode_tag(url.fragment());
+        if decoded.is_empty() {
+            default_tag_for_url(&url)
+        } else {
+            decoded
+        }
+    };
+
+    let sni = query
+        .get("peer")
+        .or_else(|| query.get("sni"))
+        .or_else(|| query.get("servername"))
+        .map(|s| s.trim())
+        .unwrap_or("");
+    let insecure = query
+        .get("insecure")
+        .or_else(|| query.get("allowInsecure"))
+        .and_then(|v| parse_boolish(v))
+        .unwrap_or(false);
+    let alpn = read_alpn_from_query(&query);
+
+    let mut node = json!({
+        "tag": tag,
+        "type": "hysteria",
+        "server": server,
+        "server_port": server_port,
+        "auth_str": auth,
+        "tls": build_basic_tls_config(&server, sni, insecure, alpn.as_deref())
+    });
+
+    for (param, field) in [
+        ("upmbps", "up_mbps"),
+        ("up_mbps", "up_mbps"),
+        ("downmbps", "down_mbps"),
+        ("down_mbps", "down_mbps"),
+    ] {
+        if let Some(value) = query.get(param).and_then(|s| s.trim().parse::<u64>().ok()) {
+            node[field] = json!(value);
+        }
+    }
+
+    // 注：URI 的 protocol=udp/wechat-video/faketcp 是 hysteria 传输模式，
+    // 不是 sing-box 的 network，忽略即可（写错会让出站只支持 UDP）。
+
+    // URI 的 obfs 是类型名（xplus），obfsParam / obfs-password 才是密码；
+    // sing-box 的 obfs 字段需要密码。
+    let obfs_password = query
+        .get("obfsParam")
+        .or_else(|| query.get("obfs_param"))
+        .or_else(|| query.get("obfs-password"))
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            query
+                .get("obfs")
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("xplus"))
+        });
+    if let Some(password) = obfs_password {
+        node["obfs"] = json!(password);
+    }
+
+    // mport 端口跳跃（"20000-30000" / 逗号分隔多段）→ server_ports
+    if let Some(mport) = query
+        .get("mport")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        let ports: Vec<Value> = mport
+            .split(',')
+            .map(|p| p.trim())
+            .filter(|p| !p.is_empty())
+            .map(|p| Value::String(p.replace('-', ":")))
+            .collect();
+        if !ports.is_empty() {
+            node["server_ports"] = json!(ports);
+        }
     }
 
     Some(node)

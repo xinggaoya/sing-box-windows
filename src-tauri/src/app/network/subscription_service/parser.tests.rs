@@ -302,6 +302,104 @@ proxies:
 }
 
 #[test]
+fn parse_clash_yaml_hysteria_v1() {
+    // 面板下发的 Clash YAML 里 hysteria v1 用 auth_str + up/down + protocol。
+    let yaml = r#"
+proxies:
+  - { name: hy1, server: hy1.example.com, port: 8443, udp: true, skip-cert-verify: true, sni: example.com, type: hysteria, auth_str: example-auth, up: 100, down: 100, protocol: udp }
+"#;
+    let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0]["type"].as_str().unwrap(), "hysteria");
+    assert_eq!(nodes[0]["tag"].as_str().unwrap(), "hy1");
+    assert_eq!(nodes[0]["server"].as_str().unwrap(), "hy1.example.com");
+    assert_eq!(nodes[0]["server_port"].as_u64().unwrap(), 8443);
+    assert_eq!(nodes[0]["auth_str"].as_str().unwrap(), "example-auth");
+    assert_eq!(nodes[0]["up_mbps"].as_u64().unwrap(), 100);
+    assert_eq!(nodes[0]["down_mbps"].as_u64().unwrap(), 100);
+    assert_eq!(
+        nodes[0]["tls"]["server_name"].as_str().unwrap(),
+        "example.com"
+    );
+    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    // Clash 的 protocol 是 hysteria 传输模式，不能映射成 sing-box 的 network。
+    assert!(nodes[0].get("network").is_none());
+}
+
+#[test]
+fn parse_clash_yaml_hysteria_v1_auth_dash_and_ports() {
+    let yaml = r#"
+proxies:
+  - name: hy1
+    type: hysteria
+    server: hy1.example.com
+    port: 443
+    auth-str: example-auth
+    obfs: xplus
+    obfs-password: example-obfs
+    ports: "20000-30000,443"
+    sni: example.com
+"#;
+    let nodes = extract_nodes_from_subscription(yaml).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0]["auth_str"].as_str().unwrap(), "example-auth");
+    assert_eq!(nodes[0]["obfs"].as_str().unwrap(), "example-obfs");
+    assert_eq!(nodes[0]["server_ports"][0].as_str().unwrap(), "20000:30000");
+    assert_eq!(nodes[0]["server_ports"][1].as_str().unwrap(), "443");
+}
+
+#[test]
+fn parse_uri_list_hysteria_v1() {
+    let content = "hysteria://example.com:443?auth=example-auth&peer=cdn.example.com&insecure=1&upmbps=100&downmbps=50&alpn=h3&obfsParam=example-obfs#Hy%20Node";
+    let nodes = extract_nodes_from_subscription(content).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0]["type"].as_str().unwrap(), "hysteria");
+    assert_eq!(nodes[0]["tag"].as_str().unwrap(), "Hy Node");
+    assert_eq!(nodes[0]["auth_str"].as_str().unwrap(), "example-auth");
+    assert_eq!(nodes[0]["up_mbps"].as_u64().unwrap(), 100);
+    assert_eq!(nodes[0]["down_mbps"].as_u64().unwrap(), 50);
+    assert_eq!(nodes[0]["obfs"].as_str().unwrap(), "example-obfs");
+    assert_eq!(
+        nodes[0]["tls"]["server_name"].as_str().unwrap(),
+        "cdn.example.com"
+    );
+    assert!(nodes[0]["tls"]["insecure"].as_bool().unwrap());
+    assert_eq!(nodes[0]["tls"]["alpn"][0].as_str().unwrap(), "h3");
+}
+
+#[test]
+fn parse_uri_list_hysteria_v1_auth_is_decoded_once() {
+    // query 参数由 url crate 解码一次；解析器不能再解一次，
+    // 否则 `%2540`（字面 `%40`）会被多解一层。
+    let content = "hysteria://example.com:443?auth=pa%2540ss#Hy";
+    let nodes = extract_nodes_from_subscription(content).expect("should parse");
+    assert_eq!(nodes[0]["auth_str"].as_str().unwrap(), "pa%40ss");
+}
+
+#[test]
+fn extract_json_outbounds_should_include_hysteria_v1() {
+    // 面板的 sing-box 目标仍会下发 hysteria(v1)，不能因为白名单缺失而静默丢弃。
+    let content = r#"{
+  "outbounds": [
+    {
+      "type": "hysteria",
+      "tag": "hy1-node",
+      "server": "hy1.example.com",
+      "server_port": 8443,
+      "auth_str": "example-auth",
+      "up_mbps": 100,
+      "down_mbps": 100,
+      "tls": { "enabled": true, "insecure": true, "server_name": "example.com" }
+    }
+  ]
+}"#;
+    let nodes = extract_nodes_from_subscription(content).expect("should parse");
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0]["type"].as_str().unwrap(), "hysteria");
+    assert_eq!(nodes[0]["tag"].as_str().unwrap(), "hy1-node");
+}
+
+#[test]
 fn parse_clash_yaml_tuic() {
     let yaml = r#"
 proxies:

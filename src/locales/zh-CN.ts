@@ -427,12 +427,13 @@ export default {
     uriList: '节点链接 / YAML',
     uriContent: '节点内容',
     uriContentPlaceholder:
-      '支持 vmess://、vless://、trojan://、ss://、hysteria2://、tuic://、anytls://（一行一个）或 Clash/Mihomo YAML',
+      '支持 vmess://、vless://、trojan://、ss://、hysteria://、hysteria2://、tuic://、anytls://（一行一个）或 Clash/Mihomo YAML',
     uriContentRequired: '请输入节点链接或 Clash YAML',
     manualContent: '手动配置内容',
     urlHint: '支持 sing-box JSON / Clash(Mihomo) YAML / URI 列表，可 Base64 封装',
     manualHint: '仅支持 sing-box JSON。默认按原始配置运行，仅替换端口',
-    uriHint: '支持 vmess/vless/trojan/ss/hysteria2/tuic/anytls，一行一个；也支持 Clash/Mihomo YAML',
+    uriHint:
+      '支持 vmess/vless/trojan/ss/hysteria/hysteria2/tuic/anytls，一行一个；也支持 Clash/Mihomo YAML',
     autoUpdate: '自动更新',
     autoUpdateManualHint: '手动输入内容不支持自动更新',
     autoUpdateOff: '关闭自动更新',
